@@ -10,6 +10,13 @@
 
   "reserve_capacity": null,
 
+  "indulgence": {
+    "soak_phase_cost": 2,
+    "soak_cards_cleared": 1,
+    "forced_light_count": 1,
+    "forced_normal_until": 3
+  },
+
   "_pending": {
     "hand_size": "待決 35：發狂卡開始佔格後要重驗；動 14 就要一起動 madness_cap",
     "madness_cap": "待決 35：一個標記可能給 2-3 張之後，7 很緊（3+3+1 就到了）",

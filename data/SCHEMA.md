@@ -54,6 +54,20 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `madness_vision_threshold` | 桌上幾張發狂卡才看得見某些東西 |
 | `reserve_capacity` | 備用區容量，`null` ＝ 無上限 |
 | `phases_per_day` | 每天幾個行動時段（夜不算） |
+| `indulgence.soak_phase_cost` | 泡湯吃掉幾格（其他出口都是 1） |
+| `indulgence.soak_cards_cleared` | 泡湯清掉幾張 |
+| `indulgence.forced_light_count` | 本輪前幾次強制縱慾放輕 |
+| `indulgence.forced_normal_until` | 第幾次之後開始加碼並改挑最重的出口 |
+
+### 縱慾出口
+
+**出口不是獨立資料，就是某些地點的卡槽 `accepts` 裡有 `madness`。** 沒有縱慾選單。
+
+六個出口見企劃書第七節。實作要點：
+
+- **砸東西與食慾無條件**——倒數歸零時主角一定要有東西可以發動，否則規格會停在未定義狀態。
+- **遊戲自動挑出口時，挑條件成立裡代價最重的那個。**
+- **泡湯永遠不進自動挑選池**，而且它吃兩格、只清一張。
 
 ## `cards.json`
 
