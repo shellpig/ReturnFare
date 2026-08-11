@@ -1,0 +1,672 @@
+{
+  "_comment": "第二章第 16-22 天（新常態）。欄位說明見 data/SCHEMA.md。文字為佔位，取自 subdocs/故事線/故事線_第一輪_第二章.md，未經潤稿。夜間標記的內容 beat 見 ch2_nights.json。",
+
+  "beats": [
+    {
+      "id": "d16_morning_awake",
+      "location": "clinic",
+      "when": { "day": 16, "phase": "morning" },
+      "fixed": true,
+      "title": "叔叔醒了",
+      "text": "他醒著。第一句話是「旅館今天誰在顧」。\n陳醫師說要住一陣子，說不準多久。",
+      "slots": [
+        { "id": "uncle", "occupant": "npc_uncle", "label": "叔叔", "accepts": [] },
+        { "id": "chen", "occupant": "npc_chen", "label": "陳醫師", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "uncle_hospitalized": true } },
+      "note": "上午這格是固定事件，不算開關 6 的累計（見第二章故事線第 16 天）"
+    },
+    {
+      "id": "d16_pm_clinic",
+      "location": "clinic",
+      "when": { "day": 16, "phase": "afternoon" },
+      "title": "陪叔叔",
+      "text": "他一直問旅館的事。你講一次，他問第二次。",
+      "slots": [
+        {
+          "id": "stay",
+          "occupant": "npc_uncle",
+          "label": "陪他一個下午",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "講到後來他睡著了。你坐到護士來換點滴。",
+            "switch_progress": "s6"
+          }
+        },
+        {
+          "id": "awei_meds",
+          "occupant": "npc_awei",
+          "label": "阿薇來幫阿嬤拿藥",
+          "accepts": [],
+          "note": "雜訊。第一次在靜和園以外的地方遇到她。她點個頭就走"
+        }
+      ]
+    },
+    {
+      "id": "d16_pm_sanquan",
+      "location": "sanquan",
+      "when": { "day": 16, "phase": "afternoon" },
+      "title": "回旅館撐場",
+      "text": "沒有人在櫃檯。電話響過兩次。",
+      "slots": [
+        {
+          "id": "hold",
+          "occupant": null,
+          "label": "把今天撐過去",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你做完了。沒有人看到，也沒有人謝你。" }
+        },
+        {
+          "id": "ajie",
+          "occupant": "npc_ajie",
+          "label": "阿婕：「我一個人顧不來。」",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "她把排班表推過來。「你要嘛決定，要嘛我決定。」",
+            "relation": { "npc": "ajie", "delta": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d16_pm_oldhouse",
+      "location": "oldhouse",
+      "when": { "day": 16, "phase": "afternoon" },
+      "title": "老家",
+      "text": "叔叔不在，沒有人攔你。",
+      "slots": [
+        {
+          "id": "locked_room",
+          "occupant": null,
+          "label": "那間房",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "門還是鎖的。鑰匙不在這裡。",
+            "flag": { "tried_locked_room": true }
+          }
+        }
+      ],
+      "note": "第 11 夜那間屋子的白天版。鑰匙在叔叔的袋子裡——玩家要自己想到去翻"
+    },
+
+    {
+      "id": "d17_morning_phone",
+      "location": "sanquan",
+      "when": { "day": 17, "phase": "morning" },
+      "fixed": true,
+      "title": "訂房電話",
+      "text": "阿婕提分工，講到一半電話響了。\n一個十四人的進香團，第 19 天到，住三晚。\n阿婕：「我們接不下來。」\n同時診所那邊要一份東西——叔叔以前用過的一份舊藥單，找不到了。",
+      "slots": [
+        { "id": "ajie", "occupant": "npc_ajie", "label": "阿婕（一邊算分工一邊咬指甲）", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "pilgrimage_call": true, "prescription_missing": true } },
+      "note": "種：阿婕咬指甲。這通電話替第 16-19 天建立倒數"
+    },
+    {
+      "id": "d17_pm_pilgrimage",
+      "location": "sanquan",
+      "when": { "day": 17, "phase": "afternoon" },
+      "title": "十四個人",
+      "text": "接還是不接。",
+      "slots": [
+        {
+          "id": "accept",
+          "occupant": null,
+          "label": "答應接進香團",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "你答應了。掛掉電話才開始算房間夠不夠。",
+            "switch": "s5",
+            "flag": { "pilgrimage_accepted": true }
+          }
+        },
+        {
+          "id": "decline",
+          "occupant": null,
+          "label": "推掉",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "「不好意思，我們這幾天……」對方很客氣地掛了。\n阿婕鬆一口氣，但她沒說話。",
+            "flag": { "pilgrimage_declined": true }
+          }
+        },
+        {
+          "id": "find_self",
+          "occupant": null,
+          "label": "自己回旅館翻找藥單",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "在倉庫最裡面的箱子。花了一個下午，但你找到了，而且乾淨。",
+            "gain": ["doc_prescription"]
+          },
+          "note": "委託教學的對照組：自己做最乾淨，代價是這一格不能拿去處理進香團或叔叔"
+        }
+      ]
+    },
+    {
+      "id": "d17_pm_delegate",
+      "location": "sanquan",
+      "when": { "day": 17, "phase": "afternoon" },
+      "title": "委託（第一次）",
+      "text": "你一個人做不完。而這裡有人可以幫你去。",
+      "slots": [
+        {
+          "id": "ask_ajie",
+          "occupant": null,
+          "label": "請阿婕去找",
+          "accepts": ["npc_ajie"],
+          "on_place": {
+            "text": "兩天後她把藥袋放到櫃檯上。「那個箱子裡還有你爸媽的東西欸。你知道嗎？」",
+            "gain": ["doc_prescription", "info_ajie_saw_parents"]
+          }
+        },
+        {
+          "id": "ask_azhu",
+          "occupant": null,
+          "label": "請阿珠護士去查",
+          "accepts": ["npc_azhu"],
+          "on_place": {
+            "text": "兩天後她把你叫到走廊上，講得很含糊，而且一直看門口。",
+            "gain": ["doc_prescription", "info_uncle_treated_20y"]
+          }
+        },
+        {
+          "id": "ask_acai",
+          "occupant": null,
+          "label": "請阿財去找",
+          "accepts": ["npc_acai"],
+          "on_place": {
+            "text": "隔天他就找到了。「裡面沒什麼啊。」他把箱子擱在櫃檯上就去做別的了。",
+            "gain": ["info_acai_box"]
+          },
+          "note": "他漏掉了重要文件，而且他不知道。這一條不給 doc_prescription——回報是主觀的"
+        }
+      ],
+      "note": "企劃書第六節的委託教學。三種雜訊（會知道太多／會出事／回報是主觀的）用同一個事件框架定義完畢。單一玩家這輪只看得到自己委託的那一種"
+    },
+    {
+      "id": "d17_pm_acai_intro",
+      "location": "sanquan",
+      "when": { "day": 17, "phase": "afternoon" },
+      "title": "跟阿財做事",
+      "text": "他今天又來了。叔叔倒了之後他來得更勤。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": "npc_acai",
+          "label": "跟他做一個下午",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "搬完東西他坐在階梯上，下樓梯的時候先顧了一下左膝。「舊傷啦，年輕的時候摔的。」",
+            "flag": { "acai_obs_knee": true }
+          }
+        }
+      ],
+      "note": "從今天起「跟阿財做事」是常駐的下午選項，而且看起來毫無回報。三個觀察開關（左膝／繭／疤）分散在第 17-19 天，全部當日常閒聊演，不要標記"
+    },
+
+    {
+      "id": "d18_morning_jinghe",
+      "location": "jinghe",
+      "when": { "day": 18, "phase": "morning" },
+      "title": "靜和園",
+      "text": "慶典的客人陸續到，阿薇忙翻了。",
+      "slots": [
+        {
+          "id": "help_awei",
+          "occupant": "npc_awei",
+          "label": "幫她一把",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "她沒有道謝。但隔天她會記得。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "helped_awei_d18": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d18_morning_prep",
+      "location": "sanquan",
+      "when": { "day": 18, "phase": "morning" },
+      "condition": { "flag": "pilgrimage_accepted" },
+      "title": "備料、排班、清房間",
+      "text": "十四個人。後天。",
+      "slots": [
+        {
+          "id": "prep",
+          "occupant": null,
+          "label": "做準備",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "清到一半你發現房間不夠，還要再挪。", "flag": { "pilgrimage_prep_1": true } }
+        }
+      ]
+    },
+    {
+      "id": "d18_pm_clinic_back",
+      "location": "clinic_back",
+      "when": { "day": 18, "phase": "afternoon" },
+      "title": "診所後棟",
+      "text": "叔叔住在這裡，所以你有理由往裡面走。\n病房、走廊、藥品室。住的全是外地老人。",
+      "slots": [
+        {
+          "id": "walk_in",
+          "occupant": null,
+          "label": "繞進去看看",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "沒有一個看起來像在治療。他們只是住在這裡，安安靜靜地等。\n有一個房間門牌寫著吳姓。",
+            "flag": { "seen_clinic_back": true }
+          }
+        }
+      ],
+      "echo": {
+        "text": "後來你再往那邊走的時候，陳醫師剛好站在走廊口。他沒有攔你，但你自己轉身了。",
+        "condition": { "not": { "flag": "seen_clinic_back" } }
+      },
+      "note": "只有第 18-19 天真的繞得進去。第二章第一次真正的取捨：後棟一年只開這一次，而進香團後天就到"
+    },
+    {
+      "id": "d18_pm_festival_prep",
+      "location": "communitycenter",
+      "when": { "day": 18, "phase": "afternoon" },
+      "title": "慶典籌備",
+      "text": "吳會長這個名字今天被提到很多次。",
+      "slots": [
+        {
+          "id": "help",
+          "occupant": null,
+          "label": "去幫忙",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "沒有人不認識他。「你叔叔跟吳會長很好啊。」", "flag": { "heard_of_wu": true } }
+        }
+      ]
+    },
+    {
+      "id": "d18_pm_zhao",
+      "location": "sanquan",
+      "when": { "day": 18, "phase": "afternoon" },
+      "title": "趙先生",
+      "text": "住對面靜和園的客人，跑來這裡抱怨對面的服務。",
+      "slots": [
+        { "id": "zhao", "occupant": "npc_zhao", "label": "趙先生", "accepts": [] }
+      ],
+      "note": "周先生的對照組。先讓玩家討厭他，第三章才發現兩人在買同一樣東西"
+    },
+    {
+      "id": "d18_pm_acai_2",
+      "location": "sanquan",
+      "when": { "day": 18, "phase": "afternoon" },
+      "title": "跟阿財做事",
+      "text": "今天是搬桌椅。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": "npc_acai",
+          "label": "跟他做一個下午",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "遞東西的時候你碰到他的手。虎口一層很厚的繭，跟他的年紀不太搭。",
+            "flag": { "acai_obs_hands": true }
+          }
+        },
+        {
+          "id": "photo",
+          "occupant": null,
+          "label": "幫他拍一張",
+          "accepts": ["equip_polaroid"],
+          "on_place": {
+            "text": "他比了個很蠢的姿勢。照片你隨手夾在櫃檯的本子裡。",
+            "flag": { "polaroid_acai": true }
+          },
+          "note": "第 22 天完整版的另一條入口。玩家不會知道自己在存證據"
+        }
+      ]
+    },
+
+    {
+      "id": "d19_morning_xiaowu",
+      "location": "oldstreet",
+      "when": { "day": 19, "phase": "morning" },
+      "title": "小武纏著你",
+      "text": "十歲。話很多。他說他下禮拜要第一次去泡湯，全家一起去。他講了一整天。",
+      "slots": [
+        {
+          "id": "listen",
+          "occupant": "npc_xiaowu",
+          "label": "聽他講",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "「聽說很燙。」他一直問燙是什麼感覺。" }
+        }
+      ],
+      "note": "第一輪玩家會覺得這是可愛的日常。沒有任何辦法看出這是取樣。他還沒到十六歲，所以還沒進簿子——六年後才輪到他"
+    },
+    {
+      "id": "d19_morning_back_last",
+      "location": "clinic_back",
+      "when": { "day": 19, "phase": "morning" },
+      "title": "後棟：最後一次機會",
+      "text": "今天之後陳醫師會注意到。",
+      "slots": [
+        {
+          "id": "walk_in",
+          "occupant": null,
+          "label": "再繞進去一次",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "藥品室的門今天是開的。架上的東西你看不懂，但數量不對——這裡住不了那麼多人。",
+            "flag": { "seen_clinic_back": true, "seen_clinic_stock": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d19_pm_upstream",
+      "location": "upstream",
+      "when": { "day": 19, "phase": "afternoon" },
+      "requires": { "has_knowledge": "k_forty_something" },
+      "title": "上游源頭",
+      "text": "登山隊給的那條路線。走上去要一個下午。",
+      "slots": [
+        {
+          "id": "look",
+          "occupant": "npc_aqin",
+          "label": "上去看看",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "取水口、管線房。阿欽伯在這裡管了三十年。\n你認得這個地方——你在夢裡來過。",
+            "flag": { "seen_upstream": true }
+          }
+        }
+      ],
+      "note": "⚠️ requires 暫時掛在 k_forty_something 上，但故事線寫的門檻是「登山隊給的路線（第一章第 7-9 天）＋第 7 夜看過」。第一章沒有替登山隊路線建卡，也沒有「看過某個夜間標記」的條件語彙——這一條要回頭補。企劃書第十五節「夜裡看到的東西白天可以去驗」在這裡第一次全額兌現，座標與 n_source 相同"
+    },
+    {
+      "id": "d19_evening_arrive",
+      "location": "sanquan",
+      "when": { "day": 19, "phase": "evening" },
+      "fixed": true,
+      "condition": { "flag": "pilgrimage_accepted" },
+      "title": "他們到了",
+      "text": "十四個人，一台遊覽車，很吵，很熱鬧。",
+      "slots": [],
+      "on_enter": { "flag": { "pilgrimage_arrived": true } }
+    },
+    {
+      "id": "d19_evening_acai_leave",
+      "location": "sanquan",
+      "when": { "day": 19, "phase": "evening" },
+      "fixed": true,
+      "title": "他先把假請好",
+      "text": "阿財一邊看手機上的數字，一邊把第 20-21 天的假請好。\n「有個兩天的臨時工，錢不錯。二十二號我就回來。」\n他報出的日薪約是這裡的兩三倍。你回一句「靠，比這邊多那麼多？」然後親手在排班表上把那兩天劃掉。",
+      "slots": [],
+      "on_enter": { "flag": { "acai_leave_scheduled": true } },
+      "note": "高薪臨工誘餌（企劃書第十節）。玩家親手劃掉那兩天——這是第二輪回頭看最痛的一格"
+    },
+
+    {
+      "id": "d20_morning_wu",
+      "location": "clinic",
+      "when": { "day": 20, "phase": "morning" },
+      "fixed": true,
+      "title": "吳會長來探望",
+      "text": "他慷慨、真心、什麼都幫得上忙。\n「你叔叔幫過我很多。」他也記得主角的父母。",
+      "slots": [
+        { "id": "wu", "occupant": "npc_wu", "label": "吳會長", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "met_wu": true } },
+      "note": "經營者第一次露面。他家人在後棟，快到期了"
+    },
+    {
+      "id": "d20_pm_wu_walk",
+      "location": "oldstreet",
+      "when": { "day": 20, "phase": "afternoon" },
+      "condition": { "flag": "met_wu" },
+      "title": "跟他走一段",
+      "text": "他講鎮上的過去。哪一年開始有客人、哪一年鋪的路。",
+      "slots": [
+        {
+          "id": "walk",
+          "occupant": "npc_wu",
+          "label": "陪他走",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "「以前那間才是第一間。」他指了指山下那個方向。「塌一半了，沒人管。」",
+            "flag": { "heard_old_bathhouse": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d20_pm_awei_home",
+      "location": "oldstreet",
+      "when": { "day": 20, "phase": "afternoon" },
+      "title": "老街遇到阿薇",
+      "text": "她在買東西。她阿嬤的藥又要拿了。",
+      "slots": [
+        {
+          "id": "talk",
+          "occupant": "npc_awei",
+          "label": "跟她走一段",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "她第一次主動講自己的家。講到一半停下來說「啊我幹嘛跟你講這個」。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "awei_talked_home": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d20_pm_pilgrimage_work",
+      "location": "sanquan",
+      "when": { "day": 20, "phase": "afternoon" },
+      "condition": { "flag": "pilgrimage_arrived" },
+      "title": "他們要早餐、要熱水、要導覽",
+      "text": "十四個人，而阿財今天請假。",
+      "slots": [
+        {
+          "id": "serve",
+          "occupant": null,
+          "label": "撐過今天",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你一個人做完兩個人的份。沒有出事，但也只是沒有出事。" }
+        }
+      ],
+      "note": "雜訊：阿財照昨天說好的去做高薪臨工。沒有人覺得奇怪；唯一的效果是你們正缺人缺得要死"
+    },
+
+    {
+      "id": "d21_morning_student",
+      "location": "sanquan",
+      "when": { "day": 21, "phase": "morning" },
+      "title": "研究生來找你",
+      "text": "他把廟的名冊和戶籍室的資料比對過了。他很興奮。",
+      "slots": [
+        {
+          "id": "listen",
+          "occupant": "npc_student",
+          "label": "聽他講",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "「你看這個——走的人不是散開的。」他還說這兩天問到一個「剛好符合」的活人。",
+            "flag": { "student_pitch": true }
+          }
+        }
+      ],
+      "note": "「剛好符合的活人」＝阿財。第一輪玩家不會立刻把這句和阿財請假連在一起"
+    },
+    {
+      "id": "d21_pm_student_data",
+      "location": "registry_office",
+      "when": { "day": 21, "phase": "afternoon" },
+      "condition": { "flag": "student_pitch" },
+      "title": "跟他一起看資料",
+      "text": "戶籍謄本、遷入遷出、死亡登記。第三本簿子。",
+      "slots": [
+        {
+          "id": "read",
+          "occupant": "npc_student",
+          "label": "跟他一起看",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "排在一起就看出來了：走的人集中在同一場慶典之後。",
+            "gain": ["info_same_festival"]
+          }
+        },
+        {
+          "id": "stop_him",
+          "occupant": null,
+          "label": "勸他別查",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "他笑了一下，說你講話跟他指導教授一樣。他沒有停。",
+            "flag": { "warned_student": true }
+          }
+        }
+      ],
+      "echo": {
+        "day": 25,
+        "text": "他的房間還封著。你想起他那天要給你看的東西，你沒有去。",
+        "condition": { "not": { "has_card": "info_same_festival" } }
+      },
+      "note": "第一輪唯一一次能拿到那張卡的機會——他四天後會死。沒拿到的玩家第 25 天在他房間有第二次機會（如果筆記還在）。而今天旅館正忙：這張卡要跟一團十四個人搶，取捨才成立"
+    },
+    {
+      "id": "d21_morning_temple_guide",
+      "location": "temple",
+      "when": { "day": 21, "phase": "morning" },
+      "condition": { "flag": "pilgrimage_arrived" },
+      "title": "進香團今天要去廟裡",
+      "text": "要有人帶。",
+      "slots": [
+        {
+          "id": "guide",
+          "occupant": "npc_jinbo",
+          "label": "帶他們去",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "金伯很高興。他多講了兩句慶典的事，你沒有記下來。" }
+        }
+      ]
+    },
+
+    {
+      "id": "d22_morning_typhoon",
+      "location": "sanquan",
+      "when": { "day": 22, "phase": "morning" },
+      "fixed": true,
+      "title": "颱風警報",
+      "text": "最後一班公車下午三點。進香團提前退房，一團亂。\n阿財照第 19 天說好的時間來上工。\n你問「有賺到？」他說工作很累、錢有拿到、兩天而已很划算。",
+      "slots": [
+        { "id": "acai", "occupant": "npc_acai", "label": "阿財", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "typhoon_warning": true, "acai_returned": true } },
+      "note": "他回來這件事本身不是異常。沒有失聯、沒有遲到、沒有一個人問他去哪裡；工作與薪水也都真實存在"
+    },
+    {
+      "id": "d22_pm_sandbags",
+      "location": "sanquan",
+      "when": { "day": 22, "phase": "afternoon" },
+      "condition": {
+        "any": [
+          { "flag": "acai_obs_knee" },
+          { "flag": "acai_obs_hands" },
+          { "flag": "acai_obs_scar" },
+          { "flag": "polaroid_acai" }
+        ]
+      },
+      "title": "採買、封窗、扛沙包",
+      "text": "全鎮都在忙。你也在忙。而阿財在旁邊。\n他扛得比你快。他不護膝蓋了。\n\n扛到一半，畫面停一下：你覺得哪裡不對？",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": "npc_acai",
+          "label": "跟他一起扛一個下午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "整個下午。他一次都沒有停下來喘。" }
+        },
+        {
+          "id": "obs_walk",
+          "occupant": null,
+          "label": "① 他走路的方式",
+          "accepts": ["equip_polaroid", "info_acai_box"],
+          "on_place": {
+            "text": "「上次他下這段樓梯的時候」對「剛剛」。他不先顧左膝了。",
+            "gain": ["info_acai_walk"]
+          },
+          "note": "薄版與完整版都有這條。三個觀察裡門檻最低的一條——跟他走過一次樓梯就會有印象"
+        },
+        {
+          "id": "obs_hands",
+          "occupant": null,
+          "label": "② 他的手",
+          "accepts": ["equip_polaroid", "info_acai_box"],
+          "requires": {
+            "any": [
+              { "flag": "polaroid_acai" },
+              { "all": [{ "flag": "acai_obs_knee" }, { "flag": "acai_obs_hands" }] },
+              { "all": [{ "flag": "acai_obs_knee" }, { "flag": "acai_obs_scar" }] },
+              { "all": [{ "flag": "acai_obs_hands" }, { "flag": "acai_obs_scar" }] }
+            ]
+          },
+          "reject_reason": "（你沒有真的跟他遞過幾次東西。）",
+          "on_place": {
+            "text": "虎口的繭沒了。手臂那道疤也沒了。兩天前還在。",
+            "gain": ["info_acai_scars_gone"]
+          },
+          "note": "⚠️ 故事線寫的是薄版「拿掉」②而不是灰掉它，理由是灰掉會暗示手上有東西可看。但 schema 的槽只有 requires（灰掉），沒有槽層級的 condition。這裡暫時用灰掉＋不指向答案的理由欄，等槽要不要支援 condition 拍板後再改"
+        },
+        {
+          "id": "obs_talk",
+          "occupant": null,
+          "label": "③ 他說話的內容",
+          "accepts": ["equip_polaroid", "info_acai_box"],
+          "on_place": { "text": "他說話完全正常，因為那本來就是他。這條是對的，但它證明不了什麼。" }
+        },
+        {
+          "id": "dismiss",
+          "occupant": null,
+          "label": "④ 我想太多了",
+          "accepts": ["equip_polaroid", "info_acai_box"],
+          "on_place": {
+            "text": "你回去搬你的沙包。",
+            "flag": { "acai_dismissed": true }
+          },
+          "note": "這一格關掉。第 27 天還可以回頭查，但線索少一半"
+        }
+      ],
+      "note": "⚠️ 比對的兩個入口只做出card 路徑。故事線的硬規則是手上沒有卡的玩家也要能選（改用主角自己的記憶並列），但 schema 沒有「不吃卡的選擇槽」——accepts 為 [] 是純顯示。這是本章最需要回頭補的一條。條件裡的 acai_obs_scar 目前沒有任何 beat 會給：三個觀察開關只寫了左膝（第 17 天）與繭（第 18 天），疤那一個還沒排位置"
+    },
+    {
+      "id": "d22_evening_uncle",
+      "location": "clinic",
+      "when": { "day": 22, "phase": "evening" },
+      "fixed": true,
+      "title": "叔叔交代",
+      "text": "「颱風要來了，這幾天不要亂跑，旅館顧好就好。」",
+      "slots": [],
+      "on_enter": { "flag": { "uncle_told_stay": true } },
+      "note": "這句話是第一輪主角不在現場的全部理由，而且他是自願照做的。要溫柔、要合理、要像一句普通的長輩叮嚀——第二輪玩家會為了同一件事違背它"
+    },
+    {
+      "id": "d22_evening_ajie_leaves",
+      "location": "sanquan",
+      "when": { "day": 22, "phase": "evening" },
+      "fixed": true,
+      "title": "阿婕回阿姨那邊過颱風",
+      "text": "親戚要她過去，那是這種小鎮理所當然的事。她走的時候還說了聲抱歉。\n她在盤點物資，一邊算一邊咬指甲。",
+      "slots": [
+        {
+          "id": "tell_her_leave",
+          "occupant": null,
+          "label": "叫她搭那班車下山",
+          "accepts": ["protagonist"],
+          "requires": { "flag": "never_true_loop1" },
+          "reject_reason": "（你想不到理由。）"
+        }
+      ],
+      "on_enter": { "flag": { "ajie_away": true } },
+      "note": "灰掉那一行沿用企劃書第十八節「不上車」的視覺語言——看得到、點不下去、掛在那裡當懸念。第二輪拿到足夠知識之後才亮起來，而那時它是真的兩難：她走了，那一格換誰上去。⚠️ requires 用了一個永遠不成立的 flag 當佔位，等「輪次」條件語彙定案後改掉"
+    }
+  ]
+}

@@ -181,12 +181,130 @@
       "name": "這裡有人四十幾歲就走",
       "text": "不是一兩個。是一小群，而且集中在同一個區間。",
       "slotless": true, "stashable": false, "discardable": false
+    },
+
+    {
+      "id": "npc_ajie",
+      "type": "person",
+      "name": "阿婕",
+      "text": "旅館的員工。她比你更清楚這間店怎麼運作。",
+      "stashable": false,
+      "discardable": false,
+      "note": "第 17 天委託登場時進手牌。委託雜訊型＝會知道太多"
+    },
+    {
+      "id": "npc_azhu",
+      "type": "person",
+      "name": "阿珠護士",
+      "text": "診所的護士。有些事她知道，有些事她不想知道。",
+      "stashable": false,
+      "discardable": false,
+      "note": "委託雜訊型＝會出事"
+    },
+    {
+      "id": "npc_acai",
+      "type": "person",
+      "name": "阿財",
+      "text": "在旅館打零工。去年回鄉。做事比你快。",
+      "stashable": false,
+      "discardable": false,
+      "note": "委託雜訊型＝回報是主觀的"
+    },
+    {
+      "id": "npc_awei",
+      "type": "person",
+      "name": "阿薇",
+      "text": "對面靜和園的櫃檯。她不欠你，你也不欠她。",
+      "stashable": false,
+      "discardable": false,
+      "note": "⚠️ 她不是委託對象。建這張卡是因為第 29 天的邀請槽收人物卡——邀一個人的動作就是把那個人拖進慶典的位子。要不要因此讓她也能被委託，還沒決定"
+    },
+
+    {
+      "id": "doc_prescription",
+      "type": "document",
+      "name": "叔叔的舊藥單",
+      "text": "一張很舊的藥單。紙已經軟了。",
+      "stashable": true,
+      "discardable": true
+    },
+    {
+      "id": "info_ajie_saw_parents",
+      "type": "info",
+      "name": "阿婕順便看到的東西",
+      "text": "「那個箱子裡還有你爸媽的東西欸。你知道嗎？」",
+      "stashable": true,
+      "discardable": true,
+      "note": "委託阿婕的回報。她會知道太多——這條在第三章繼承線會回來"
+    },
+    {
+      "id": "info_uncle_treated_20y",
+      "type": "info",
+      "name": "叔叔二十年前也在這裡治療",
+      "text": "同一間診所，同一個療程名稱。阿珠講得很含糊，而且她一直看門口。",
+      "stashable": true,
+      "discardable": true,
+      "note": "委託阿珠的回報。第一章「陳年紙本證據」的延續，而且是用委託換來的"
+    },
+    {
+      "id": "info_acai_box",
+      "type": "info",
+      "name": "阿財說裡面沒什麼",
+      "text": "他把箱子找到了，翻了一下。「裡面沒什麼啊。」",
+      "stashable": true,
+      "discardable": true,
+      "note": "委託阿財的回報。他漏掉了重要文件，而他不知道——回報是主觀的"
+    },
+
+    {
+      "id": "info_acai_scars_gone",
+      "type": "info",
+      "name": "阿財身上的舊傷消失了",
+      "text": "虎口的繭、手臂那道疤。兩天前還在。",
+      "stashable": true,
+      "discardable": false,
+      "note": "第 22 天完整版產出（兩個觀察開關以上，或拍立得拍過他）"
+    },
+    {
+      "id": "info_acai_walk",
+      "type": "info",
+      "name": "阿財走路的方式變了",
+      "text": "他下樓梯不再先顧左膝。你說不出他少了什麼，但他變了。",
+      "stashable": true,
+      "discardable": false,
+      "note": "第 22 天薄版產出（只翻到一個觀察開關）。少掉的是第三個確認——他知道阿財變了，但說不出少了什麼。這正是第三章第 40 天沒有人相信他的預演"
+    },
+    {
+      "id": "info_same_festival",
+      "type": "info",
+      "name": "同一場慶典之後",
+      "text": "研究生把廟的名冊和戶籍室的資料排在一起。走的人集中在同一場慶典之後。",
+      "stashable": true,
+      "discardable": false,
+      "note": "第 21 天跟研究生一起看資料。第一輪唯一一次能拿到的機會——他四天後會死。沒拿到的玩家第 25 天在他房間有第二次機會（如果筆記還在）"
+    },
+    {
+      "id": "k_town_covers",
+      "type": "knowledge",
+      "name": "這裡出事的時候，大家會一起把它蓋過去",
+      "text": "它不指控任何人。它描述一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "第 26–27 天被動撞到任意兩個閃躲的人即成立。第三章第 40 天沒有人相信他的時候，這張卡在手上"
+    },
+    {
+      "id": "mood_watched",
+      "type": "mood",
+      "name": "被盯上",
+      "text": "老曾開始出現在你去的地方。診所的人會主動問你睡得好不好。",
+      "stashable": false,
+      "discardable": false,
+      "note": "曝光兩階段的第一階段，佔一格。第二次曝光時翻面成「療養通知」，下一個固定時段觸發「走進庫存」BE。⚠️ 翻面後的卡還沒建（等第三章）"
     }
   ],
 
   "_pending": {
     "all": "待決 22：物品／情報／知識的完整清單還沒盤點，這裡只有第一章用得到的",
-    "person_cards": "第一章不發人物卡（見 SCHEMA.md 暫定決定）；委託第 17 天登場時再開",
+    "person_cards": "第 17 天委託登場，已開三張（阿婕／阿珠／阿財），對應企劃書第六節的三種雜訊。⚠️ 其餘 NPC 仍只以 occupant 形式存在、沒有卡片定義——要不要求所有 occupant id 都在這裡建檔，還沒決定",
     "compare_table": "已解決：不需要比對表。比對是一個 accepts 不含 protagonist 的槽，需要哪幾張由槽自己寫（見 SCHEMA.md > 比對）。k_forty_something 的產出路徑已補在第 9 天納骨塔。第 22／39／43 天的比對槽等第二、三章資料",
     "encounter_cards": "第 8 夜遭遇的三個要求還不知道接受哪些卡，等卡片清單"
   }

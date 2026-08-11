@@ -216,6 +216,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
   "gain":     ["card_id"],
   "lose":     ["card_id"],
   "switch":   "s1",
+  "switch_progress": "s6",
   "relation": { "npc": "ajie", "delta": 1 },
   "madness":  1,
   "flag":     { "ahong_last_seen": true }
@@ -223,6 +224,8 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 ```
 
 > **放入主角卡即消耗該時段**，不用每個槽標。`fixed: true` 的 beat 不需要主角卡。
+
+> **`switch` 與 `switch_progress` 不一樣。** `switch` 是翻開一個開關（一次就到位）；`switch_progress` 是**累計一格**——同一個開關可以被很多個槽各推一格，第 35 天才結算。目前只有開關 6（陪叔叔）是累計型：第二、三章任何一個**主動選的**診所時段都累計，上午那格固定事件不算。
 
 ---
 

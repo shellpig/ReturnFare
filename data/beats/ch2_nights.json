@@ -1,0 +1,130 @@
+{
+  "_comment": "第二章第 16-32 夜。標記定義（最早可開、價碼）在 data/locations.json，這裡是打開之後看到什麼。四個新標記（n_litcorridor 17／n_higher 20／n_emptyspot 21／n_gathering 28）＋既有標記的第二章變體。故事線的五個定點掛在哪：找叔叔→n_litwindow、空的位子→n_emptyspot、第 24 夜找人→n_queue、隊伍→n_gathering、邊界壞掉→sanquan（白天層的夜間入侵，不是標記）。文字取自 subdocs/故事線/故事線_第一輪_第二章.md。",
+
+  "beats": [
+    {
+      "id": "n_litcorridor_ch2",
+      "location": "n_litcorridor",
+      "chapter": 2,
+      "title": "有燈的走廊",
+      "text": "診所後棟的夜版。燈是亮的，但沒有電。\n每一扇門後面都有人在睡，而且睡得很沉。你數了一下門的數量——比白天多。",
+      "slots": [],
+      "on_enter": { "flag": { "opened_n_litcorridor": true } },
+      "note": "白天去驗：診所後棟（第 18-19 天）。看過白天版的玩家會發現門的數量對不上"
+    },
+    {
+      "id": "n_higher_ch2",
+      "location": "n_higher",
+      "chapter": 2,
+      "title": "再往上",
+      "text": "源頭更上面。水從哪裡來。\n再往上走，管線還在，而且更粗。上面沒有取水口，只有一個往下的開口。",
+      "slots": [],
+      "on_enter": { "flag": { "opened_n_higher": true } },
+      "note": "白天去驗：上游源頭（第 19 天起）。阿欽伯管了三十年，他不知道上面還有東西"
+    },
+    {
+      "id": "n_emptyspot_ch2",
+      "location": "n_emptyspot",
+      "chapter": 2,
+      "title": "空的位子",
+      "text": "夜鎮裡多了一個空位。有人站的地方現在沒人。\n旁邊的人照常做他們的事，沒有人往那個位子看。",
+      "slots": [],
+      "on_enter": { "flag": { "opened_n_emptyspot": true } },
+      "note": "第一輪玩家不會知道那是阿財的——白天他只是照約定請假的第二天，所以這個空位沒有任何失蹤事件可以對號入座。要到後續輪次玩家才會知道這個正常請假日正好蓋住出庫"
+    },
+    {
+      "id": "n_gathering_ch2",
+      "location": "n_gathering",
+      "chapter": 2,
+      "title": "集合的隊伍",
+      "text": "遊行的隊伍在夜鎮集合。他們每晚多幾個人。",
+      "slots": [],
+      "on_enter": { "flag": { "opened_n_gathering": true } },
+      "note": "第 28-31 夜逐夜增加。第 31 夜隊伍站滿了"
+    },
+    {
+      "id": "n_gathering_d31",
+      "location": "n_gathering",
+      "chapter": 2,
+      "when": { "day": 31, "phase": "night" },
+      "condition": { "flag": "opened_n_gathering" },
+      "title": "隊伍站滿了",
+      "text": "第 31 夜。隊伍站滿了。\n你第 29 天邀的那個人在裡面。她白天還在你旁邊。",
+      "slots": [],
+      "note": "第一輪玩家會以為那是夢裡的焦慮。不邀的玩家：隊伍一樣站滿，而裡面那個人他認得，只是他不會多想"
+    },
+
+    {
+      "id": "n_litwindow_ch2",
+      "location": "n_litwindow",
+      "chapter": 2,
+      "title": "亮著的窗（第 16-19 夜：找叔叔）",
+      "text": "第 15 夜他就不在了。你開始在夜鎮裡找他。\n你敲窗。裡面那家人還在等他們那個沒回來的人，他們沒有看你。\n白天他躺在診所，夜裡他不在夜鎮。兩邊都不在的那個部分去哪了。",
+      "slots": [],
+      "note": "⚠️ 這是故事線「第 16-19 夜——找叔叔」的暫定掛點。它本來不屬於任何一個標記——夜鎮裡找一個人是跨標記的行為，而 beat 一定要掛在 location 上。要不要給「搜尋」一個獨立的載體，留待拍板"
+    },
+    {
+      "id": "n_queue_d24",
+      "location": "n_queue",
+      "chapter": 2,
+      "when": { "day": 24, "phase": "night" },
+      "title": "隊伍今晚多了一個人",
+      "text": "你去找研究生。無論你往哪個方向，你到的時候夜鎮已經在那裡了。\n排隊的隊伍今晚多了一個人。你認不出那是誰，因為他背對著。",
+      "slots": [],
+      "on_enter": { "flag": { "saw_student_in_queue": true } },
+      "note": "隔天早上你才知道昨晚看到的是誰。這是第二章唯一一次夜鎮跑在白天前面——白天他人在自己的旅館裡什麼都不知道，夜裡他卻已經看到了。目擊者的規則在夜間層剛好反過來"
+    },
+    {
+      "id": "n_ahong_3_ch2",
+      "location": "n_ahong_3",
+      "chapter": 2,
+      "condition": { "flag": "opened_n_ahong_2" },
+      "title": "還差一層",
+      "text": "同一段搬貨的聲音，這次在更深的地方。\n地上有一件東西，是他失蹤之後才可能留下的。你拿得起來，但你看不懂它為什麼在這裡。",
+      "slots": [],
+      "note": "⚠️ 待決 40：阿宏鏈的分級級數、各級內容與跨章接續都還沒定，所以第二章沒有新增阿宏標記，只在既有的第三級上放一個第二章變體。要讓玩家感覺「快追到了，但還差一層」，不是感覺第一輪漏做任務。第一輪仍不讓玩家站到阿宏面前，也不定義他是否活著"
+    },
+
+    {
+      "id": "d23_night_bleed",
+      "location": "sanquan",
+      "when": { "day": 23, "phase": "night" },
+      "title": "停電：邊界壞掉",
+      "text": "空的旅館，長的走廊。\n停電讓夜間層和白天開始模糊。",
+      "slots": [],
+      "on_enter": { "flag": { "boundary_bleeding": true } },
+      "note": "⚠️ 這四天白天的行動格有機率直接觸發夜間內容，而且不產生發狂卡（不是玩家去找它）。這個「機率觸發」目前沒有 schema 載體——beat 只能靠 condition 決定出不出現，沒有隨機。要補"
+    },
+    {
+      "id": "d24_night_bleed",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "night" },
+      "condition": { "flag": "boundary_bleeding" },
+      "title": "二樓有人在走",
+      "text": "走廊變長了。應該有門的地方沒有門。二樓有人在走，而二樓只有一個睡著的老太太。\n阿薇在樓梯口停下來，問你：「你剛剛有沒有聽到？」",
+      "slots": [],
+      "on_enter": { "flag": { "awei_heard_it": true } },
+      "note": "在避難所裡那是「停電嘛」，在這裡不是。這條跟阿薇線互相加成——兩個人在停電的旅館裡待了四天"
+    },
+    {
+      "id": "d25_night_bleed",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "night" },
+      "condition": { "flag": "boundary_bleeding" },
+      "title": "湯屋有水聲",
+      "text": "湯屋沒有開。水聲從那邊傳來，跟第 3 夜河邊那個一樣。\n鎮上的解釋一律是「停電嘛，看錯了」。",
+      "slots": [],
+      "note": "第一輪玩家會在這裡第一次意識到：夜鎮不需要等到晚上"
+    },
+    {
+      "id": "d26_night_bleed",
+      "location": "sanquan",
+      "when": { "day": 26, "phase": "night" },
+      "condition": { "flag": "boundary_bleeding" },
+      "title": "電來了之後",
+      "text": "燈全部亮起來的那一秒，走廊縮回原來的長度。\n你站在原地確認了三次。",
+      "slots": [],
+      "on_enter": { "flag": { "boundary_bleeding": false } }
+    }
+  ]
+}

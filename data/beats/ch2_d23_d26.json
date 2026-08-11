@@ -1,0 +1,479 @@
+{
+  "_comment": "第二章第 23-26 天（颱風封閉四天）。欄位說明見 data/SCHEMA.md。文字為佔位，取自 subdocs/故事線/故事線_第一輪_第二章.md，未經潤稿。一天兩格已拍板（見待決事項.md 第二節），所以這四天共 8 格。「三件事搶兩格」的三件事在第 24、25 天各寫兩份（morning／afternoon），因為 when.phase 是單值。",
+
+  "beats": [
+    {
+      "id": "d23_morning_awei_knocks",
+      "location": "sanquan",
+      "when": { "day": 23, "phase": "morning" },
+      "fixed": true,
+      "title": "阿薇帶她阿嬤來敲門",
+      "text": "停電、斷訊、山路封。沒有人擠在一起，大家關在自己家裡。\n她開口的時候完全不看你的眼睛。靜和園就在對面，她在那裡上班——但靜和園不收鎮上的人，那裡是給客人的。\n你讓她們進來。這是叔叔會做的決定。",
+      "slots": [
+        { "id": "awei", "occupant": "npc_awei", "label": "阿薇", "accepts": [] },
+        { "id": "grandma", "occupant": "npc_awei_grandma", "label": "她阿嬤", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "typhoon_started": true, "awei_sheltering": true } },
+      "note": "這是難堪，不是求助。整段四天是阿薇線的重量來源——第 29 天邀誰是全輪最重的決策，而她整條線就靠這四天"
+    },
+    {
+      "id": "d23_pm_settle_grandma",
+      "location": "sanquan",
+      "when": { "day": 23, "phase": "afternoon" },
+      "condition": { "flag": "awei_sheltering" },
+      "title": "二樓安置阿嬤",
+      "text": "把二樓最不會漏的那間清出來。她的藥要放在她看得到的地方。",
+      "slots": [
+        {
+          "id": "settle",
+          "occupant": null,
+          "label": "安置她們",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "阿薇不會道謝。她只是把棉被角折得很整齊，折了三次。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "awei_care_d23": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d23_pm_secure",
+      "location": "sanquan",
+      "when": { "day": 23, "phase": "afternoon" },
+      "title": "全棟封窗、接水、備電",
+      "text": "叔叔不在，阿婕不在。這棟樓現在是你的。",
+      "slots": [
+        {
+          "id": "secure",
+          "occupant": null,
+          "label": "把該撐的都撐好",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你做完了能做的。剩下的看風。", "flag": { "typhoon_secured": true } }
+        }
+      ]
+    },
+    {
+      "id": "d23_pm_guests",
+      "location": "sanquan",
+      "when": { "day": 23, "phase": "afternoon" },
+      "title": "安置走不掉的客人",
+      "text": "前台。研究生在借手電筒，他說他要出去一趟。",
+      "slots": [
+        {
+          "id": "guests",
+          "occupant": null,
+          "label": "安置他們",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "有人問幾時能走。你說不知道。" }
+        },
+        {
+          "id": "student",
+          "occupant": "npc_student",
+          "label": "研究生（在借手電筒）",
+          "accepts": [],
+          "note": "他一整天在寫東西。他很興奮，他覺得這是難得的田野機會"
+        }
+      ]
+    },
+
+    {
+      "id": "d24_am_grandma",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "morning" },
+      "condition": { "flag": "awei_sheltering" },
+      "title": "照顧阿嬤",
+      "text": "她的藥、她的體溫。她半夜會叫人。",
+      "slots": [
+        {
+          "id": "care",
+          "occupant": "npc_awei_grandma",
+          "label": "照顧她",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "阿薇一個人扛了一整夜，而她不會開口。你接手的時候她說「不用啦」，然後就去睡了。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "awei_care_d24am": true }
+          }
+        }
+      ],
+      "echo": {
+        "text": "你經過二樓的時候聽到阿薇在裡面低聲講話。你沒有進去。",
+        "condition": { "not": { "flag": "awei_care_d24am" } }
+      }
+    },
+    {
+      "id": "d24_am_hold",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "morning" },
+      "title": "撐住旅館",
+      "text": "漏水、跳電、二樓的窗、湯屋的管線。",
+      "slots": [
+        {
+          "id": "hold",
+          "occupant": null,
+          "label": "堵一個上午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你堵住一個，另一個就開始漏。", "flag": { "hold_d24am": true } }
+        }
+      ],
+      "note": "阿婕不在，所以旅館這一項是真的做不完，不是設計上的擺設"
+    },
+    {
+      "id": "d24_am_guests",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "morning" },
+      "title": "安置客人",
+      "text": "有人吵著要退房，有人怕。",
+      "slots": [
+        {
+          "id": "guests",
+          "occupant": null,
+          "label": "處理他們",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你講到他們安靜下來。你自己也不確定你講的對不對。", "flag": { "guests_d24am": true } }
+        }
+      ]
+    },
+    {
+      "id": "d24_pm_grandma",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "afternoon" },
+      "condition": { "flag": "awei_sheltering" },
+      "title": "照顧阿嬤",
+      "text": "下午她燒起來了。",
+      "slots": [
+        {
+          "id": "care",
+          "occupant": "npc_awei_grandma",
+          "label": "照顧她",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "退燒藥、擰毛巾、換第三次。阿薇在旁邊看你做，看到一半她說了一句「我媽以前也是這樣」。\n她講完自己愣了一下。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "awei_care_d24pm": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d24_pm_hold",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "afternoon" },
+      "title": "撐住旅館",
+      "text": "二樓的窗在響。湯屋那邊有水聲，但湯屋沒有開。",
+      "slots": [
+        {
+          "id": "hold",
+          "occupant": null,
+          "label": "撐一個下午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你把窗釘死了。水聲還在。", "flag": { "hold_d24pm": true } }
+        }
+      ]
+    },
+    {
+      "id": "d24_pm_guests",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "afternoon" },
+      "title": "安置客人",
+      "text": "沒有電，沒有訊號。他們開始互相講故事。",
+      "slots": [
+        {
+          "id": "guests",
+          "occupant": null,
+          "label": "陪他們坐一個下午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "有人說這種天氣以前出過事。沒有人接話。", "flag": { "guests_d24pm": true } }
+        }
+      ]
+    },
+    {
+      "id": "d24_evening_student_missing",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "evening" },
+      "fixed": true,
+      "title": "研究生沒回來吃飯",
+      "text": "你唯一可能注意到的時候，正在幫一個老太太把藥搬上二樓。",
+      "slots": [],
+      "on_enter": { "flag": { "student_missing": true } },
+      "note": "他是山泉閣的房客。這件事第一輪不會被講明，但玩家自己會知道"
+    },
+    {
+      "id": "d24_night_laozeng",
+      "location": "sanquan",
+      "when": { "day": 24, "phase": "night" },
+      "fixed": true,
+      "title": "老曾來敲門",
+      "text": "他挨家挨戶巡查點名。他站在門口，全身濕的，跟你講了兩句話，登記，走了。",
+      "slots": [
+        { "id": "laozeng", "occupant": "npc_laozeng", "label": "老曾", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "laozeng_patrol_d24": true } },
+      "note": "第一輪玩家什麼都沒想。這一格是待決 29 那條隱藏線索的載體——他說他巡的那條路那晚淹了"
+    },
+
+    {
+      "id": "d25_morning_found",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "morning" },
+      "fixed": true,
+      "title": "他們在浴場找到他",
+      "text": "消息傳到旅館。有人死在公共浴場。是你們家的房客。\n老曾封鎖現場。你走得到的最近距離是外面那條路。\n你跟他只是房客關係。你沒有立場，老曾也沒有理由讓你進。",
+      "slots": [],
+      "on_enter": { "flag": { "student_dead": true } },
+      "note": "屍體不上鏡。第一輪主角不在現場，也進不去。這一天最重要的設計是：玩家手上仍然只有兩格，而那兩格跟死人無關"
+    },
+    {
+      "id": "d25_am_grandma",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "morning" },
+      "condition": { "flag": "awei_sheltering" },
+      "title": "照顧阿嬤",
+      "text": "風還沒停。她今天清醒一點。",
+      "slots": [
+        {
+          "id": "care",
+          "occupant": "npc_awei_grandma",
+          "label": "照顧她",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "阿嬤問你是誰家的孩子。你講了你叔叔的名字，她點點頭，說那家人很好。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "awei_care_d25am": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d25_am_hold",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "morning" },
+      "title": "撐住旅館",
+      "text": "招牌昨天晚上歪了。",
+      "slots": [
+        {
+          "id": "hold",
+          "occupant": null,
+          "label": "先顧會壞的那些",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你爬上去看了一眼就下來了。今天不可能修。", "flag": { "hold_d25am": true } }
+        }
+      ]
+    },
+    {
+      "id": "d25_am_guests",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "morning" },
+      "title": "安置客人",
+      "text": "客人在議論。有人說要退房。沒有人害怕，大家覺得麻煩。",
+      "slots": [
+        {
+          "id": "guests",
+          "occupant": null,
+          "label": "處理他們",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "「死在浴場喔？」「唉唷這種天氣。」他們講兩句就換話題了。", "flag": { "guests_d25am": true } }
+        }
+      ]
+    },
+    {
+      "id": "d25_pm_grandma",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "afternoon" },
+      "condition": { "flag": "awei_sheltering" },
+      "title": "照顧阿嬤",
+      "text": "阿薇今天話比較多。",
+      "slots": [
+        {
+          "id": "care",
+          "occupant": "npc_awei_grandma",
+          "label": "照顧她",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "換完藥，她們兩個在講以前的事，講到一半阿薇笑了一次——很短，而且她馬上用手遮住嘴。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "awei_smiled": true, "awei_care_d25pm": true }
+          },
+          "note": "破綻的種：她笑的時候用手遮嘴（第三章第 39 天要用）。而玩家在這一秒看到了那顆牙"
+        }
+      ]
+    },
+    {
+      "id": "d25_pm_hold",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "afternoon" },
+      "title": "撐住旅館",
+      "text": "湯屋的管線今天開始出問題。",
+      "slots": [
+        {
+          "id": "hold",
+          "occupant": null,
+          "label": "撐一個下午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "水是溫的，但它不該從那裡出來。", "flag": { "hold_d25pm": true } }
+        }
+      ]
+    },
+    {
+      "id": "d25_pm_guests",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "afternoon" },
+      "title": "安置客人",
+      "text": "有兩個人堅持明天一早就要走。",
+      "slots": [
+        {
+          "id": "guests",
+          "occupant": null,
+          "label": "處理他們",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你讓他們留下來了。你不確定這算不算做對。", "flag": { "guests_d25pm": true } }
+        }
+      ]
+    },
+    {
+      "id": "d25_pm_student_room",
+      "location": "sanquan",
+      "when": { "day": 25, "phase": "afternoon" },
+      "condition": {
+        "all": [
+          { "flag": "student_dead" },
+          { "not": { "has_card": "info_same_festival" } }
+        ]
+      },
+      "title": "他的房間",
+      "text": "門沒有鎖。裡面照原樣。",
+      "slots": [
+        {
+          "id": "notes",
+          "occupant": null,
+          "label": "他那天要給你看的東西",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "筆記還在桌上，翻開的那一頁就是他那天很興奮的那一頁。",
+            "gain": ["info_same_festival"]
+          }
+        }
+      ],
+      "note": "第 21 天沒拿到那張卡的玩家的第二次機會。第一輪房間照原樣封著，四張散頁與「只能藏走一張」整段移到第二輪——所以這一格只給那一張，不給搜查"
+    },
+
+    {
+      "id": "d26_morning_accident",
+      "location": "sanquan",
+      "when": { "day": 26, "phase": "morning" },
+      "fixed": true,
+      "title": "老曾說是意外",
+      "text": "停電、風大，他自己跑出去，摔的。\n兩天結案。全鎮沒有一個人覺得有問題。",
+      "slots": [],
+      "on_enter": { "flag": { "ruled_accident": true } }
+    },
+    {
+      "id": "d26_am_repairs",
+      "location": "sanquan",
+      "when": { "day": 26, "phase": "morning" },
+      "title": "清點災損",
+      "text": "你親手做了兩天防颱，還是有三樣東西壞了。\n帳上的錢只夠修一樣。",
+      "slots": [
+        {
+          "id": "fix_sign",
+          "occupant": null,
+          "label": "修招牌",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "門面保住了。慶典的客人看得到你。湯屋只能開一半，二樓房間不能住。",
+            "flag": { "repaired_sign": true }
+          }
+        },
+        {
+          "id": "fix_pipes",
+          "occupant": null,
+          "label": "修湯屋的管線",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "這是溫泉旅館唯一真正的產品。招牌歪著，二樓空著。",
+            "flag": { "repaired_pipes": true }
+          }
+        },
+        {
+          "id": "fix_windows",
+          "occupant": null,
+          "label": "修二樓的窗",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "房間數保住了，也就是慶典期間的營收。招牌歪著，湯屋開一半。",
+            "flag": { "repaired_windows": true }
+          }
+        }
+      ],
+      "note": "⚠️ 待決：第一輪的第二次桌面痛感。形狀跟四張散頁一樣——都看得見、只能保一個——但這是家業的痛，不是調查的痛。三樣的狀態要帶進第三章，影響繼承線的演出與結局文字。這仍是提案不是共識（見待決事項.md 第二節）"
+    },
+    {
+      "id": "d26_am_awei_leaves",
+      "location": "sanquan",
+      "when": { "day": 26, "phase": "morning" },
+      "condition": { "flag": "awei_sheltering" },
+      "title": "送阿嬤回家",
+      "text": "風停了。她要走了。",
+      "slots": [
+        {
+          "id": "walk_them",
+          "occupant": "npc_awei",
+          "label": "送她們回去",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "走到對面那條路她停下來，說「那個……謝謝」，講得很快，然後就進去了。\n這是四天以來她第一次道謝。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "awei_thanked": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d26_pm_guests_out",
+      "location": "sanquan",
+      "when": { "day": 26, "phase": "afternoon" },
+      "title": "客人退房與安撫",
+      "text": "山路通了。走的人比留下來的多。",
+      "slots": [
+        {
+          "id": "checkout",
+          "occupant": null,
+          "label": "送他們走",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "有人留了一句「你很盡力了」。你不知道該不該高興。" }
+        }
+      ]
+    },
+    {
+      "id": "d26_pm_longstay",
+      "location": "sanquan",
+      "when": { "day": 26, "phase": "afternoon" },
+      "title": "長住的客人",
+      "text": "他從第 11 天就住在這裡，一直續住。",
+      "slots": [
+        {
+          "id": "talk",
+          "occupant": "npc_longstay",
+          "label": "跟他講話",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "「這不是意外。」\n「我見過這個鎮怎麼處理一個人——他們不用動手的。」",
+            "flag": { "longstay_warned": true }
+          }
+        }
+      ],
+      "note": "他沒有講他太太。他要到第三章第 41 天才會講完。第一輪玩家聽到的是一句沒有根據的抱怨，作用是讓玩家記住這個人，好在第三章第 40 天回來找他"
+    },
+    {
+      "id": "d26_evening_power_back",
+      "location": "sanquan",
+      "when": { "day": 26, "phase": "evening" },
+      "fixed": true,
+      "title": "電來了",
+      "text": "訊號回來了。手機湧進三天的訊息。",
+      "slots": [],
+      "on_enter": { "flag": { "typhoon_over": true } }
+    }
+  ]
+}
