@@ -1,126 +1,194 @@
 {
-  "_comment": "第一章 13 個白天地點 ＋ 第 1-3 夜的夜間標記。欄位說明見 data/SCHEMA.md。地圖座標為示意值，但保留相對位置（待決 29 需要地理關係）。",
-
+  "_comment": "第一章 13 個白天地點 ＋ 全三章的夜間標記。欄位說明見 data/SCHEMA.md。地圖座標為示意值，但保留相對位置（待決 29 需要地理關係）。價碼規則：收費的是「往裡走」（樓下、後面、再往上、痕跡的下一級），免費的是「夜鎮的地形」。全輪只有 10 個收費，見待決 38。",
   "day": [
     {
       "id": "sanquan",
       "name": "山泉閣",
-      "phases": ["morning", "afternoon"],
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 50, "y": 50 },
+      "map": {
+        "x": 50,
+        "y": 50
+      },
       "note": "叔叔的旅館。後院看得到靜和園後門，晚上有車進出"
     },
     {
       "id": "jinghe",
       "name": "靜和園",
-      "phases": ["morning", "afternoon"],
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 62, "y": 46 },
+      "map": {
+        "x": 62,
+        "y": 46
+      },
       "note": "對面。大廳、櫃檯、林姐、阿薇。玩家只到得了大廳"
     },
     {
       "id": "oldstreet",
       "name": "老街",
-      "phases": ["morning", "afternoon"],
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 40, "y": 60 },
+      "map": {
+        "x": 40,
+        "y": 60
+      },
       "note": "春阿嬤（雜貨店）、土產店、麵攤"
     },
     {
       "id": "temple",
       "name": "廟＋廟埕",
-      "phases": ["morning", "afternoon"],
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 33, "y": 40 },
+      "map": {
+        "x": 33,
+        "y": 40
+      },
       "note": "金伯、慶典籌備、信徒名冊"
     },
     {
       "id": "clinic",
       "name": "診所",
-      "phases": ["morning"],
+      "phases": [
+        "morning"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 55, "y": 66 },
+      "map": {
+        "x": 55,
+        "y": 66
+      },
       "note": "陳醫師、護士、候診室。候診室的人年紀都不大"
     },
     {
       "id": "riverside",
       "name": "河邊",
-      "phases": ["afternoon"],
+      "phases": [
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 25, "y": 72 },
+      "map": {
+        "x": 25,
+        "y": 72
+      },
       "note": "周先生、父母出事的橋。叔叔會勸你別去"
     },
     {
       "id": "columbarium",
       "name": "納骨塔",
-      "phases": ["afternoon"],
+      "phases": [
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 18, "y": 28 },
+      "map": {
+        "x": 18,
+        "y": 28
+      },
       "note": "父母的位子、鎮民的塔位。玩家可以自己算生卒年"
     },
     {
       "id": "oldschool",
       "name": "舊國小",
-      "phases": ["afternoon"],
+      "phases": [
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 30, "y": 55 },
+      "map": {
+        "x": 30,
+        "y": 55
+      },
       "note": "廢教室、榮譽榜、畢業照"
     },
     {
       "id": "bathhouse",
       "name": "公共浴場",
-      "phases": ["morning", "afternoon"],
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 46, "y": 74 },
+      "map": {
+        "x": 46,
+        "y": 74
+      },
       "note": "二手水，不取樣。休館公告越接近慶典越頻繁。⚠️ 待決 29：要確認它在不在老曾聲稱的巡查路線上"
     },
     {
       "id": "busstop",
       "name": "公車站／山路口",
-      "phases": ["morning"],
+      "phases": [
+        "morning"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 72, "y": 30 },
+      "map": {
+        "x": 72,
+        "y": 30
+      },
       "note": "車只有上午（下山用）。不是線索地點，是位置——坐它的是被叫回來的年輕人，客戶都自己開車。每一輪的第一個與最後一個畫面都在這裡"
     },
     {
       "id": "communitycenter",
       "name": "活動中心",
-      "phases": ["afternoon"],
+      "phases": [
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 38, "y": 48 },
+      "map": {
+        "x": 38,
+        "y": 48
+      },
       "note": "慶典籌備會、公告欄。建築太新太好"
     },
     {
       "id": "oldhouse",
       "name": "老家",
-      "phases": ["afternoon"],
+      "phases": [
+        "afternoon"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 22, "y": 62 },
+      "map": {
+        "x": 22,
+        "y": 62
+      },
       "note": "父母舊屋。叔叔不讓進。裡面是收拾到一半的行李和那份契書"
     },
     {
       "id": "police",
       "name": "派出所",
-      "phases": ["morning"],
+      "phases": [
+        "morning"
+      ],
       "layer": "day",
       "chapter": 1,
-      "map": { "x": 58, "y": 58 },
+      "map": {
+        "x": 58,
+        "y": 58
+      },
       "note": "老曾、舊卷宗（二十年前那份事故報告）"
     }
   ],
-
   "night": [
     {
       "id": "n_corridor",
@@ -130,7 +198,10 @@
       "earliest_night": 1,
       "madness_cost": 0,
       "night_reveal": null,
-      "map": { "x": 62, "y": 46 },
+      "map": {
+        "x": 62,
+        "y": 46
+      },
       "note": "固定演出，不產生發狂卡。真相：靜和園內部。對位後改名。第三章第 37 天他會站在同一個地方，而那時飯菜是冷的"
     },
     {
@@ -141,7 +212,10 @@
       "earliest_night": 2,
       "madness_cost": 0,
       "night_reveal": null,
-      "map": { "x": 50, "y": 50 },
+      "map": {
+        "x": 50,
+        "y": 50
+      },
       "note": "固定演出，不產生發狂卡。房子的位置不對，一盞燈都沒有"
     },
     {
@@ -150,9 +224,12 @@
       "layer": "night",
       "chapter": 1,
       "earliest_night": 3,
-      "madness_cost": 1,
+      "madness_cost": 0,
       "night_reveal": null,
-      "map": { "x": 55, "y": 66 },
+      "map": {
+        "x": 55,
+        "y": 66
+      },
       "note": "真相：那是名單。他不用排，因為他已經在上面了。第 43 夜這句話會改口"
     },
     {
@@ -161,9 +238,12 @@
       "layer": "night",
       "chapter": 1,
       "earliest_night": 3,
-      "madness_cost": 1,
+      "madness_cost": 0,
       "night_reveal": null,
-      "map": { "x": 44, "y": 57 },
+      "map": {
+        "x": 44,
+        "y": 57
+      },
       "note": "真相：那家人在等一個沒回來的人"
     },
     {
@@ -172,16 +252,289 @@
       "layer": "night",
       "chapter": 1,
       "earliest_night": 3,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 25,
+        "y": 72
+      },
+      "note": "河是乾的，水聲從地底傳來。地上排著大小不一的鞋"
+    },
+    {
+      "id": "n_ahong_1",
+      "name": "有人走過的路",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 6,
       "madness_cost": 1,
       "night_reveal": null,
-      "map": { "x": 25, "y": 72 },
-      "note": "河是乾的，水聲從地底傳來。地上排著大小不一的鞋"
+      "map": {
+        "x": 36,
+        "y": 34
+      },
+      "note": "阿宏鏈第一級：工作鞋腳印、他常用的小東西、霧裡的背影。追過去就沒有了"
+    },
+    {
+      "id": "n_woodtags",
+      "name": "數木牌的屋子",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 6,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 33,
+        "y": 40
+      },
+      "note": "有人背對著數小木牌，數到一半重數，永遠數不對。⚠️ 待決 4：一條世界規則在這裡失去載體（阿宏開始忘記簿子上「不在」的人）"
+    },
+    {
+      "id": "n_source",
+      "name": "上坡／源頭",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 7,
+      "madness_cost": 1,
+      "night_reveal": null,
+      "map": {
+        "x": 30,
+        "y": 18
+      },
+      "note": "水是黑的但很燙。水裡背對著的人轉頭——是主角自己。那是第 2 天泡湯留下的備份，五天前才放進去。第 45 天他會再看到同一個畫面，而那次他沒有醒"
+    },
+    {
+      "id": "n_manydoors",
+      "name": "很多門的巷子",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 8,
+      "madness_cost": 1,
+      "night_reveal": null,
+      "map": {
+        "x": 42,
+        "y": 52
+      },
+      "note": "第一場遭遇。「你叫什麼名字？」「不對。那個名字有人在用了。」價碼仍是 1——遭遇會永久吃掉一兩張卡，那本身就是它的價碼，不再收第二次"
+    },
+    {
+      "id": "n_music",
+      "name": "有音樂的地方",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 9,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 33,
+        "y": 40
+      },
+      "note": "廟埕上在辦儀式，沒有人的臉朝著他。他聽到自己的名字被唱到，沒有人回頭"
+    },
+    {
+      "id": "n_lockedhouse",
+      "name": "上鎖的屋子",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 11,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 22,
+        "y": 62
+      },
+      "note": "擺設和老家一模一樣，但叔叔不讓進的那間房在這裡門是開的。大門鎖著——給玩家一個明確的白天目標：拿鑰匙"
+    },
+    {
+      "id": "n_ahong_2",
+      "name": "血還是新的",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 11,
+      "madness_cost": 1,
+      "requires": {
+        "flag": "opened_n_ahong_1"
+      },
+      "night_reveal": null,
+      "map": {
+        "x": 36,
+        "y": 34
+      },
+      "note": "阿宏鏈第二級：血是第 3 天那道割傷的位置與形狀，還是新的。搬貨的聲音重複同一段。白天他已經失蹤兩天，這裡卻停在他失蹤之前。第一輪只到「矛盾成立」為止"
+    },
+    {
+      "id": "n_nodoor",
+      "name": "沒有門的建築",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 12,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 62,
+        "y": 46
+      },
+      "note": "靜和園的位置。原本不在標記表上，補入"
+    },
+    {
+      "id": "n_landmark",
+      "name": "地標",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 13,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 45,
+        "y": 44
+      },
+      "note": "長歪的樹／斷掉的石碑／很特別的轉角。隔天白天在鎮上走會看到同一個東西——這是「夜鎮就是同一個鎮」的證明。原本不在標記表上，補入"
+    },
+    {
+      "id": "n_plaza",
+      "name": "中心廣場",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 14,
+      "madness_cost": 1,
+      "night_reveal": null,
+      "map": {
+        "x": 45,
+        "y": 50
+      },
+      "note": "桌上攤著簿子，全是名字，有些被劃掉又重寫。他找到自己的名字，旁邊有個看不懂的記號。轉身時看到叔叔也站在人群裡，叫他，他沒有回頭"
+    },
+    {
+      "id": "n_ahong_3",
+      "name": "有人叫他的名字",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 14,
+      "madness_cost": 1,
+      "requires": {
+        "flag": "opened_n_ahong_2"
+      },
+      "night_reveal": null,
+      "map": {
+        "x": 36,
+        "y": 34
+      },
+      "note": "阿宏鏈第三級（第一輪高投入上限）：夜裡有人清楚叫出主角的名字；或拿到一件只有阿宏本人、且失蹤後才可能留下的物件。結論仍只到「他跟夜裡有關」"
+    },
+    {
+      "id": "n_litcorridor",
+      "name": "有燈的走廊",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 17,
+      "madness_cost": 1,
+      "night_reveal": null,
+      "map": {
+        "x": 55,
+        "y": 66
+      },
+      "note": "診所後棟的夜版。燈是亮的，但沒有電"
+    },
+    {
+      "id": "n_higher",
+      "name": "再往上",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 20,
+      "madness_cost": 1,
+      "night_reveal": null,
+      "map": {
+        "x": 28,
+        "y": 10
+      },
+      "note": "源頭更上面。水從哪裡來"
+    },
+    {
+      "id": "n_emptyspot",
+      "name": "空的位子",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 21,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 48,
+        "y": 54
+      },
+      "note": "阿財原本站的地方。第一輪玩家不會知道那是他的——白天他只是照約定請假的第二天"
+    },
+    {
+      "id": "n_gathering",
+      "name": "集合的隊伍",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 28,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 38,
+        "y": 42
+      },
+      "note": "遊行隊伍在夜鎮集合。他們每晚多幾個人"
+    },
+    {
+      "id": "n_steam_below",
+      "name": "有蒸氣的樓下",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 37,
+      "madness_cost": 1,
+      "night_reveal": null,
+      "map": {
+        "x": 62,
+        "y": 48
+      },
+      "note": "靜和園後棟夜版。白天被請出去的那個池子。第 1 夜走廊盡頭的樓下，玩家等了 37 天"
+    },
+    {
+      "id": "n_emptyspot_2",
+      "name": "又一個空的位子",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 39,
+      "madness_cost": 0,
+      "night_reveal": null,
+      "map": {
+        "x": 48,
+        "y": 54
+      },
+      "note": "她原本站的地方。對應第 21 夜阿財那個空位"
+    },
+    {
+      "id": "n_behind_temple",
+      "name": "廟的後面",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 42,
+      "madness_cost": 1,
+      "night_reveal": null,
+      "map": {
+        "x": 31,
+        "y": 37
+      },
+      "note": "燒金爐。火是冷的"
+    },
+    {
+      "id": "n_corridor_end",
+      "name": "走廊的盡頭",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 45,
+      "madness_cost": null,
+      "night_reveal": null,
+      "map": {
+        "x": 62,
+        "y": 46
+      },
+      "note": "永遠開不了——第 45 夜不存在，主角第 45 天下午就被取走了。它跟開局選單那行灰掉的「不上車」是同一種語言。價碼留 null，玩家看得到這個標記但永遠等不到那一夜"
     }
   ],
-
   "_pending": {
-    "phases": "待決 20：21 地點 17 NPC 的開放時段與夜間三分類還沒完整標，這裡只有第一章 13 個",
-    "madness_cost": "待決 38：全作標記價碼一個都沒標，這裡先全填 1"
+    "phases": "待決 20：21 地點 17 NPC 的開放時段與夜間三分類還沒完整標，白天這裡只有第一章 13 個",
+    "madness_cost": "待決 38 已結案：第一輪全部 1，多張價碼留給第二輪之後。資料結構支援 2-3，改這個欄位即可"
   }
-
 }
