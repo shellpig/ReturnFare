@@ -194,10 +194,19 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 { "switch": "s1" }
 { "relation_at_least": { "npc": "awei", "state": "疑似" } }
 { "flag": "ahong_missing" }
+{ "madness_at_least": 3 }
 { "not": { ... } }
 { "all": [ ... ] }
 { "any": [ ... ] }
 ```
+
+#### `madness_at_least`＝「撐著不清」的報酬
+
+企劃書第七節：**桌面上有 ≥3 張發狂卡才看得見某些東西**（門檻值住 `tuning.json` 的 `madness_vision_threshold`，寫條件時填那個值）。
+
+**這是拖延唯一的正報酬，沒有它那條路只剩壞處**——一張卡不管主動清還是倒數歸零都是一格，拖延省不到行動格。
+
+用在 `condition` 而不是 `requires`：看不見的東西就是不存在，不該灰給玩家看。**這是三態裡「不顯示」那一態的正當用法**——它不是缺鑰匙，是他還不夠不正常。
 
 ### `on_place` 效果
 

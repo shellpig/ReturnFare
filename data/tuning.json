@@ -14,13 +14,14 @@
     "soak_phase_cost": 2,
     "soak_cards_cleared": 1,
     "forced_light_count": 1,
-    "forced_normal_until": 3
+    "forced_normal_until": 5
   },
 
   "_pending": {
     "hand_size": "待決 35：發狂卡開始佔格後要重驗；動 14 就要一起動 madness_cap",
-    "madness_cap": "待決 35：一個標記可能給 2-3 張之後，7 很緊（3+3+1 就到了）",
+    "madness_cap": "第一輪碰不到，這是可接受的（機制層模擬：全輪供給 10 張、倒數 7 天，最貪心的玩家峰值 4 張）。7 是留給第二輪之後的懸崖——那時深標記可能給 2-3 張，3+3+1 就到了",
     "madness_countdown_days": "待決 36：提案 7 天，要靠實際遊玩驗",
-    "reserve_capacity": "待決 34：目前無上限，要不要加硬上限等實際遊玩才知道"
+    "reserve_capacity": "待決 34：目前無上限，要不要加硬上限等實際遊玩才知道",
+    "indulgence.forced_normal_until": "原為 3，機制層模擬後改 5：9 次強制縱慾裡最重級從 6 次降到 4 次，第一次最重從第 18 天推到第 21 天，第一章維持全部輕／正常"
   }
 }
