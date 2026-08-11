@@ -1,0 +1,19 @@
+{
+  "_comment": "全部可調數值。改這裡不用動任何文件。欄位說明見 data/SCHEMA.md。",
+
+  "hand_size": 14,
+  "phases_per_day": 2,
+
+  "madness_cap": 7,
+  "madness_countdown_days": 7,
+  "madness_vision_threshold": 3,
+
+  "reserve_capacity": null,
+
+  "_pending": {
+    "hand_size": "待決 35：發狂卡開始佔格後要重驗；動 14 就要一起動 madness_cap",
+    "madness_cap": "待決 35：一個標記可能給 2-3 張之後，7 很緊（3+3+1 就到了）",
+    "madness_countdown_days": "待決 36：提案 7 天，要靠實際遊玩驗",
+    "reserve_capacity": "待決 34：目前無上限，要不要加硬上限等實際遊玩才知道"
+  }
+}

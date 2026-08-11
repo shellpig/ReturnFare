@@ -1,0 +1,98 @@
+{
+  "_comment": "第 1-3 天會用到的卡。欄位說明見 data/SCHEMA.md。完整卡片清單見待決 22。",
+
+  "cards": [
+    {
+      "id": "protagonist",
+      "type": "protagonist",
+      "name": "我",
+      "text": "把我放進一個槽，就是把這個時段花在那裡。",
+      "slotless": false,
+      "stashable": false,
+      "discardable": false
+    },
+
+    {
+      "id": "info_husband_version",
+      "type": "info",
+      "name": "先生說的那一段",
+      "text": "他說這趟是他提議的。他想把事情講開。",
+      "slotless": false,
+      "stashable": true,
+      "discardable": true
+    },
+    {
+      "id": "info_wife_version",
+      "type": "info",
+      "name": "太太說的那一段",
+      "text": "她說這趟是她提議的，而且她已經想清楚了。",
+      "slotless": false,
+      "stashable": true,
+      "discardable": true
+    },
+    {
+      "id": "info_ahong_private",
+      "type": "info",
+      "name": "只有你們兩人知道的一件小事",
+      "text": "搬貨的時候他講的。沒什麼大不了，但除了你們沒有別人知道。",
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "note": "阿宏線的私人鑰匙。⚠️ 待決 2：它在第一輪目前沒有兌現點"
+    },
+    {
+      "id": "info_ajie_class",
+      "type": "info",
+      "name": "阿婕那屆的畢業照",
+      "text": "榮譽榜上她的名字只到某一年。那年她搬走了。",
+      "slotless": false,
+      "stashable": true,
+      "discardable": true
+    },
+    {
+      "id": "info_chunama_pause",
+      "type": "info",
+      "name": "春阿嬤停住的那一下",
+      "text": "她講你們小時候講得很順。講到你媽媽的時候停住了。",
+      "slotless": false,
+      "stashable": true,
+      "discardable": true
+    },
+
+    {
+      "id": "equip_polaroid",
+      "type": "equipment",
+      "name": "夫妻留下的拍立得",
+      "text": "他們忘在房裡的。常駐佔一格。把它拖到接受它的事件上使用。",
+      "slotless": false,
+      "stashable": true,
+      "discardable": true
+    },
+
+    {
+      "id": "madness",
+      "type": "madness",
+      "name": "發狂",
+      "text": "夜裡帶回來的東西。佔一格，丟不掉，寄放不了，只能縱慾消掉。",
+      "slotless": false,
+      "stashable": false,
+      "discardable": false,
+      "countdown": true
+    },
+
+    {
+      "id": "routine_debt",
+      "type": "routine",
+      "name": "還款通知",
+      "text": "學貸和一點卡債。不處理它會往心境卡掉。",
+      "slotless": false,
+      "stashable": false,
+      "discardable": false
+    }
+  ],
+
+  "_pending": {
+    "all": "待決 22：物品／情報／知識的完整清單還沒盤點，這裡只有第 1-3 天用得到的",
+    "person_cards": "第 1-3 天不發人物卡（見 SCHEMA.md 暫定決定）；委託第 17 天登場時再開"
+  }
+}
