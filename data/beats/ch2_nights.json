@@ -89,17 +89,33 @@
       "id": "d23_night_bleed",
       "location": "sanquan",
       "when": { "day": 23, "phase": "night" },
+      "condition": {
+        "any": [
+          { "flag": "secured_early" },
+          { "flag": "typhoon_secured" },
+          { "madness_at_least": 3 }
+        ]
+      },
       "title": "停電：邊界壞掉",
       "text": "空的旅館，長的走廊。\n停電讓夜間層和白天開始模糊。",
       "slots": [],
       "on_enter": { "flag": { "boundary_bleeding": true } },
-      "note": "⚠️ 這四天白天的行動格有機率直接觸發夜間內容，而且不產生發狂卡（不是玩家去找它）。這個「機率觸發」目前沒有 schema 載體——beat 只能靠 condition 決定出不出現，沒有隨機。要補"
+      "note": "故事線寫的是「有機率觸發」，改成決定性的：**你自己一個人在整棟樓裡走動的那些格子**（封窗、接水、備電、堵漏），加上桌上發狂卡夠多的那條。\n理由是隨機跟這款遊戲對衝——推理在這裡是排程知識（企劃書第十七節），而隨機的東西跨輪學不起來。改成掛在行動上之後它變成可學的：第二輪玩家會知道，颱風那四天一個人去撐旅館的那一格會看到東西。\n而且它剛好是這一段的主題——這四天發生在一棟只有主角、阿薇、一個睡著的老太太和幾個客人的空旅館裡。撐住旅館是你非做不可的事，也正是讓你看見的那件事。\n⚠️ madness_at_least 那條目前的排程摸不到：颱風四天最貪心的玩家也只有 2 張（第 20 夜那張撐到第 27 天）。它留在這裡是為了待決 41 補完收費標記之後自動生效，現在實際生效的是前兩條"
     },
     {
       "id": "d24_night_bleed",
       "location": "sanquan",
       "when": { "day": 24, "phase": "night" },
-      "condition": { "flag": "boundary_bleeding" },
+      "condition": {
+        "all": [
+          { "flag": "boundary_bleeding" },
+          { "any": [
+            { "flag": "hold_d24am" },
+            { "flag": "hold_d24pm" },
+            { "madness_at_least": 3 }
+          ] }
+        ]
+      },
       "title": "二樓有人在走",
       "text": "走廊變長了。應該有門的地方沒有門。二樓有人在走，而二樓只有一個睡著的老太太。\n阿薇在樓梯口停下來，問你：「你剛剛有沒有聽到？」",
       "slots": [],
@@ -110,7 +126,16 @@
       "id": "d25_night_bleed",
       "location": "sanquan",
       "when": { "day": 25, "phase": "night" },
-      "condition": { "flag": "boundary_bleeding" },
+      "condition": {
+        "all": [
+          { "flag": "boundary_bleeding" },
+          { "any": [
+            { "flag": "hold_d25am" },
+            { "flag": "hold_d25pm" },
+            { "madness_at_least": 3 }
+          ] }
+        ]
+      },
       "title": "湯屋有水聲",
       "text": "湯屋沒有開。水聲從那邊傳來，跟第 3 夜河邊那個一樣。\n鎮上的解釋一律是「停電嘛，看錯了」。",
       "slots": [],
@@ -124,7 +149,8 @@
       "title": "電來了之後",
       "text": "燈全部亮起來的那一秒，走廊縮回原來的長度。\n你站在原地確認了三次。",
       "slots": [],
-      "on_enter": { "flag": { "boundary_bleeding": false } }
+      "on_enter": { "flag": { "boundary_bleeding": false } },
+      "note": "只掛 boundary_bleeding，不再加行動條件——看過任何一次的人才需要看到它縮回去。四天都沒撞到的玩家不會知道有東西縮過"
     }
   ]
 }

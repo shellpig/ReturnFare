@@ -13,8 +13,11 @@
         { "id": "awei", "occupant": "npc_awei", "label": "阿薇", "accepts": [] },
         { "id": "grandma", "occupant": "npc_awei_grandma", "label": "她阿嬤", "accepts": [] }
       ],
-      "on_enter": { "flag": { "typhoon_started": true, "awei_sheltering": true } },
-      "note": "這是難堪，不是求助。整段四天是阿薇線的重量來源——第 29 天邀誰是全輪最重的決策，而她整條線就靠這四天"
+      "on_enter": {
+        "gain": ["npc_awei"],
+        "flag": { "typhoon_started": true, "awei_sheltering": true }
+      },
+      "note": "她的人物卡在這一格進手牌——不是為了委託，是為了第 29 天邀得出口。這一格是固定事件，所以每個玩家都拿得到；邀不邀得成由那時的關係狀態決定，不由有沒有卡決定。\n這是難堪，不是求助。整段四天是阿薇線的重量來源——第 29 天邀誰是全輪最重的決策，而她整條線就靠這四天"
     },
     {
       "id": "d23_am_settle_grandma",

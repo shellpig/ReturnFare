@@ -195,10 +195,30 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 { "relation_at_least": { "npc": "awei", "state": "疑似" } }
 { "flag": "ahong_missing" }
 { "madness_at_least": 3 }
+{ "count_at_least": { "n": 2, "of": [ ... ] } }
+{ "switch_progress_at_least": { "switch": "s6", "n": 3 } }
 { "not": { ... } }
 { "all": [ ... ] }
 { "any": [ ... ] }
 ```
+
+#### `count_at_least`＝「這幾個裡面成立了幾個」
+
+`all` 是全部、`any` 是至少一個，**中間那一段一直沒有語彙**。而設計裡到處是中間那一段：第 22 天「兩個觀察開關以上」、第 26–27 天「碰到任意兩個閃躲的人」。
+
+沒有它就只能窮舉配對——三個裡挑兩個要寫三組 `all`，四個裡挑兩個要寫六組。**條件會隨人數平方成長，而且看不出原意。**
+
+```json
+{ "count_at_least": { "n": 2, "of": [
+  { "flag": "acai_obs_knee" }, { "flag": "acai_obs_hands" }, { "flag": "acai_obs_scar" }
+] } }
+```
+
+`of` 裡放的是條件，不是旗標名——所以它可以混搭 `has_card`、`relation_at_least` 等等。`n: 1` 等於 `any`，`n` ＝全長等於 `all`；兩者仍優先用 `any` / `all` 寫，讀起來比較清楚。
+
+#### `switch_progress_at_least`＝累計型開關的讀法
+
+`switch_progress` 只能寫入，**沒有辦法問「累計到幾格了」**——而開關 6 第 35 天要結算。這一條補上讀的那一半。
 
 #### `madness_at_least`＝「撐著不清」的報酬
 
