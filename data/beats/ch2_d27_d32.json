@@ -230,6 +230,84 @@
     },
 
     {
+      "id": "d29_morning_ajie",
+      "location": "sanquan",
+      "when": { "day": 29, "phase": "morning" },
+      "condition": { "flag": "ajie_back" },
+      "title": "阿婕在排明天的班",
+      "text": "她把慶典那兩天的人手排好了，包括你不在的時段。",
+      "slots": [
+        {
+          "id": "talk",
+          "occupant": "npc_ajie",
+          "label": "跟她待一個上午",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "「你要去吧？」她問得很自然。「那我顧店。」\n她講完就去做別的事了，沒有等你回答。",
+            "relation": { "npc": "ajie", "delta": 1 }
+          }
+        }
+      ],
+      "note": "第 29 天下午的邀請是全輪最重的決策。上午這一格是最後一次移動天平——你把它花在誰身上，下午就比較容易想到誰"
+    },
+    {
+      "id": "d29_morning_awei",
+      "location": "jinghe",
+      "when": { "day": 29, "phase": "morning" },
+      "title": "阿薇在對面",
+      "text": "颱風過後靜和園也在收拾。她在門口刷地。",
+      "slots": [
+        {
+          "id": "talk",
+          "occupant": "npc_awei",
+          "label": "跟她待一個上午",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "「你們那邊還好吧。」她問的時候沒有停下手上的事。\n講到後來她說阿嬤這幾天睡得比較好。",
+            "relation": { "npc": "awei", "delta": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d29_morning_prep",
+      "location": "temple",
+      "when": { "day": 29, "phase": "morning" },
+      "title": "廟埕在排明天的事",
+      "text": "金伯在點人數。名冊攤在桌上。",
+      "slots": [
+        {
+          "id": "help",
+          "occupant": "npc_jinbo",
+          "label": "去幫忙",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "「今年多幾個人。」他一邊寫一邊說。你沒問是哪幾個。",
+            "flag": { "helped_festival_prep": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d29_morning_clinic",
+      "location": "clinic",
+      "when": { "day": 29, "phase": "morning" },
+      "title": "診所",
+      "text": "他今天精神不錯。",
+      "slots": [
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "陪叔叔",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "他問你明天要不要去慶典。你說要。他說「那就去」。",
+            "switch_progress": "s6"
+          }
+        }
+      ]
+    },
+    {
       "id": "d29_pm_invitation",
       "location": "sanquan",
       "when": { "day": 29, "phase": "afternoon" },

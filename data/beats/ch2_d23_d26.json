@@ -17,10 +17,75 @@
       "note": "這是難堪，不是求助。整段四天是阿薇線的重量來源——第 29 天邀誰是全輪最重的決策，而她整條線就靠這四天"
     },
     {
+      "id": "d23_am_settle_grandma",
+      "location": "sanquan",
+      "when": { "day": 23, "phase": "morning" },
+      "condition": { "flag": "awei_sheltering" },
+      "title": "先把阿嬤安頓上去",
+      "text": "她們還站在門口。行李只有一個袋子跟一盒藥。",
+      "slots": [
+        {
+          "id": "settle",
+          "occupant": null,
+          "label": "現在就安頓她們",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "你挑了二樓最不會漏的那間。阿薇跟在後面，一句話都沒說。\n上樓的時候她伸手扶了阿嬤一下，那個動作她做過很多次。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "awei_care_d23am": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d23_am_early_secure",
+      "location": "sanquan",
+      "when": { "day": 23, "phase": "morning" },
+      "title": "趕在風進來之前",
+      "text": "現在動手，還來得及做完一輪。",
+      "slots": [
+        {
+          "id": "secure_early",
+          "occupant": null,
+          "label": "先封該封的",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "你一個人把一樓的窗全部封了。做完手在抖。\n這樣做是對的，但你還不知道那不夠。",
+            "flag": { "secured_early": true }
+          }
+        }
+      ],
+      "note": "⚠️ 這一格不減少第 26 天壞掉的三樣東西。「他親手做了兩天防颱，還是不夠」是那一格的全部重量，早做也一樣壞——差別只在他知道自己盡力了"
+    },
+    {
+      "id": "d23_am_guests_early",
+      "location": "sanquan",
+      "when": { "day": 23, "phase": "morning" },
+      "title": "還走得掉嗎",
+      "text": "最後一班公車昨天下午三點就開走了。",
+      "slots": [
+        {
+          "id": "explain",
+          "occupant": null,
+          "label": "跟他們說清楚",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "你講了兩次他們才接受。有一個人一直看窗外，好像看久一點路就會通。",
+            "flag": { "guests_told_d23": true }
+          }
+        }
+      ]
+    },
+    {
       "id": "d23_pm_settle_grandma",
       "location": "sanquan",
       "when": { "day": 23, "phase": "afternoon" },
-      "condition": { "flag": "awei_sheltering" },
+      "condition": {
+        "all": [
+          { "flag": "awei_sheltering" },
+          { "not": { "flag": "awei_care_d23am" } }
+        ]
+      },
       "title": "二樓安置阿嬤",
       "text": "把二樓最不會漏的那間清出來。她的藥要放在她看得到的地方。",
       "slots": [
