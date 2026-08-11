@@ -187,7 +187,7 @@
   "_pending": {
     "all": "待決 22：物品／情報／知識的完整清單還沒盤點，這裡只有第一章用得到的",
     "person_cards": "第一章不發人物卡（見 SCHEMA.md 暫定決定）；委託第 17 天登場時再開",
-    "compare_table": "⚠️ 比對的產出表不存在。情報卡 × 情報卡 → 知識卡／推論卡 的組合一個都還沒列。k_forty_something 目前沒有產出路徑——第 9 天只給 info_forty_something，比對那一步無處可掛。第 22／39／43 天的核心回報全部靠比對，這是下一個要補的東西",
+    "compare_table": "已解決：不需要比對表。比對是一個 accepts 不含 protagonist 的槽，需要哪幾張由槽自己寫（見 SCHEMA.md > 比對）。k_forty_something 的產出路徑已補在第 9 天納骨塔。第 22／39／43 天的比對槽等第二、三章資料",
     "encounter_cards": "第 8 夜遭遇的三個要求還不知道接受哪些卡，等卡片清單"
   }
 }
