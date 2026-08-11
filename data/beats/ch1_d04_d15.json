@@ -1,0 +1,630 @@
+{
+  "_comment": "第一章第 4-15 天。欄位說明見 data/SCHEMA.md。文字為佔位，取自 subdocs/故事線/故事線_第一輪_第一章.md，未經潤稿。夜間標記的內容 beat 另見 ch1_nights.json。",
+
+  "beats": [
+    {
+      "id": "d4_morning_missing",
+      "location": "sanquan",
+      "when": { "day": 4, "phase": "morning" },
+      "fixed": true,
+      "title": "阿宏不見了",
+      "text": "全天起霧，能見度極差，山路口與納骨塔關閉。老曾來旅館問話——你是最後見過他的人之一。",
+      "slots": [{ "id": "laozeng", "occupant": "npc_laozeng", "label": "老曾", "accepts": [] }],
+      "on_enter": { "flag": { "ahong_missing": true } }
+    },
+    {
+      "id": "d4_pm_police",
+      "location": "police",
+      "when": { "day": 4, "phase": "afternoon" },
+      "title": "派出所",
+      "text": "老曾把該問的都問了。他辦得認真。",
+      "slots": [{ "id": "ask", "occupant": "npc_laozeng", "label": "問案子的進展", "accepts": ["protagonist"], "on_place": { "text": "「才一天。」他說。「先別想壞的。」" } }]
+    },
+    {
+      "id": "d4_pm_ahong_home",
+      "location": "oldstreet",
+      "when": { "day": 4, "phase": "afternoon" },
+      "title": "阿宏家",
+      "text": "他媽媽很慌。",
+      "slots": [{ "id": "visit", "occupant": null, "label": "去看看", "accepts": ["protagonist"], "on_place": { "text": "她一直問你昨天他有沒有說什麼。你昨天有沒有說什麼。" } }]
+    },
+    {
+      "id": "d4_pm_street",
+      "location": "oldstreet",
+      "when": { "day": 4, "phase": "afternoon" },
+      "title": "老街",
+      "text": "消息傳得很快。",
+      "slots": [{ "id": "listen", "occupant": null, "label": "聽大家怎麼說", "accepts": ["protagonist"], "on_place": { "text": "「他早就想下山了啦。」" } }],
+      "note": "第一層錯誤歸因——大家需要一個能讓失蹤事件回到日常秩序裡的說法。不是替「兩天後回來」鋪墊"
+    },
+    {
+      "id": "d4_pm_search",
+      "location": "sanquan",
+      "when": { "day": 4, "phase": "afternoon" },
+      "title": "一起找人",
+      "text": "幾個人組了隊要去山路那邊看看。",
+      "slots": [{ "id": "join", "occupant": null, "label": "跟去找", "accepts": ["protagonist"], "on_place": { "text": "霧很大。走了三個小時，什麼都沒有。" } }]
+    },
+    {
+      "id": "d4_ambient",
+      "location": "sanquan",
+      "when": { "day": 4, "phase": "evening" },
+      "fixed": true,
+      "title": "雜訊",
+      "text": "三個大學生入住，興奮地說霧好有氣氛。",
+      "slots": []
+    },
+
+    {
+      "id": "d5_morning_stillmissing",
+      "location": "sanquan",
+      "when": { "day": 5, "phase": "morning" },
+      "fixed": true,
+      "title": "人還是沒找到",
+      "text": "老曾說已經問過下山的交通、他常去的地方、認識的人，沒有消息。阿宏家人還在等。",
+      "slots": [],
+      "note": "不要在第一輪前幾天把案件正式宣布死亡或定案。阿宏就是一直沒有回來"
+    },
+    {
+      "id": "d5_pm_ahong_home",
+      "location": "oldstreet",
+      "when": { "day": 5, "phase": "afternoon" },
+      "title": "阿宏家",
+      "text": "他媽媽把飯留著。",
+      "slots": [{ "id": "visit", "occupant": null, "label": "再去一次", "accepts": ["protagonist"], "on_place": { "text": "桌上那副碗筷擺著，沒有人動。" } }],
+      "echo": {
+        "text": "旁邊有人提起第 3 天下午發生過的一件小事。你接不上話，而現在也沒有人可以問了。",
+        "condition": { "not": { "flag": "ahong_last_normal_contact" } }
+      },
+      "note": "第一章第一次殘響。世界在他沒去的那個下午動過"
+    },
+    {
+      "id": "d5_pm_photos",
+      "location": "sanquan",
+      "when": { "day": 5, "phase": "afternoon" },
+      "title": "找阿婕看照片",
+      "text": "她把這幾天拍的翻出來，想看看有沒有拍到阿宏。",
+      "slots": [{ "id": "look", "occupant": "npc_ajie", "label": "一起看", "accepts": ["protagonist"], "on_place": { "text": "她翻照片的時候在咬指甲。" } }],
+      "note": "種：咬指甲。第三章第 39 天的破綻——她還是咬，而指甲是完好的"
+    },
+    {
+      "id": "d5_pm_police",
+      "location": "police",
+      "when": { "day": 5, "phase": "afternoon" },
+      "title": "派出所",
+      "text": "案子沒有結，但也查不出東西。",
+      "slots": [{ "id": "ask", "occupant": "npc_laozeng", "label": "問老曾", "accepts": ["protagonist"], "on_place": { "text": "「我還在查。」他說，而他是真的還在查。" } }],
+      "echo": {
+        "text": "旁邊有人提起第 3 天下午發生過的一件小事。你接不上話，而現在也沒有人可以問了。",
+        "condition": { "not": { "flag": "ahong_last_normal_contact" } }
+      }
+    },
+    {
+      "id": "d5_pm_street",
+      "location": "oldstreet",
+      "when": { "day": 5, "phase": "afternoon" },
+      "title": "老街",
+      "text": "說法開始定型了。",
+      "slots": [{ "id": "listen", "occupant": null, "label": "聽", "accepts": ["protagonist"], "on_place": { "text": "「年輕人本來就待不住。」" } }]
+    },
+
+    {
+      "id": "d6_morning_bath",
+      "location": "sanquan",
+      "when": { "day": 6, "phase": "morning" },
+      "title": "公共浴場休館了",
+      "text": "一批不住店的人跑來問山泉閣能不能泡。",
+      "slots": [
+        { "id": "open_bath", "occupant": null, "label": "把湯屋開放給他們", "accepts": ["protagonist"], "on_place": { "text": "叔叔沒說什麼，但他看著你做完。", "switch": "s2" } },
+        { "id": "frontdesk", "occupant": null, "label": "前台幫忙", "accepts": ["protagonist"], "on_place": { "text": "接到一通問路電話：一位老人要去對面。" } }
+      ]
+    },
+    {
+      "id": "d6_morning_notice",
+      "location": "bathhouse",
+      "when": { "day": 6, "phase": "morning" },
+      "title": "去浴場看公告",
+      "text": "鐵門拉下來，公告貼在旁邊。",
+      "slots": [{ "id": "read", "occupant": null, "label": "看公告", "accepts": ["protagonist"], "on_place": { "text": "「換水保養」。下面還貼著上個月的、上上個月的——越接近慶典越密。", "gain": ["info_bath_notice"] } }]
+    },
+    {
+      "id": "d6_morning_clinic",
+      "location": "clinic",
+      "when": { "day": 6, "phase": "morning" },
+      "title": "陪叔叔複診",
+      "text": "候診室坐了七八個人。",
+      "slots": [{ "id": "accompany", "occupant": "npc_uncle", "label": "陪他去", "accepts": ["protagonist"], "on_place": { "text": "他說不用陪，但你去了他也沒趕你走。候診室裡的人年紀都不大。", "switch_progress": { "s6": 1 } } }],
+      "note": "開關 6 第 1 格。它只累計，不進檢查點 1——要到第 35 天才結算，這一格的沉默是刻意的"
+    },
+    {
+      "id": "d6_pm_river",
+      "location": "riverside",
+      "when": { "day": 6, "phase": "afternoon" },
+      "title": "河邊",
+      "text": "有個外地來的老先生坐在那裡。",
+      "slots": [{ "id": "sit", "occupant": "npc_zhou", "label": "陪他坐", "accepts": ["protagonist"], "on_place": { "text": "他姓周。他說這裡風景好，他每天都來。" } }],
+      "note": "他坐的就是主角父母出事那座橋的位置"
+    },
+    {
+      "id": "d6_pm_oldschool",
+      "location": "oldschool",
+      "when": { "day": 6, "phase": "afternoon" },
+      "title": "舊國小",
+      "text": "榮譽榜和一整排抽屜。",
+      "slots": [{ "id": "search", "occupant": null, "label": "翻找", "accepts": ["protagonist"], "on_place": { "text": "抽屜底下壓著一張畢業照。", "gain": ["item_gradphoto"] } }]
+    },
+    {
+      "id": "d6_pm_columbarium",
+      "location": "columbarium",
+      "when": { "day": 6, "phase": "afternoon" },
+      "title": "納骨塔",
+      "text": "一整面牆的名字與生卒年。",
+      "slots": [{ "id": "copy", "occupant": null, "label": "抄名字", "accepts": ["protagonist"], "on_place": { "text": "你抄了幾個。抄的時候會經過你自己家那兩格。", "flag": { "columbarium_visits": true } } }],
+      "note": "父母的卒年不在四十幾歲那個區間裡。遊戲不指出來，但玩家自己抄的名單上就擺著——他們是這條線索的反例"
+    },
+    {
+      "id": "d6_pm_street",
+      "location": "oldstreet",
+      "when": { "day": 6, "phase": "afternoon" },
+      "title": "老街",
+      "text": "春阿嬤在搬貨。",
+      "slots": [{ "id": "help", "occupant": "npc_chunama", "label": "幫她搬", "accepts": ["protagonist"], "on_place": { "text": "她多講了一段你們小時候的事。" } }]
+    },
+    {
+      "id": "d6_pm_center",
+      "location": "communitycenter",
+      "when": { "day": 6, "phase": "afternoon" },
+      "title": "活動中心",
+      "text": "慶典陣頭誰家出的，吵起來了。",
+      "slots": [{ "id": "watch", "occupant": null, "label": "在旁邊看", "accepts": ["protagonist"], "on_place": { "text": "鬧得很難看。你第一次看到這裡的人不客氣的樣子。" } }]
+    },
+    {
+      "id": "d6_evening_inherit",
+      "location": "sanquan",
+      "when": { "day": 6, "phase": "evening" },
+      "fixed": true,
+      "title": "他第一次提",
+      "text": "講得很輕，像在說別的事：「你要是待得慣，這裡以後也是有人要顧的。」",
+      "slots": [{ "id": "uncle", "occupant": "npc_uncle", "label": "阿源叔", "accepts": [] }],
+      "note": "檢查點 1：開關 1-2 翻了幾個，決定他講哪個版本"
+    },
+
+    {
+      "id": "d7_morning_frontdesk",
+      "location": "sanquan",
+      "when": { "day": 7, "phase": "morning" },
+      "title": "前台",
+      "text": "一隊登山客入住，講山上的事。",
+      "slots": [{ "id": "work", "occupant": null, "label": "顧前台", "accepts": ["protagonist"], "on_place": { "text": "他們說上面那條路現在沒人走了。" } }]
+    },
+    {
+      "id": "d7_morning_busstop",
+      "location": "busstop",
+      "when": { "day": 7, "phase": "morning" },
+      "title": "山路口",
+      "text": "一輛車開上來。",
+      "slots": [{ "id": "watch", "occupant": null, "label": "看著", "accepts": ["protagonist"], "on_place": { "text": "車上載著一位老人和一個陪同的人。車沒有停，直接開向對面。" } }],
+      "note": "客戶自己開車上山。這一格是「晚上有車進出」的白天版"
+    },
+    {
+      "id": "d7_pm_numbers",
+      "location": "sanquan",
+      "when": { "day": 7, "phase": "afternoon" },
+      "fixed": true,
+      "title": "阿婕算的數字",
+      "text": "這幾天來問路的老人全部去靜和園，山泉閣一組都沒有。她想去看看。",
+      "slots": [
+        { "id": "agree", "occupant": "npc_ajie", "label": "答應一起去", "accepts": ["protagonist"], "on_place": { "text": "「那明天。」她說。", "flag": { "jinghe_with_ajie": true } } },
+        { "id": "alone", "occupant": null, "label": "婉拒，自己去", "accepts": ["protagonist"], "on_place": { "text": "她看了你一下，沒有再說什麼。", "flag": { "jinghe_alone": true } } },
+        { "id": "skip", "occupant": null, "label": "不去", "accepts": ["protagonist"], "on_place": { "text": "「好吧。」" } }
+      ]
+    },
+    {
+      "id": "d7_ambient_rejection",
+      "location": "sanquan",
+      "when": { "day": 7, "phase": "evening" },
+      "fixed": true,
+      "title": "雜訊",
+      "text": "求職回信來了，是拒絕。這一輪只有這一封。",
+      "slots": [],
+      "note": "沒回開局那通電話的玩家，這一封更重——家業線的「留下」變成唯一選項"
+    },
+
+    {
+      "id": "d8_morning_jinghe",
+      "location": "jinghe",
+      "when": { "day": 8, "phase": "morning" },
+      "title": "靜和園",
+      "text": "大廳很安靜，地板擦得發亮。",
+      "slots": [
+        { "id": "go_with_ajie", "occupant": "npc_ajie", "label": "跟阿婕一起進去", "accepts": ["protagonist"], "requires": { "flag": "jinghe_with_ajie" }, "reject_reason": "（你昨天沒有答應她。）", "on_place": { "text": "櫃檯後面站著一個跟你差不多年紀的女生。她從頭到尾沒有笑。", "flag": { "met_awei": true } } },
+        { "id": "go_alone", "occupant": null, "label": "自己進去", "accepts": ["protagonist"], "on_place": { "text": "櫃檯那個女生問你要找誰。你答不出來。", "flag": { "met_awei": true } } }
+      ]
+    },
+    {
+      "id": "d8_pm_lobby",
+      "location": "jinghe",
+      "when": { "day": 8, "phase": "afternoon" },
+      "title": "靜和園大廳",
+      "text": "林姐親切招待，請喝茶。",
+      "slots": [{ "id": "tea", "occupant": "npc_linjie", "label": "坐下來喝", "accepts": ["protagonist"], "on_place": { "text": "她認得阿婕。她說得很自然，自然到你沒有多想。" } }],
+      "note": "⚠️ 待決 6：「阿姨」是不是林姐。若成立，阿婕被叫回來就不是巧合。硬限制：第 29 天之前不准暗示阿婕比較危險"
+    },
+    {
+      "id": "d8_pm_temple",
+      "location": "temple",
+      "when": { "day": 8, "phase": "afternoon" },
+      "title": "廟",
+      "text": "金伯在講慶典的規矩。",
+      "slots": [{ "id": "listen", "occupant": "npc_jinbo", "label": "聽他講", "accepts": ["protagonist"], "on_place": { "text": "他講得很嚴，每一條都一樣嚴。" } }]
+    },
+    {
+      "id": "d8_pm_river",
+      "location": "riverside",
+      "when": { "day": 8, "phase": "afternoon" },
+      "title": "河邊",
+      "text": "周先生還在那裡。",
+      "slots": [{ "id": "sit", "occupant": "npc_zhou", "label": "陪他坐", "accepts": ["protagonist"], "on_place": { "text": "他問你打算待多久。" } }]
+    },
+    {
+      "id": "d8_echo_bathhouse",
+      "location": "bathhouse",
+      "when": { "day": 8, "phase": "afternoon" },
+      "fixed": true,
+      "title": "殘響",
+      "text": "不管你今天去哪都會經過浴場。公告換過了，而且今天裡面有人——門開著一條縫，你進不去。",
+      "slots": [],
+      "condition": { "not": { "has_card": "info_bath_notice" } },
+      "note": "第一章第二次殘響，不佔格"
+    },
+    {
+      "id": "d8_ambient_monkey",
+      "location": "sanquan",
+      "when": { "day": 8, "phase": "evening" },
+      "fixed": true,
+      "title": "雜訊",
+      "text": "猴子闖進旅館，一團亂。帶小孩的一家人覺得很好玩。",
+      "slots": []
+    },
+
+    {
+      "id": "d9_morning_frontdesk",
+      "location": "sanquan",
+      "when": { "day": 9, "phase": "morning" },
+      "title": "前台",
+      "text": "一個研究生入住，開始問東問西。",
+      "slots": [{ "id": "work", "occupant": "npc_student", "label": "顧前台", "accepts": ["protagonist"], "on_place": { "text": "他說他在做民俗研究，問你這裡的慶典是不是真的很特別。" } }]
+    },
+    {
+      "id": "d9_morning_clinic",
+      "location": "clinic",
+      "when": { "day": 9, "phase": "morning" },
+      "title": "診所",
+      "text": "護士在整理藥。",
+      "slots": [{ "id": "ask", "occupant": "npc_azhu", "label": "問叔叔的狀況", "accepts": ["protagonist"], "on_place": { "text": "她無意間提到，叔叔那個藥不是普通的藥。然後她就不講了。" } }]
+    },
+    {
+      "id": "d9_pm_river",
+      "location": "riverside",
+      "when": { "day": 9, "phase": "afternoon" },
+      "title": "河邊",
+      "text": "周先生今天話比較多。",
+      "slots": [{ "id": "sit", "occupant": "npc_zhou", "label": "陪他坐", "accepts": ["protagonist"], "on_place": { "text": "「我在等一個位置。」他說。你以為他在講療養院的床位。", "gain": ["info_zhou_waiting"] } }],
+      "note": "他等的是進貨。而今年之所以空，是因為本地人不夠用了"
+    },
+    {
+      "id": "d9_pm_columbarium",
+      "location": "columbarium",
+      "when": { "day": 9, "phase": "afternoon" },
+      "title": "納骨塔",
+      "text": "生卒年就寫在那裡，你可以自己算。",
+      "slots": [{ "id": "count", "occupant": null, "label": "算生卒年", "accepts": ["protagonist"], "on_place": { "text": "抄滿五個之後，你發現有一小群人的卒年落在同一個區間。", "gain": ["info_forty_something"] } }]
+    },
+    {
+      "id": "d9_pm_oldhouse_outside",
+      "location": "oldhouse",
+      "when": { "day": 9, "phase": "afternoon" },
+      "title": "老家外面",
+      "text": "繞到後面。",
+      "slots": [{ "id": "peek", "occupant": null, "label": "看那間房的窗", "accepts": ["protagonist"], "on_place": { "text": "窗簾拉著。從外面看不出裡面有什麼。" } }]
+    },
+    {
+      "id": "d9_pm_tail_linjie",
+      "location": "bathhouse",
+      "when": { "day": 9, "phase": "afternoon" },
+      "title": "跟拍林姐",
+      "text": "她下午會出門。",
+      "slots": [{ "id": "tail", "occupant": "npc_linjie", "label": "跟上去", "accepts": ["protagonist"], "on_place": { "text": "她走到公共浴場的後門，跟裡面的人講了幾句話，然後離開。" } }]
+    },
+    {
+      "id": "d9_pm_student",
+      "location": "sanquan",
+      "when": { "day": 9, "phase": "afternoon" },
+      "title": "找研究生聊民俗",
+      "text": "他很願意講。",
+      "slots": [{ "id": "talk", "occupant": "npc_student", "label": "跟他聊", "accepts": ["protagonist"], "on_place": { "text": "他說這種山村的慶典通常都有一套自己的規矩，而規矩比信仰活得久。" } }]
+    },
+    {
+      "id": "d9_ambient_classmates",
+      "location": "sanquan",
+      "when": { "day": 9, "phase": "evening" },
+      "fixed": true,
+      "title": "雜訊",
+      "text": "大學同學群組在講誰找到工作了。",
+      "slots": []
+    },
+
+    {
+      "id": "d10_morning_landslide",
+      "location": "sanquan",
+      "when": { "day": 10, "phase": "morning" },
+      "fixed": true,
+      "title": "山路小坍方",
+      "text": "公車停開一天，鎮上暫時進不來也出不去。慶典籌備正式開始，活動中心貼了公告，全鎮動起來。\n同一個上午，那位先生回來了——他發現拍立得忘在房裡，那是他們一起買的。然後山路塌了，他走不掉。",
+      "slots": [{ "id": "husband", "occupant": "npc_husband", "label": "那位先生", "accepts": [] }],
+      "note": "颱風的預演"
+    },
+    {
+      "id": "d10_pm_couple_close",
+      "location": "sanquan",
+      "when": { "day": 10, "phase": "afternoon" },
+      "title": "留下處理下不了山的客人",
+      "text": "他要多住一晚。他坐在大廳，沒有回房間。",
+      "slots": [
+        { "id": "stay", "occupant": "npc_husband", "label": "留下來陪他", "accepts": ["protagonist"], "on_place": { "text": "你陪他喝了一杯。他講了一些話，但沒有講到重點。", "switch": "s3" } },
+        { "id": "show_photo", "occupant": null, "label": "把那天的相紙拿出來", "accepts": ["equip_polaroid"], "requires": { "has_card": "equip_polaroid" }, "reject_reason": "（你沒有那天的照片。）", "on_place": { "text": "相紙上兩個人站得很開，太太先上的車。他看著那張照片講話。" } }
+      ],
+      "note": "本章的完成感節點。三選一收束詳見第二節專節。拍立得因此被用了兩次：第 3 天當教學卡，第 10 天當情感卡。玩家到今天已經累積六天「撿到碎片、得到一個聳肩」——這一格是那六天的解藥"
+    },
+    {
+      "id": "d10_pm_center",
+      "location": "communitycenter",
+      "when": { "day": 10, "phase": "afternoon" },
+      "title": "籌備會",
+      "text": "全鎮的人都在。",
+      "slots": [{ "id": "attend", "occupant": null, "label": "去聽", "accepts": ["protagonist"], "on_place": { "text": "你看得出來誰說話有份量。吳會長講話的時候沒有人插嘴。" } }]
+    },
+    {
+      "id": "d10_pm_jinghe",
+      "location": "jinghe",
+      "when": { "day": 10, "phase": "afternoon" },
+      "title": "靜和園",
+      "text": "阿薇在櫃檯。",
+      "slots": [{ "id": "talk", "occupant": "npc_awei", "label": "跟她講話", "accepts": ["protagonist"], "on_place": { "text": "「你們那間也想接慶典的客人？」" } }]
+    },
+
+    {
+      "id": "d11_morning_longstay",
+      "location": "sanquan",
+      "when": { "day": 11, "phase": "morning" },
+      "title": "前台",
+      "text": "一位五十幾歲的客人來登記。",
+      "slots": [{ "id": "checkin", "occupant": "npc_longstay", "label": "幫他登記", "accepts": ["protagonist"], "on_place": { "text": "寫住幾天的時候他猶豫了一下，最後寫了一個很長的數字。" } }],
+      "note": "他是山泉閣唯一的長住客，而山泉閣的客人本來住一兩晚就走。UI 上他一直叫「長住的客人」，到第 41 天才變成名字"
+    },
+    {
+      "id": "d11_morning_street",
+      "location": "oldstreet",
+      "when": { "day": 11, "phase": "morning" },
+      "title": "老街",
+      "text": "春阿嬤在店裡。",
+      "slots": [
+        { "id": "parents", "occupant": "npc_chunama", "label": "問我爸媽的事", "accepts": ["protagonist"], "on_place": { "text": "她講到一半停住了。追下去她會說：「那時候……大家都覺得你媽媽有點那個。」", "gain": ["info_chunama_pause"] } },
+        { "id": "awei_mother", "occupant": null, "label": "問阿薇她媽媽", "accepts": ["protagonist"], "on_place": { "text": "「最後那兩年很辛苦。」她說。「那孩子一個人扛。」", "gain": ["info_awei_mother"] } }
+      ],
+      "note": "她的情緒是羞愧，不是傷心——她當年也跟著不再有事找主角的媽媽"
+    },
+    {
+      "id": "d11_pm_oldhouse",
+      "location": "oldhouse",
+      "when": { "day": 11, "phase": "afternoon" },
+      "title": "老家",
+      "text": "阿源叔在打掃。那間房他不讓你進。",
+      "slots": [{ "id": "trydoor", "occupant": "npc_uncle", "label": "趁他去拿東西時試門把", "accepts": ["protagonist"], "on_place": { "text": "鎖著。", "flag": { "tried_the_door": true } } }],
+      "note": "檢查點 2：開關 1-3 翻了幾個，決定叔叔講繼承講得多明"
+    },
+    {
+      "id": "d11_pm_ask_uncle",
+      "location": "sanquan",
+      "when": { "day": 11, "phase": "afternoon" },
+      "title": "問叔叔父母的事",
+      "text": "他會講一段。",
+      "slots": [{ "id": "ask", "occupant": "npc_uncle", "label": "問他", "accepts": ["protagonist"], "on_place": { "text": "中間有幾年他說他生病，記不清。他講不下去。", "gain": ["info_uncle_gap"] } }],
+      "note": "那幾年就是弟妹說他不是他自己的那幾年。而他到死都不知道她是對的"
+    },
+    {
+      "id": "d11_pm_oldschool",
+      "location": "oldschool",
+      "when": { "day": 11, "phase": "afternoon" },
+      "title": "舊國小",
+      "text": "畢業照上有年輕時的叔叔。",
+      "slots": [{ "id": "compare", "occupant": null, "label": "比對照片裡的叔叔與現在的叔叔", "accepts": ["item_gradphoto"], "requires": { "has_card": "item_gradphoto" }, "reject_reason": "（你手上沒有那張照片。）", "on_place": { "text": "你看了很久。說不出哪裡不一樣，但你看了很久。" } }]
+    },
+    {
+      "id": "d11_pm_river",
+      "location": "riverside",
+      "when": { "day": 11, "phase": "afternoon" },
+      "title": "河邊",
+      "text": "周先生問你在做什麼。",
+      "slots": [
+        { "id": "tell_debt", "occupant": "npc_zhou", "label": "說債的事", "accepts": ["protagonist"], "on_place": { "text": "他聽完沒有安慰你。他只是問了幾個很具體的問題。", "flag": { "told_zhou_debt": true } } },
+        { "id": "deflect", "occupant": null, "label": "帶過去", "accepts": ["protagonist"], "on_place": { "text": "他沒有追問。" } }
+      ]
+    },
+
+    {
+      "id": "d12_morning_medicine",
+      "location": "clinic",
+      "when": { "day": 12, "phase": "morning" },
+      "fixed": true,
+      "title": "幫叔叔拿藥",
+      "text": "藥袋上是那間診所。",
+      "slots": [],
+      "note": "固定事件不算開關 6——不花格子的東西不是選擇"
+    },
+    {
+      "id": "d12_pm_chen",
+      "location": "clinic",
+      "when": { "day": 12, "phase": "afternoon" },
+      "title": "追問陳醫師",
+      "text": "他很有耐心。",
+      "slots": [{ "id": "ask", "occupant": "npc_chen", "label": "問那個藥", "accepts": ["protagonist"], "on_place": { "text": "他解釋得非常清楚，清楚到你找不到地方可以再問。" } }]
+    },
+    {
+      "id": "d12_pm_ajie",
+      "location": "sanquan",
+      "when": { "day": 12, "phase": "afternoon" },
+      "title": "問阿婕",
+      "text": "她查了藥名。",
+      "slots": [{ "id": "ask", "occupant": "npc_ajie", "label": "問她查到什麼", "accepts": ["protagonist"], "on_place": { "text": "「查不太到。」她說。「不過我也不是醫生。」" } }]
+    },
+    {
+      "id": "d12_pm_awei",
+      "location": "oldstreet",
+      "when": { "day": 12, "phase": "afternoon" },
+      "title": "老街遇到阿薇",
+      "text": "她一個人在搬東西。",
+      "slots": [{ "id": "help", "occupant": "npc_awei", "label": "幫她", "accepts": ["protagonist"], "on_place": { "text": "她愣了一下，然後笑了一下——笑的時候用手遮了嘴。", "relation": { "npc": "awei", "delta": 1 } } }],
+      "note": "種：遮嘴（門牙缺一角）。第三章第 39 天她還是遮，而那顆牙已經好了"
+    },
+    {
+      "id": "d12_pm_tail_longstay",
+      "location": "columbarium",
+      "when": { "day": 12, "phase": "afternoon" },
+      "title": "跟蹤長住的客人",
+      "text": "他出門了。",
+      "slots": [{ "id": "tail", "occupant": "npc_longstay", "label": "跟上去", "accepts": ["protagonist"], "on_place": { "text": "他去了納骨塔。他在一整面牆前面站了很久，沒有燒香。" } }]
+    },
+    {
+      "id": "d12_pm_zhou_job",
+      "location": "riverside",
+      "when": { "day": 12, "phase": "afternoon" },
+      "title": "周先生邀你投履歷",
+      "text": "他認識人。",
+      "slots": [{ "id": "accept", "occupant": "npc_zhou", "label": "聽他說", "accepts": ["protagonist"], "requires": { "flag": "told_zhou_debt" }, "reject_reason": "（他不知道你需要一份工作。）", "on_place": { "text": "「你把東西寄給我，我幫你問問。」他說得很輕鬆，像這對他不是什麼事。", "gain": ["info_zhou_job"] } }],
+      "note": "履歷從第 13 天移到這裡：第 13 天下午原本同時撞名冊、履歷、開關 4，三條線的關鍵節點在第一章太早撞在一起"
+    },
+    {
+      "id": "d12_ambient_shops",
+      "location": "oldstreet",
+      "when": { "day": 12, "phase": "evening" },
+      "fixed": true,
+      "title": "雜訊",
+      "text": "老街兩家土產店互相講對方壞話，各自拉你評理。",
+      "slots": []
+    },
+
+    {
+      "id": "d13_morning_rules",
+      "location": "temple",
+      "when": { "day": 13, "phase": "morning" },
+      "title": "金伯講慶典規矩",
+      "text": "他講得極嚴。八條，每一條都一樣嚴。",
+      "slots": [{ "id": "listen", "occupant": "npc_jinbo", "label": "聽完", "accepts": ["protagonist"], "on_place": { "text": "其中一條是：「不管誰叫你，不要應。」", "gain": ["info_festival_rules"] } }],
+      "note": "八條裡 2 條是真的，6 條是假的，而金伯自己不知道哪些是真的。玩家第一輪記不住八條，這是刻意的——他會記住的是「有很多規矩」"
+    },
+    {
+      "id": "d13_pm_registry",
+      "location": "temple",
+      "when": { "day": 13, "phase": "afternoon" },
+      "title": "信徒名冊",
+      "text": "金伯讓你看。",
+      "slots": [{ "id": "read", "occupant": "npc_jinbo", "label": "翻名冊", "accepts": ["protagonist"], "on_place": { "text": "你的名字在上面，已登記，那一格註記「不在」。旁邊另有一筆拜契的紀錄。\n阿婕的名字也在，但那一欄是空的。\n阿薇已登記，一直是「在」。", "gain": ["info_registry"] } }],
+      "note": "第一輪玩家看不懂那些欄位是什麼意思。他會記得的是「我的名字在上面」"
+    },
+    {
+      "id": "d13_pm_festival_business",
+      "location": "sanquan",
+      "when": { "day": 13, "phase": "afternoon" },
+      "title": "接慶典的生意",
+      "text": "要接就要現在講。",
+      "slots": [{ "id": "take", "occupant": null, "label": "接下來", "accepts": ["protagonist"], "on_place": { "text": "叔叔說他早就想接了，只是一個人做不動。", "switch": "s4" } }],
+      "note": "這個下午是名冊 vs 開關 4——查真相對顧家業。它問的是「你到底是回來幹嘛的」，不是「你比較想要哪個獎品」"
+    },
+    {
+      "id": "d13_pm_temple_awei",
+      "location": "temple",
+      "when": { "day": 13, "phase": "afternoon" },
+      "title": "廟裡幫忙",
+      "text": "阿薇也在。",
+      "slots": [{ "id": "help", "occupant": "npc_awei", "label": "一起弄", "accepts": ["protagonist"], "on_place": { "text": "她做事很俐落，而且不太講話。" } }]
+    },
+    {
+      "id": "d13_pm_student",
+      "location": "sanquan",
+      "when": { "day": 13, "phase": "afternoon" },
+      "title": "找研究生對照慶典的說法",
+      "text": "他手上有資料。",
+      "slots": [{ "id": "compare", "occupant": "npc_student", "label": "跟他對照", "accepts": ["protagonist"], "on_place": { "text": "他說這裡的規矩比他看過的任何一個都多。" } }]
+    },
+    {
+      "id": "d13_ambient_dog",
+      "location": "oldstreet",
+      "when": { "day": 13, "phase": "evening" },
+      "fixed": true,
+      "title": "雜訊",
+      "text": "誰家的狗不見了，全鎮在找。",
+      "slots": []
+    },
+
+    {
+      "id": "d14_morning_name",
+      "location": "sanquan",
+      "when": { "day": 14, "phase": "morning" },
+      "title": "長住的客人主動找上你",
+      "text": "他問你認不認識某個名字。",
+      "slots": [{ "id": "ask", "occupant": "npc_longstay", "label": "聽他問", "accepts": ["protagonist"], "on_place": { "text": "你不認得。他說沒關係，只是問問。但他問的時候不是「只是問問」的樣子。", "gain": ["info_a_name"] } }]
+    },
+    {
+      "id": "d14_pm_chase_name",
+      "location": "oldstreet",
+      "when": { "day": 14, "phase": "afternoon" },
+      "title": "拿那個名字去問春阿嬤",
+      "text": "她認得。",
+      "slots": [{ "id": "ask", "occupant": "npc_chunama", "label": "問她", "accepts": ["info_a_name"], "requires": { "has_card": "info_a_name" }, "reject_reason": "（你手上沒有那個名字。）", "on_place": { "text": "「哦——那個啊。」她說。然後她講的內容跟你想的完全不一樣，而且她講得很平常。" } }],
+      "note": "待決 1：第 14 天下午原本是空的。現行做法是把上午那個名字的追查升成下午的正式內容——不需要另外設計固定事件"
+    },
+    {
+      "id": "d14_pm_registry_name",
+      "location": "temple",
+      "when": { "day": 14, "phase": "afternoon" },
+      "title": "去名冊上找那個名字",
+      "text": "金伯讓你自己翻。",
+      "slots": [{ "id": "search", "occupant": null, "label": "翻名冊", "accepts": ["info_a_name"], "requires": { "has_card": "info_a_name" }, "reject_reason": "（你手上沒有那個名字。）", "on_place": { "text": "那一格註記「不在」。跟你自己那一格一樣。" } }]
+    },
+    {
+      "id": "d14_pm_awei",
+      "location": "jinghe",
+      "when": { "day": 14, "phase": "afternoon" },
+      "title": "去找阿薇",
+      "text": "她在櫃檯。",
+      "slots": [{ "id": "mother", "occupant": "npc_awei", "label": "講她媽媽的事", "accepts": ["info_awei_mother"], "requires": { "has_card": "info_awei_mother" }, "reject_reason": "（你不知道她家裡的事。）", "on_place": { "text": "她停了一下。「你去問誰的？」但她沒有生氣。她講到後來笑了一次，又用手遮住。", "relation": { "npc": "awei", "delta": 1 } } }],
+      "note": "關係第一次鬆動。種：那顆牙"
+    },
+
+    {
+      "id": "d15_morning_collapse",
+      "location": "sanquan",
+      "when": { "day": 15, "phase": "morning" },
+      "fixed": true,
+      "title": "他在你面前倒下",
+      "text": "早上他還在講今天要做什麼。講到一半就倒了。",
+      "slots": [{ "id": "uncle", "occupant": "npc_uncle", "label": "阿源叔", "accepts": [] }],
+      "note": "檢查點 3：倒下前最後一句話由開關狀態決定。翻滿的版本最難受——他終於把繼承講白了"
+    },
+    {
+      "id": "d15_pm_clinic",
+      "location": "clinic",
+      "when": { "day": 15, "phase": "afternoon" },
+      "fixed": true,
+      "title": "診所",
+      "text": "陳醫師溫和地解釋，說是老毛病，要多休息。",
+      "slots": [{ "id": "chen", "occupant": "npc_chen", "label": "陳醫師", "accepts": [] }],
+      "on_enter": {
+        "text": "走出來的時候阿薇站在外面。「我媽以前也是這樣。」",
+        "relation": { "npc": "awei", "delta": 1 }
+      },
+      "note": "章末。第 15 天是兩條路的對撞：繼承從「有一天」變成「可能很快」，而周先生的履歷還放在那裡。而它同時是另一件事——叔叔倒下之後，主角變成鎮上最沒有人會問的那個人"
+    }
+  ]
+}

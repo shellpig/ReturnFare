@@ -88,11 +88,106 @@
       "slotless": false,
       "stashable": false,
       "discardable": false
+    },
+
+    {
+      "id": "item_gradphoto",
+      "type": "equipment",
+      "name": "畢業照",
+      "text": "從舊國小的抽屜底下翻出來的。上面有年輕時的叔叔。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_bath_notice",
+      "type": "info",
+      "name": "浴場的休館公告",
+      "text": "「換水保養」。下面壓著上個月的、上上個月的——越接近慶典越密。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_forty_something",
+      "type": "info",
+      "name": "納骨塔抄下來的名字",
+      "text": "五個人，卒年落在同一個區間。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_zhou_waiting",
+      "type": "info",
+      "name": "「我在等一個位置」",
+      "text": "他說的時候你以為是療養院的床位。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_zhou_job",
+      "type": "info",
+      "name": "周先生說可以幫你問問",
+      "text": "外面還有一條路。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_awei_mother",
+      "type": "info",
+      "name": "阿薇的媽媽最後那兩年",
+      "text": "很辛苦。那孩子一個人扛。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_uncle_gap",
+      "type": "info",
+      "name": "叔叔記不清的那幾年",
+      "text": "他說那幾年他生病。他講不下去。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_registry",
+      "type": "info",
+      "name": "信徒名冊上的三格",
+      "text": "你：已登記，註記「不在」，旁邊另有一筆拜契的紀錄。阿婕：那一欄是空的。阿薇：一直是「在」。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_festival_rules",
+      "type": "info",
+      "name": "慶典的八條規矩",
+      "text": "金伯講得極嚴，每一條都一樣嚴。其中一條是「不管誰叫你，不要應」。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_a_name",
+      "type": "info",
+      "name": "長住客問的那個名字",
+      "text": "你不認得。他說沒關係，只是問問——但他問的時候不是「只是問問」的樣子。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_ahong_traces",
+      "type": "info",
+      "name": "夜裡有阿宏留下的痕跡",
+      "text": "工作鞋的腳印，尺寸對得上。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+    {
+      "id": "info_ahong_not_normal",
+      "type": "info",
+      "name": "阿宏沒有正常離開小鎮",
+      "text": "第一輪能到的最深處。他跟夜裡有關，僅此而已。",
+      "slotless": false, "stashable": true, "discardable": true
+    },
+
+    {
+      "id": "k_forty_something",
+      "type": "knowledge",
+      "name": "這裡有人四十幾歲就走",
+      "text": "不是一兩個。是一小群，而且集中在同一個區間。",
+      "slotless": true, "stashable": false, "discardable": false
     }
   ],
 
   "_pending": {
-    "all": "待決 22：物品／情報／知識的完整清單還沒盤點，這裡只有第 1-3 天用得到的",
-    "person_cards": "第 1-3 天不發人物卡（見 SCHEMA.md 暫定決定）；委託第 17 天登場時再開"
+    "all": "待決 22：物品／情報／知識的完整清單還沒盤點，這裡只有第一章用得到的",
+    "person_cards": "第一章不發人物卡（見 SCHEMA.md 暫定決定）；委託第 17 天登場時再開",
+    "compare_table": "⚠️ 比對的產出表不存在。情報卡 × 情報卡 → 知識卡／推論卡 的組合一個都還沒列。k_forty_something 目前沒有產出路徑——第 9 天只給 info_forty_something，比對那一步無處可掛。第 22／39／43 天的核心回報全部靠比對，這是下一個要補的東西",
+    "encounter_cards": "第 8 夜遭遇的三個要求還不知道接受哪些卡，等卡片清單"
   }
 }
