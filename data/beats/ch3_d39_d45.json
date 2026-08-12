@@ -139,6 +139,202 @@
     },
 
     {
+      "id": "d40_pm_tell_someone",
+      "location": "sanquan",
+      "when": { "day": 40, "phase": "afternoon" },
+      "condition": { "has_card": "info_something_off" },
+      "title": "還可以再講給一個人聽",
+      "text": "上午那個人的反應你還在想。",
+      "slots": [],
+      "note": "第 40 天的兩格都是這組對話——五個人，玩家講得到兩個。實際的槽在 d40_tell_someone，這一格只是把下午也開起來。\n⚠️ 同一組 tell_* 槽要能在上午與下午各用一次，而槽目前沒有「用過就關」以外的次數概念。等下午這一格真的要跟上午分開演的時候再拆"
+    },
+    {
+      "id": "d40_pm_fallback",
+      "location": "clinic",
+      "when": { "day": 40, "phase": "afternoon" },
+      "condition": { "not": { "has_card": "info_something_off" } },
+      "title": "沒有什麼要講的",
+      "text": "今天跟昨天一樣。",
+      "slots": [
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "陪叔叔",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "他今天話很少。你坐到探病時間結束。",
+            "switch_progress": { "s6": 1 }
+          }
+        }
+      ],
+      "note": "不邀路徑沒有第 39 天那張卡，所以第 40 天沒有固定觸發——故事線說這兩格留給診所、旅館或其他調查"
+    },
+    {
+      "id": "d40_pm_inn",
+      "location": "sanquan",
+      "when": { "day": 40, "phase": "afternoon" },
+      "condition": { "not": { "has_card": "info_something_off" } },
+      "title": "顧旅館",
+      "text": "帳、房間、明天的料。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": null,
+          "label": "做完今天的",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你做完了。這一輪剩下五天。" }
+        }
+      ]
+    },
+
+    {
+      "id": "d41_morning_clinic",
+      "location": "clinic",
+      "when": { "day": 41, "phase": "morning" },
+      "title": "診所",
+      "text": "叔叔在等出院的日子。",
+      "slots": [
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "陪叔叔",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "他問你想好了沒。你講什麼他都說好。",
+            "switch_progress": { "s6": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d41_morning_her",
+      "location": "sanquan",
+      "when": { "day": 41, "phase": "morning" },
+      "condition": { "flag": "she_returned" },
+      "title": "她",
+      "text": "她在前台。她今天很好。",
+      "slots": [
+        {
+          "id": "with_her",
+          "occupant": null,
+          "label": "跟她待一個上午",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "你一直在看她做那些動作。她做得都對。\n只是你已經開始數了。",
+            "flag": { "watched_her_d41": true }
+          }
+        }
+      ],
+      "note": "第 39 天之後，跟她相處變成一件會消耗人的事——玩家不是在陪她，是在檢查她。這一格不給卡，那正是它的重點"
+    },
+    {
+      "id": "d41_morning_inn",
+      "location": "sanquan",
+      "when": { "day": 41, "phase": "morning" },
+      "title": "顧旅館",
+      "text": "慶典的帳還沒結完。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": null,
+          "label": "做完今天的",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "數字比你想的好一點。叔叔會高興。" }
+        }
+      ]
+    },
+    {
+      "id": "d41_morning_dig",
+      "location": "registry_office",
+      "when": { "day": 41, "phase": "morning" },
+      "title": "查",
+      "text": "戶籍室今天有人在。",
+      "slots": [
+        {
+          "id": "search",
+          "occupant": null,
+          "label": "再翻一次",
+          "accepts": ["protagonist"],
+          "requires": { "has_card": "info_same_festival" },
+          "reject_reason": "（你不知道要對哪幾年。）",
+          "on_place": { "text": "同一場慶典之後那幾格，你這次看得比上次久。名字你都不認得，但格式你認得。" }
+        }
+      ]
+    },
+
+    {
+      "id": "d43_morning_clinic",
+      "location": "clinic",
+      "when": { "day": 43, "phase": "morning" },
+      "title": "診所",
+      "text": "再兩天他就出院了。",
+      "slots": [
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "陪叔叔",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "他在收東西。他說回去要先把湯屋那邊看一遍。",
+            "switch_progress": { "s6": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d43_morning_her",
+      "location": "sanquan",
+      "when": { "day": 43, "phase": "morning" },
+      "condition": { "flag": "she_returned" },
+      "title": "她",
+      "text": "她在。她一直都在。",
+      "slots": [
+        {
+          "id": "with_her",
+          "occupant": null,
+          "label": "跟她待一個上午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你們沒有講第 40 天那件事。兩個人都沒有提。" }
+        }
+      ]
+    },
+    {
+      "id": "d43_morning_inn",
+      "location": "sanquan",
+      "when": { "day": 43, "phase": "morning" },
+      "title": "顧旅館",
+      "text": "叔叔後天回來。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": null,
+          "label": "把店整理好",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你把每一個角落都弄乾淨了。你想讓他回來的時候看到。" }
+        }
+      ]
+    },
+    {
+      "id": "d43_morning_dig",
+      "location": "columbarium",
+      "when": { "day": 43, "phase": "morning" },
+      "title": "查",
+      "text": "納骨塔。你第 9 天來過。",
+      "slots": [
+        {
+          "id": "recount",
+          "occupant": null,
+          "label": "再算一次生卒年",
+          "accepts": ["protagonist"],
+          "requires": { "has_knowledge": "k_forty_something" },
+          "reject_reason": "（你沒有抄過那些名字。）",
+          "on_place": { "text": "還是那個區間。只是這一次你知道要拿它跟什麼比。" }
+        }
+      ],
+      "note": "不給新卡。第 43 天下午玩家要自己下結論，上午這一格的作用是讓他把手上的東西再看一遍"
+    },
+
+    {
       "id": "d41_pm_longstay",
       "location": "sanquan",
       "when": { "day": 41, "phase": "afternoon" },
