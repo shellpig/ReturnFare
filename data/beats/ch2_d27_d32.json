@@ -320,8 +320,7 @@
           "occupant": null,
           "label": "邀阿婕",
           "accepts": ["npc_ajie"],
-          "requires": { "not": { "flag": "invited_awei" } },
-          "reject_reason": "（你已經開過口了。）",
+          "choice_group": "invitation",
           "on_place": { "text": "她愣了一下，然後說好。", "flag": { "invited_ajie": true } }
         },
         {
@@ -329,24 +328,22 @@
           "occupant": null,
           "label": "邀阿薇",
           "accepts": ["npc_awei"],
-          "requires": {
-            "all": [
-              { "relation_at_least": { "npc": "awei", "state": "恩人" } },
-              { "not": { "flag": "invited_ajie" } }
-            ]
-          },
+          "choice_group": "invitation",
+          "requires": { "relation_at_least": { "npc": "awei", "state": "恩人" } },
           "reject_reason": "（你想不出用什麼身分開這個口。）",
           "on_place": { "text": "她說「喔」，隔了兩秒才說好。", "flag": { "invited_awei": true } }
         },
         {
           "id": "invite_none",
           "occupant": null,
-          "label": "不邀（什麼都不放就是這個）",
+          "label": "不邀",
           "accepts": [],
-          "note": "⚠️ 純顯示。「不邀」是不放卡的預設結果，但它在設計上是三個並列選項之一、而且是最差的那個牌，玩家應該看得到自己正在選它。這需要一個不吃卡也不吃行動格的選擇槽——與第 22 天觀察那一格同一個缺口"
+          "choice_group": "invitation",
+          "on_place": { "text": "你想了一下，決定誰都不找。", "flag": { "invited_none": true } },
+          "note": "明寫成組員，因為它是三個並列選項之一、而且是最差的那張牌——玩家應該看得到自己正在選它。走開不選結果相同，差別只在他知不知道"
         }
       ],
-      "note": "你邀的那個人，就是被記進今年簿子的那個人。機制載體是企劃書第十二節罰則第 2 型（由最靠近你的人代付）。不邀不是安全牌，是最差的牌——系統一樣會取走這一輪你花最多格子的那一位，而你全程什麼都沒看到。\n兩個邀請槽用 not-flag 互鎖，開過口就不能再開第二次。⚠️ relation_at_least 的狀態名取自企劃書第五節的六到七種，「恩人」是暫填"
+      "note": "你邀的那個人，就是被記進今年簿子的那個人。機制載體是企劃書第十二節罰則第 2 型（由最靠近你的人代付）。不邀不是安全牌，是最差的牌——系統一樣會取走這一輪你花最多格子的那一位，而你全程什麼都沒看到。\n三個槽同屬 choice_group「invitation」：最多選一個，走開不選＝不邀。⚠️ relation_at_least 的狀態名取自企劃書第五節的六到七種，「恩人」是暫填"
     },
 
     {

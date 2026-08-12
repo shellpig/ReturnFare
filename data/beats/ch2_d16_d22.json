@@ -593,12 +593,10 @@
           "occupant": null,
           "label": "① 他走路的方式",
           "accepts": ["equip_polaroid", "info_acai_box"],
-          "requires": { "not": { "flag": "acai_read_done" } },
-          "reject_reason": "（你已經想過了。）",
+          "choice_group": "acai_read",
           "on_place": {
             "text": "「上次他下這段樓梯的時候」對「剛剛」。他不先顧左膝了。",
-            "gain": ["info_acai_walk"],
-            "flag": { "acai_read_done": true }
+            "gain": ["info_acai_walk"]
           },
           "note": "薄版與完整版都有這條。三個觀察裡門檻最低的一條——跟他走過一次樓梯就會有印象"
         },
@@ -607,26 +605,21 @@
           "occupant": null,
           "label": "② 他的手",
           "accepts": ["equip_polaroid", "info_acai_box"],
+          "choice_group": "acai_read",
           "requires": {
-            "all": [
-              {
-                "any": [
-                  { "flag": "polaroid_acai" },
-                  { "count_at_least": { "n": 2, "of": [
-                    { "flag": "acai_obs_knee" },
-                    { "flag": "acai_obs_hands" },
-                    { "flag": "acai_obs_scar" }
-                  ] } }
-                ]
-              },
-              { "not": { "flag": "acai_read_done" } }
+            "any": [
+              { "flag": "polaroid_acai" },
+              { "count_at_least": { "n": 2, "of": [
+                { "flag": "acai_obs_knee" },
+                { "flag": "acai_obs_hands" },
+                { "flag": "acai_obs_scar" }
+              ] } }
             ]
           },
           "reject_reason": "（你沒有真的跟他遞過幾次東西。）",
           "on_place": {
             "text": "虎口的繭沒了。手臂那道疤也沒了。兩天前還在。",
-            "gain": ["info_acai_scars_gone"],
-            "flag": { "acai_read_done": true }
+            "gain": ["info_acai_scars_gone"]
           },
           "note": "⚠️ 故事線寫的是薄版「拿掉」②而不是灰掉它，理由是灰掉會暗示手上有東西可看。但 schema 的槽只有 requires（灰掉），沒有槽層級的 condition。這裡暫時用灰掉＋不指向答案的理由欄，等槽要不要支援 condition 拍板後再改"
         },
@@ -635,11 +628,9 @@
           "occupant": null,
           "label": "③ 他說話的內容",
           "accepts": ["equip_polaroid", "info_acai_box"],
-          "requires": { "not": { "flag": "acai_read_done" } },
-          "reject_reason": "（你已經想過了。）",
+          "choice_group": "acai_read",
           "on_place": {
-            "text": "他說話完全正常，因為那本來就是他。這條是對的，但它證明不了什麼。",
-            "flag": { "acai_read_done": true }
+            "text": "他說話完全正常，因為那本來就是他。這條是對的，但它證明不了什麼。"
           }
         },
         {
@@ -647,11 +638,10 @@
           "occupant": null,
           "label": "④ 我想太多了",
           "accepts": ["equip_polaroid", "info_acai_box"],
-          "requires": { "not": { "flag": "acai_read_done" } },
-          "reject_reason": "（你已經想過了。）",
+          "choice_group": "acai_read",
           "on_place": {
             "text": "你回去搬你的沙包。",
-            "flag": { "acai_dismissed": true, "acai_read_done": true }
+            "flag": { "acai_dismissed": true }
           },
           "note": "這一格關掉。第 27 天還可以回頭查，但線索少一半"
         }
