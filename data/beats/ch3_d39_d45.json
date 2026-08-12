@@ -448,16 +448,40 @@
           "on_place": { "text": "「他是我們做的。」" }
         },
         {
-          "id": "play_theory",
+          "id": "play_theory_exchange",
           "occupant": null,
           "label": "你寫下的那個結論",
-          "accepts": ["inf_health_disappearance", "inf_jinghe_does_it", "inf_hotspring_kills"],
+          "accepts": ["inf_health_disappearance"],
           "on_place": {
-            "text": "世界回應了你的推論。",
-            "lose": ["inf_health_disappearance", "inf_jinghe_does_it", "inf_hotspring_kills"],
-            "gain": ["k_health_from_disappearance", "k_jinghe_not_entrance", "k_not_side_effect"]
+            "text": "世界用周先生與你的配對回應了它。\n不是「有關」。是「來自」。",
+            "lose": ["inf_health_disappearance"],
+            "gain": ["k_health_from_disappearance"]
           },
-          "note": "⚠️ 這一格的三對一映射寫不出來：正確推論翻面成 k_health_from_disappearance，兩張錯誤推論各自破掉產出較窄的真知識。現在 on_place 把三張全列在 gain／lose 裡，等於誰打出來都拿到三張。需要「依打出的是哪張卡給不同結果」的寫法——schema 沒有，這是第三章抓到的第四個缺口"
+          "note": "方向正確的那張。翻面成知識卡——驗證的是交換因果，不是「她是不是她」"
+        },
+        {
+          "id": "play_theory_jinghe",
+          "occupant": null,
+          "label": "你寫下的那個結論",
+          "accepts": ["inf_jinghe_does_it"],
+          "on_place": {
+            "text": "「那棟房子只是我們用的地方之一。」\n你寫下的東西在你手上碎掉了。",
+            "lose": ["inf_jinghe_does_it"],
+            "gain": ["k_jinghe_not_entrance"]
+          },
+          "note": "錯誤推論破掉，產出較窄但為真的知識"
+        },
+        {
+          "id": "play_theory_hotspring",
+          "occupant": null,
+          "label": "你寫下的那個結論",
+          "accepts": ["inf_hotspring_kills"],
+          "on_place": {
+            "text": "「泡湯不會殺死任何人。」\n你寫下的東西在你手上碎掉了。",
+            "lose": ["inf_hotspring_kills"],
+            "gain": ["k_not_side_effect"]
+          },
+          "note": "同上。三張推論卡各自一個槽——玩家第 43 天只會寫下一張，所以只有一個槽收得到東西，另外兩個不會亮"
         }
       ],
       "note": "第一輪正規遭遇共兩次：第 8 夜與第 45 天。這裡驗證的是交換因果，不是「她是不是她」。即使拿到正確知識，主角仍不知道備份、消失者去了哪、為何記憶完整"
