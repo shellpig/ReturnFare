@@ -316,6 +316,144 @@
       "note": "阿宏鏈第六級。三個對位點的第三個。三張湊齊，第 43 夜的路才走得出去"
     },
     {
+      "id": "item_room_key",
+      "type": "equipment",
+      "name": "那間房的鑰匙",
+      "text": "在叔叔的隨身物品袋最底下。他沒有提過它。",
+      "stashable": true,
+      "discardable": false,
+      "note": "⚠️ 這是第二章就該有的東西（第二章故事線第七節「那間房的鑰匙｜若翻了叔叔的袋子」），但第二章資料沒建。補在第 28 天診所——第三章第 42 天要用"
+    },
+    {
+      "id": "item_festival_photo",
+      "type": "equipment",
+      "name": "慶典那晚的合照",
+      "text": "洗出來了。你們兩個都在裡面，笑得很開心。",
+      "stashable": true,
+      "discardable": true,
+      "note": "第 33 天。第 39 天客觀路線的入口之一——跟第一章阿婕拍的工作照是同一套比對動作"
+    },
+    {
+      "id": "info_jinghe_pool",
+      "type": "info",
+      "name": "靜和園樓下有一個池子",
+      "text": "走廊盡頭有樓梯往下。蒸氣很濃，水面在動，水裡有一個人背對著。",
+      "stashable": true,
+      "discardable": false,
+      "note": "第 37 或 38 天後棟，只能去一次。空間證據。真相層裡那個人就是她，而主角站在門邊看著她，沒有認出來"
+    },
+    {
+      "id": "info_stories_dont_match",
+      "type": "info",
+      "name": "說法對不上",
+      "text": "三個人講她這兩天在哪，三個版本兜不成同一條時間線。",
+      "stashable": true,
+      "discardable": false,
+      "note": "第 37 或 38 天找她。時間／口供證據。它只證明沒有人講得圓，不證明她被換，也不證明她在靜和園"
+    },
+    {
+      "id": "info_something_off",
+      "type": "info",
+      "name": "有些地方對不上",
+      "text": "阿財去做高薪臨工回來後，身上的舊傷／走路方式變了。\n她這次回來後，也有一個原本存在的身體細節不見了。\n但兩個人的記憶、說話方式與習慣都沒有變。",
+      "stashable": true,
+      "discardable": false,
+      "note": "第 39 天。三個入口（主觀／客觀／模式）產出同一張。第一輪到這裡只能確認「這種物理異常不只一次」，不能得到身份結論"
+    },
+    {
+      "id": "k_twenty_years_ago",
+      "type": "knowledge",
+      "name": "這種變化二十年前也發生過",
+      "text": "有人回鄉之後舊傷消失，二十年後在四十多歲快速病逝。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "第 41 天長住的客人。只陳述可確認的歷史，不判定她是否仍是同一個人"
+    },
+    {
+      "id": "item_old_paper",
+      "type": "document",
+      "name": "一張蓋了印的舊紙",
+      "text": "摺起來的，蓋著廟印。你看不懂是什麼。",
+      "stashable": true,
+      "discardable": false,
+      "note": "第 42 天老家那間房。就是那份契書——拜契一份燒化、一份家長保管，他家那份還在。第一輪不能燒：燒契書需要「你還在契約裡」的知識，那要等主角死過一次"
+    },
+    {
+      "id": "info_parents_leaving",
+      "type": "info",
+      "name": "他們本來要搬走",
+      "text": "收拾到一半的行李，二十年沒動過。你不記得他們要搬家——你當時七八歲。",
+      "stashable": true,
+      "discardable": false
+    },
+
+    {
+      "id": "inf_health_disappearance",
+      "type": "inference",
+      "name": "一個人的健康，和另一個人的消失有關",
+      "text": "你自己寫下的。你還沒有辦法證明。",
+      "stashable": false,
+      "discardable": true,
+      "note": "第 43 天三理論之一：方向正確，尚未驗證。推論卡佔一格、可對可錯、不跨迴圈——它不是知識卡，不破壞「知識永遠可信」的系統語法"
+    },
+    {
+      "id": "inf_jinghe_does_it",
+      "type": "inference",
+      "name": "靜和園在做那件事",
+      "text": "你自己寫下的。你還沒有辦法證明。",
+      "stashable": false,
+      "discardable": true,
+      "note": "第 43 天三理論之一：方向接近、位置錯。走後棟的玩家較容易推到這裡——那是具體證據的代價，不是漏洞"
+    },
+    {
+      "id": "inf_hotspring_kills",
+      "type": "inference",
+      "name": "溫泉會讓人早死",
+      "text": "你自己寫下的。你還沒有辦法證明。",
+      "stashable": false,
+      "discardable": true,
+      "note": "第 43 天三理論之一：因果倒置"
+    },
+
+    {
+      "id": "k_health_from_disappearance",
+      "type": "knowledge",
+      "name": "一個人的健康，來自另一個人的消失",
+      "text": "不是有關。是來自。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "第 45 天遭遇驗證正確推論後翻面。驗證的是交換因果，不是「她是不是她」"
+    },
+    {
+      "id": "k_jinghe_not_entrance",
+      "type": "knowledge",
+      "name": "靜和園不是入口",
+      "text": "那棟建築只是其中一個地方。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "錯誤推論在最後遭遇翻面離場，產出較窄但為真的知識"
+    },
+    {
+      "id": "k_not_side_effect",
+      "type": "knowledge",
+      "name": "早死不是療效本身的副作用",
+      "text": "泡湯不會殺死你。殺死你的是別的東西。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_not_today",
+      "type": "knowledge",
+      "name": "不是今天才輪到我",
+      "text": "第 45 天那個邀請不是起因。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "第 45 天一定產出。拒絕仍被帶走，只證明邀請不是起因"
+    },
+    {
+      "id": "k_already_on_list",
+      "type": "knowledge",
+      "name": "我在回來之前，就已經在名單上",
+      "text": "那一格早就寫好了。你回來之前它就在那裡。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "升級版，需要第一章看過名冊上自己那一格。它不解釋機制，但直接生成第二輪的第一個目標：我要找出自己是什麼時候被寫進去的"
+    },
+    {
       "id": "mood_watched",
       "type": "mood",
       "name": "被盯上",

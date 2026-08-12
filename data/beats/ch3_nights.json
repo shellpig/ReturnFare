@@ -1,7 +1,57 @@
 {
-  "_comment": "第三章第 33-45 夜。⚠️ 目前只有阿宏鏈第六、七級——第三章其餘夜間內容等第三章資料一起寫。標記定義（最早可開、價碼、門檻）在 data/locations.json。",
+  "_comment": "第三章第 33-45 夜。標記定義（最早可開、價碼、門檻）在 data/locations.json。這一章夜裡的功能是「它開始找主角」——第一章夜鎮的人不理他，第三章他們會轉頭。文字取自 subdocs/故事線/故事線_第一輪_第三章.md。",
 
   "beats": [
+    {
+      "id": "n_gathering_ch3",
+      "location": "n_gathering",
+      "chapter": 3,
+      "title": "隊伍走了",
+      "text": "第 31 夜站滿的隊伍不見了。\n夜鎮空得不正常。",
+      "slots": [],
+      "note": "第 33-36 夜。慶典結束了——貨進來了"
+    },
+    {
+      "id": "n_steam_below_ch3",
+      "location": "n_steam_below",
+      "chapter": 3,
+      "title": "有蒸氣的樓下",
+      "text": "靜和園樓下，池子裡有人。和白天同一個位置、同一個姿勢。\n夜裡看得更清楚。你還是認不出來。",
+      "slots": [],
+      "on_enter": { "flag": { "opened_n_steam_below": true } },
+      "note": "第 37-38 夜——她在裡面。主角認不出來，因為他還不知道要認什麼。第二輪玩家會直接來這裡，才可能看清楚"
+    },
+    {
+      "id": "n_emptyspot_2_ch3",
+      "location": "n_emptyspot_2",
+      "chapter": 3,
+      "title": "又一個空的位子",
+      "text": "夜鎮裡她原本站的位置空了。\n白天她卻在你旁邊。",
+      "slots": [],
+      "on_enter": { "flag": { "opened_n_emptyspot_2": true } },
+      "note": "第 39 夜。第 21 夜阿財那個空位的重播，但第一輪只能強烈感覺「這件事又重複」，還不知道重複的究竟是什麼。缺少機制知識時，空位不能被翻譯成「本尊消失、複製品回來」"
+    },
+    {
+      "id": "n_queue_ch3",
+      "location": "n_queue",
+      "chapter": 3,
+      "when": { "day": 43, "phase": "night" },
+      "title": "輪到你了",
+      "text": "第 3 夜他說「你不用排」。\n這一次他改口：\n\n「輪到你了。」",
+      "slots": [],
+      "on_enter": { "flag": { "queue_your_turn": true } },
+      "note": "第 40-44 夜他們開始看主角，而這一夜是那句話。\n同一個晚上，阿宏鏈第七級也在第 43 夜——一邊是他終於指出阿宏的方向，一邊是這座鎮叫到他自己"
+    },
+    {
+      "id": "n_behind_temple_ch3",
+      "location": "n_behind_temple",
+      "chapter": 3,
+      "title": "廟的後面",
+      "text": "燒金爐。\n火是冷的。",
+      "slots": [],
+      "on_enter": { "flag": { "opened_n_behind_temple": true } },
+      "note": "白天版是 temple_back（還願解約的地方），座標相同。打破迴圈的方法就在那裡，而第一輪玩家沒有需要的知識卡"
+    },
     {
       "id": "n_ahong_6_ch3",
       "location": "n_ahong_6",

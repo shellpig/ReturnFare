@@ -1,0 +1,422 @@
+{
+  "_comment": "第三章第 33-38 天（餘光＋那兩天）。欄位說明見 data/SCHEMA.md。文字為佔位，取自 subdocs/故事線/故事線_第一輪_第三章.md，未經潤稿。第三章刻意不擴張地圖，四件事搶兩格：照顧叔叔／顧旅館／盯著她／查真相。",
+
+  "beats": [
+    {
+      "id": "d33_morning_after",
+      "location": "temple",
+      "when": { "day": 33, "phase": "morning" },
+      "fixed": true,
+      "title": "散場之後",
+      "text": "慶典隔天。全鎮收東西，廟埕滿地垃圾，金伯在掃。他看起來鬆了一口氣。",
+      "slots": [
+        { "id": "jinbo", "occupant": "npc_jinbo", "label": "金伯", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "chapter3_start": true } },
+      "note": "若第 32 天玩家鬆了手：金伯會多看主角一眼，什麼都不說"
+    },
+    {
+      "id": "d33_pm_cleanup",
+      "location": "temple",
+      "when": { "day": 33, "phase": "afternoon" },
+      "title": "廟埕幫忙收",
+      "text": "金伯：「今年很順。」",
+      "slots": [
+        {
+          "id": "help",
+          "occupant": "npc_jinbo",
+          "label": "留下來收",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "他講今年很順，講了三次。" }
+        }
+      ]
+    },
+    {
+      "id": "d33_pm_her",
+      "location": "sanquan",
+      "when": { "day": 33, "phase": "afternoon" },
+      "condition": {
+        "any": [{ "flag": "invited_ajie" }, { "flag": "invited_awei" }]
+      },
+      "title": "跟她",
+      "text": "她精神很好。昨晚她很開心。",
+      "slots": [
+        {
+          "id": "with_her",
+          "occupant": null,
+          "label": "陪她一個下午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "她一直講昨天晚上的事。你聽她講。" }
+        }
+      ]
+    },
+    {
+      "id": "d33_pm_photo",
+      "location": "sanquan",
+      "when": { "day": 33, "phase": "afternoon" },
+      "fixed": true,
+      "title": "照片洗出來了",
+      "text": "慶典那晚的合照。你們兩個都在裡面。",
+      "slots": [],
+      "on_enter": { "gain": ["item_festival_photo"] },
+      "note": "雜訊，不吃格。第 39 天客觀路線的入口之一"
+    },
+    {
+      "id": "d33_pm_jinghe",
+      "location": "jinghe",
+      "when": { "day": 33, "phase": "afternoon" },
+      "title": "靜和園",
+      "text": "林姐在忙交接。慶典的客人一批走，一批還沒走。",
+      "slots": [
+        {
+          "id": "watch",
+          "occupant": "npc_linjie",
+          "label": "看她忙",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "她一邊點名單一邊講電話。你聽到她說「後棟那邊等清完再說」。" }
+        }
+      ]
+    },
+
+    {
+      "id": "d34_morning_normal",
+      "location": "sanquan",
+      "when": { "day": 34, "phase": "morning" },
+      "title": "前台",
+      "text": "日常回來了。",
+      "slots": [
+        {
+          "id": "desk",
+          "occupant": null,
+          "label": "顧前台",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "沒有事情發生。這種日子這一輪剩下不多了。" }
+        }
+      ]
+    },
+    {
+      "id": "d34_pm_acai",
+      "location": "sanquan",
+      "when": { "day": 34, "phase": "afternoon" },
+      "title": "跟阿財做事",
+      "text": "他仍在。慶典後的收尾很多。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": "npc_acai",
+          "label": "跟他做一個下午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "他還是做得比你快。你已經不會覺得那是體力好了。" }
+        }
+      ],
+      "note": "他是活的參考答案。第 39 天要靠他形成「兩個案例才是模式」"
+    },
+    {
+      "id": "d34_pm_zhou",
+      "location": "riverside",
+      "when": { "day": 34, "phase": "afternoon" },
+      "title": "周先生仍在河邊",
+      "text": "他說自己的事快辦好了。",
+      "slots": [
+        {
+          "id": "talk",
+          "occupant": "npc_zhou",
+          "label": "跟他講話",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "「快了。」他說。他看起來比第一章那時候好很多。" }
+        }
+      ]
+    },
+
+    {
+      "id": "d35_morning_inherit",
+      "location": "clinic",
+      "when": { "day": 35, "phase": "morning" },
+      "fixed": true,
+      "title": "繼承",
+      "text": "叔叔第一次把話講白。\n\n「我這樣子也顧不動了。」",
+      "slots": [
+        { "id": "uncle", "occupant": "npc_uncle", "label": "叔叔", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "inheritance_offered": true } },
+      "note": "檢查點 4。六個開關的狀態決定他講哪個版本，而開關 6 在這一格結算——這是它唯一一次被讀到。\n4-6 個：他把旅館交出來，他很高興，而那是最難受的版本。\n2-3 個：「你要是不想，也不用勉強。」\n0-1 個：「我對不起你爸媽。」\n⚠️ 三個版本的分支目前只寫在 note 裡——beat 的 text 是單一版本，分支演出要等文本階段。另外五個開關量的是旅館，開關 6 量的是叔叔；一個整輪都在跑診所的玩家，最後不能聽到「我對不起你爸媽」"
+    },
+    {
+      "id": "d35_pm_answer",
+      "location": "clinic",
+      "when": { "day": 35, "phase": "afternoon" },
+      "condition": { "flag": "inheritance_offered" },
+      "title": "你怎麼回答",
+      "text": "他在等。",
+      "slots": [
+        {
+          "id": "accept",
+          "occupant": null,
+          "label": "答應他",
+          "choice_group": "inheritance",
+          "on_place": {
+            "text": "他點頭，然後說了句「那我就放心了」。他說得太快，好像已經練習過。",
+            "flag": { "accepted_inn": true }
+          }
+        },
+        {
+          "id": "think",
+          "occupant": null,
+          "label": "說再想想",
+          "choice_group": "inheritance",
+          "on_place": {
+            "text": "「嗯。」他沒有再問。",
+            "flag": { "deferred_inn": true }
+          }
+        }
+      ],
+      "note": "第三個選項「不回答，去做別的」＝不選，走開就是。從這一格開始，兩張互斥的未來每天都在互相擠——周先生的履歷仍在玩家手上"
+    },
+
+    {
+      "id": "d36_morning_her",
+      "location": "sanquan",
+      "when": { "day": 36, "phase": "morning" },
+      "condition": {
+        "any": [{ "flag": "invited_ajie" }, { "flag": "invited_awei" }]
+      },
+      "title": "她在前台",
+      "text": "破綻的細節最後演一次。",
+      "slots": [
+        {
+          "id": "watch",
+          "occupant": null,
+          "label": "跟她待一個上午",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "阿婕線：她一邊接電話一邊咬指甲，指甲禿的，邊緣參差。前台那支原子筆上有一排她啃出來的齒痕。\n阿薇線：她笑的時候用手遮嘴。你看到過那顆缺一角的門牙。",
+            "flag": { "saw_her_tell": true }
+          }
+        }
+      ],
+      "note": "最後一次正常的她。這一格演的東西第 39 天會全部回來，而且是反過來的"
+    },
+    {
+      "id": "d36_pm_date",
+      "location": "oldstreet",
+      "when": { "day": 36, "phase": "afternoon" },
+      "condition": {
+        "any": [{ "flag": "invited_ajie" }, { "flag": "invited_awei" }]
+      },
+      "title": "跟她出去一趟",
+      "text": "沒有為什麼。就是出去走走。",
+      "slots": [
+        {
+          "id": "go",
+          "occupant": null,
+          "label": "跟她出去",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "你們走到河邊那條路的盡頭才折回來。她講了很多小時候的事。",
+            "relation": { "npc": "awei", "delta": 1 },
+            "flag": { "went_out_with_her": true }
+          }
+        }
+      ],
+      "note": "第三章唯一一次純戀愛線下午，沒有任何調查產出。選這一格的玩家到第 39 天之後才知道自己拿到了什麼——那是他最後一次看到真的她，而遊戲把它標成「沒有產出」。⚠️ relation 目前寫死 awei，阿婕線要另一個分支；等關係狀態機的寫法定案"
+    },
+    {
+      "id": "d36_notice",
+      "location": "jinghe",
+      "when": { "day": 36, "phase": "afternoon" },
+      "fixed": true,
+      "title": "靜和園貼公告",
+      "text": "後棟明後兩天清掃，暫停接待。",
+      "slots": [],
+      "on_enter": { "flag": { "back_wing_window": true } },
+      "note": "不吃格。讓玩家有一整晚可以排程，同時是誘餌——玩家會為那扇門排明天的行程，而那正是她去向無法講圓的兩天"
+    },
+
+    {
+      "id": "d37_morning_absent",
+      "location": "sanquan",
+      "when": { "day": 37, "phase": "morning" },
+      "fixed": true,
+      "condition": {
+        "any": [{ "flag": "invited_ajie" }, { "flag": "invited_awei" }]
+      },
+      "title": "她沒來上工",
+      "text": "阿婕線：阿姨轉告她感冒、去看醫生。\n阿薇線：靜和園說她請假，回去陪阿嬤。",
+      "slots": [],
+      "on_enter": { "flag": { "she_is_gone": true } },
+      "note": "不邀路徑沒有這場固定事件。系統取走的仍是本輪投入最多格子的那個人，但主角不在場，也沒有理由立刻注意"
+    },
+    {
+      "id": "d37_back_wing",
+      "location": "jinghe_back",
+      "when": { "day": 37, "phase": "afternoon" },
+      "condition": { "flag": "back_wing_window" },
+      "requires": { "not": { "flag": "seen_back_wing" } },
+      "title": "靜和園後棟",
+      "text": "側門沒鎖。走廊很長，兩側都是門，門上沒有號碼——跟第 1 夜一模一樣。\n推開一扇門：和室桌上有吃到一半的飯菜。這次是冷的。\n走廊盡頭有樓梯往下。下面是大浴池，蒸氣很濃，水面在動。\n水裡有一個人背對著。你想走近——\n\n林姐出現。她不生氣，只非常客氣地說：「這邊是客人的區域喔。」",
+      "slots": [
+        {
+          "id": "go_in",
+          "occupant": null,
+          "label": "從側門進去",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "你被請出來的時候，蒸氣還在門縫裡。",
+            "gain": ["info_jinghe_pool"],
+            "flag": { "seen_back_wing": true }
+          }
+        }
+      ],
+      "note": "第 1 夜那條走廊的白天版，玩家等了 37 天。真相層裡水裡那個人就是她——他去找的那個人就在眼前，而他站在門邊看著她，沒有認出來。\n只能去一次（第 37 或 38 天），空間證據。它跟「找她」互斥：兩條都有產出，但彼此不能取代"
+    },
+    {
+      "id": "d37_look_for_her",
+      "location": "oldstreet",
+      "when": { "day": 37, "phase": "afternoon" },
+      "condition": { "flag": "she_is_gone" },
+      "requires": { "not": { "has_card": "info_stories_dont_match" } },
+      "title": "找她",
+      "text": "一個下午把她平常會去的幾個地方跑一圈。",
+      "slots": [
+        {
+          "id": "search",
+          "occupant": null,
+          "label": "去問",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "阿婕線：阿姨說她去看醫生；診所說今天沒見到她；熟人說她昨天一早就出門了。\n阿薇線：靜和園說她回去陪阿嬤；她家說她昨天一早就出門了；診所說她沒來。\n\n你還是找不到她。但三句話兜不成同一條時間線。",
+            "gain": ["info_stories_dont_match"]
+          }
+        }
+      ],
+      "note": "一個行動格跑完三個合理來源，不拆成三格。時間／口供證據。它只證明沒有人能把兩天去向講成同一條時間線；不證明她被換，也不證明她在靜和園"
+    },
+    {
+      "id": "d37_clinic",
+      "location": "clinic",
+      "when": { "day": 37, "phase": "afternoon" },
+      "title": "診所",
+      "text": "叔叔今天不太好。",
+      "slots": [
+        {
+          "id": "visit",
+          "occupant": "npc_uncle",
+          "label": "去看他",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "阿珠護士在走廊上說：「都沒人來看他。」她不是在指責你，這句話更難受。",
+            "switch_progress": "s6"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d37_inn",
+      "location": "sanquan",
+      "when": { "day": 37, "phase": "afternoon" },
+      "title": "旅館",
+      "text": "慶典後的帳與退房。阿財一個人在扛。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": "npc_acai",
+          "label": "去幫他",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "他沒有抱怨。他從來不抱怨。" }
+        }
+      ]
+    },
+
+    {
+      "id": "d38_back_wing",
+      "location": "jinghe_back",
+      "when": { "day": 38, "phase": "afternoon" },
+      "condition": { "flag": "back_wing_window" },
+      "requires": { "not": { "flag": "seen_back_wing" } },
+      "title": "靜和園後棟（最後一天）",
+      "text": "今天是最後一天。明天門就鎖回去了。",
+      "slots": [
+        {
+          "id": "go_in",
+          "occupant": null,
+          "label": "從側門進去",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "沒有號碼的門、冷掉的飯菜、往下的樓梯、蒸氣、水裡背對著的人。\n然後林姐非常客氣地請你出去。",
+            "gain": ["info_jinghe_pool"],
+            "flag": { "seen_back_wing": true }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d38_look_for_her",
+      "location": "oldstreet",
+      "when": { "day": 38, "phase": "afternoon" },
+      "condition": { "flag": "she_is_gone" },
+      "requires": { "not": { "has_card": "info_stories_dont_match" } },
+      "title": "找她（第二天）",
+      "text": "還是找不到。",
+      "slots": [
+        {
+          "id": "search",
+          "occupant": null,
+          "label": "再去問一次",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "同樣三個來源，同樣三個版本。今天他們講得比昨天更肯定。",
+            "gain": ["info_stories_dont_match"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "d38_ask_around",
+      "location": "jinghe",
+      "when": { "day": 38, "phase": "morning" },
+      "condition": {
+        "any": [
+          { "has_card": "info_jinghe_pool" },
+          { "has_card": "info_stories_dont_match" }
+        ]
+      },
+      "title": "拿去問人",
+      "text": "你手上有一件講不通的事。",
+      "slots": [
+        {
+          "id": "ask_linjie",
+          "occupant": "npc_linjie",
+          "label": "問林姐",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "她客氣地否認。「後棟在清掃啊，沒有客人。」" }
+        },
+        {
+          "id": "ask_chen",
+          "occupant": "npc_chen",
+          "label": "問陳醫師",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "他給出一個無懈可擊的合理解釋。你當場想不出哪裡不對。" }
+        },
+        {
+          "id": "ask_acai",
+          "occupant": "npc_acai",
+          "label": "問阿財",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "他愣了一下。然後說「我怎麼知道」，就去搬東西了。" }
+        }
+      ],
+      "note": "每個人都能補一個合理解釋，但沒有人能把三句話對成同一條時間線。卡不升級，也不直接指向後棟"
+    },
+    {
+      "id": "d38_evening_back_tomorrow",
+      "location": "sanquan",
+      "when": { "day": 38, "phase": "evening" },
+      "fixed": true,
+      "condition": { "flag": "she_is_gone" },
+      "title": "有人說，她明天就回來",
+      "text": "沒有人覺得這句話需要解釋。",
+      "slots": [],
+      "on_enter": { "flag": { "she_returns_tomorrow": true } }
+    }
+  ]
+}
