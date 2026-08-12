@@ -1,0 +1,25 @@
+; Engine configuration file.
+; ReturnFare（溫泉小鎮）
+;
+; 專案根目錄與文件庫共用同一個資料夾，這是刻意的：data/ 是本作的核心資產，
+; 它現在的位置正好就是 res://data/。分成兩份會馬上製造「資料有兩份」的風險。
+; 場景放 scenes/，腳本放 scripts/，資料留在 data/。
+
+config_version=5
+
+[application]
+
+config/name="ReturnFare"
+config/description="45 天，一座小鎮，同時發生太多事——你只能在場一次。"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.6", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

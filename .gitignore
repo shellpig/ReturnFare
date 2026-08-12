@@ -1,1 +1,7 @@
 /_舊文件/
+
+# Godot
+/.godot/
+/android/
+*.translation
+export_presets.cfg
