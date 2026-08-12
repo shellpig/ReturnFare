@@ -93,7 +93,7 @@
           "accepts": ["protagonist"],
           "on_place": {
             "text": "他問旅館怎麼樣了。你講了一半。",
-            "switch_progress": "s6"
+            "switch_progress": { "s6": 1 }
           }
         },
         {
@@ -196,7 +196,7 @@
           "accepts": ["protagonist"],
           "on_place": {
             "text": "你講到修繕那一段的時候他沉默了一下，然後說「你決定就好」。",
-            "switch_progress": "s6"
+            "switch_progress": { "s6": 1 }
           }
         },
         {
@@ -313,7 +313,7 @@
           "accepts": ["protagonist"],
           "on_place": {
             "text": "他問你明天要不要去慶典。你說要。他說「那就去」。",
-            "switch_progress": "s6"
+            "switch_progress": { "s6": 1 }
           }
         }
       ]

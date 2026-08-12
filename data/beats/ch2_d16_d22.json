@@ -30,7 +30,7 @@
           "accepts": ["protagonist"],
           "on_place": {
             "text": "講到後來他睡著了。你坐到護士來換點滴。",
-            "switch_progress": "s6"
+            "switch_progress": { "s6": 1 }
           }
         },
         {

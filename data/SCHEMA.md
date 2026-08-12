@@ -256,7 +256,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
   "gain":     ["card_id"],
   "lose":     ["card_id"],
   "switch":   "s1",
-  "switch_progress": "s6",
+  "switch_progress": { "s6": 1 },
   "relation": { "npc": "ajie", "delta": 1 },
   "madness":  1,
   "flag":     { "ahong_last_seen": true }

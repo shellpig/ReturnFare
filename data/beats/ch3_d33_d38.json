@@ -129,17 +129,83 @@
     },
 
     {
-      "id": "d35_morning_inherit",
+      "id": "d35_morning_inherit_high",
       "location": "clinic",
       "when": { "day": 35, "phase": "morning" },
       "fixed": true,
+      "condition": {
+        "count_at_least": { "n": 4, "of": [
+          { "switch": "s1" },
+          { "switch": "s2" },
+          { "switch": "s3" },
+          { "switch": "s4" },
+          { "switch": "s5" },
+          { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
+        ] }
+      },
       "title": "繼承",
-      "text": "叔叔第一次把話講白。\n\n「我這樣子也顧不動了。」",
+      "text": "叔叔第一次把話講白。\n\n「我這樣子也顧不動了。」\n\n他沒有問你要不要。他已經在講交接的事了——哪一本帳給誰看、湯屋的管線誰來修、慶典那幾天要備多少料。\n他講得很快，而且他一直在笑。\n「你做得比我那時候好。」",
       "slots": [
         { "id": "uncle", "occupant": "npc_uncle", "label": "叔叔", "accepts": [] }
       ],
-      "on_enter": { "flag": { "inheritance_offered": true } },
-      "note": "檢查點 4。六個開關的狀態決定他講哪個版本，而開關 6 在這一格結算——這是它唯一一次被讀到。\n4-6 個：他把旅館交出來，他很高興，而那是最難受的版本。\n2-3 個：「你要是不想，也不用勉強。」\n0-1 個：「我對不起你爸媽。」\n⚠️ 三個版本的分支目前只寫在 note 裡——beat 的 text 是單一版本，分支演出要等文本階段。另外五個開關量的是旅館，開關 6 量的是叔叔；一個整輪都在跑診所的玩家，最後不能聽到「我對不起你爸媽」"
+      "on_enter": { "flag": { "inheritance_offered": true, "inherit_version": "high" } },
+      "note": "四到六個開關。他把旅館交出來，他很高興——而那是最難受的版本"
+    },
+    {
+      "id": "d35_morning_inherit_mid",
+      "location": "clinic",
+      "when": { "day": 35, "phase": "morning" },
+      "fixed": true,
+      "condition": {
+        "all": [
+          { "count_at_least": { "n": 2, "of": [
+            { "switch": "s1" },
+            { "switch": "s2" },
+            { "switch": "s3" },
+            { "switch": "s4" },
+            { "switch": "s5" },
+            { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
+          ] } },
+          { "not": { "count_at_least": { "n": 4, "of": [
+            { "switch": "s1" },
+            { "switch": "s2" },
+            { "switch": "s3" },
+            { "switch": "s4" },
+            { "switch": "s5" },
+            { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
+          ] } } }
+        ]
+      },
+      "title": "繼承",
+      "text": "叔叔第一次把話講白。\n\n「我這樣子也顧不動了。」\n\n然後他停了很久。\n「你要是不想，也不用勉強。」\n他講完就看窗外，好像那句話是講給自己聽的。",
+      "slots": [
+        { "id": "uncle", "occupant": "npc_uncle", "label": "叔叔", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "inheritance_offered": true, "inherit_version": "mid" } },
+      "note": "兩到三個開關"
+    },
+    {
+      "id": "d35_morning_inherit_low",
+      "location": "clinic",
+      "when": { "day": 35, "phase": "morning" },
+      "fixed": true,
+      "condition": {
+        "not": { "count_at_least": { "n": 2, "of": [
+          { "switch": "s1" },
+          { "switch": "s2" },
+          { "switch": "s3" },
+          { "switch": "s4" },
+          { "switch": "s5" },
+          { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
+        ] } }
+      },
+      "title": "繼承",
+      "text": "叔叔第一次把話講白。\n\n「我這樣子也顧不動了。」\n\n他沒有講旅館。他講的是別的。\n「我對不起你爸媽。」\n他沒有再說下去，你也沒有問。",
+      "slots": [
+        { "id": "uncle", "occupant": "npc_uncle", "label": "叔叔", "accepts": [] }
+      ],
+      "on_enter": { "flag": { "inheritance_offered": true, "inherit_version": "low" } },
+      "note": "零到一個開關。一個整輪都在跑診所的玩家不能聽到這一句——那是這三個版本存在的理由"
     },
     {
       "id": "d35_pm_answer",
@@ -305,7 +371,7 @@
           "accepts": ["protagonist"],
           "on_place": {
             "text": "阿珠護士在走廊上說：「都沒人來看他。」她不是在指責你，這句話更難受。",
-            "switch_progress": "s6"
+            "switch_progress": { "s6": 1 }
           }
         }
       ]
