@@ -506,6 +506,21 @@
       "note": "源頭更上面。水從哪裡來"
     },
     {
+      "id": "n_ahong_4",
+      "name": "聲音停下來的地方",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 20,
+      "madness_cost": 1,
+      "requires": { "flag": "opened_n_ahong_3" },
+      "night_reveal": null,
+      "map": {
+        "x": 34,
+        "y": 30
+      },
+      "note": "阿宏鏈第四級。搬貨的聲音第一次有方向——跟著走，它會停。第一個對位點"
+    },
+    {
       "id": "n_emptyspot",
       "name": "空的位子",
       "layer": "night",
@@ -534,6 +549,21 @@
       "note": "遊行隊伍在夜鎮集合。他們每晚多幾個人"
     },
     {
+      "id": "n_ahong_5",
+      "name": "被留下的東西",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 28,
+      "madness_cost": 1,
+      "requires": { "has_knowledge": "k_ahong_point_1" },
+      "night_reveal": null,
+      "map": {
+        "x": 31,
+        "y": 26
+      },
+      "note": "阿宏鏈第五級。一件他失蹤之後才可能留下的物件。第二個對位點。⚠️ 門檻用知識卡不用 flag——知識卡跨輪繼承，所以第二輪玩家不必重爬前面幾級（企劃書第七節：已對位過的標記，之後所有輪次免費）"
+    },
+    {
       "id": "n_steam_below",
       "name": "有蒸氣的樓下",
       "layer": "night",
@@ -546,6 +576,21 @@
         "y": 48
       },
       "note": "靜和園後棟夜版。白天被請出去的那個池子。第 1 夜走廊盡頭的樓下，玩家等了 37 天"
+    },
+    {
+      "id": "n_ahong_6",
+      "name": "新的腳印",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 38,
+      "madness_cost": 1,
+      "requires": { "has_knowledge": "k_ahong_point_2" },
+      "night_reveal": null,
+      "map": {
+        "x": 29,
+        "y": 22
+      },
+      "note": "阿宏鏈第六級。腳印第一次是新的——不是舊痕跡，是剛剛才踩過的，而且往同一個方向。第三個對位點"
     },
     {
       "id": "n_emptyspot_2",
@@ -574,6 +619,27 @@
         "y": 37
       },
       "note": "燒金爐。火是冷的"
+    },
+    {
+      "id": "n_ahong_7",
+      "name": "三個點指向的地方",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 43,
+      "madness_cost": 1,
+      "requires": {
+        "count_at_least": { "n": 3, "of": [
+          { "has_knowledge": "k_ahong_point_1" },
+          { "has_knowledge": "k_ahong_point_2" },
+          { "has_knowledge": "k_ahong_point_3" }
+        ] }
+      },
+      "night_reveal": null,
+      "map": {
+        "x": 26,
+        "y": 14
+      },
+      "note": "阿宏鏈第七級，第一輪的終點。三個對位點連起來指向一個方向，走過去——那裡地圖上是空的。\n跟「走廊的盡頭」（最早可開 45，而第 45 夜不存在）與開局那行灰掉的「不上車」是同一種語言：看得到、到不了。\n⚠️ 三張知識卡跨輪繼承，所以第二輪玩家在第 43 夜可以直接站到這裡，不必重開前六級。那個空位第二輪要有東西——但那是超脫輪迴／超自然線的事，第一輪不定義"
     },
     {
       "id": "n_corridor_end",

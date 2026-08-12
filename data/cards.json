@@ -292,6 +292,30 @@
       "note": "第 26–27 天被動撞到任意兩個閃躲的人即成立。第三章第 40 天沒有人相信他的時候，這張卡在手上"
     },
     {
+      "id": "k_ahong_point_1",
+      "type": "knowledge",
+      "name": "聲音停在那裡",
+      "text": "夜裡那段搬貨的聲音不是四面八方來的。它有起點，而你站到過那個起點。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "阿宏鏈第四級。三個對位點的第一個"
+    },
+    {
+      "id": "k_ahong_point_2",
+      "type": "knowledge",
+      "name": "東西被留在那裡",
+      "text": "那件東西不會自己走到那個位置。有人把它放在那裡，而且是在他失蹤之後。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "阿宏鏈第五級。三個對位點的第二個"
+    },
+    {
+      "id": "k_ahong_point_3",
+      "type": "knowledge",
+      "name": "腳印往那裡去",
+      "text": "新的，而且跟前兩個地方在同一條線上。",
+      "slotless": true, "stashable": false, "discardable": false,
+      "note": "阿宏鏈第六級。三個對位點的第三個。三張湊齊，第 43 夜的路才走得出去"
+    },
+    {
       "id": "mood_watched",
       "type": "mood",
       "name": "被盯上",
