@@ -11,6 +11,7 @@ func _initialize() -> void:
 	print("=== ReturnFare 資料載入 ===")
 	print("卡片　%d" % loader.cards.size())
 	print("地點　%d" % loader.locations.size())
+	print("NPC　%d" % loader.npcs.size())
 	print("beat　%d" % loader.beats.size())
 
 	if not ok:
@@ -29,6 +30,26 @@ func _initialize() -> void:
 		return
 
 	print("引用檢查　0 錯誤")
+
+	# 地點三分類（企劃書第十五節）：由 day_counterpart 推導，不另存欄位。
+	var paired := {}
+	var night_only := 0
+	for lid in loader.locations:
+		var loc: Dictionary = loader.locations[lid]
+		if loc.get("layer", "") != "night":
+			continue
+		var counterpart: Variant = loc.get("day_counterpart")
+		if counterpart == null:
+			night_only += 1
+		else:
+			paired[counterpart] = true
+	var day_total := 0
+	for lid in loader.locations:
+		if loader.locations[lid].get("layer", "") == "day":
+			day_total += 1
+	print("地點三分類　只有白天 %d／日夜都有 %d／只有夜裡 %d" % [
+		day_total - paired.size(), paired.size(), night_only,
+	])
 
 	# 45 天每一格都要有東西——這是第一輪資料完整的最低標準。
 	# 三格是刻意留空的：第 1 天是搭車上山（只有傍晚與夜），

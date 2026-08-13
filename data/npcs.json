@@ -1,0 +1,214 @@
+{
+  "_comment": "待決 20 的 NPC 那一半：誰在哪、什麼時段找得到。第一版由 data/beats/ 反推（誰在哪些 beat 出現過）＋企劃書第十三節校正，逐項註明依據。欄位說明見 data/SCHEMA.md。這份檔不放關係值與委託規則——關係住 GameState（規格書第十二節），委託形狀等 P4。",
+  "npcs": [
+    {
+      "id": "uncle",
+      "name": "阿源叔",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 1 },
+        { "location": "clinic", "phases": ["morning"], "from_day": 6 }
+      ],
+      "note": "旅館與診所並存到最後，不是搬過去——第 43 天他兩邊都出現得到。企劃書第十三節：他第一輪不會死"
+    },
+    {
+      "id": "ajie",
+      "name": "阿婕",
+      "locked_name": null,
+      "reveal": null,
+      "card": "npc_ajie",
+      "at": [
+        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 2, "to_day": 22 },
+        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 27 }
+      ],
+      "note": "戀愛對象 A。第 1 天與主角同車上山（busstop，傍晚，不是行動格）。第 23–26 天回阿姨那邊過颱風，所以 at[] 斷成兩段——那四天她不在正是颱風段的設計核心（企劃書第十三節：三件事搶兩格才是真的）。第 22 天傍晚走（d22_evening_ajie_leaves）、第 27 天上午回來上工（d27_morning_ajie_back）"
+    },
+    {
+      "id": "awei",
+      "name": "阿薇",
+      "locked_name": null,
+      "reveal": null,
+      "card": "npc_awei",
+      "at": [
+        { "location": "jinghe", "phases": ["morning", "afternoon"], "from_day": 10 },
+        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 23, "to_day": 26 }
+      ],
+      "note": "戀愛對象 B。本業在靜和園櫃檯；颱風四天帶阿嬤來山泉閣避難（企劃書第十三節，第一輪戀愛線重心）"
+    },
+    {
+      "id": "acai",
+      "name": "阿財",
+      "locked_name": null,
+      "reveal": null,
+      "card": "npc_acai",
+      "at": [
+        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 17 }
+      ],
+      "note": "叔叔住院後來旅館代班。第 21 夜起 n_emptyspot 是他原本站的位置"
+    },
+    {
+      "id": "ahong",
+      "name": "阿宏",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 1, "to_day": 5 }
+      ],
+      "note": "第一輪白天只到第 5 天，之後不再回來（阿宏線改版，待決一）。第 6 夜起改由 n_ahong_1..7 承接"
+    },
+    {
+      "id": "linjie",
+      "name": "林姐",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "jinghe", "phases": ["morning", "afternoon"], "from_day": 8 },
+        { "location": "jinghe_back", "phases": ["morning", "afternoon"], "from_day": 37, "to_day": 38 }
+      ],
+      "note": "靜和園經理。⚠️ 待決 6：她是不是阿婕口中的「阿姨」還沒拍板；若成立也只能是背景關係"
+    },
+    {
+      "id": "jinbo",
+      "name": "金伯",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "temple", "phases": ["morning", "afternoon"], "from_day": 3 }
+      ],
+      "note": "二十年前那三個人之一。唯一在警告主角的人"
+    },
+    {
+      "id": "chun_ama",
+      "name": "春阿嬤",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "oldstreet", "phases": ["morning", "afternoon"], "from_day": 2 }
+      ],
+      "note": "二十年前那三個人之一。雜貨店。⚠️ beats 只到第 14 天，第二、三章沒有她——待驗"
+    },
+    {
+      "id": "drchen",
+      "name": "陳醫師",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "clinic", "phases": ["morning"], "from_day": 12 },
+        { "location": "clinic_back", "phases": ["morning", "afternoon"], "from_day": 18 }
+      ],
+      "note": "二十年前那三個人之一。第 18–19 天之後他會注意到你往後棟繞（locations.json clinic_back 註）"
+    },
+    {
+      "id": "azhu",
+      "name": "阿珠護士",
+      "locked_name": null,
+      "reveal": null,
+      "card": "npc_azhu",
+      "at": [
+        { "location": "clinic", "phases": ["morning"], "from_day": 17 }
+      ],
+      "note": "委託對象。有些事她知道，有些事她不想知道"
+    },
+    {
+      "id": "laozeng",
+      "name": "老曾",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "police", "phases": ["morning"], "from_day": 4 }
+      ],
+      "note": "⚠️ 待決 29：他聲稱的巡查路線在不在公共浴場那條上，要先畫地圖才驗得了"
+    },
+    {
+      "id": "zhou",
+      "name": "周先生",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "riverside", "phases": ["afternoon"], "from_day": 8 }
+      ],
+      "note": "河邊。父母出事那座橋旁邊"
+    },
+    {
+      "id": "grad_student",
+      "name": "研究生",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 9 },
+        { "location": "registry_office", "phases": ["morning"], "from_day": 16 }
+      ],
+      "note": "住山泉閣的客人。企劃書第十節第三本簿子的入口——他會帶主角去戶籍室，也可以自己去。⚠️ registry_office 的 from_day 16 是按第二章開章推的，beats 尚無他在該地點的 beat"
+    },
+    {
+      "id": "aqinbo",
+      "name": "阿欽伯",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "upstream", "phases": ["afternoon"], "from_day": 19 }
+      ],
+      "note": "取水口與管線房。舊湯屋那條線也可以由他起頭（locations.json old_bathhouse 註）"
+    },
+    {
+      "id": "wu_chairman",
+      "name": "吳會長",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "communitycenter", "phases": ["afternoon"], "from_day": 10 }
+      ],
+      "note": "慶典籌備。⚠️ 待決 11：他的家人是妻子還是兒子還沒定"
+    },
+    {
+      "id": "xiaowu",
+      "name": "小武",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "oldstreet", "phases": ["morning", "afternoon"], "from_day": 19 }
+      ],
+      "note": "⚠️ 待決 15：他的取樣能不能阻止未定，目前建議第一輪不給選項"
+    },
+    {
+      "id": "mr_xu",
+      "name": "許先生",
+      "locked_name": "長住的客人",
+      "reveal": { "day_at_least": 41 },
+      "card": null,
+      "at": [
+        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 11 }
+      ],
+      "note": "企劃書第十三節：第 11 天入住、續住到最後、全輪六個接觸點，第 41 天講完太太的事才從「長住的客人」變成他的名字——NPC 版的地圖對位。⚠️ beats 目前只有第 41、44 天兩個接觸點，缺四個；姓氏「許」是暫名（待決 19）"
+    },
+    {
+      "id": "bus_driver",
+      "name": "公車司機",
+      "locked_name": null,
+      "reveal": null,
+      "card": null,
+      "at": [
+        { "location": "busstop", "phases": ["morning"], "from_day": 1 }
+      ],
+      "note": "⚠️ 待決 7：他是不是超脫輪迴者還沒拍板。第一輪只做一件事——讓他存在過（第 44 天那句「你不是坐過了嗎」）"
+    }
+  ],
+  "_pending": {
+    "roster_size": "**已拍板 18 人。** 故事線第一章文末寫的「17 NPC」是估數不是名單，從未存在過清冊：18 ＝ 資料裡出現過的具名個人，已把「阿源」併入 uncle、「護士」併入 azhu，並排除「登山隊」（群體不是 NPC）。不砍到 17 的理由：候選只有 xiaowu 與 bus_driver，而兩人各自綁著一條待決（15 取樣能不能阻止／7 超脫輪迴者），砍掉等於把待決的載體也砍了",
+    "night_presence": "本檔只標白天。夜鎮裡出現的人（n_plaza 的叔叔、n_queue 的阿宏、n_emptyspot 的阿財）是夜間 beat 的演出內容，不是「找得到的 NPC」，所以不進 at[]；要不要給夜間也一份可及性表，等 P3 夜間層真值化再定",
+    "relation": "全作只有 awei 與 ajie 有 relation 資料（beats 21 ／ 3 筆）。其餘 16 人目前不吃關係值，這是內容期的缺口不是本檔的"
+  }
+}

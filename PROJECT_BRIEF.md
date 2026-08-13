@@ -25,7 +25,7 @@ Steam 買斷制、單人、敘事驅動的**卡牌經營／調查／迴圈敘事
 ├── data/                    # 全部遊戲內容與可調數值（單一事實來源）
 │   ├── SCHEMA.md            # 欄位定義
 │   ├── tuning.json          # 全部可調數值
-│   ├── cards.json / locations.json
+│   ├── cards.json / locations.json / npcs.json
 │   └── beats/               # 三章逐日事件，10 檔
 ├── scenes/main.tscn         # 目前為空殼，P1-A 起長出宿主
 ├── scripts/
@@ -37,7 +37,7 @@ Steam 買斷制、單人、敘事驅動的**卡牌經營／調查／迴圈敘事
 
 ## 資料層現況
 
-headless 實測（2026-08-13，`verify_data.gd`）：**54 張卡／48 個地點（白天 20＋夜間 28）／251 個 beat**（第 1、2 夜重複 beat 清理後）；引用 0 錯誤；第 1–45 天行動格全覆蓋（第 1 天上午下午、第 32 天下午為刻意留空，名單將抽至 `scripts/core/data_facts.gd` 共用）。
+headless 實測（2026-08-13，`verify_data.gd`）：**54 張卡／48 個地點（白天 20＋夜間 28）／18 個 NPC／251 個 beat**（第 1、2 夜重複 beat 清理後）；引用 0 錯誤；地點三分類 10／10／16；第 1–45 天行動格全覆蓋（第 1 天上午下午、第 32 天下午為刻意留空，名單將抽至 `scripts/core/data_facts.gd` 共用）。
 
 ## Phase 進度
 
@@ -105,3 +105,5 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 - 2026-08-13：verifier 覆審（`P1文件審核.md`）五個契約缺口已全數修正——放置持有檢查、choice 原子化＋RESOLVED、夜間可達性（睡覺解析旅館、附加 beat、`day_at_least` 語彙、lint 7）、卡片 unique／gain 冪等、NPC 投入帳契約；`n_take_something` 與 `n_landmark` 資料已對齊。
 - 2026-08-13：codex 全文審查的六條必修＋次要項已全數修正（規則層下沉到 GameState／PanelBuilder、evening 改「非行動格」規則、第 45 天 evening 結局 coda、夜間三步解析、槽一次性 `beat_id+slot_id`、`enter_beat` 統一入口、fixture 化破壞性測試）；第 1、2 夜重複 beat 已清理。
 - 未拍板的落差集中在 `實作規格書.md > 附：本檔對資料層的既知落差清單`（縱慾權重、`ending` 鍵、開局選單、委託形狀——各自綁定後續 Phase）。
+- 2026-08-13：**待決 20 完成第一版**——`data/npcs.json`（18 人的可及性）＋夜間三分類（`day_counterpart`，10／10／16），四個缺口全部處理，`verify_data` 新增三條檢查。
+- 2026-08-13：**發狂卡機制模擬第二次重跑**（基準 `0f6d369`）。收費標記 10 → 14（`43f29ee` 擴阿宏鏈後一直沒重跑），峰值 4 → 5、視野窗口從一個變兩個。待決 35／38／41／42 已更新，**42 結案**；翻出兩條新待決：**43**（最重級縱慾回到 6 次，建議 `forced_normal_until` 5→7）、**44**（一夜能不能開多個標記，建議照企劃書一夜一個）。兩條都未改數值，等拍板。

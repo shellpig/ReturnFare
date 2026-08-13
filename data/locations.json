@@ -1,5 +1,5 @@
 {
-  "_comment": "第一、二章的白天地點（13 ＋ 4）＋ 全三章的夜間標記。第二章新增 4 個（故事線原本寫 5 個是多算了公共浴場，它第一章就已建檔，已更正）。欄位說明見 data/SCHEMA.md。地圖座標為示意值，但保留相對位置（待決 29 需要地理關係）。價碼規則：收費的是「往裡走」（樓下、後面、再往上、痕跡的下一級），免費的是「夜鎮的地形」。全輪只有 10 個收費，見待決 38。",
+  "_comment": "第一、二章的白天地點（13 ＋ 4）＋ 全三章的夜間標記。第二章新增 4 個（故事線原本寫 5 個是多算了公共浴場，它第一章就已建檔，已更正）。欄位說明見 data/SCHEMA.md。地圖座標為示意值，但保留相對位置（待決 29 需要地理關係）。價碼規則：收費的是「往裡走」（樓下、後面、再往上、痕跡的下一級），免費的是「夜鎮的地形」。全輪 14 個收費（第一章 6、第二章 4、第三章 4，其中阿宏鏈佔 7），見待決 38。夜間地點的 day_counterpart 指白天去同一個位置是哪裡，第二類必須與它同座標（verify_data 會擋）。",
   "day": [
     {
       "id": "sanquan",
@@ -297,12 +297,13 @@
       "chapter": 1,
       "earliest_night": 1,
       "madness_cost": 0,
+      "day_counterpart": "jinghe_back",
       "night_reveal": null,
       "map": {
         "x": 62,
-        "y": 46
+        "y": 48
       },
-      "note": "固定演出，不產生發狂卡。真相：靜和園內部。對位後改名。第三章第 37 天他會站在同一個地方，而那時飯菜是冷的"
+      "note": "固定演出，不產生發狂卡。真相：靜和園內部。對位後改名。第三章第 37 天他會站在同一個地方，而那時飯菜是冷的。座標原為 (62,46)＝大廳，已改成與 jinghe_back 一致——走廊在後棟不在大廳，大廳那個座標留給 n_nodoor"
     },
     {
       "id": "n_exit",
@@ -311,6 +312,7 @@
       "chapter": 1,
       "earliest_night": 2,
       "madness_cost": 0,
+      "day_counterpart": "sanquan",
       "night_reveal": null,
       "map": {
         "x": 50,
@@ -325,6 +327,7 @@
       "chapter": 1,
       "earliest_night": 3,
       "madness_cost": 0,
+      "day_counterpart": "clinic",
       "night_reveal": null,
       "map": {
         "x": 55,
@@ -339,6 +342,7 @@
       "chapter": 1,
       "earliest_night": 3,
       "madness_cost": 0,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 44,
@@ -353,6 +357,7 @@
       "chapter": 1,
       "earliest_night": 3,
       "madness_cost": 0,
+      "day_counterpart": "riverside",
       "night_reveal": null,
       "map": {
         "x": 25,
@@ -367,6 +372,7 @@
       "chapter": 1,
       "earliest_night": 6,
       "madness_cost": 1,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 36,
@@ -381,6 +387,7 @@
       "chapter": 1,
       "earliest_night": 6,
       "madness_cost": 0,
+      "day_counterpart": "temple",
       "night_reveal": null,
       "map": {
         "x": 33,
@@ -395,6 +402,7 @@
       "chapter": 1,
       "earliest_night": 7,
       "madness_cost": 1,
+      "day_counterpart": "upstream",
       "night_reveal": null,
       "map": {
         "x": 30,
@@ -409,6 +417,7 @@
       "chapter": 1,
       "earliest_night": 8,
       "madness_cost": 1,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 42,
@@ -423,6 +432,7 @@
       "chapter": 1,
       "earliest_night": 9,
       "madness_cost": 0,
+      "day_counterpart": "temple",
       "night_reveal": null,
       "map": {
         "x": 33,
@@ -437,6 +447,7 @@
       "chapter": 1,
       "earliest_night": 11,
       "madness_cost": 0,
+      "day_counterpart": "oldhouse_room",
       "night_reveal": null,
       "map": {
         "x": 22,
@@ -454,6 +465,7 @@
       "requires": {
         "flag": "opened_n_ahong_1"
       },
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 36,
@@ -468,6 +480,7 @@
       "chapter": 1,
       "earliest_night": 12,
       "madness_cost": 0,
+      "day_counterpart": "jinghe",
       "night_reveal": null,
       "map": {
         "x": 62,
@@ -482,6 +495,7 @@
       "chapter": 1,
       "earliest_night": 10,
       "madness_cost": 0,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 45,
@@ -496,6 +510,7 @@
       "chapter": 1,
       "earliest_night": 14,
       "madness_cost": 1,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 45,
@@ -513,6 +528,7 @@
       "requires": {
         "flag": "opened_n_ahong_2"
       },
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 36,
@@ -527,10 +543,11 @@
       "chapter": 2,
       "earliest_night": 17,
       "madness_cost": 1,
+      "day_counterpart": "clinic_back",
       "night_reveal": null,
       "map": {
-        "x": 55,
-        "y": 66
+        "x": 56,
+        "y": 68
       },
       "note": "診所後棟的夜版。燈是亮的，但沒有電"
     },
@@ -541,6 +558,7 @@
       "chapter": 2,
       "earliest_night": 20,
       "madness_cost": 1,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 28,
@@ -556,6 +574,7 @@
       "earliest_night": 20,
       "madness_cost": 1,
       "requires": { "flag": "opened_n_ahong_3" },
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 34,
@@ -570,6 +589,7 @@
       "chapter": 2,
       "earliest_night": 21,
       "madness_cost": 0,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 48,
@@ -584,6 +604,7 @@
       "chapter": 2,
       "earliest_night": 28,
       "madness_cost": 0,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 38,
@@ -599,6 +620,7 @@
       "earliest_night": 28,
       "madness_cost": 1,
       "requires": { "has_knowledge": "k_ahong_point_1" },
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 31,
@@ -613,6 +635,7 @@
       "chapter": 3,
       "earliest_night": 37,
       "madness_cost": 1,
+      "day_counterpart": "jinghe_back",
       "night_reveal": null,
       "map": {
         "x": 62,
@@ -628,6 +651,7 @@
       "earliest_night": 38,
       "madness_cost": 1,
       "requires": { "has_knowledge": "k_ahong_point_2" },
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 29,
@@ -642,6 +666,7 @@
       "chapter": 3,
       "earliest_night": 39,
       "madness_cost": 0,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 48,
@@ -656,6 +681,7 @@
       "chapter": 3,
       "earliest_night": 42,
       "madness_cost": 1,
+      "day_counterpart": "temple_back",
       "night_reveal": null,
       "map": {
         "x": 31,
@@ -677,6 +703,7 @@
           { "has_knowledge": "k_ahong_point_3" }
         ] }
       },
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 26,
@@ -691,16 +718,17 @@
       "chapter": 3,
       "earliest_night": 45,
       "madness_cost": null,
+      "day_counterpart": null,
       "night_reveal": null,
       "map": {
         "x": 62,
-        "y": 46
+        "y": 48
       },
       "note": "永遠開不了——第 45 夜不存在，主角第 45 天下午就被取走了。它跟開局選單那行灰掉的「不上車」是同一種語言。價碼留 null，玩家看得到這個標記但永遠等不到那一夜"
     }
   ],
   "_pending": {
-    "phases": "待決 20：21 地點 17 NPC 的開放時段與夜間三分類還沒完整標，白天這裡只有第一章 13 個",
-    "madness_cost": "待決 38 已結案：第一輪全部 1，多張價碼留給第二輪之後。資料結構支援 2-3，改這個欄位即可"
+    "madness_cost": "待決 38 已結案：第一輪全部 1，多張價碼留給第二輪之後。資料結構支援 2-3，改這個欄位即可",
+    "night_reveal": "28 個夜間地點全是 null——對位所需的知識卡一張都還沒開（現有 11 張 knowledge 全是真相／理論卡，沒有一張是地點命名卡）。要補的是第二類那 10 個地方：jinghe_back（n_corridor／n_steam_below 共用）、sanquan（n_exit）、clinic（n_queue）、riverside（n_watersound）、temple（n_woodtags／n_music 共用）、upstream（n_source）、oldhouse_room（n_lockedhouse）、jinghe（n_nodoor）、clinic_back（n_litcorridor）、temple_back（n_behind_temple）。第三類的 16 個沒有白天版，永遠 null。卡開不出來就填不動——綁卡片清單（待決 22）"
   }
 }

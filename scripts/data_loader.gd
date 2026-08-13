@@ -15,6 +15,7 @@ const CARD_TYPES := [
 var tuning: Dictionary = {}
 var cards: Dictionary = {}          ## id -> card
 var locations: Dictionary = {}      ## id -> location（白天與夜間合在一起，id 全域唯一）
+var npcs: Dictionary = {}           ## id -> npc
 var beats: Array[Dictionary] = []
 var beats_by_id: Dictionary = {}
 
@@ -39,6 +40,12 @@ func load_all() -> bool:
 				errors.append("地點 id 重複：%s" % l["id"])
 			locations[l["id"]] = l
 
+	var npcs_file := _read_json(DATA_DIR + "npcs.json")
+	for n in npcs_file.get("npcs", []):
+		if npcs.has(n["id"]):
+			errors.append("NPC id 重複：%s" % n["id"])
+		npcs[n["id"]] = n
+
 	for path in _beat_files():
 		var d := _read_json(path)
 		for b in d.get("beats", []):
@@ -53,6 +60,36 @@ func load_all() -> bool:
 ## 跨檔引用檢查：beat 指到的地點與卡片是否真的存在。
 func verify_references() -> PackedStringArray:
 	var problems: PackedStringArray = []
+
+	# 夜間地點的白天版：指到的地點要存在，而且必須是白天地點。
+	for lid in locations:
+		var loc: Dictionary = locations[lid]
+		var counterpart: Variant = loc.get("day_counterpart")
+		if counterpart == null:
+			continue
+		if not locations.has(counterpart):
+			problems.append("%s：day_counterpart 不存在 → %s" % [lid, counterpart])
+		elif locations[counterpart].get("layer", "") != "day":
+			problems.append("%s：day_counterpart 不是白天地點 → %s" % [lid, counterpart])
+		elif locations[counterpart].get("map", {}) != loc.get("map", {}):
+			# 第二類的意思就是「白天去同一個位置」——座標不同就不是同一個地方。
+			problems.append("%s：座標與 day_counterpart %s 不一致" % [lid, counterpart])
+
+	# NPC 可及性：地點要存在，時段不能超出該地點開放的時段。
+	for nid in npcs:
+		var npc: Dictionary = npcs[nid]
+		var card_id: Variant = npc.get("card")
+		if card_id != null and not cards.has(card_id):
+			problems.append("NPC %s：card 不存在 → %s" % [nid, card_id])
+		for at in npc.get("at", []):
+			var at_loc: String = at.get("location", "")
+			if not locations.has(at_loc):
+				problems.append("NPC %s：at.location 不存在 → %s" % [nid, at_loc])
+				continue
+			var open_phases: Array = locations[at_loc].get("phases", [])
+			for p in at.get("phases", []):
+				if not open_phases.has(p):
+					problems.append("NPC %s：%s 沒有 %s 這個時段" % [nid, at_loc, p])
 
 	for b in beats:
 		var bid: String = b["id"]
