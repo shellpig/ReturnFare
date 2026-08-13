@@ -22,10 +22,16 @@ func _ready() -> void:
 		return
 
 	# tuning.phases_per_day 只是一致性驗證，它本身不是可調數值（規格書第二節）
+	# Engine.get_singleton 讓 headless fixture 測試也能用（--script 模式無 autoload 全域名）
 	var ppd: Variant = loader.tuning.get("phases_per_day")
-	if ppd != GameState.ACTION_PHASES.size():
+	var gs_node := Engine.get_singleton("GameState")
+	if gs_node == null:
+		push_error("[Data] GameState singleton not found")
+		return
+	var expected_count: int = gs_node.ACTION_PHASES.size()
+	if ppd != expected_count:
 		push_error("[Data] tuning.phases_per_day=%s ≠ ACTION_PHASES count=%d" % [
-			str(ppd), GameState.ACTION_PHASES.size()
+			str(ppd), expected_count
 		])
 		return
 
