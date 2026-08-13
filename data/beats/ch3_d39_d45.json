@@ -373,6 +373,7 @@
         }
       ],
       "echo": {
+        "day": 43,
         "text": "叔叔在診所提到那間房該整理了。他講完自己頓了一下。",
         "condition": { "not": { "flag": "opened_the_room" } }
       },
@@ -530,6 +531,7 @@
         }
       ],
       "echo": {
+        "day": 45,
         "text": "有人提到她昨天下午在前台坐了很久。",
         "condition": { "not": { "flag": "reconciled" } }
       },

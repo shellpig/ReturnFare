@@ -166,9 +166,16 @@
         }
       ],
       "echo": {
+        "day": 25,
         "text": "你經過二樓的時候聽到阿薇在裡面低聲講話。你沒有進去。",
-        "condition": { "not": { "flag": "awei_care_d24am" } }
-      }
+        "condition": {
+          "all": [
+            { "not": { "flag": "awei_care_d24am" } },
+            { "not": { "flag": "awei_care_d24pm" } }
+          ]
+        }
+      },
+      "note": "殘響掛在上午這一格，但條件必須連下午那格一起看：第 24 天上下午各有一次照顧阿嬤，只做了下午的玩家也「進去過」，原本只查 awei_care_d24am 會對他播出一條假的殘響。echo.day 25 ＝兩次機會都用完的隔天"
     },
     {
       "id": "d24_am_hold",

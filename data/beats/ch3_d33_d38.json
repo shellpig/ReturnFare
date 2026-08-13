@@ -398,7 +398,13 @@
       "location": "jinghe_back",
       "when": { "day": 38, "phase": "afternoon" },
       "condition": { "flag": "back_wing_window" },
-      "requires": { "not": { "flag": "seen_back_wing" } },
+      "requires": {
+        "all": [
+          { "not": { "flag": "seen_back_wing" } },
+          { "not": { "has_card": "info_stories_dont_match" } }
+        ]
+      },
+      "reject_reason": "（兩天，兩個下午。你已經用掉一個。）",
       "title": "靜和園後棟（最後一天）",
       "text": "今天是最後一天。明天門就鎖回去了。",
       "slots": [
@@ -420,7 +426,13 @@
       "location": "oldstreet",
       "when": { "day": 38, "phase": "afternoon" },
       "condition": { "flag": "she_is_gone" },
-      "requires": { "not": { "has_card": "info_stories_dont_match" } },
+      "requires": {
+        "all": [
+          { "not": { "has_card": "info_stories_dont_match" } },
+          { "not": { "flag": "seen_back_wing" } }
+        ]
+      },
+      "reject_reason": "（兩天，兩個下午。你已經用掉一個。）",
       "title": "找她（第二天）",
       "text": "還是找不到。",
       "slots": [
@@ -435,6 +447,26 @@
           }
         }
       ]
+    },
+    {
+      "id": "d38_clinic",
+      "location": "clinic",
+      "when": { "day": 38, "phase": "afternoon" },
+      "title": "診所",
+      "text": "叔叔比昨天更沉。阿珠護士今天沒有說話。",
+      "slots": [
+        {
+          "id": "visit",
+          "occupant": "npc_uncle",
+          "label": "去看他",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "你坐了一個下午。他大部分時間在睡。",
+            "switch_progress": { "s6": 1 }
+          }
+        }
+      ],
+      "note": "後棟與找她互斥之後（待決 37② 結案），已經拿到其中一張的玩家在第 38 天下午會沒有格子可放。這一格是無條件的底——同時也是叔叔那條線第 37→38 天的連續，不是為了補洞硬塞的新設計"
     },
     {
       "id": "d38_ask_around",

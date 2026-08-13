@@ -200,7 +200,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `title` / `text` | 面板標題與敘述 |
 | `slots` | 槽陣列 |
 | `on_enter` | beat 首次呈現給玩家時結算一次的效果；鍵同 `on_place` |
-| `echo` | 沒到場時留下什麼：`{day, text, condition}`——該天 `condition` 成立才播（企劃書第十七節殘響三級） |
+| `echo` | 沒到場時留下什麼：`{day, text, condition}`——該天 `condition` 成立才播（企劃書第十七節殘響三級）。**`day` 必填且必須大於本 beat 的 `when.day`**：引擎掃的是 `echo.day == 今天`，缺欄的 echo 永遠不播。同一段 `text` 不得在多個 beat 重複（lint 8） |
 | `encounter` | 遭遇定義：`rounds[]{demand, on_wrong, accepts}`／`per_round_slot_cost`／`escape_cost`（規格書第十節） |
 | `chapter` | **只有夜間標記用**。同一個標記的章節變體，見下 |
 | `note` | 設計註記，引擎不讀 |

@@ -110,21 +110,21 @@
       "note": "陳醫師＝三個閃躲的人之一"
     },
     {
-      "id": "d27_pm_awei_confirm",
+      "id": "d27_evening_awei_confirm",
       "location": "sanquan",
-      "when": { "day": 27, "phase": "afternoon" },
+      "when": { "day": 27, "phase": "evening" },
       "condition": { "flag": "awei_sheltering" },
       "title": "那四天她整晚在二樓",
       "text": "這是你唯一能親眼確認的人。",
       "slots": [],
       "on_enter": { "flag": { "dodger_awei_cleared": true } },
       "fixed": true,
-      "note": "阿薇這一條有雙重作用：第一輪是感情線的材料——她是那四天唯一一個沒有在做別的事的人，而主角在場。第二輪它是排除法的第一塊磚"
+      "note": "阿薇這一條有雙重作用：第一輪是感情線的材料——她是那四天唯一一個沒有在做別的事的人，而主角在場。第二輪它是排除法的第一塊磚。\n改掛 evening（待決 37① 結案，選項 B）：三個 dodger 原本全部落在第 27 天下午，而下午只有一個行動格——門檻 2 永遠不成立，k_town_covers 第一輪拿不到。這一格移到 evening 之後不吃格也不綁地點，玩家的下午照樣去診所或靜和園拿第二個 flag。主角本來就在場看了四天，不需要花一個下午去確認"
     },
     {
-      "id": "d27_pm_cover_knowledge",
+      "id": "d27_evening_cover_knowledge",
       "location": "sanquan",
-      "when": { "day": 27, "phase": "afternoon" },
+      "when": { "day": 27, "phase": "evening" },
       "fixed": true,
       "condition": {
         "count_at_least": { "n": 2, "of": [
@@ -137,7 +137,7 @@
       "text": "有幾個人在閃躲，而你說不上來為什麼。",
       "slots": [],
       "on_enter": { "gain": ["k_town_covers"] },
-      "note": "碰到任意兩個閃躲的人即成立。它不指控任何人，它描述一座鎮"
+      "note": "碰到任意兩個閃躲的人即成立。它不指控任何人，它描述一座鎮。\n⚠️ 必須排在 d27_evening_awei_confirm 之後：同一個 evening 的 fixed beat 依陣列順序結算（實作規格書第十一節），這一格的 condition 讀的是前一格寫的 dodger_awei_cleared"
     },
 
     {

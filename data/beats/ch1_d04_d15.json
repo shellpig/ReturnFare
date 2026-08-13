@@ -165,15 +165,7 @@
           }
         }
       ],
-      "echo": {
-        "text": "旁邊有人提起第 3 天下午發生過的一件小事。你接不上話，而現在也沒有人可以問了。",
-        "condition": {
-          "not": {
-            "flag": "ahong_last_normal_contact"
-          }
-        }
-      },
-      "note": "第一章第一次殘響。世界在他沒去的那個下午動過"
+      "note": "第一章第一次殘響的落點是第 3 天下午那格（d3_pm_couple.echo，day 5），不是這裡。這格原本掛過一份同文的 echo 複本，但引擎掃的是 echo.day，複本沒有 day 欄、永遠不播，已移除"
     },
     {
       "id": "d5_pm_photos",
@@ -220,15 +212,7 @@
             "text": "「我還在查。」他說，而他是真的還在查。"
           }
         }
-      ],
-      "echo": {
-        "text": "旁邊有人提起第 3 天下午發生過的一件小事。你接不上話，而現在也沒有人可以問了。",
-        "condition": {
-          "not": {
-            "flag": "ahong_last_normal_contact"
-          }
-        }
-      }
+      ]
     },
     {
       "id": "d5_pm_street",
@@ -715,7 +699,7 @@
       "location": "bathhouse",
       "when": {
         "day": 8,
-        "phase": "afternoon"
+        "phase": "evening"
       },
       "fixed": true,
       "title": "殘響",
@@ -726,7 +710,7 @@
           "has_card": "info_bath_notice"
         }
       },
-      "note": "第一章第二次殘響，不佔格"
+      "note": "第一章第二次殘響，不佔格。掛 evening 而不是 afternoon：非 evening 的 fixed beat 玩家沒去該地點就不結算（實作規格書第五節），而這一格的文字明說「不管你今天去哪」，只有 evening 的強制演出做得到"
     },
     {
       "id": "d8_ambient_monkey",
@@ -1309,11 +1293,23 @@
             "relation": {
               "npc": "awei",
               "delta": 1
+            },
+            "flag": {
+              "helped_awei_d12": true
             }
           }
         }
       ],
-      "note": "種：遮嘴（門牙缺一角）。第三章第 39 天她還是遮，而那顆牙已經好了"
+      "echo": {
+        "day": 13,
+        "text": "有人說阿薇那天一個人搬到天黑。你不在場，而她也沒有提。",
+        "condition": {
+          "not": {
+            "flag": "helped_awei_d12"
+          }
+        }
+      },
+      "note": "種：遮嘴（門牙缺一角）。第三章第 39 天她還是遮，而那顆牙已經好了。\n第一章第三次殘響（待決 1 結案）：第 12 天下午是全章競爭最兇的一格（5 選 1），而阿薇是第 29 天邀誰那個決策的核心。錯過她的玩家要被告知那條線今天動過。helped_awei_d12 只為這條殘響存在"
     },
     {
       "id": "d12_pm_tail_longstay",
