@@ -1,4 +1,14 @@
 {
   "phases_per_day": 3,
-  "hand_size": 14
+  "hand_size": 14,
+  "madness_cap": 7,
+  "madness_countdown_days": 7,
+  "madness_vision_threshold": 3,
+  "indulgence": {
+    "soak_phase_cost": 2,
+    "soak_cards_cleared": 1,
+    "forced_light_count": 1,
+    "forced_normal_until": 7
+  }
 }
+

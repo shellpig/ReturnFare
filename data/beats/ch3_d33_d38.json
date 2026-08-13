@@ -318,6 +318,7 @@
       "when": { "day": 37, "phase": "afternoon" },
       "condition": { "flag": "back_wing_window" },
       "requires": { "not": { "flag": "seen_back_wing" } },
+      "reject_reason": "（你已經去過後棟了。）",
       "title": "靜和園後棟",
       "text": "側門沒鎖。走廊很長，兩側都是門，門上沒有號碼——跟第 1 夜一模一樣。\n推開一扇門：和室桌上有吃到一半的飯菜。這次是冷的。\n走廊盡頭有樓梯往下。下面是大浴池，蒸氣很濃，水面在動。\n水裡有一個人背對著。你想走近——\n\n林姐出現。她不生氣，只非常客氣地說：「這邊是客人的區域喔。」",
       "slots": [
@@ -341,6 +342,7 @@
       "when": { "day": 37, "phase": "afternoon" },
       "condition": { "flag": "she_is_gone" },
       "requires": { "not": { "has_card": "info_stories_dont_match" } },
+      "reject_reason": "（你已經把能問的地方都問過一輪了。）",
       "title": "找她",
       "text": "一個下午把她平常會去的幾個地方跑一圈。",
       "slots": [

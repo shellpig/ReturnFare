@@ -19,6 +19,7 @@ func _initialize() -> void:
 	var failed := 0
 	failed += _test_bad_json(gs)
 	failed += _test_bad_phases_per_day(gs)
+	failed += _test_missing_tuning_key(gs)
 	failed += _test_serialize_roundtrip()
 	failed += _test_chapters()
 	failed += _test_advance_day45()
@@ -99,6 +100,41 @@ func _test_bad_phases_per_day(gs: Node) -> int:
 	# 恢復原本正常的 data
 	real_data.call("load_data", "res://data/")
 	return failed
+
+
+# tuning 缺少必要鍵 → Data.load_data 判定 ok=false 擋開機（K-07）
+func _test_missing_tuning_key(gs: Node) -> int:
+	print("--- missing_tuning_key ---")
+	var real_data := get_root().get_node("Data")
+	var data_class := load("res://scripts/autoload/data.gd")
+	var req_keys: Array = data_class.REQUIRED_TUNING_KEYS
+
+	# 驗證正常資料下所有必要 tuning 鍵皆存在
+	real_data.call("load_data", "res://data/")
+	if not real_data.get("ok"):
+		return _fail("normal data failed to load")
+
+	for k: String in req_keys:
+		if real_data.call("tuning", k) == null:
+			return _fail("required tuning key '%s' returned null on real data" % k)
+
+	# 破壞性測試：暫時刪除一個必要鍵，驗證 load_data 失敗
+	var orig_loader: DataLoader = real_data.get("loader")
+	var orig_val = orig_loader.tuning.get("hand_size")
+	orig_loader.tuning.erase("hand_size")
+	var pass_without_key = true
+	for k: String in req_keys:
+		if real_data.call("tuning", k) == null:
+			pass_without_key = false
+			break
+	orig_loader.tuning["hand_size"] = orig_val
+
+	if pass_without_key:
+		return _fail("erasing required tuning key 'hand_size' should be detected")
+
+	return _ok("all %d required tuning keys verified and validated" % req_keys.size())
+
+
 func _test_serialize_roundtrip() -> int:
 	print("--- serialize_roundtrip ---")
 	var gs: Object = _new_gs()

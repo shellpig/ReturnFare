@@ -193,6 +193,7 @@
       "text": "霧裡有人清楚地叫出主角的名字。聲音的方向對不上任何一條路。",
       "slots": [],
       "requires": { "flag": "opened_n_ahong_2" },
+      "reject_reason": "（你還沒找到上一處痕跡。）",
       "on_enter": { "gain": ["info_ahong_not_normal"], "flag": { "opened_n_ahong_3": true } },
       "note": "阿宏鏈第三級，第一輪的高投入上限。結論仍只到「他跟夜裡有關」——不能定義他被困在哪裡、是否活著、能否救回"
     },

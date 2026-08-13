@@ -165,6 +165,11 @@ static func _lint_condition(node: Variant, bid: String, where: String, problems:
 		problems.append("%s [%s]：condition 不是 Dictionary" % [bid, where])
 		return
 	var d := node as Dictionary
+	if d.is_empty():
+		problems.append("%s [%s]：condition 是空的 Dictionary（非 null）" % [bid, where])
+		return
+	if d.keys().size() > 1:
+		problems.append("%s [%s]：condition 包含多個運算子鍵（應使用 all）→ %s" % [bid, where, str(d.keys())])
 	for k: String in d.keys():
 		if not ConditionEval.KNOWN_KEYS.has(k):
 			problems.append("%s [%s]：未知 condition 運算子 → %s" % [bid, where, k])

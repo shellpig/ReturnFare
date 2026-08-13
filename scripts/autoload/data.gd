@@ -5,6 +5,18 @@ extends Node
 ## 因為 _ready 用到 GameState.ACTION_PHASES 做一致性驗證。
 ## GameState 的取得方式見 _find_game_state()——autoload 不是 Engine singleton。
 
+const REQUIRED_TUNING_KEYS := [
+	"hand_size",
+	"phases_per_day",
+	"madness_cap",
+	"madness_countdown_days",
+	"madness_vision_threshold",
+	"indulgence.soak_phase_cost",
+	"indulgence.soak_cards_cleared",
+	"indulgence.forced_light_count",
+	"indulgence.forced_normal_until",
+]
+
 var loader: DataLoader
 var ok: bool = false
 
@@ -37,6 +49,12 @@ func load_data(data_dir: String = "res://data/") -> bool:
 	# lint 2：有 requires 卻沒填 reject_reason，只警告不擋開機。
 	for w in DataLoader.lint_missing_reject_reason(loader.beats):
 		push_warning("[Data] " + w)
+
+	# tuning 必要鍵存在性檢查（規格書第二節、已知問題 K-07）
+	for key: String in REQUIRED_TUNING_KEYS:
+		if tuning(key) == null:
+			push_error("[Data] tuning.json 缺少必要鍵：%s" % key)
+			return false
 
 	# tuning.phases_per_day 只是一致性驗證，它本身不是可調數值（規格書第二節）
 	var ppd: Variant = loader.tuning.get("phases_per_day")

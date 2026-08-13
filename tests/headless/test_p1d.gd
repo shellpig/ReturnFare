@@ -500,6 +500,17 @@ func _test_lint_vocabulary() -> int:
 	else:
 		failed += _ok("lint_vocabulary: unknown condition operator caught (%s)" % problems1[0])
 
+	var multi_key_condition: Array[Dictionary] = [{
+		"id": "p1d_lint_multi_key",
+		"condition": { "day": 5, "flag": "x" },
+		"slots": [],
+	}]
+	var problems_multi := DataLoader.lint_vocabulary(multi_key_condition)
+	if problems_multi.is_empty():
+		failed += _fail("lint_vocabulary: multi-key condition dictionary should be caught (should use 'all')")
+	else:
+		failed += _ok("lint_vocabulary: multi-key condition caught (%s)" % problems_multi[0])
+
 	var bad_effect: Array[Dictionary] = [{
 		"id": "p1d_lint_bad_effect",
 		"slots": [
@@ -517,6 +528,7 @@ func _test_lint_vocabulary() -> int:
 		"condition": { "all": [{ "day_at_least": 1 }, { "not": { "flag": "x" } }] },
 		"slots": [
 			{ "id": "s1", "requires": { "count_at_least": { "n": 1, "of": [{ "has_card": "protagonist" }] } },
+			  "reject_reason": "（測試）",
 			  "on_place": { "text": "t", "gain": ["protagonist"], "flag": { "a": true } } },
 		],
 	}]
@@ -535,5 +547,12 @@ func _test_lint_vocabulary() -> int:
 			real_problems.size(), str(real_problems[0])])
 	else:
 		failed += _ok("lint_vocabulary: real data (252 beats) is clean")
+
+	var missing_reasons := DataLoader.lint_missing_reject_reason(real_loader.beats)
+	if not missing_reasons.is_empty():
+		failed += _fail("lint_missing_reject_reason: real data has %d missing reject_reason(s): %s" % [
+			missing_reasons.size(), str(missing_reasons[0])])
+	else:
+		failed += _ok("lint_missing_reject_reason: real data has 0 missing reject_reason warnings")
 
 	return failed

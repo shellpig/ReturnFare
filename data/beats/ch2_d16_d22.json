@@ -369,6 +369,7 @@
       "location": "upstream",
       "when": { "day": 19, "phase": "afternoon" },
       "requires": { "has_knowledge": "k_forty_something" },
+      "reject_reason": "（你還不知道這條山路的線索。）",
       "title": "上游源頭",
       "text": "登山隊給的那條路線。走上去要一個下午。",
       "slots": [

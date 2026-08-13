@@ -20,7 +20,7 @@ func _ready() -> void:
 
 
 func _refresh() -> void:
-	var limit: int = Data.tuning("hand_size", 14)
+	var limit: int = int(Data.tuning("hand_size"))
 	_slots_label.text = _FMT_SLOTS % [GameState.hand_slots_used(), limit]
 	_hand_label.text = " ".join(GameState.hand) if not GameState.hand.is_empty() else _LABEL_EMPTY_HAND
 	var k_keys: Array = GameState.knowledge.keys()

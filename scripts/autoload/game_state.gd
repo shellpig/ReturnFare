@@ -106,7 +106,7 @@ func gain_card(id: String) -> void:
 		_madness_counter += 1
 		var inst := id + "#" + str(_madness_counter)
 		hand.append(inst)
-		madness_clock[inst] = Data.tuning("madness_countdown_days", 7)
+		madness_clock[inst] = int(Data.tuning("madness_countdown_days"))
 		_check_hand_overflow(id)
 		hand_changed.emit()
 		return
@@ -120,7 +120,7 @@ func gain_card(id: String) -> void:
 
 
 func _check_hand_overflow(card_id: String) -> void:
-	var max_hand: int = Data.tuning("hand_size", 14)
+	var max_hand: int = int(Data.tuning("hand_size"))
 	if hand.size() > max_hand:
 		push_warning("gain_card: hand is full (%d/%d), card '%s' gained anyway" % [hand.size(), max_hand, card_id])
 
