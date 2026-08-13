@@ -1,16 +1,15 @@
 extends SceneTree
 
-## P1-C 修 bug 回歸測試（2026-08-13 code review 找到的 A1／A2，兩條都在動 P1-D 之後補回）：
-## A1：白天／固定面板要走 GameState.enter_beat()（beat 呈現的唯一入口，規格書第四節）——
-##     結算 on_enter、寫入 beats_entered，不能只在 evening 演出流走這條。
-## A2：beat 級 requires 不成立時，內部槽三態要一併降為 LOCKED（規格書第五節）——
-##     PanelBuilder 的 view model 要降，GameState.try_place 的規則層也要獨立擋（不能只靠 UI）。
+## P1-C / P1-D 修 bug 回歸測試（K-01～K-04）：
+## A1：location_panel.show_location() 透過 GameState.open_panel() 呈現 beat 並結算 on_enter。
+## A2：beat 級 requires 不成立時，內部槽三態要一併降為 LOCKED（規格書第五節）。
+## A3 (K-01+K-02)：GameState.open_panel() 規則層獨立入口，先結算 on_enter 再求值（Day 23 上午山泉閣連鎖解鎖）。
+## A4 (K-03+K-04)：GameState.placeable_cards() 規則層過濾＋try_place() reason_code/reason_text 分離。
 ##
 ## 跑法：
 ##   Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p1c_bugfix.gd
 ##
-## 本檔刻意不手動組裝 singleton，直接用 /root/GameState 與 /root/Data（project.godot 的
-## autoload 路徑）——location_panel.gd 內部呼叫的就是這兩個裸全域，驗的要是遊戲實際會走的那條路。
+## 本檔直接用 /root/GameState 與 /root/Data（project.godot 的 autoload 路徑）。
 ## 全綠 exit 0；任一失敗 exit 1。
 
 
@@ -26,6 +25,8 @@ func _initialize() -> void:
 	var failed := 0
 	failed += await _test_a1_location_panel_calls_enter_beat()
 	failed += _test_a2_beat_requires_cascades_to_slots()
+	failed += _test_a3_open_panel_rule_layer_and_intra_panel()
+	failed += _test_a4_placeable_cards_and_try_place_reason_code()
 
 	if failed > 0:
 		push_error("P1-C bugfix: %d test(s) failed" % failed)
@@ -45,13 +46,31 @@ func _fail(msg: String) -> int:
 	return 1
 
 
-# ── A1：show_location() 要透過 enter_beat() 呈現 beat ───────────────────────
+func _reset_gs(gs: Node) -> void:
+	(gs.get("hand") as Array).clear()
+	(gs.get("knowledge") as Dictionary).clear()
+	(gs.get("madness_clock") as Dictionary).clear()
+	(gs.get("beats_entered") as Dictionary).clear()
+	(gs.get("slots_placed") as Dictionary).clear()
+	(gs.get("flags") as Dictionary).clear()
+	(gs.get("switches") as Dictionary).clear()
+	(gs.get("switch_progress") as Dictionary).clear()
+	(gs.get("relations") as Dictionary).clear()
+	(gs.get("npc_action_counts") as Dictionary).clear()
+	gs.set("_madness_counter", 0)
+	gs.set("day", 1)
+	gs.set("phase", "morning")
+	gs.set("action_spent", false)
+
+
+# ── A1：show_location() 要透過 open_panel() 呈現 beat ───────────────────────
 
 func _test_a1_location_panel_calls_enter_beat() -> int:
-	print("--- A1: location_panel.show_location() calls enter_beat ---")
+	print("--- A1: location_panel.show_location() calls open_panel / enter_beat ---")
 	var failed := 0
 
 	var gs: Node = get_root().get_node("GameState")
+	_reset_gs(gs)
 	gs.set("day", 1)
 	gs.set("phase", "evening")
 
@@ -84,6 +103,7 @@ func _test_a2_beat_requires_cascades_to_slots() -> int:
 
 	var gs: Node = get_root().get_node("GameState")
 	var data_node: Node = get_root().get_node("Data")
+	_reset_gs(gs)
 
 	gs.call("gain_card", "protagonist")
 	gs.set("day", 19)
@@ -125,11 +145,15 @@ func _test_a2_beat_requires_cascades_to_slots() -> int:
 		failed += _fail("try_place on beat-LOCKED slot should fail, got ok=true")
 	else:
 		failed += _ok("try_place on beat-LOCKED slot → ok=false (reason=%s)" % str(result.get("reason")))
-	if str(result.get("reason")) != beat_reason:
-		failed += _fail("try_place rejection reason should match beat reason; got %s expected %s" % [
-			str(result.get("reason")), beat_reason])
+	if str(result.get("reason_code")) != "locked":
+		failed += _fail("try_place rejection reason_code should be 'locked', got %s" % str(result.get("reason_code")))
 	else:
-		failed += _ok("try_place rejection reason matches beat reason")
+		failed += _ok("try_place rejection reason_code is 'locked'")
+	if str(result.get("reason_text")) != beat_reason:
+		failed += _fail("try_place rejection reason_text should match beat reason; got %s expected %s" % [
+			str(result.get("reason_text")), beat_reason])
+	else:
+		failed += _ok("try_place rejection reason_text matches beat reason")
 	if not (gs.get("slots_placed") as Dictionary).is_empty():
 		failed += _fail("try_place on beat-LOCKED slot should leave slots_placed empty")
 	else:
@@ -153,8 +177,108 @@ func _test_a2_beat_requires_cascades_to_slots() -> int:
 	return failed
 
 
+# ── A3 (K-01+K-02)：open_panel 規則層入口與同面板連鎖求值 ─────────────────────
+
+func _test_a3_open_panel_rule_layer_and_intra_panel() -> int:
+	print("--- A3: GameState.open_panel() rule layer & intra-panel on_enter (d23 AM sanquan) ---")
+	var failed := 0
+
+	var gs: Node = get_root().get_node("GameState")
+	_reset_gs(gs)
+	gs.call("gain_card", "protagonist")
+	gs.set("day", 23)
+	gs.set("phase", "morning")
+
+	# 不 instantiate 任何 UI，直接呼叫 GameState.open_panel("sanquan")
+	var view: Dictionary = gs.call("open_panel", "sanquan")
+
+	# ① 驗證 d23_morning_awei_knocks 已被 enter_beat，flag awei_sheltering 已寫入
+	if not (gs.get("beats_entered") as Dictionary).has("d23_morning_awei_knocks"):
+		failed += _fail("open_panel(sanquan): beats_entered missing d23_morning_awei_knocks")
+	else:
+		failed += _ok("open_panel(sanquan): beats_entered has d23_morning_awei_knocks")
+
+	if not bool((gs.get("flags") as Dictionary).get("awei_sheltering", false)):
+		failed += _fail("open_panel(sanquan): on_enter flag awei_sheltering not set")
+	else:
+		failed += _ok("open_panel(sanquan): on_enter flag awei_sheltering = true")
+
+	# ② 驗證依賴 awei_sheltering 的 d23_am_settle_grandma 在同一回傳的 view model 中已呈 OPEN
+	var grandma_beat: Dictionary = _find_beat(view, "d23_am_settle_grandma")
+	if grandma_beat.is_empty():
+		failed += _fail("open_panel(sanquan): d23_am_settle_grandma missing from view (evaluated before on_enter?)")
+	else:
+		if int(grandma_beat.get("tri", -1)) != PanelBuilder.TriState.OPEN:
+			failed += _fail("open_panel(sanquan): d23_am_settle_grandma tri expected OPEN, got %d" % int(grandma_beat.get("tri", -1)))
+		else:
+			failed += _ok("open_panel(sanquan): d23_am_settle_grandma is OPEN on first open")
+
+	return failed
+
+
+# ── A4 (K-03+K-04)：placeable_cards 過濾與 try_place 結構 ────────────────────
+
+func _test_a4_placeable_cards_and_try_place_reason_code() -> int:
+	print("--- A4: GameState.placeable_cards() & try_place reason_code/reason_text ---")
+	var failed := 0
+
+	var gs: Node = get_root().get_node("GameState")
+	_reset_gs(gs)
+	gs.call("gain_card", "protagonist")
+	gs.call("gain_card", "info_husband_version")
+	gs.set("day", 3)
+	gs.set("phase", "afternoon")
+
+	# d3_pm_sanquan 下有兩個槽：soak（收 protagonist）、show_version（收 info 類比對卡）
+	# ① 尚未消耗行動格時，soak 槽的 placeable_cards 應含 protagonist
+	var soak_cards: Array = gs.call("placeable_cards", "d3_pm_sanquan", "soak")
+	if not soak_cards.has("protagonist"):
+		failed += _fail("placeable_cards soak: expected protagonist in list, got %s" % str(soak_cards))
+	else:
+		failed += _ok("placeable_cards soak contains protagonist")
+
+	# ② show_version 是比對槽，不收 protagonist，只收 info
+	var show_cards: Array = gs.call("placeable_cards", "d3_pm_sanquan", "show_version")
+	if show_cards.has("protagonist") or not show_cards.has("info_husband_version"):
+		failed += _fail("placeable_cards show_version: expected [info_husband_version], got %s" % str(show_cards))
+	else:
+		failed += _ok("placeable_cards show_version correctly filters by accepts")
+
+	# ③ 放入主角卡消耗行動格後，soak 的 placeable_cards 應過濾掉 protagonist
+	var place_res: Dictionary = gs.call("try_place", "protagonist", "d3_pm_sanquan", "soak")
+	if not place_res.get("ok", false):
+		failed += _fail("try_place protagonist in soak failed: %s" % str(place_res))
+		return failed
+	failed += _ok("try_place protagonist in soak succeeded")
+
+	# 同一格已放過 → placeable_cards 應為空
+	var soak_after: Array = gs.call("placeable_cards", "d3_pm_sanquan", "soak")
+	if not soak_after.is_empty():
+		failed += _fail("placeable_cards on resolved slot should be empty, got %s" % str(soak_after))
+	else:
+		failed += _ok("placeable_cards on resolved slot is empty")
+
+	# 行動格 ledger（收 protagonist）因為 action_spent=true，placeable_cards 不得列出 protagonist
+	var ledger_cards: Array = gs.call("placeable_cards", "d3_pm_sanquan", "ledger")
+	if ledger_cards.has("protagonist"):
+		failed += _fail("placeable_cards ledger should NOT contain protagonist when action_spent=true, got %s" % str(ledger_cards))
+	else:
+		failed += _ok("placeable_cards ledger excludes protagonist when action_spent=true")
+
+	# ④ try_place 拒絕原因格式檢查：
+	# action_spent 失敗時 reason_code 為 "action_spent", reason_text 為 ""
+	var spent_res: Dictionary = gs.call("try_place", "protagonist", "d3_pm_sanquan", "ledger")
+	if str(spent_res.get("reason_code")) != "action_spent" or str(spent_res.get("reason_text")) != "":
+		failed += _fail("try_place action_spent: expected reason_code='action_spent', reason_text='', got %s" % str(spent_res))
+	else:
+		failed += _ok("try_place action_spent returns reason_code='action_spent' and empty reason_text")
+
+	return failed
+
+
 func _find_beat(view: Dictionary, beat_id: String) -> Dictionary:
 	for entry in view.get("beats", []) as Array:
 		if str((entry as Dictionary)["beat"]["id"]) == beat_id:
 			return entry as Dictionary
 	return {}
+
