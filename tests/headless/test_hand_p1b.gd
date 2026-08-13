@@ -40,6 +40,7 @@ func _initialize() -> void:
 	failed += _test_madness_multi_instance(gs)
 	failed += _test_slots_used(gs)
 	failed += _test_serialize_roundtrip(gs)
+	failed += _test_hand_overflow_warning(gs)
 
 	Engine.unregister_singleton("Data")
 	Engine.unregister_singleton("GameState")
@@ -216,6 +217,23 @@ func _test_serialize_roundtrip(gs: Node) -> int:
 		failed += _fail("roundtrip: knowledge missing from knowledge dict (meta layer)")
 	else:
 		failed += _ok("roundtrip: knowledge in meta layer")
+	return failed
+
+
+# 超載時 gain 先直接照收並記警告
+func _test_hand_overflow_warning(gs: Node) -> int:
+	print("--- hand_overflow_warning ---")
+	_reset(gs)
+	var failed := 0
+	# 塞滿 15 張卡（tuning hand_size 為 14）
+	for i in range(15):
+		gs.call("gain_card", ID_MADNESS)
+
+	var hand_array: Array = gs.get("hand")
+	if hand_array.size() != 15:
+		failed += _fail("hand overflow: expected 15 cards, got %d" % hand_array.size())
+	else:
+		failed += _ok("hand overflow: 15 cards gained despite exceeding hand_size (warning emitted)")
 	return failed
 
 

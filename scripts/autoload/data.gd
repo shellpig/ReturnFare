@@ -10,24 +10,29 @@ var ok: bool = false
 
 
 func _ready() -> void:
-	loader = DataLoader.new()
+	load_data("res://data/")
+
+
+func load_data(data_dir: String = "res://data/") -> bool:
+	ok = false
+	loader = DataLoader.new(data_dir)
 	if not loader.load_all():
 		for e in loader.errors:
 			push_error("[Data] " + e)
-		return
+		return false
 
 	var refs := loader.verify_references()
 	if not refs.is_empty():
 		for e in refs:
 			push_error("[Data] " + e)
-		return
+		return false
 
 	# 語彙封閉性 lint 1（規格書第十七節）：未知 condition/effect 鍵擋開機。
 	var vocab_problems := DataLoader.lint_vocabulary(loader.beats)
 	if not vocab_problems.is_empty():
 		for e in vocab_problems:
 			push_error("[Data] " + e)
-		return
+		return false
 
 	# lint 2：有 requires 卻沒填 reject_reason，只警告不擋開機。
 	for w in DataLoader.lint_missing_reject_reason(loader.beats):
@@ -38,15 +43,16 @@ func _ready() -> void:
 	var gs_node := _find_game_state()
 	if gs_node == null:
 		push_error("[Data] GameState not found (既非 Engine singleton，/root 底下也沒有)")
-		return
+		return false
 	var expected_count: int = gs_node.ACTION_PHASES.size()
 	if ppd != expected_count:
 		push_error("[Data] tuning.phases_per_day=%s ≠ ACTION_PHASES count=%d" % [
 			str(ppd), expected_count
 		])
-		return
+		return false
 
 	ok = true
+	return true
 
 
 ## 取得 GameState，兩條路依序試。

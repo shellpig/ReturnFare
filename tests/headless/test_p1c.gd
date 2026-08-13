@@ -30,6 +30,8 @@ func _initialize() -> void:
 	failed += _test_available_locations(gs, data_node)
 	failed += _test_panel_build_busstop_d1_evening(gs, data_node)
 	failed += _test_panel_build_sanquan_d3_pm(gs, data_node)
+	failed += _test_panel_build_all_d3_pm_locations(gs, data_node)
+	failed += _test_condition_hidden_filtering(gs, data_node)
 
 	Engine.unregister_singleton("Data")
 	Engine.unregister_singleton("GameState")
@@ -390,5 +392,102 @@ func _test_panel_build_sanquan_d3_pm(gs: Node, data: Node) -> int:
 		failed += _fail("show_version after gaining info_husband_version: expected OPEN, got %d" % show_sv["tri"])
 	else:
 		failed += _ok("show_version after gaining info_husband_version → OPEN")
+
+	return failed
+
+
+# ── PanelBuilder.build：第 3 天下午三個地點面板（sanquan, oldstreet, temple）全部按資料呈現 ──
+
+func _test_panel_build_all_d3_pm_locations(gs: Node, data: Node) -> int:
+	print("--- panel_build all_d3_pm_locations ---")
+	_reset(gs)
+	gs.set("day", 3)
+	gs.set("phase", "afternoon")
+	var failed := 0
+
+	# 1. sanquan
+	var view_sanquan: Dictionary = PanelBuilder.build("sanquan", gs, data)
+	var beats_sq: Array = view_sanquan["beats"] as Array
+	if beats_sq.size() != 1 or str((beats_sq[0] as Dictionary)["beat"]["id"]) != "d3_pm_sanquan":
+		failed += _fail("d3 pm sanquan: expected 1 beat (d3_pm_sanquan), got %d" % beats_sq.size())
+	else:
+		failed += _ok("d3 pm sanquan: beat d3_pm_sanquan correctly loaded")
+
+	# 2. oldstreet: d3_pm_oldstreet (1 slot: wander)
+	var view_oldstreet: Dictionary = PanelBuilder.build("oldstreet", gs, data)
+	var beats_os: Array = view_oldstreet["beats"] as Array
+	if beats_os.size() != 1:
+		failed += _fail("d3 pm oldstreet: expected 1 beat, got %d" % beats_os.size())
+	else:
+		var bv_os: Dictionary = beats_os[0] as Dictionary
+		if str(bv_os["beat"]["id"]) != "d3_pm_oldstreet":
+			failed += _fail("d3 pm oldstreet: beat id expect d3_pm_oldstreet, got %s" % str(bv_os["beat"]["id"]))
+		else:
+			failed += _ok("d3 pm oldstreet: beat d3_pm_oldstreet present")
+		var slots_os: Array = bv_os["slots"] as Array
+		if slots_os.size() != 1 or str((slots_os[0] as Dictionary)["slot"]["id"]) != "wander":
+			failed += _fail("d3 pm oldstreet: expected 1 slot (wander)")
+		else:
+			failed += _ok("d3 pm oldstreet: slot wander present and OPEN")
+
+	# 3. temple: d3_pm_temple (1 slot: jinbo)
+	var view_temple: Dictionary = PanelBuilder.build("temple", gs, data)
+	var beats_tp: Array = view_temple["beats"] as Array
+	if beats_tp.size() != 1:
+		failed += _fail("d3 pm temple: expected 1 beat, got %d" % beats_tp.size())
+	else:
+		var bv_tp: Dictionary = beats_tp[0] as Dictionary
+		if str(bv_tp["beat"]["id"]) != "d3_pm_temple":
+			failed += _fail("d3 pm temple: beat id expect d3_pm_temple, got %s" % str(bv_tp["beat"]["id"]))
+		else:
+			failed += _ok("d3 pm temple: beat d3_pm_temple present")
+		var slots_tp: Array = bv_tp["slots"] as Array
+		if slots_tp.size() != 1 or str((slots_tp[0] as Dictionary)["slot"]["id"]) != "jinbo":
+			failed += _fail("d3 pm temple: expected 1 slot (jinbo)")
+		else:
+			failed += _ok("d3 pm temple: slot jinbo present and OPEN")
+
+	return failed
+
+
+# ── PanelBuilder.build：condition 不成立時 Beat 與 Slot 呈 HIDDEN (完全不出 appearances in view model) ──
+
+func _test_condition_hidden_filtering(gs: Node, data: Node) -> int:
+	print("--- condition_hidden_filtering ---")
+	_reset(gs)
+	var failed := 0
+
+	# 第 18 天上午 sanquan 的 d18_morning_prep 有 condition: { flag: "pilgrimage_accepted" }
+	gs.set("day", 18)
+	gs.set("phase", "morning")
+
+	# 條件不成立 (flag 未設定) → d18_morning_prep 完全不出現 (HIDDEN 被過濾)
+	var view_before: Dictionary = PanelBuilder.build("sanquan", gs, data)
+	var beats_before: Array = view_before["beats"] as Array
+	var found_before := false
+	for bv in beats_before:
+		if str((bv as Dictionary)["beat"]["id"]) == "d18_morning_prep":
+			found_before = true
+			break
+
+	if found_before:
+		failed += _fail("beat with false condition appeared in panel (should be HIDDEN/filtered out)")
+	else:
+		failed += _ok("beat with false condition (d18_morning_prep) is HIDDEN and absent from panel")
+
+	# 設定 flag 使 condition 成立 → Beat 出現在面板中
+	(gs.get("flags") as Dictionary)["pilgrimage_accepted"] = true
+	var view_after: Dictionary = PanelBuilder.build("sanquan", gs, data)
+	var beats_after: Array = view_after["beats"] as Array
+	var found_after := false
+	for bv in beats_after:
+		if str((bv as Dictionary)["beat"]["id"]) == "d18_morning_prep":
+			found_after = true
+			break
+
+	if not found_after:
+		failed += _fail("beat with true condition missing from panel after flag set")
+	else:
+		failed += _ok("beat with true condition (d18_morning_prep) appears in panel after flag set")
 
 	return failed

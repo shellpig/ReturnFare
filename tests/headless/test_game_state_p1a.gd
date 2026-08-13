@@ -11,12 +11,21 @@ const _GS_PATH := "res://scripts/autoload/game_state.gd"
 
 
 func _initialize() -> void:
+	var gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs.name = "GameState"
+	get_root().add_child(gs)
+	Engine.register_singleton("GameState", gs)
+
 	var failed := 0
-	failed += _test_bad_json()
-	failed += _test_bad_phases_per_day()
+	failed += _test_bad_json(gs)
+	failed += _test_bad_phases_per_day(gs)
 	failed += _test_serialize_roundtrip()
 	failed += _test_chapters()
 	failed += _test_advance_day45()
+	failed += _test_full_45_days_loop()
+
+	Engine.unregister_singleton("GameState")
+	gs.queue_free()
 
 	if failed > 0:
 		push_error("P1-A: %d test(s) failed" % failed)
@@ -40,30 +49,56 @@ func _new_gs() -> Object:
 	return load(_GS_PATH).new()
 
 
-# 壞 JSON fixture → DataLoader 回報錯誤
-func _test_bad_json() -> int:
+# 壞 JSON fixture → DataLoader 回報錯誤，Data.ok = false 擋進遊戲
+func _test_bad_json(gs: Node) -> int:
 	print("--- bad_json ---")
-	var loader := DataLoader.new("res://tests/fixtures/broken/bad_json/")
-	loader.load_all()
-	if loader.errors.is_empty():
-		return _fail("bad_json: 預期有錯誤，卻得到 0 筆")
-	return _ok("bad_json: 正確回報 %d 筆錯誤" % loader.errors.size())
+	var real_data := get_root().get_node("Data")
+	var res: bool = real_data.call("load_data", "res://tests/fixtures/broken/bad_json/")
+	var ok_flag: bool = real_data.get("ok")
+	real_data.call("load_data", "res://data/")
+
+	if res or ok_flag:
+		return _fail("bad_json: Data.ok 預期為 false，實際為 true")
+	return _ok("bad_json: Data.ok=false 擋進遊戲")
 
 
-# tuning.phases_per_day=3 → 與 ACTION_PHASES 不符
-func _test_bad_phases_per_day() -> int:
+# tuning.phases_per_day=3 → 與 ACTION_PHASES 不符，Data.ok = false 且主畫面顯示 ErrorLabel 隱藏操作 UI
+func _test_bad_phases_per_day(gs: Node) -> int:
 	print("--- bad_phases_per_day ---")
-	var loader := DataLoader.new("res://tests/fixtures/broken/bad_phases_per_day/")
-	loader.load_all()
-	var ppd: Variant = loader.tuning.get("phases_per_day")
-	if ppd == null:
-		return _fail("bad_phases_per_day: tuning.json 沒有 phases_per_day 鍵")
-	if (ppd as int) == _EXPECTED_ACTION_PHASES_COUNT:
-		return _fail("bad_phases_per_day: phases_per_day=%s 沒有觸發不符" % str(ppd))
-	return _ok("bad_phases_per_day: phases_per_day=%s ≠ %d，可偵測" % [str(ppd), _EXPECTED_ACTION_PHASES_COUNT])
+	var real_data := get_root().get_node("Data")
+	var res: bool = real_data.call("load_data", "res://tests/fixtures/broken/bad_phases_per_day/")
+	var ok_flag: bool = real_data.get("ok")
 
+	var failed := 0
+	if res or ok_flag:
+		failed += _fail("bad_phases_per_day: Data.ok 預期為 false，實際為 true")
+	else:
+		failed += _ok("bad_phases_per_day: tuning.phases_per_day ≠ 2 判定 ok=false")
 
-# GameState 序列化往返相等
+	# 驗證 Data.ok = false 時，main 畫面切到 ErrorLabel 隱藏操作 UI
+	var main_scene_class := load("res://scenes/main.tscn")
+	var main_node: Control = main_scene_class.instantiate()
+	main_node._ready()
+
+	var error_label: Label = main_node.get_node("ErrorLabel")
+	var status_label: Label = main_node.get_node("StatusLabel")
+	var advance_btn: Button = main_node.get_node("AdvanceButton")
+
+	if error_label.text != "資料載入失敗，詳情見 Output。":
+		failed += _fail("main error UI: text wrong, got '%s'" % error_label.text)
+	else:
+		failed += _ok("main error UI: ErrorLabel shows error text correctly")
+
+	if status_label.visible or advance_btn.visible:
+		failed += _fail("main error UI: status_label or advance_btn should be hidden")
+	else:
+		failed += _ok("main error UI: status_label and advance_btn hidden correctly")
+
+	main_node.queue_free()
+
+	# 恢復原本正常的 data
+	real_data.call("load_data", "res://data/")
+	return failed
 func _test_serialize_roundtrip() -> int:
 	print("--- serialize_roundtrip ---")
 	var gs: Object = _new_gs()
@@ -148,4 +183,50 @@ func _test_advance_day45() -> int:
 		failed += _ok("day45 after run_ended: phase stays evening (no night)")
 
 	(gs as Node).queue_free()
+	return failed
+
+
+# 從 Day 1 morning 一路 advance_phase 跑完 45 天，驗證 day/phase 遞增與 chapter_changed 恰為 2 次
+func _test_full_45_days_loop() -> int:
+	print("--- full_45_days_loop ---")
+	var gs: Object = _new_gs()
+	var gs_node := gs as Node
+	get_root().add_child(gs_node)
+
+	var chapter_changes: Array = []
+	gs_node.connect("chapter_changed", func(ch: int) -> void: chapter_changes.append(ch))
+
+	var day_changes: Array = []
+	gs_node.connect("day_changed", func(d: int) -> void: day_changes.append(d))
+
+	gs.set("day", 1)
+	gs.set("phase", "morning")
+
+	# 45 天 × 4 時段：Day 1 morning 到 Day 45 evening 需推進 178 次 advance_phase()
+	for i in range(178):
+		gs.call("advance_phase")
+
+	var failed := 0
+	if gs.get("day") != 45 or gs.get("phase") != "evening":
+		failed += _fail("full 45 loop: expected day 45 evening, got day %d %s" % [
+			gs.get("day"), gs.get("phase")
+		])
+	else:
+		failed += _ok("full 45 loop: 178 steps reached day 45 evening correctly")
+
+	if chapter_changes.size() != 2:
+		failed += _fail("chapter_changed count: expected 2 (ch 1->2 at day 16, 2->3 at day 33), got %d: %s" % [
+			chapter_changes.size(), str(chapter_changes)
+		])
+	elif chapter_changes != [2, 3]:
+		failed += _fail("chapter_changed sequence: expected [2, 3], got %s" % str(chapter_changes))
+	else:
+		failed += _ok("chapter_changed fired exactly 2 times at ch2 and ch3")
+
+	if day_changes.size() != 44:
+		failed += _fail("day_changed count: expected 44 (day 2..45), got %d" % day_changes.size())
+	else:
+		failed += _ok("day_changed fired exactly 44 times")
+
+	gs_node.queue_free()
 	return failed
