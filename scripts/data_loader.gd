@@ -3,14 +3,15 @@ extends RefCounted
 
 ## 把 data/ 底下的 JSON 全部讀進來並建索引。
 ## 欄位定義見 data/SCHEMA.md——這裡不重複，只負責讀進來與檢查引用。
-
-const DATA_DIR := "res://data/"
-const BEATS_DIR := "res://data/beats/"
+## data_dir 可選參數供壞資料 fixture 測試使用（全域結構決策的唯一豁免）。
 
 const CARD_TYPES := [
 	"protagonist", "person", "group", "equipment", "consumable", "info",
 	"inference", "document", "knowledge", "mood", "madness", "routine",
 ]
+
+var DATA_DIR: String
+var BEATS_DIR: String
 
 var tuning: Dictionary = {}
 var cards: Dictionary = {}          ## id -> card
@@ -20,6 +21,11 @@ var beats: Array[Dictionary] = []
 var beats_by_id: Dictionary = {}
 
 var errors: PackedStringArray = []
+
+
+func _init(data_dir: String = "res://data/") -> void:
+	DATA_DIR = data_dir
+	BEATS_DIR = data_dir + "beats/"
 
 
 func load_all() -> bool:

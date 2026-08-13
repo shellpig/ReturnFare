@@ -19,6 +19,11 @@ config/features=PackedStringArray("4.6", "GL Compatibility")
 window/size/viewport_width=1280
 window/size/viewport_height=720
 
+[autoload]
+
+GameState="*res://scripts/autoload/game_state.gd"
+Data="*res://scripts/autoload/data.gd"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
