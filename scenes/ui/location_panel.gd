@@ -6,6 +6,15 @@ extends VBoxContainer
 
 signal closed
 
+const _LABEL_NO_TITLE := "（無標題）"
+const _FMT_BEAT_TITLE := "== %s =="
+const _FMT_BEAT_LOCKED_SUFFIX := "  [%s]"
+const _FMT_SLOT_OCCUPIED := "  [出席] %s（%s）"
+const _PREFIX_SLOT_EMPTY := "  [空槽] "
+const _FMT_SLOT_LOCKED := "  [灰] %s  %s"
+const _PREFIX_SLOT_RESOLVED := "  [已放] "
+const _PREFIX_SLOT_UNKNOWN := "  [?] "
+
 @onready var _back_btn: Button = $BackButton
 @onready var _beat_container: VBoxContainer = $BeatContainer
 
@@ -34,10 +43,10 @@ func _rebuild() -> void:
 
 		# Beat 標題
 		var title_lbl := Label.new()
-		var title_text: String = str(beat.get("title", "（無標題）"))
+		var title_text: String = str(beat.get("title", _LABEL_NO_TITLE))
 		if tri == PanelBuilder.TriState.LOCKED:
-			title_text += "  [%s]" % reason
-		title_lbl.text = "== " + title_text + " =="
+			title_text += _FMT_BEAT_LOCKED_SUFFIX % reason
+		title_lbl.text = _FMT_BEAT_TITLE % title_text
 		_beat_container.add_child(title_lbl)
 
 		# Beat 主文
@@ -62,15 +71,15 @@ func _rebuild() -> void:
 					if occupant != null:
 						var npc: Dictionary = Data.loader.npcs.get(str(occupant), {}) as Dictionary
 						var npc_name: String = str(npc.get("name", occupant))
-						slot_lbl.text = "  [出席] %s（%s）" % [npc_name, label_text]
+						slot_lbl.text = _FMT_SLOT_OCCUPIED % [npc_name, label_text]
 					else:
-						slot_lbl.text = "  [空槽] " + label_text
+						slot_lbl.text = _PREFIX_SLOT_EMPTY + label_text
 				PanelBuilder.TriState.LOCKED:
-					slot_lbl.text = "  [灰] %s  %s" % [label_text, sreason]
+					slot_lbl.text = _FMT_SLOT_LOCKED % [label_text, sreason]
 				PanelBuilder.TriState.RESOLVED:
-					slot_lbl.text = "  [已放] " + label_text
+					slot_lbl.text = _PREFIX_SLOT_RESOLVED + label_text
 				_:
-					slot_lbl.text = "  [?] " + label_text
+					slot_lbl.text = _PREFIX_SLOT_UNKNOWN + label_text
 			_beat_container.add_child(slot_lbl)
 
 		_beat_container.add_child(HSeparator.new())

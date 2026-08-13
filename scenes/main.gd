@@ -4,6 +4,7 @@ extends Control
 
 const _MSG_DATA_ERROR := "資料載入失敗，詳情見 Output。"
 const _MSG_ENDING_STUB := "[結局 stub]"
+const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 
 @onready var _error_label: Label = $ErrorLabel
 @onready var _status_label: Label = $StatusLabel
@@ -68,7 +69,7 @@ func _on_panel_closed() -> void:
 
 
 func _refresh_status() -> void:
-	_status_label.text = "第 %d 天  %s  第 %d 章" % [
+	_status_label.text = _FMT_STATUS % [
 		GameState.day, GameState.phase, GameState.chapter()
 	]
 

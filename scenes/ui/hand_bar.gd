@@ -5,6 +5,8 @@ extends VBoxContainer
 
 const _LABEL_EMPTY_HAND := "(空)"
 const _LABEL_EMPTY_KNOWLEDGE := "(無)"
+const _FMT_SLOTS := "手牌 %d / %d"
+const _LABEL_KNOWLEDGE_PREFIX := "知識："
 
 @onready var _slots_label: Label = $SlotsLabel
 @onready var _hand_label: Label = $HandLabel
@@ -19,9 +21,9 @@ func _ready() -> void:
 
 func _refresh() -> void:
 	var limit: int = Data.tuning("hand_size", 14)
-	_slots_label.text = "手牌 %d / %d" % [GameState.hand_slots_used(), limit]
+	_slots_label.text = _FMT_SLOTS % [GameState.hand_slots_used(), limit]
 	_hand_label.text = " ".join(GameState.hand) if not GameState.hand.is_empty() else _LABEL_EMPTY_HAND
 	var k_keys: Array = GameState.knowledge.keys()
-	_knowledge_label.text = "知識：" + (
+	_knowledge_label.text = _LABEL_KNOWLEDGE_PREFIX + (
 		" ".join(k_keys) if not k_keys.is_empty() else _LABEL_EMPTY_KNOWLEDGE
 	)

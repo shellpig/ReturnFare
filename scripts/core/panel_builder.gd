@@ -6,6 +6,10 @@ extends RefCounted
 
 enum TriState { HIDDEN = 0, LOCKED = 1, OPEN = 2, RESOLVED = 3 }
 
+## 資料沒寫 reject_reason 時的通用理由。三態的硬規則要求灰掉一定要附理由（企劃書第十七節），
+## 所以這裡不能留空字串——但資料端該補的仍然要補，lint 2 會抓。
+const _REASON_FALLBACK := "（條件不足）"
+
 
 ## 當前天╱時段可到的白天地點 id 列表。
 ## 過濾條件：layer(day/both) + chapter ≤ 當前章 + phases 含當前時段。
@@ -67,7 +71,7 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 			beat_tri = TriState.HIDDEN
 		elif not ConditionEval.eval(b.get("requires"), gs):
 			beat_tri = TriState.LOCKED
-			beat_reason = str(b.get("reject_reason", "（條件不足）"))
+			beat_reason = str(b.get("reject_reason", _REASON_FALLBACK))
 		else:
 			beat_tri = TriState.OPEN
 
@@ -86,7 +90,7 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 				slot_tri = TriState.RESOLVED
 			elif not ConditionEval.eval(s.get("requires"), gs):
 				slot_tri = TriState.LOCKED
-				slot_reason = str(s.get("reject_reason", "（條件不足）"))
+				slot_reason = str(s.get("reject_reason", _REASON_FALLBACK))
 			else:
 				slot_tri = TriState.OPEN
 
