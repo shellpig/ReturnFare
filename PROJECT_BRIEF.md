@@ -2,7 +2,7 @@
 
 本文件供新 session 快速了解專案全貌；需要細節時按下方文件索引深入。**本檔是唯一「隨進度持續更新」的文件**（每個 Phase 收尾更新一次）。
 
-最後更新：2026-08-13
+最後更新：2026-08-14
 
 > **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-D 已實作並 headless 全綠，P1-E（choice_group）待動工**。
 
@@ -87,7 +87,7 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 | `subdocs/故事線/` | 三章逐日事件層（各 50–70 KB，標題 grep） | 改動某天內容時 |
 | `subdocs/驗證/` | 體驗模擬與機制模擬 | 調數值前 |
 | `subdocs/歸檔/` | 已完成 Phase 段落與歷史歸檔 | 考古時 |
-| `驗證後已知問題.md` | 待修清單（**尚未建立**，第一波驗證收尾時建） | 修 bug 前 |
+| `驗證後已知問題.md` | 待修清單（`K-nn`）＋已接受的邊界決定（`B-nn`） | 修 bug 前；動工前掃一遍該 Phase 的條目 |
 
 **流向一句話**：還沒拍板 → 待決事項；規則與為什麼 → 企劃書；具體內容 → subdocs＋data；驗收意圖 → 規格書；怎麼做 → 方針；數值 → tuning。上游往下編譯，永不反向（完整版住 `實作規格書.md > 本檔範圍與邊界`）。
 
@@ -102,7 +102,9 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 
 ## 下一步
 
-- **P1-E 動工**（契約見 `開發設計方針.md > P1-E`）。依賴線性：A → B → C → D → E → F。
+- **P1-E 動工**（契約見 `開發設計方針.md > P1-E`）。依賴線性：A → B → C → D → E → F。動工前先修 `驗證後已知問題.md > K-01`（＋隨之消失的 K-02）——P1-E 的 `choose()` 是第二個要被 UI 與走查共用的規則層入口，K-01 不修很可能複製同一個錯誤分層。
+- 2026-08-14：**建立 `驗證後已知問題.md`**——P1-A～P1-D 實作 review 的產出，12 條待修（K-01～K-12）＋3 條已接受的邊界決定（B-01～B-03），含優先度與建議批次。最高優先是 K-01：白天面板的 `on_enter` 結算住在 UI 層，headless 走查那條路沒有，屬於七套測試全綠也涵蓋不到的路徑。
+- 2026-08-14：`開發設計方針.md > P1-F` 與 `測試指南.md > P1-F` 補上結局收尾的歸屬——`advance_phase()` 自己呼叫 `end_run()`，不把收尾丟給 `run_ended` 的 listener（否則 `main.gd` 與走查腳本各要寫一份順序），並加一條「`run_ended` 一輪恰好發射一次」的驗收。
 - 2026-08-13：**P1-D 完成後的 code review 抓到兩個 P1-C 契約缺口，已修**——白天面板沒走 `enter_beat()`（`on_enter` 沒結算、`beats_entered` 沒寫）、beat 級 `requires` LOCKED 沒傳導到槽（view model 與 `try_place` 規則層都補）。細節與回歸測試見 `開發設計方針.md > P1-C` 的 2026-08-13 bugfix 段、`tests/headless/test_p1c_bugfix.gd`。全部既有 headless 測試（`verify_data`／`test_boot`／`test_game_state_p1a`／`test_hand_p1b`／`test_p1c`／`test_p1d`）重跑無迴歸。
 - 2026-08-13：**P1-D 完成**——`try_place()` 放置唯一入口（持有→三態→accepts→action_spent 四步檢查）、`EffectApply`（`text`/`gain`/`lose`/`switch`/`switch_progress`/`relation`/`madness`/`flag` 八鍵，固定順序）、`GameState` 新增旗標／開關／關係群、`npc_action_counts` 投入帳、語彙封閉性 lint 1／2（`DataLoader.lint_vocabulary`/`lint_missing_reject_reason`，掛在 `Data._ready()`）。新建 `data/relation_scale.json`（單軸關係序數表，僅「疑似」「恩人」兩個狀態有資料在用，其餘五個是占位排序，見 `開發設計方針.md > P1-D` 說明）。`test_p1d.gd` 全綠，連同既有 `verify_data`／`test_boot`／`test_game_state_p1a`／`test_hand_p1b`／`test_p1c` 一併重跑確認無迴歸。
 - **P1-D 過程中發現的測試工具細節**（不影響玩法，記在這裡給後續寫合成 beat 測試的人參考）：headless 測試裡「另建一個 Data 節點＋`Engine.register_singleton`」的慣例，並不會讓 `game_state.gd` 內部的裸 `Data` 全域參照指向那個新節點——`Data` 全域固定綁 `project.godot` 掛的原生 autoload（因為同名節點 `add_child` 時會被引擎自動改名）。至今的測試都只做唯讀斷言所以沒事；P1-D 測試第一次要塞合成 beat 進 `loader.beats_by_id`，就得改寫 `get_root().get_node("Data")` 拿到的那一份，不是自己另外 new 的那個。
