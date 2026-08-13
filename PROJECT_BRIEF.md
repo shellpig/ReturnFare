@@ -37,7 +37,7 @@ Steam 買斷制、單人、敘事驅動的**卡牌經營／調查／迴圈敘事
 
 ## 資料層現況
 
-headless 實測（2026-08-13，`verify_data.gd`）：**54 張卡／48 個地點（白天 20＋夜間 28）／253 個 beat**；引用 0 錯誤；第 1–45 天行動格全覆蓋（第 1 天上午下午、第 32 天下午為刻意留空，名單住 `verify_data.gd` 的 `by_design`）。
+headless 實測（2026-08-13，`verify_data.gd`）：**54 張卡／48 個地點（白天 20＋夜間 28）／251 個 beat**（第 1、2 夜重複 beat 清理後）；引用 0 錯誤；第 1–45 天行動格全覆蓋（第 1 天上午下午、第 32 天下午為刻意留空，名單將抽至 `scripts/core/data_facts.gd` 共用）。
 
 ## Phase 進度
 
@@ -102,5 +102,5 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 ## 下一步
 
 - **P1-A 動工**（契約見 `開發設計方針.md > P1-A`）。依賴線性：A → B → C → D → E → F。
-- 掛著的拍板事項：關係系統單軸暫行案已拍板，兩軸升級留文本階段（`實作規格書.md > 第十二節`）；其餘落差見 `實作規格書.md > 附：既知落差清單`。
-- Step 5 文件接線未做：AGENTS.md 四處修正＋ SCHEMA.md 補欄位與瘦身（行為段搬規格書）。
+- 2026-08-13：codex 全文審查的六條必修＋次要項已全數修正（規則層下沉到 GameState／PanelBuilder、evening 改「非行動格」規則、第 45 天 evening 結局 coda、夜間三步解析、槽一次性 `beat_id+slot_id`、`enter_beat` 統一入口、fixture 化破壞性測試）；第 1、2 夜重複 beat 已清理。
+- 未拍板的落差集中在 `實作規格書.md > 附：本檔對資料層的既知落差清單`（縱慾權重、`ending` 鍵、開局選單、委託形狀——各自綁定後續 Phase）。

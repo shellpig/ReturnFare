@@ -135,6 +135,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `chapter` | 第幾章開放 |
 | `earliest_night` | 夜間地點最早可開的夜。**是下限不是期限**——開過與否跨夜持續 |
 | `requires` | 夜間地點級門檻（如阿宏鏈逐級旗標）；不成立時灰掉 |
+| `reject_reason` | 夜間地點灰掉時那一行字（選填；未填時引擎用通用文案） |
 | `night_reveal` | 對位所需的知識卡 id；拿到後夜間名改成白天名 |
 | `madness_cost` | **夜間標記的價碼**，開這個標記產生幾張發狂卡；0 ＝ 免費地形 |
 | `map` | 地圖座標，`{x, y}` |
@@ -148,7 +149,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 |---|---|
 | `id` | 唯一鍵 |
 | `location` | 掛在哪個地點 |
-| `when` | `{day, phase}`；`phase` ＝ `morning` / `afternoon` / `evening` / `night`。**沒有 `when` 的 beat 是夜間標記內容**——掛在夜間地點上，開放與否由地點的 `earliest_night` / `requires` 決定 |
+| `when` | `{day, phase}`；`phase` ＝ `morning` / `afternoon` / `evening` / `night`。**沒有 `when` 的 beat 是夜間章節變體**——掛在夜間地點上，開放與否由地點的 `earliest_night` / `requires` 決定。`phase: "night"` 的**定日夜 beat** 也存在（引導夜、颱風夜等）；兩者的解析順序住 `實作規格書.md > 夜間層` |
 | `fixed` | `true` ＝ 一定發生且**不吃行動格** |
 | `condition` | 出現條件，不成立則整個 beat 不存在 |
 | `requires` / `reject_reason` | beat 級門檻：不成立時整個 beat 灰掉＋理由（語意同槽級） |
@@ -188,6 +189,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 |---|---|
 | `id` / `label` | — |
 | `occupant` | 已在場的卡 id；`null` ＝ 空槽 |
+| `condition` | 槽級出現條件；不成立則槽不存在（「拿掉而非灰掉」的載體，已拍板支援） |
 | `accepts` | 接受的 `type` 或指定卡 id 陣列；`[]` ＝ 純顯示 |
 | `requires` | 額外條件；不成立則灰掉 |
 | `reject_reason` | 灰掉時那一行字 |
