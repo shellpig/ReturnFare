@@ -3,6 +3,7 @@ extends Node
 ## Data autoload: 啟動時跑 DataLoader，失敗時 ok = false 擋進遊戲。
 ## GameState 需在此之前載入（project.godot autoload 順序），
 ## 因為 _ready 用到 GameState.ACTION_PHASES 做一致性驗證。
+## GameState 的取得方式見 _find_game_state()——autoload 不是 Engine singleton。
 
 var loader: DataLoader
 var ok: bool = false
@@ -22,11 +23,10 @@ func _ready() -> void:
 		return
 
 	# tuning.phases_per_day 只是一致性驗證，它本身不是可調數值（規格書第二節）
-	# Engine.get_singleton 讓 headless fixture 測試也能用（--script 模式無 autoload 全域名）
 	var ppd: Variant = loader.tuning.get("phases_per_day")
-	var gs_node := Engine.get_singleton("GameState")
+	var gs_node := _find_game_state()
 	if gs_node == null:
-		push_error("[Data] GameState singleton not found")
+		push_error("[Data] GameState not found (既非 Engine singleton，/root 底下也沒有)")
 		return
 	var expected_count: int = gs_node.ACTION_PHASES.size()
 	if ppd != expected_count:
@@ -36,6 +36,21 @@ func _ready() -> void:
 		return
 
 	ok = true
+
+
+## 取得 GameState，兩條路依序試。
+##
+## **autoload 不是 Engine singleton**——它是掛在 `/root` 底下的節點，
+## `Engine.get_singleton()` 只認引擎自己的 singleton 與 `register_singleton()` 註冊過的東西。
+## 所以正式遊戲走的是第二條（`/root/GameState`）。
+##
+## 第一條留著是給 headless fixture 測試：測試自己 `Engine.register_singleton()` 塞一個
+## 獨立 instance 進來，就會優先命中它，而不是 autoload 那個。這是刻意的注入接縫。
+## `has_singleton()` 的守衛不可省——`get_singleton()` 找不到時會自己 push_error。
+func _find_game_state() -> Object:
+	if Engine.has_singleton("GameState"):
+		return Engine.get_singleton("GameState")
+	return get_node_or_null("/root/GameState")
 
 
 ## 讀 tuning.json 的值，key 用點路徑（例：「indulgence.soak_phase_cost」）。
