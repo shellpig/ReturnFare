@@ -22,6 +22,17 @@ func _ready() -> void:
 			push_error("[Data] " + e)
 		return
 
+	# 語彙封閉性 lint 1（規格書第十七節）：未知 condition/effect 鍵擋開機。
+	var vocab_problems := DataLoader.lint_vocabulary(loader.beats)
+	if not vocab_problems.is_empty():
+		for e in vocab_problems:
+			push_error("[Data] " + e)
+		return
+
+	# lint 2：有 requires 卻沒填 reject_reason，只警告不擋開機。
+	for w in DataLoader.lint_missing_reject_reason(loader.beats):
+		push_warning("[Data] " + w)
+
 	# tuning.phases_per_day 只是一致性驗證，它本身不是可調數值（規格書第二節）
 	var ppd: Variant = loader.tuning.get("phases_per_day")
 	var gs_node := _find_game_state()

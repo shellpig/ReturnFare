@@ -14,6 +14,7 @@ var DATA_DIR: String
 var BEATS_DIR: String
 
 var tuning: Dictionary = {}
+var relation_scale: Dictionary = {} ## 狀態名 -> 最低整數值（規格書第十二節單軸暫行案）
 var cards: Dictionary = {}          ## id -> card
 var locations: Dictionary = {}      ## id -> location（白天與夜間合在一起，id 全域唯一）
 var npcs: Dictionary = {}           ## id -> npc
@@ -32,6 +33,7 @@ func load_all() -> bool:
 	errors.clear()
 
 	tuning = _read_json(DATA_DIR + "tuning.json")
+	relation_scale = _read_json(DATA_DIR + "relation_scale.json")
 
 	var cards_file := _read_json(DATA_DIR + "cards.json")
 	for c in cards_file.get("cards", []):
@@ -134,6 +136,73 @@ func _check_card_refs(node: Variant, bid: String, where: String, problems: Packe
 	elif node is Array:
 		for v in node:
 			_check_card_refs(v, bid, where, problems)
+
+
+## 語彙封閉性 lint（規格書第十七節 lint 1）：condition/requires/on_place/on_enter/echo.condition
+## 用到的鍵，是否都在 ConditionEval / EffectApply 的封閉集合內。未知鍵即回傳問題。
+static func lint_vocabulary(beats_list: Array[Dictionary]) -> PackedStringArray:
+	var problems: PackedStringArray = []
+	for b in beats_list:
+		var bid: String = str(b.get("id", "?"))
+		_lint_condition(b.get("condition"), bid, "beat.condition", problems)
+		_lint_condition(b.get("requires"), bid, "beat.requires", problems)
+		_lint_effect(b.get("on_enter"), bid, "beat.on_enter", problems)
+		var echo: Variant = b.get("echo")
+		if echo is Dictionary:
+			_lint_condition((echo as Dictionary).get("condition"), bid, "echo.condition", problems)
+		for s in b.get("slots", []) as Array:
+			var where := "slot:" + str(s.get("id", "?"))
+			_lint_condition(s.get("condition"), bid, where + ".condition", problems)
+			_lint_condition(s.get("requires"), bid, where + ".requires", problems)
+			_lint_effect(s.get("on_place"), bid, where + ".on_place", problems)
+	return problems
+
+
+static func _lint_condition(node: Variant, bid: String, where: String, problems: PackedStringArray) -> void:
+	if node == null:
+		return
+	if not node is Dictionary:
+		problems.append("%s [%s]：condition 不是 Dictionary" % [bid, where])
+		return
+	var d := node as Dictionary
+	for k: String in d.keys():
+		if not ConditionEval.KNOWN_KEYS.has(k):
+			problems.append("%s [%s]：未知 condition 運算子 → %s" % [bid, where, k])
+			continue
+		match k:
+			"not":
+				_lint_condition(d[k], bid, where, problems)
+			"all", "any":
+				for sub: Variant in d[k] as Array:
+					_lint_condition(sub, bid, where, problems)
+			"count_at_least":
+				var ca: Dictionary = d[k] as Dictionary
+				for sub: Variant in ca.get("of", []) as Array:
+					_lint_condition(sub, bid, where, problems)
+
+
+static func _lint_effect(node: Variant, bid: String, where: String, problems: PackedStringArray) -> void:
+	if node == null:
+		return
+	if not node is Dictionary:
+		problems.append("%s [%s]：效果不是 Dictionary" % [bid, where])
+		return
+	for k: String in (node as Dictionary).keys():
+		if not EffectApply.KNOWN_KEYS.has(k):
+			problems.append("%s [%s]：未知效果鍵 → %s" % [bid, where, k])
+
+
+## 語彙封閉性 lint 2：有 requires 但沒填 reject_reason（架構要求灰掉一定要附理由）。回傳警告，不擋 Data.ok。
+static func lint_missing_reject_reason(beats_list: Array[Dictionary]) -> PackedStringArray:
+	var warnings: PackedStringArray = []
+	for b in beats_list:
+		var bid: String = str(b.get("id", "?"))
+		if b.has("requires") and str(b.get("reject_reason", "")).is_empty():
+			warnings.append("%s [beat]：有 requires 但沒有 reject_reason" % bid)
+		for s in b.get("slots", []) as Array:
+			if s.has("requires") and str(s.get("reject_reason", "")).is_empty():
+				warnings.append("%s [slot:%s]：有 requires 但沒有 reject_reason" % [bid, str(s.get("id", "?"))])
+	return warnings
 
 
 ## 某一天某個時段有哪些 beat（不解 condition，只挑時間對的）。

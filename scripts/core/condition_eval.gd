@@ -6,6 +6,12 @@ extends RefCounted
 ## 未知運算子 → push_error + return false。
 ## 無副作用，可重入。
 
+const KNOWN_KEYS := [
+	"day", "day_at_least", "has_card", "has_knowledge", "switch",
+	"switch_progress_at_least", "flag", "relation_at_least", "madness_at_least",
+	"count_at_least", "not", "all", "any",
+]
+
 static func eval(cond: Variant, gs: Node) -> bool:
 	if cond == null:
 		return true
@@ -39,8 +45,8 @@ static func eval(cond: Variant, gs: Node) -> bool:
 		var flags: Variant = gs.get("flags")
 		return flags is Dictionary and (flags as Dictionary).get(str(d["flag"]), false)
 	if d.has("relation_at_least"):
-		push_error("ConditionEval: relation_at_least not yet supported (P1-D)")
-		return false
+		var ra: Dictionary = d["relation_at_least"] as Dictionary
+		return gs.call("relation_at_least", str(ra.get("npc", "")), str(ra.get("state", "")))
 	if d.has("count_at_least"):
 		var ca: Dictionary = d["count_at_least"] as Dictionary
 		var n := int(ca.get("n", 0))

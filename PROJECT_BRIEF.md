@@ -4,7 +4,7 @@
 
 最後更新：2026-08-13
 
-> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件（實作規格書／開發設計方針／測試指南／本檔）建立完成；**Phase 1（最小可玩迴圈）規格可實作、程式未動工**。
+> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-D 已實作並 headless 全綠，P1-E（choice_group）待動工**。
 
 ---
 
@@ -50,7 +50,7 @@ headless 實測（2026-08-13，`verify_data.gd`）：**54 張卡／48 個地點�
 | P1-A 遊戲狀態與時段狀態機 | 📐 | GameState＋Data autoload、45 天 × 4 時段循環、序列化骨架 |
 | P1-B 卡片與手牌 | 📐 | 卡片實體化、手牌／知識分離、主角卡釘死 |
 | P1-C 地圖、面板與三態 | 📐 | 面板聚合、三態求值、fixed beat 與 on_enter |
-| P1-D 放置與效果結算 | 📐 | 放卡、on_place 結算、行動格消耗、條件求值器、語彙 lint |
+| P1-D 放置與效果結算 | ✅ | 放卡、on_place 結算、行動格消耗、條件求值器、語彙 lint（`test_p1d.gd` 全綠，含 13 個 condition 運算子、8 個效果鍵、`try_place` 四步檢查、`npc_action_counts`、序列化往返） |
 | P1-E choice_group | 📐 | 互斥選擇題、選定即定案、雙入口 |
 | P1-F 45 天全程走通 | 📐 | 殘響播出、夜間 stub、結局 stub、迴圈重置、貪心走查腳本 |
 | P2 發狂時鐘與縱慾 | ⬜ | 驗收＝headless 重演 `subdocs/驗證/發狂卡機制模擬.md` 三種玩家 |
@@ -102,7 +102,10 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 
 ## 下一步
 
-- **P1-A 動工**（契約見 `開發設計方針.md > P1-A`）。依賴線性：A → B → C → D → E → F。
+- **P1-E 動工**（契約見 `開發設計方針.md > P1-E`）。依賴線性：A → B → C → D → E → F。
+- 2026-08-13：**P1-D 完成後的 code review 抓到兩個 P1-C 契約缺口，已修**——白天面板沒走 `enter_beat()`（`on_enter` 沒結算、`beats_entered` 沒寫）、beat 級 `requires` LOCKED 沒傳導到槽（view model 與 `try_place` 規則層都補）。細節與回歸測試見 `開發設計方針.md > P1-C` 的 2026-08-13 bugfix 段、`tests/headless/test_p1c_bugfix.gd`。全部既有 headless 測試（`verify_data`／`test_boot`／`test_game_state_p1a`／`test_hand_p1b`／`test_p1c`／`test_p1d`）重跑無迴歸。
+- 2026-08-13：**P1-D 完成**——`try_place()` 放置唯一入口（持有→三態→accepts→action_spent 四步檢查）、`EffectApply`（`text`/`gain`/`lose`/`switch`/`switch_progress`/`relation`/`madness`/`flag` 八鍵，固定順序）、`GameState` 新增旗標／開關／關係群、`npc_action_counts` 投入帳、語彙封閉性 lint 1／2（`DataLoader.lint_vocabulary`/`lint_missing_reject_reason`，掛在 `Data._ready()`）。新建 `data/relation_scale.json`（單軸關係序數表，僅「疑似」「恩人」兩個狀態有資料在用，其餘五個是占位排序，見 `開發設計方針.md > P1-D` 說明）。`test_p1d.gd` 全綠，連同既有 `verify_data`／`test_boot`／`test_game_state_p1a`／`test_hand_p1b`／`test_p1c` 一併重跑確認無迴歸。
+- **P1-D 過程中發現的測試工具細節**（不影響玩法，記在這裡給後續寫合成 beat 測試的人參考）：headless 測試裡「另建一個 Data 節點＋`Engine.register_singleton`」的慣例，並不會讓 `game_state.gd` 內部的裸 `Data` 全域參照指向那個新節點——`Data` 全域固定綁 `project.godot` 掛的原生 autoload（因為同名節點 `add_child` 時會被引擎自動改名）。至今的測試都只做唯讀斷言所以沒事；P1-D 測試第一次要塞合成 beat 進 `loader.beats_by_id`，就得改寫 `get_root().get_node("Data")` 拿到的那一份，不是自己另外 new 的那個。
 - 2026-08-13：verifier 覆審（`P1文件審核.md`）五個契約缺口已全數修正——放置持有檢查、choice 原子化＋RESOLVED、夜間可達性（睡覺解析旅館、附加 beat、`day_at_least` 語彙、lint 7）、卡片 unique／gain 冪等、NPC 投入帳契約；`n_take_something` 與 `n_landmark` 資料已對齊。
 - 2026-08-13：codex 全文審查的六條必修＋次要項已全數修正（規則層下沉到 GameState／PanelBuilder、evening 改「非行動格」規則、第 45 天 evening 結局 coda、夜間三步解析、槽一次性 `beat_id+slot_id`、`enter_beat` 統一入口、fixture 化破壞性測試）；第 1、2 夜重複 beat 已清理。
 - 2026-08-13：**待決 1／20／37 全部結案**。① 第一章第三次殘響落在第 12 天下午（`d12_pm_awei.echo`），並修掉兩條無 `day` 的複本與 `d8_echo_bathhouse` 的地點綁定——第一章保證播出的殘響從 1 條回到 3 條；全作另有四條缺 `day` 的 echo 一併補齊（現在 7 條齊全）② `k_town_covers` 原本第一輪拿不到（三個 dodger 全擠在第 27 天下午的同一個行動格），兩格改掛 evening 修正 ③ 第 37–38 天兩張證據卡改成真互斥，並補 `d38_clinic` 撐住第 38 天下午的行動格 ④ 待決 20 拍板 18 人、`night_reveal` 全 null。**連帶補了兩條引擎契約**：lint 8（殘響可播出性）與 evening 演出流的結算順序（陣列順序）。

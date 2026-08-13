@@ -4,6 +4,7 @@ extends Node
 ## P1-A：時間群與序列化骨架。
 ## P1-B：手牌群（hand / knowledge / madness_clock）。
 ## P1-C：beat 事件群（beats_entered / slots_placed / enter_beat）。
+## P1-D：旗標／開關／關係群、放置與效果結算（try_place）、行動格消耗。
 
 const CHAPTER_START_DAYS := [1, 16, 33]
 const LAST_DAY := 45
@@ -24,8 +25,15 @@ var _madness_counter: int = 0         # 實例編號計數器（run 層）
 var beats_entered: Dictionary = {}    # beat_id -> true（一次性 on_enter 追蹤）
 var slots_placed: Dictionary = {}     # "beat_id::slot_id" -> true（P1-D 填入，P1-C 保留空結構）
 
-# --- 其他群（各 Phase 填入）---
-var action_spent: bool = false        # P1-D 才有人寫（run 層）
+# --- 旗標／開關／關係群（P1-D, run 層）---
+var flags: Dictionary = {}            # name -> bool
+var switches: Dictionary = {}         # id -> true
+var switch_progress: Dictionary = {}  # id -> int（累計型開關）
+var relations: Dictionary = {}        # npc -> int（單軸整數暫行案，規格書第十二節）
+
+# --- 其他群 ---
+var action_spent: bool = false                 # 當前行動格是否已放過主角卡（run 層）
+var npc_action_counts: Dictionary = {}         # npc_id -> 本輪投入的主角行動數（run 層，規格書第十二節）
 
 signal phase_changed(day: int, phase: String)
 signal day_changed(day: int)
@@ -50,6 +58,7 @@ func advance_phase() -> void:
 	# 第 45 天特殊路徑：afternoon → evening（結局 coda）→ run_ended，不進 night
 	if day == LAST_DAY and phase == "afternoon":
 		phase = "evening"
+		action_spent = false
 		phase_changed.emit(day, phase)
 		return
 
@@ -67,6 +76,7 @@ func advance_phase() -> void:
 		phase = PHASES[0]
 		day_changed.emit(day)
 
+	action_spent = false
 	phase_changed.emit(day, phase)
 
 	var new_ch := chapter()
@@ -149,7 +159,7 @@ func hand_slots_used() -> int:
 
 ## Beat 呈現的唯一入口（規格書第四節）。
 ## 一次性判定：beats_entered 記錄是否第一次。
-## P1-C 最小效果結算：只處理 on_enter 的 text 與 gain；P1-D 換成正式 EffectApply。
+## on_enter 效果走正式 EffectApply（規格書第十四節）。
 ## 回傳要播的文字行（PackedStringArray）。
 func enter_beat(beat_id: String) -> PackedStringArray:
 	var is_first := not beats_entered.has(beat_id)
@@ -169,17 +179,121 @@ func enter_beat(beat_id: String) -> PackedStringArray:
 
 	# on_enter 效果（只在第一次結算）
 	if is_first:
-		var on_enter: Variant = beat.get("on_enter")
-		if on_enter is Dictionary:
-			var et: Variant = (on_enter as Dictionary).get("text")
-			if et is String and not (et as String).is_empty():
-				lines.append(et as String)
-			var gain: Variant = (on_enter as Dictionary).get("gain")
-			if gain is Array:
-				for card_id: Variant in gain as Array:
-					gain_card(str(card_id))
+		lines.append_array(EffectApply.apply(beat.get("on_enter"), self))
 
 	return lines
+
+
+# ── 放置與效果結算（P1-D）───────────────────────────────────────────────────
+
+const _REASON_UNKNOWN_BEAT := "unknown_beat"
+const _REASON_UNKNOWN_SLOT := "unknown_slot"
+const _REASON_NOT_HELD := "not_held"
+const _REASON_HIDDEN := "hidden"
+const _REASON_RESOLVED := "resolved"
+const _REASON_NOT_ACCEPTED := "not_accepted"
+const _REASON_ACTION_SPENT := "action_spent"
+const _REASON_LOCKED_FALLBACK := "（條件不足）"
+
+
+func set_flag(name: String, value: bool = true) -> void:
+	flags[name] = value
+
+
+func open_switch(id: String) -> void:
+	switches[id] = true
+
+
+func add_switch_progress(id: String, n: int) -> void:
+	switch_progress[id] = int(switch_progress.get(id, 0)) + n
+
+
+func add_relation(npc: String, delta: int) -> void:
+	relations[npc] = int(relations.get(npc, 0)) + delta
+
+
+## `relation_at_least` 求值：讀 `data/relation_scale.json`（規格書第十二節）。
+func relation_at_least(npc: String, state: String) -> bool:
+	var scale: Dictionary = Data.loader.relation_scale
+	if not scale.has(state):
+		push_error("relation_at_least: unknown state '%s' (data/relation_scale.json)" % state)
+		return false
+	return int(relations.get(npc, 0)) >= int(scale[state])
+
+
+## 標記當前行動格已用（規格書第六節）。
+func consume_action() -> void:
+	action_spent = true
+
+
+## 放卡的唯一入口（UI 與 headless 走查共用；UI 內不做任何判斷）。
+## 放置合法性四步檢查，順序固定（規格書第六節）：
+## ①持有 → ②三態 OPEN（beat 與槽兩級 condition/requires 都要過，含一次性未放過）→
+## ③accepts → ④action_spent（僅行動格內的主角卡）。
+## 任一步不過 → { ok=false, reason, lines=[] }，GameState 零變化。
+## 回傳：{ "ok": bool, "reason": String, "lines": PackedStringArray }
+func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
+	if beat.is_empty():
+		return { "ok": false, "reason": _REASON_UNKNOWN_BEAT, "lines": PackedStringArray() }
+
+	var slot: Dictionary = {}
+	for s: Dictionary in beat.get("slots", []) as Array:
+		if str(s.get("id", "")) == slot_id:
+			slot = s
+			break
+	if slot.is_empty():
+		return { "ok": false, "reason": _REASON_UNKNOWN_SLOT, "lines": PackedStringArray() }
+
+	# ① 持有：傳入的卡此刻必須在手牌或知識集合（UI 是零規則顯示層，不能靠它擋非法卡 id）。
+	if not has_card(card_id):
+		return { "ok": false, "reason": _REASON_NOT_HELD, "lines": PackedStringArray() }
+
+	var base_id := _card_base_id(card_id)
+	var card: Dictionary = Data.loader.cards.get(base_id, {})
+	var slot_key := beat_id + "::" + slot_id
+
+	# ② 三態必須 OPEN（含一次性未放過）。beat 級 condition/requires 語意相同——
+	# beat 不可互動時，內部槽一律不可放（規格書第五節），不能只靠 PanelBuilder 的 view model
+	# 擋（UI 是零規則顯示層，規則層要能獨立擋下非法呼叫）。
+	if not ConditionEval.eval(beat.get("condition"), self):
+		return { "ok": false, "reason": _REASON_HIDDEN, "lines": PackedStringArray() }
+	if not ConditionEval.eval(beat.get("requires"), self):
+		var beat_reason := str(beat.get("reject_reason", _REASON_LOCKED_FALLBACK))
+		return { "ok": false, "reason": beat_reason, "lines": PackedStringArray() }
+	if not ConditionEval.eval(slot.get("condition"), self):
+		return { "ok": false, "reason": _REASON_HIDDEN, "lines": PackedStringArray() }
+	if slots_placed.has(slot_key):
+		return { "ok": false, "reason": _REASON_RESOLVED, "lines": PackedStringArray() }
+	if not ConditionEval.eval(slot.get("requires"), self):
+		var reason := str(slot.get("reject_reason", _REASON_LOCKED_FALLBACK))
+		return { "ok": false, "reason": reason, "lines": PackedStringArray() }
+
+	# ③ accepts：型別名或卡 id。
+	var accepts: Array = slot.get("accepts", []) as Array
+	var card_type := str(card.get("type", ""))
+	if not (accepts.has(base_id) or accepts.has(card_type)):
+		return { "ok": false, "reason": _REASON_NOT_ACCEPTED, "lines": PackedStringArray() }
+
+	# ④ 主角卡在行動格（morning/afternoon）時，同一時段不能放第二次。
+	# night 時段放主角卡不消耗行動格（規格書第六節），所以不受這一步限制。
+	var is_protagonist := card_type == "protagonist"
+	var in_action_phase := ACTION_PHASES.has(phase)
+	if is_protagonist and in_action_phase and action_spent:
+		return { "ok": false, "reason": _REASON_ACTION_SPENT, "lines": PackedStringArray() }
+
+	# 全過 → 效果結算（原子操作：全部套完才重求值）。
+	var lines: PackedStringArray = EffectApply.apply(slot.get("on_place", {}), self)
+	slots_placed[slot_key] = true
+
+	if is_protagonist and in_action_phase:
+		consume_action()
+		var attn: Variant = slot.get("attention_npc")
+		if attn != null:
+			var npc_id := str(attn)
+			npc_action_counts[npc_id] = int(npc_action_counts.get(npc_id, 0)) + 1
+
+	return { "ok": true, "reason": "", "lines": lines }
 
 
 # ── 序列化 ──────────────────────────────────────────────────────────────────
@@ -195,6 +309,11 @@ func serialize() -> Dictionary:
 			"_madness_counter": _madness_counter,
 			"beats_entered": beats_entered.duplicate(),
 			"slots_placed": slots_placed.duplicate(),
+			"flags": flags.duplicate(),
+			"switches": switches.duplicate(),
+			"switch_progress": switch_progress.duplicate(),
+			"relations": relations.duplicate(),
+			"npc_action_counts": npc_action_counts.duplicate(),
 		},
 		"meta": {
 			"knowledge": knowledge.duplicate(),
@@ -212,6 +331,11 @@ func deserialize(d: Dictionary) -> void:
 	_madness_counter = run.get("_madness_counter", 0)
 	beats_entered = run.get("beats_entered", {}).duplicate()
 	slots_placed = run.get("slots_placed", {}).duplicate()
+	flags = run.get("flags", {}).duplicate()
+	switches = run.get("switches", {}).duplicate()
+	switch_progress = run.get("switch_progress", {}).duplicate()
+	relations = run.get("relations", {}).duplicate()
+	npc_action_counts = run.get("npc_action_counts", {}).duplicate()
 
 	var meta: Dictionary = d.get("meta", {})
 	knowledge = meta.get("knowledge", {}).duplicate()

@@ -101,6 +101,13 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 					"reason": slot_reason,
 				})
 
+		# beat 級 requires 語意相同：成立前整個 beat 呈灰卡狀態＋理由，內部槽不可互動
+		# （規格書第五節）——beat LOCKED 時，槽的三態一律降為 LOCKED，理由沿用 beat 的。
+		if beat_tri == TriState.LOCKED:
+			for slot_view: Dictionary in slots_result:
+				slot_view["tri"] = TriState.LOCKED
+				slot_view["reason"] = beat_reason
+
 		beats_result.append({
 			"beat": b,
 			"tri": beat_tri,
