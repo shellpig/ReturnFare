@@ -331,10 +331,12 @@ func serialize() -> Dictionary:
 
 func deserialize(d: Dictionary) -> void:
 	var run: Dictionary = d.get("run", {})
-	day = run.get("day", 1)
-	phase = run.get("phase", "morning")
-	action_spent = run.get("action_spent", false)
-	hand = run.get("hand", []).duplicate()
+	day = int(run.get("day", 1))
+	phase = str(run.get("phase", "morning"))
+	action_spent = bool(run.get("action_spent", false))
+	hand.clear()
+	for item in run.get("hand", []):
+		hand.append(str(item))
 	madness_clock = run.get("madness_clock", {}).duplicate()
 	_madness_counter = run.get("_madness_counter", 0)
 	beats_entered = run.get("beats_entered", {}).duplicate()

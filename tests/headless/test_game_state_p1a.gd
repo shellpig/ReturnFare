@@ -107,10 +107,13 @@ func _test_serialize_roundtrip() -> int:
 	gs.set("action_spent", true)
 
 	var snap: Dictionary = gs.call("serialize")
+	var json_str := JSON.stringify(snap)
+	var parsed: Dictionary = JSON.parse_string(json_str)
+
 	gs.set("day", 1)
 	gs.set("phase", "morning")
 	gs.set("action_spent", false)
-	gs.call("deserialize", snap)
+	gs.call("deserialize", parsed)
 
 	var day_ok: bool = gs.get("day") == 17
 	var phase_ok: bool = gs.get("phase") == "night"

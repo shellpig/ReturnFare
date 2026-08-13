@@ -448,8 +448,11 @@ func _test_serialize_roundtrip(gs: Node) -> int:
 	gs.call("try_place", "protagonist", "d3_pm_sanquan", "soak")
 
 	var snap: Dictionary = gs.call("serialize")
+	var json_str := JSON.stringify(snap)
+	var parsed: Dictionary = JSON.parse_string(json_str)
+
 	_reset(gs)
-	gs.call("deserialize", snap)
+	gs.call("deserialize", parsed)
 
 	var failed := 0
 	if not (gs.get("flags") as Dictionary).get("rt_flag", false):
