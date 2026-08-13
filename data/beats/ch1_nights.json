@@ -122,8 +122,7 @@
     {
       "id": "n_take_something",
       "location": "n_landmark",
-      "chapter": 1,
-      "when": { "day": 10, "phase": "night" },
+      "condition": { "day_at_least": 10 },
       "title": "有東西可以拿走",
       "text": "某個地方擺著一個小玩具、一張照片、一枚硬幣。",
       "slots": [

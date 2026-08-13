@@ -102,5 +102,6 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 ## 下一步
 
 - **P1-A 動工**（契約見 `開發設計方針.md > P1-A`）。依賴線性：A → B → C → D → E → F。
+- 2026-08-13：verifier 覆審（`P1文件審核.md`）五個契約缺口已全數修正——放置持有檢查、choice 原子化＋RESOLVED、夜間可達性（睡覺解析旅館、附加 beat、`day_at_least` 語彙、lint 7）、卡片 unique／gain 冪等、NPC 投入帳契約；`n_take_something` 與 `n_landmark` 資料已對齊。
 - 2026-08-13：codex 全文審查的六條必修＋次要項已全數修正（規則層下沉到 GameState／PanelBuilder、evening 改「非行動格」規則、第 45 天 evening 結局 coda、夜間三步解析、槽一次性 `beat_id+slot_id`、`enter_beat` 統一入口、fixture 化破壞性測試）；第 1、2 夜重複 beat 已清理。
 - 未拍板的落差集中在 `實作規格書.md > 附：本檔對資料層的既知落差清單`（縱慾權重、`ending` 鍵、開局選單、委託形狀——各自綁定後續 Phase）。

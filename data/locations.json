@@ -480,7 +480,7 @@
       "name": "地標",
       "layer": "night",
       "chapter": 1,
-      "earliest_night": 13,
+      "earliest_night": 10,
       "madness_cost": 0,
       "night_reveal": null,
       "map": {

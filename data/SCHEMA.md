@@ -120,6 +120,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 > `protagonist` 不可丟棄、不可寄放，但**可以放置**——放它就是花掉那個時段。
 > `knowledge` 不佔格、唯一跨迴圈繼承。
 > `madness` 不可丟棄、不可寄放，只能靠縱慾消掉。
+> **除 `madness` 外，所有卡都是 unique**：重複取得＝no-op（gain 冪等），不會出現第二張。`madness` 是唯一的多實例卡。堆疊卡等真需求出現再開欄位（規格書第三節）。
 
 ## `locations.json`
 
@@ -195,6 +196,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `reject_reason` | 灰掉時那一行字 |
 | `on_place` | 放進去產生什麼 |
 | `choice_group` | 同組的槽互斥，見下 |
+| `attention_npc` | 此槽消耗主角行動時，投入帳記給哪位 NPC（選填；未標＝不計。供「不邀任何人時系統挑誰」判定，規格書第十二節） |
 | `note` | 設計註記，引擎不讀 |
 
 ### `choice_group`＝選擇題
@@ -220,6 +222,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 ```json
 { "day": 3 }
+{ "day_at_least": 10 }
 { "has_card": "info_ahong_private" }
 { "has_knowledge": "k_forty_something" }
 { "switch": "s1" }
