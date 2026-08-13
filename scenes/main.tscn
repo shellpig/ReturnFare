@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://c0returnfare0main"]
+[gd_scene load_steps=5 format=3 uid="uid://c0returnfare0main"]
 
 [ext_resource type="Script" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="PackedScene" uid="uid://returnfare0handbar" path="res://scenes/ui/hand_bar.tscn" id="2_handbar"]
+[ext_resource type="PackedScene" uid="uid://returnfare0maplist" path="res://scenes/ui/map_list.tscn" id="3_maplist"]
+[ext_resource type="PackedScene" uid="uid://returnfare0locpanel" path="res://scenes/ui/location_panel.tscn" id="4_locpanel"]
 
 [node name="Main" type="Control"]
 anchor_right = 1.0
@@ -27,6 +29,41 @@ offset_top = 120.0
 offset_right = 200.0
 offset_bottom = 160.0
 text = "推進時段"
+
+[node name="ContentView" type="Control" parent="."]
+offset_left = 0.0
+offset_top = 170.0
+offset_right = 1280.0
+offset_bottom = 570.0
+
+[node name="MapList" parent="ContentView" instance=ExtResource("3_maplist")]
+offset_left = 20.0
+offset_top = 0.0
+offset_right = 1260.0
+offset_bottom = 400.0
+
+[node name="LocationPanel" parent="ContentView" instance=ExtResource("4_locpanel")]
+offset_left = 20.0
+offset_top = 0.0
+offset_right = 1260.0
+offset_bottom = 400.0
+visible = false
+
+[node name="EveningLabel" type="Label" parent="ContentView"]
+offset_left = 20.0
+offset_top = 0.0
+offset_right = 1260.0
+offset_bottom = 400.0
+autowrap_mode = 3
+visible = false
+
+[node name="NightLabel" type="Label" parent="ContentView"]
+offset_left = 20.0
+offset_top = 0.0
+offset_right = 1260.0
+offset_bottom = 400.0
+text = "夜間（stub）"
+visible = false
 
 [node name="HandBar" parent="." instance=ExtResource("2_handbar")]
 offset_left = 20.0

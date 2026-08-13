@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://returnfare0locpanel"]
+
+[ext_resource type="Script" path="res://scenes/ui/location_panel.gd" id="1_loc_panel"]
+
+[node name="LocationPanel" type="VBoxContainer"]
+script = ExtResource("1_loc_panel")
+
+[node name="BackButton" type="Button" parent="."]
+text = "← 返回"
+
+[node name="BeatContainer" type="VBoxContainer" parent="."]

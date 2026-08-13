@@ -3,6 +3,7 @@ extends Node
 ## GameState autoload: 全部 runtime 狀態的唯一容器（規格書第一節）。
 ## P1-A：時間群與序列化骨架。
 ## P1-B：手牌群（hand / knowledge / madness_clock）。
+## P1-C：beat 事件群（beats_entered / slots_placed / enter_beat）。
 
 const CHAPTER_START_DAYS := [1, 16, 33]
 const LAST_DAY := 45
@@ -18,6 +19,10 @@ var hand: Array[String] = []          # 佔格卡 id，有序；主角卡恆在 
 var knowledge: Dictionary = {}        # id -> true（Set；slotless 卡；meta 層，不隨輪重置）
 var madness_clock: Dictionary = {}    # 實例 id -> 剩餘天數（P1 只建結構，P2 才走錶；run 層）
 var _madness_counter: int = 0         # 實例編號計數器（run 層）
+
+# --- Beat 事件群（P1-C, run 層）---
+var beats_entered: Dictionary = {}    # beat_id -> true（一次性 on_enter 追蹤）
+var slots_placed: Dictionary = {}     # "beat_id::slot_id" -> true（P1-D 填入，P1-C 保留空結構）
 
 # --- 其他群（各 Phase 填入）---
 var action_spent: bool = false        # P1-D 才有人寫（run 層）
@@ -140,6 +145,43 @@ func hand_slots_used() -> int:
 	return hand.size()
 
 
+# ── Beat 呈現 ───────────────────────────────────────────────────────────────
+
+## Beat 呈現的唯一入口（規格書第四節）。
+## 一次性判定：beats_entered 記錄是否第一次。
+## P1-C 最小效果結算：只處理 on_enter 的 text 與 gain；P1-D 換成正式 EffectApply。
+## 回傳要播的文字行（PackedStringArray）。
+func enter_beat(beat_id: String) -> PackedStringArray:
+	var is_first := not beats_entered.has(beat_id)
+	beats_entered[beat_id] = true
+
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
+	if beat.is_empty():
+		push_error("enter_beat: unknown beat id '%s'" % beat_id)
+		return PackedStringArray()
+
+	var lines := PackedStringArray()
+
+	# beat 主文（每次呈現都顯示）
+	var text: Variant = beat.get("text")
+	if text is String and not (text as String).is_empty():
+		lines.append(text as String)
+
+	# on_enter 效果（只在第一次結算）
+	if is_first:
+		var on_enter: Variant = beat.get("on_enter")
+		if on_enter is Dictionary:
+			var et: Variant = (on_enter as Dictionary).get("text")
+			if et is String and not (et as String).is_empty():
+				lines.append(et as String)
+			var gain: Variant = (on_enter as Dictionary).get("gain")
+			if gain is Array:
+				for card_id: Variant in gain as Array:
+					gain_card(str(card_id))
+
+	return lines
+
+
 # ── 序列化 ──────────────────────────────────────────────────────────────────
 
 func serialize() -> Dictionary:
@@ -151,6 +193,8 @@ func serialize() -> Dictionary:
 			"hand": hand.duplicate(),
 			"madness_clock": madness_clock.duplicate(),
 			"_madness_counter": _madness_counter,
+			"beats_entered": beats_entered.duplicate(),
+			"slots_placed": slots_placed.duplicate(),
 		},
 		"meta": {
 			"knowledge": knowledge.duplicate(),
@@ -166,6 +210,8 @@ func deserialize(d: Dictionary) -> void:
 	hand = run.get("hand", []).duplicate()
 	madness_clock = run.get("madness_clock", {}).duplicate()
 	_madness_counter = run.get("_madness_counter", 0)
+	beats_entered = run.get("beats_entered", {}).duplicate()
+	slots_placed = run.get("slots_placed", {}).duplicate()
 
 	var meta: Dictionary = d.get("meta", {})
 	knowledge = meta.get("knowledge", {}).duplicate()
