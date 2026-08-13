@@ -51,6 +51,8 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 	var current_phase: String = str(gs.get("phase"))
 	var placed_raw: Variant = gs.get("slots_placed")
 	var placed: Dictionary = placed_raw as Dictionary if placed_raw is Dictionary else {}
+	var choices_raw: Variant = gs.get("choices")
+	var choices: Dictionary = choices_raw as Dictionary if choices_raw is Dictionary else {}
 
 	var beats_result: Array = []
 
@@ -82,17 +84,30 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 		for s in b.get("slots", []) as Array:
 			var slot_tri: int
 			var slot_reason: String = ""
-			var slot_key: String = str(b.get("id", "")) + "::" + str(s.get("id", ""))
+			var beat_id: String = str(b.get("id", ""))
+			var slot_id: String = str(s.get("id", ""))
+			var slot_key: String = beat_id + "::" + slot_id
+			var choice_group: Variant = s.get("choice_group")
+			var is_choice := choice_group != null and not str(choice_group).is_empty()
+			var group_key := beat_id + "::" + str(choice_group) if is_choice else ""
 
-			if not ConditionEval.eval(s.get("condition"), gs):
-				slot_tri = TriState.HIDDEN
-			elif placed.has(slot_key):
-				slot_tri = TriState.RESOLVED
-			elif not ConditionEval.eval(s.get("requires"), gs):
-				slot_tri = TriState.LOCKED
-				slot_reason = str(s.get("reject_reason", _REASON_FALLBACK))
+			# choice_group 已選定：整組只渲染被選的那個，狀態為 RESOLVED（P1-E 契約）
+			if is_choice and choices.has(group_key):
+				var chosen_slot_id: String = str(choices[group_key])
+				if slot_id != chosen_slot_id:
+					continue
+				else:
+					slot_tri = TriState.RESOLVED
 			else:
-				slot_tri = TriState.OPEN
+				if not ConditionEval.eval(s.get("condition"), gs):
+					slot_tri = TriState.HIDDEN
+				elif placed.has(slot_key):
+					slot_tri = TriState.RESOLVED
+				elif not ConditionEval.eval(s.get("requires"), gs):
+					slot_tri = TriState.LOCKED
+					slot_reason = str(s.get("reject_reason", _REASON_FALLBACK))
+				else:
+					slot_tri = TriState.OPEN
 
 			if slot_tri != TriState.HIDDEN:
 				slots_result.append({

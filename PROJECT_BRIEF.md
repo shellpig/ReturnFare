@@ -4,7 +4,7 @@
 
 最後更新：2026-08-14
 
-> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-D 已實作並 headless 全綠，P1-E（choice_group）待動工**。
+> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-E 已實作並 headless 全綠，P1-F（45 天全程走通與迴圈 stub）待動工**。
 
 ---
 
@@ -47,11 +47,11 @@ headless 實測（2026-08-13，`verify_data.gd`）：**54 張卡／48 個地點�
 |---|---|---|
 | 資料層 | ✅ | 三章 beats 鋪滿、schema 語彙補齊、Godot 專案與 DataLoader／verify_data 站起來（詳見 `git log`） |
 | 文件層 | ✅ | 四份關鍵文件建立；文件分工與流向定案（見下方文件索引） |
-| P1-A 遊戲狀態與時段狀態機 | 📐 | GameState＋Data autoload、45 天 × 4 時段循環、序列化骨架 |
-| P1-B 卡片與手牌 | 📐 | 卡片實體化、手牌／知識分離、主角卡釘死 |
-| P1-C 地圖、面板與三態 | 📐 | 面板聚合、三態求值、fixed beat 與 on_enter |
-| P1-D 放置與效果結算 | ✅ | 放卡、on_place 結算、行動格消耗、條件求值器、語彙 lint（`test_p1d.gd` 全綠，含 13 個 condition 運算子、8 個效果鍵、`try_place` 四步檢查、`npc_action_counts`、序列化往返） |
-| P1-E choice_group | 📐 | 互斥選擇題、選定即定案、雙入口 |
+| P1-A 遊戲狀態與時段狀態機 | ✅ | GameState＋Data autoload、45 天 × 4 時段循環、序列化骨架 |
+| P1-B 卡片與手牌 | ✅ | 卡片實體化、手牌／知識分離、主角卡釘死 |
+| P1-C 地圖、面板與三態 | ✅ | 面板聚合、三態求值、fixed beat 與 on_enter |
+| P1-D 放置與效果結算 | ✅ | 放卡、on_place 結算、行動格消耗、條件求值器、語彙 lint（`test_p1d.gd` 全綠） |
+| P1-E choice_group | ✅ | 互斥選擇題、選定即定案、雙入口、選後唯讀 RESOLVED 展示（`test_p1e.gd` 全綠） |
 | P1-F 45 天全程走通 | 📐 | 殘響播出、夜間 stub、結局 stub、迴圈重置、貪心走查腳本 |
 | P2 發狂時鐘與縱慾 | ⬜ | 驗收＝headless 重演 `subdocs/驗證/發狂卡機制模擬.md` 三種玩家 |
 | P3 夜間層真值化 | ⬜ | 標記收費、對位改名、meta 免費 |
@@ -102,7 +102,8 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 
 ## 下一步
 
-- **P1-E 動工**（契約見 `開發設計方針.md > P1-E`）。依賴線性：A → B → C → D → E → F。動工前先修 `驗證後已知問題.md > K-01`（＋隨之消失的 K-02）——P1-E 的 `choose()` 是第二個要被 UI 與走查共用的規則層入口，K-01 不修很可能複製同一個錯誤分層。
+- **P1-F 動工**（契約見 `開發設計方針.md > P1-F`）。依賴線性：A → B → C → D → E → F。45 天全程走通、evening 殘響播出、夜間 stub、結局 coda 與 stub、迴圈重置、貪心走查腳本 `playthrough_greedy.gd`。
+- 2026-08-14：**P1-E 完成**——`GameState.choose()` 原子化唯一選擇入口（驗證未結算、三態 OPEN、帶卡持有與 accepts 檢查、`on_place` 結算、寫入 `choices` 與 `slots_placed`）、`PanelBuilder.build()` 互斥收起與唯讀（RESOLVED）展示、`try_place()` 轉導 `choose()`、`location_panel.gd` 雙入口按鈕支援（直接選擇與帶卡放置）、狀態序列化往返。`test_p1e.gd` 9 項驗證全綠（含真實資料 `d22_pm_sandbags`）。全部既有 headless 測試無迴歸。
 - 2026-08-14：**建立 `驗證後已知問題.md`**——P1-A～P1-D 實作 review 的產出，12 條待修（K-01～K-12）＋3 條已接受的邊界決定（B-01～B-03），含優先度與建議批次。最高優先是 K-01：白天面板的 `on_enter` 結算住在 UI 層，headless 走查那條路沒有，屬於七套測試全綠也涵蓋不到的路徑。
 - 2026-08-14：`開發設計方針.md > P1-F` 與 `測試指南.md > P1-F` 補上結局收尾的歸屬——`advance_phase()` 自己呼叫 `end_run()`，不把收尾丟給 `run_ended` 的 listener（否則 `main.gd` 與走查腳本各要寫一份順序），並加一條「`run_ended` 一輪恰好發射一次」的驗收。
 - 2026-08-13：**P1-D 完成後的 code review 抓到兩個 P1-C 契約缺口，已修**——白天面板沒走 `enter_beat()`（`on_enter` 沒結算、`beats_entered` 沒寫）、beat 級 `requires` LOCKED 沒傳導到槽（view model 與 `try_place` 規則層都補）。細節與回歸測試見 `開發設計方針.md > P1-C` 的 2026-08-13 bugfix 段、`tests/headless/test_p1c_bugfix.gd`。全部既有 headless 測試（`verify_data`／`test_boot`／`test_game_state_p1a`／`test_hand_p1b`／`test_p1c`／`test_p1d`）重跑無迴歸。

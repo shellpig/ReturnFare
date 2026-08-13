@@ -17,6 +17,7 @@ const _FMT_SLOT_LOCKED := "  [灰] %s  %s"
 const _PREFIX_SLOT_RESOLVED := "  [已放] "
 const _PREFIX_SLOT_UNKNOWN := "  [?] "
 const _FMT_PLACE_BUTTON := "放入：%s"
+const _FMT_CHOOSE_BUTTON := "選擇：%s"
 const _FMT_PLACE_FAILED := "（無法放置：%s）"
 
 const _REASON_CODE_TEXTS := {
@@ -112,10 +113,22 @@ func _rebuild() -> void:
 
 			if stri == PanelBuilder.TriState.OPEN:
 				var slot_id: String = str(slot.get("id", ""))
+				var choice_group: Variant = slot.get("choice_group")
+				var is_choice := choice_group != null and not str(choice_group).is_empty()
+
+				if is_choice:
+					var choose_btn := Button.new()
+					choose_btn.text = _FMT_CHOOSE_BUTTON % label_text
+					choose_btn.pressed.connect(_on_choose_pressed.bind(beat_id, str(choice_group), slot_id, ""))
+					_beat_container.add_child(choose_btn)
+
 				for card_id in GameState.placeable_cards(beat_id, slot_id):
 					var place_btn := Button.new()
 					place_btn.text = _FMT_PLACE_BUTTON % _card_display_name(card_id)
-					place_btn.pressed.connect(_on_place_pressed.bind(beat_id, slot_id, card_id))
+					if is_choice:
+						place_btn.pressed.connect(_on_choose_pressed.bind(beat_id, str(choice_group), slot_id, card_id))
+					else:
+						place_btn.pressed.connect(_on_place_pressed.bind(beat_id, slot_id, card_id))
 					_beat_container.add_child(place_btn)
 
 		_beat_container.add_child(HSeparator.new())
@@ -129,6 +142,19 @@ func _card_display_name(card_id: String) -> String:
 
 func _on_place_pressed(beat_id: String, slot_id: String, card_id: String) -> void:
 	var result: Dictionary = GameState.try_place(card_id, beat_id, slot_id)
+	if result.get("ok", false):
+		_status_label.text = ""
+	else:
+		var text: String = str(result.get("reason_text", ""))
+		if text.is_empty():
+			var code: String = str(result.get("reason_code", result.get("reason", "")))
+			text = _REASON_CODE_TEXTS.get(code, code)
+		_status_label.text = _FMT_PLACE_FAILED % text
+	_rebuild()
+
+
+func _on_choose_pressed(beat_id: String, group_id: String, slot_id: String, card_id: String) -> void:
+	var result: Dictionary = GameState.choose(beat_id, group_id, slot_id, card_id)
 	if result.get("ok", false):
 		_status_label.text = ""
 	else:
