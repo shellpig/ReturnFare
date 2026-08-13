@@ -69,13 +69,21 @@ func _rebuild() -> void:
 		title_lbl.text = _FMT_BEAT_TITLE % title_text
 		_beat_container.add_child(title_lbl)
 
-		# Beat 主文
-		var btext: Variant = beat.get("text")
-		if btext is String and not (btext as String).is_empty():
-			var text_lbl := Label.new()
-			text_lbl.text = btext as String
-			text_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			_beat_container.add_child(text_lbl)
+		# Beat 主文與 lines（K-13）
+		var lines: PackedStringArray = beat_view.get("lines", PackedStringArray())
+		if not lines.is_empty():
+			for line in lines:
+				var text_lbl := Label.new()
+				text_lbl.text = line
+				text_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				_beat_container.add_child(text_lbl)
+		else:
+			var btext: Variant = beat.get("text")
+			if btext is String and not (btext as String).is_empty():
+				var text_lbl := Label.new()
+				text_lbl.text = btext as String
+				text_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				_beat_container.add_child(text_lbl)
 
 		# 槽列表
 		for slot_view in beat_view["slots"]:

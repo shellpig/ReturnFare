@@ -151,14 +151,14 @@ func _test_serialize_roundtrip() -> int:
 	gs.set("action_spent", false)
 	gs.call("deserialize", parsed)
 
-	var day_ok: bool = gs.get("day") == 17
-	var phase_ok: bool = gs.get("phase") == "night"
-	var spent_ok: bool = gs.get("action_spent") == true
+	var actual_day: int = int(gs.get("day"))
+	var actual_phase: String = str(gs.get("phase"))
+	var actual_spent: bool = bool(gs.get("action_spent"))
 	gs.free()
 
-	if not (day_ok and phase_ok and spent_ok):
-		return _fail("roundtrip: day=%s phase=%s action_spent=%s" % [
-			str(gs.get("day")), str(gs.get("phase")), str(gs.get("action_spent"))
+	if not (actual_day == 17 and actual_phase == "night" and actual_spent == true):
+		return _fail("roundtrip: day=%d phase=%s action_spent=%s" % [
+			actual_day, actual_phase, str(actual_spent)
 		])
 	return _ok("roundtrip: day/phase/action_spent 全部還原正確")
 

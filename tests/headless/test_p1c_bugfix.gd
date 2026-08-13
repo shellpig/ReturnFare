@@ -27,6 +27,9 @@ func _initialize() -> void:
 	failed += _test_a2_beat_requires_cascades_to_slots()
 	failed += _test_a3_open_panel_rule_layer_and_intra_panel()
 	failed += _test_a4_placeable_cards_and_try_place_reason_code()
+	failed += _test_a5_enter_beat_unknown_id()
+	failed += _test_a6_locked_beat_preserves_resolved_slots()
+	failed += await _test_a7_on_enter_text_rendered_in_panel()
 
 	if failed > 0:
 		push_error("P1-C bugfix: %d test(s) failed" % failed)
@@ -273,6 +276,141 @@ func _test_a4_placeable_cards_and_try_place_reason_code() -> int:
 	else:
 		failed += _ok("try_place action_spent returns reason_code='action_spent' and empty reason_text")
 
+	return failed
+
+
+# ── A5 (K-09)：enter_beat 未知 id 不得寫入 beats_entered ─────────────────────
+
+func _test_a5_enter_beat_unknown_id() -> int:
+	print("--- A5: GameState.enter_beat() unknown id does not write beats_entered ---")
+	var failed := 0
+
+	var gs: Node = get_root().get_node("GameState")
+	_reset_gs(gs)
+
+	var lines: PackedStringArray = gs.call("enter_beat", "totally_bogus_beat_id")
+	if not lines.is_empty():
+		failed += _fail("enter_beat bogus id: expected empty lines, got %s" % str(lines))
+	else:
+		failed += _ok("enter_beat bogus id returned empty lines")
+
+	if (gs.get("beats_entered") as Dictionary).has("totally_bogus_beat_id"):
+		failed += _fail("enter_beat bogus id should NOT write beats_entered")
+	else:
+		failed += _ok("enter_beat bogus id did not write beats_entered")
+
+	return failed
+
+
+# ── A6 (K-12)：LOCKED beat 底下的 RESOLVED 槽維持 RESOLVED ────────────────────
+
+func _test_a6_locked_beat_preserves_resolved_slots() -> int:
+	print("--- A6: PanelBuilder.build() locked beat preserves RESOLVED slots ---")
+	var failed := 0
+
+	var gs: Node = get_root().get_node("GameState")
+	var data_node: Node = get_root().get_node("Data")
+	_reset_gs(gs)
+
+	# 模擬：d19_pm_upstream 原本槽已放過（RESOLVED），但 beat 處於 LOCKED（未持 k_forty_something）
+	gs.set("day", 19)
+	gs.set("phase", "afternoon")
+	(gs.get("slots_placed") as Dictionary)["d19_pm_upstream::look"] = true
+
+	var view: Dictionary = PanelBuilder.build("upstream", gs, data_node)
+	var bv: Dictionary = _find_beat(view, "d19_pm_upstream")
+	if bv.is_empty():
+		return _fail("d19_pm_upstream not found in panel")
+
+	if int(bv.get("tri", -1)) != PanelBuilder.TriState.LOCKED:
+		failed += _fail("d19_pm_upstream should be LOCKED")
+	else:
+		failed += _ok("d19_pm_upstream is LOCKED")
+
+	var look_slot: Dictionary = {}
+	for sv in bv.get("slots", []) as Array:
+		if str((sv as Dictionary)["slot"]["id"]) == "look":
+			look_slot = sv as Dictionary
+			break
+
+	if look_slot.is_empty():
+		return _fail("look slot not found")
+
+	if int(look_slot.get("tri", -1)) != PanelBuilder.TriState.RESOLVED:
+		failed += _fail("look slot should remain RESOLVED despite beat LOCKED, got tri=%d" % int(look_slot.get("tri", -1)))
+	else:
+		failed += _ok("look slot remains RESOLVED when beat is LOCKED (K-12)")
+
+	return failed
+
+
+# ── A7 (K-13)：open_panel() 保留 on_enter.text 並由 location_panel 呈現 ──────────
+
+func _test_a7_on_enter_text_rendered_in_panel() -> int:
+	print("--- A7: open_panel() and location_panel render on_enter.text (d15_pm_clinic) ---")
+	var failed := 0
+
+	var gs: Node = get_root().get_node("GameState")
+	_reset_gs(gs)
+	gs.set("day", 15)
+	gs.set("phase", "afternoon")
+
+	# ① 驗證 GameState.open_panel() 的 view model 中 lines 包含 on_enter.text
+	var view: Dictionary = gs.call("open_panel", "clinic")
+	var bv: Dictionary = _find_beat(view, "d15_pm_clinic")
+	if bv.is_empty():
+		return _fail("d15_pm_clinic not found in panel")
+
+	var lines: PackedStringArray = bv.get("lines", PackedStringArray())
+	if lines.size() < 2:
+		failed += _fail("open_panel(clinic): expected at least 2 lines (beat text + on_enter text), got %d: %s" % [lines.size(), str(lines)])
+	else:
+		if lines[0] != "陳醫師溫和地解釋，說是老毛病，要多休息。":
+			failed += _fail("open_panel(clinic): line[0] wrong: %s" % lines[0])
+		else:
+			failed += _ok("open_panel(clinic): line[0] is beat main text")
+
+		if lines[1] != "走出來的時候阿薇站在外面。「我媽以前也是這樣。」":
+			failed += _fail("open_panel(clinic): line[1] wrong: %s" % lines[1])
+		else:
+			failed += _ok("open_panel(clinic): line[1] is on_enter.text")
+
+	# ② 驗證 location_panel UI 確實建立文字 Label 渲染所有 lines
+	var scene: PackedScene = load("res://scenes/ui/location_panel.tscn")
+	var panel: Node = scene.instantiate()
+	get_root().add_child(panel)
+	await process_frame
+
+	_reset_gs(gs)
+	gs.set("day", 15)
+	gs.set("phase", "afternoon")
+	panel.call("show_location", "clinic")
+
+	var beat_container: VBoxContainer = panel.get_node("BeatContainer")
+	var all_labels_text: Array[String] = []
+	for child in beat_container.get_children():
+		if child is Label:
+			all_labels_text.append(child.text)
+
+	var found_main := false
+	var found_on_enter := false
+	for txt in all_labels_text:
+		if txt.contains("陳醫師溫和地解釋"):
+			found_main = true
+		if txt.contains("我媽以前也是這樣"):
+			found_on_enter = true
+
+	if not found_main:
+		failed += _fail("location_panel UI missing main beat text")
+	else:
+		failed += _ok("location_panel UI rendered main beat text")
+
+	if not found_on_enter:
+		failed += _fail("location_panel UI missing on_enter.text")
+	else:
+		failed += _ok("location_panel UI rendered on_enter.text (K-13 fixed)")
+
+	panel.queue_free()
 	return failed
 
 

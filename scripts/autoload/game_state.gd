@@ -204,6 +204,7 @@ func open_panel(location_id: String) -> Dictionary:
 
 	var cur_day: int = day
 	var cur_phase: String = phase
+	var lines_by_beat: Dictionary = {}
 
 	# 連鎖結算：處理可能由前面 on_enter 觸發後續 beat 變 OPEN 的情況
 	var changed := true
@@ -221,11 +222,22 @@ func open_panel(location_id: String) -> Dictionary:
 			if beats_entered.has(beat_id):
 				continue
 			if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-				enter_beat(beat_id)
+				var res_lines := enter_beat(beat_id)
+				lines_by_beat[beat_id] = res_lines
 				changed = true
 				break
 
-	return PanelBuilder.build(location_id, self, Data)
+	var view: Dictionary = PanelBuilder.build(location_id, self, Data)
+	for bv: Dictionary in view.get("beats", []):
+		var bid: String = str(bv["beat"].get("id", ""))
+		if lines_by_beat.has(bid):
+			bv["lines"] = lines_by_beat[bid]
+		elif int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
+			bv["lines"] = enter_beat(bid)
+		else:
+			bv["lines"] = PackedStringArray()
+
+	return view
 
 
 # ── 放置與效果結算（P1-D）───────────────────────────────────────────────────
