@@ -147,7 +147,7 @@ func _on_place_pressed(beat_id: String, slot_id: String, card_id: String) -> voi
 	else:
 		var text: String = str(result.get("reason_text", ""))
 		if text.is_empty():
-			var code: String = str(result.get("reason_code", result.get("reason", "")))
+			var code: String = str(result.get("reason_code", ""))
 			text = _REASON_CODE_TEXTS.get(code, code)
 		_status_label.text = _FMT_PLACE_FAILED % text
 	_rebuild()
@@ -160,7 +160,7 @@ func _on_choose_pressed(beat_id: String, group_id: String, slot_id: String, card
 	else:
 		var text: String = str(result.get("reason_text", ""))
 		if text.is_empty():
-			var code: String = str(result.get("reason_code", result.get("reason", "")))
+			var code: String = str(result.get("reason_code", ""))
 			text = _REASON_CODE_TEXTS.get(code, code)
 		_status_label.text = _FMT_PLACE_FAILED % text
 	_rebuild()

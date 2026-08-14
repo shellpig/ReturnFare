@@ -211,7 +211,7 @@ func _test_try_place_basic(gs: Node) -> int:
 
 	var result: Dictionary = gs.call("try_place", "protagonist", "d2_pm_work", "work")
 	if not result.get("ok", false):
-		failed += _fail("try_place d2_pm_work/work: expected ok, got reason=" + str(result.get("reason")))
+		failed += _fail("try_place d2_pm_work/work: expected ok, got reason_code=" + str(result.get("reason_code")))
 		return failed
 	failed += _ok("try_place d2_pm_work/work → ok")
 
@@ -233,10 +233,10 @@ func _test_try_place_basic(gs: Node) -> int:
 	# 同一槽重放：resolved，GameState 零變化
 	var hand_size_before: int = (gs.get("hand") as Array).size()
 	var retry: Dictionary = gs.call("try_place", "protagonist", "d2_pm_work", "work")
-	if retry.get("ok", false) or str(retry.get("reason")) != "resolved":
-		failed += _fail("try_place retry on resolved slot: expected ok=false reason=resolved, got %s" % str(retry))
+	if retry.get("ok", false) or str(retry.get("reason_code")) != "resolved":
+		failed += _fail("try_place retry on resolved slot: expected ok=false reason_code=resolved, got %s" % str(retry))
 	else:
-		failed += _ok("try_place retry on resolved slot → ok=false reason=resolved")
+		failed += _ok("try_place retry on resolved slot → ok=false reason_code=resolved")
 	if (gs.get("hand") as Array).size() != hand_size_before:
 		failed += _fail("try_place retry on resolved slot: hand size changed (should be zero-change)")
 	else:
@@ -262,10 +262,10 @@ func _test_try_place_action_spent(gs: Node) -> int:
 	failed += _ok("try_place d3_pm_sanquan/soak → ok (first placement this phase)")
 
 	var second: Dictionary = gs.call("try_place", "protagonist", "d3_pm_sanquan", "ledger")
-	if second.get("ok", false) or str(second.get("reason")) != "action_spent":
-		failed += _fail("try_place d3_pm_sanquan/ledger: expected ok=false reason=action_spent, got %s" % str(second))
+	if second.get("ok", false) or str(second.get("reason_code")) != "action_spent":
+		failed += _fail("try_place d3_pm_sanquan/ledger: expected ok=false reason_code=action_spent, got %s" % str(second))
 	else:
-		failed += _ok("try_place d3_pm_sanquan/ledger → ok=false reason=action_spent")
+		failed += _ok("try_place d3_pm_sanquan/ledger → ok=false reason_code=action_spent")
 
 	if (gs.get("slots_placed") as Dictionary).has("d3_pm_sanquan::ledger"):
 		failed += _fail("try_place: rejected placement should not write slots_placed")
@@ -326,10 +326,10 @@ func _test_try_place_rejections(gs: Node) -> int:
 
 	# 未持有：registry 存在但未持有 → not_held，GameState 零變化
 	var not_held: Dictionary = gs.call("try_place", "info_husband_version", "d3_pm_sanquan", "show_version")
-	if not_held.get("ok", false) or str(not_held.get("reason")) != "not_held":
-		failed += _fail("try_place unheld card: expected ok=false reason=not_held, got %s" % str(not_held))
+	if not_held.get("ok", false) or str(not_held.get("reason_code")) != "not_held":
+		failed += _fail("try_place unheld card: expected ok=false reason_code=not_held, got %s" % str(not_held))
 	else:
-		failed += _ok("try_place unheld card → ok=false reason=not_held")
+		failed += _ok("try_place unheld card → ok=false reason_code=not_held")
 	if not (gs.get("slots_placed") as Dictionary).is_empty():
 		failed += _fail("try_place unheld card: slots_placed should stay empty")
 	else:
@@ -339,23 +339,23 @@ func _test_try_place_rejections(gs: Node) -> int:
 	gs.call("gain_card", "protagonist")
 	gs.call("gain_card", "info_husband_version")
 	var not_accepted: Dictionary = gs.call("try_place", "protagonist", "d3_pm_sanquan", "show_version")
-	if not_accepted.get("ok", false) or str(not_accepted.get("reason")) != "not_accepted":
-		failed += _fail("try_place protagonist into compare slot: expected ok=false reason=not_accepted, got %s" % str(not_accepted))
+	if not_accepted.get("ok", false) or str(not_accepted.get("reason_code")) != "not_accepted":
+		failed += _fail("try_place protagonist into compare slot: expected ok=false reason_code=not_accepted, got %s" % str(not_accepted))
 	else:
-		failed += _ok("try_place protagonist into compare slot → ok=false reason=not_accepted")
+		failed += _ok("try_place protagonist into compare slot → ok=false reason_code=not_accepted")
 
 	# 不存在的槽／beat
 	var unknown_slot: Dictionary = gs.call("try_place", "protagonist", "d3_pm_sanquan", "no_such_slot")
-	if unknown_slot.get("ok", false) or str(unknown_slot.get("reason")) != "unknown_slot":
-		failed += _fail("try_place unknown slot: expected reason=unknown_slot, got %s" % str(unknown_slot))
+	if unknown_slot.get("ok", false) or str(unknown_slot.get("reason_code")) != "unknown_slot":
+		failed += _fail("try_place unknown slot: expected reason_code=unknown_slot, got %s" % str(unknown_slot))
 	else:
-		failed += _ok("try_place unknown slot → reason=unknown_slot")
+		failed += _ok("try_place unknown slot → reason_code=unknown_slot")
 
 	var unknown_beat: Dictionary = gs.call("try_place", "protagonist", "no_such_beat", "x")
-	if unknown_beat.get("ok", false) or str(unknown_beat.get("reason")) != "unknown_beat":
-		failed += _fail("try_place unknown beat: expected reason=unknown_beat, got %s" % str(unknown_beat))
+	if unknown_beat.get("ok", false) or str(unknown_beat.get("reason_code")) != "unknown_beat":
+		failed += _fail("try_place unknown beat: expected reason_code=unknown_beat, got %s" % str(unknown_beat))
 	else:
-		failed += _ok("try_place unknown beat → reason=unknown_beat")
+		failed += _ok("try_place unknown beat → reason_code=unknown_beat")
 
 	return failed
 

@@ -147,7 +147,7 @@ func _test_a2_beat_requires_cascades_to_slots() -> int:
 	if result.get("ok", false):
 		failed += _fail("try_place on beat-LOCKED slot should fail, got ok=true")
 	else:
-		failed += _ok("try_place on beat-LOCKED slot → ok=false (reason=%s)" % str(result.get("reason")))
+		failed += _ok("try_place on beat-LOCKED slot → ok=false (reason=%s)" % str(result.get("reason_text")))
 	if str(result.get("reason_code")) != "locked":
 		failed += _fail("try_place rejection reason_code should be 'locked', got %s" % str(result.get("reason_code")))
 	else:

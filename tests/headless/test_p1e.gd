@@ -234,27 +234,22 @@ func _test_choice_state_equivalence(gs: Node, _data_node: Node) -> int:
 		return _fail("path B choose failed: %s" % res_b.get("reason_code", ""))
 	var serialized_b: Dictionary = gs.call("serialize")
 
-	# 比對兩者狀態：
-	# 兩路徑除了 hand 差一張 equip_polaroid 之外，其餘所有 run/meta 欄位必須完全相同！
-	var run_a: Dictionary = serialized_a["run"]
-	var run_b: Dictionary = serialized_b["run"]
-
-	if run_a["choices"] != run_b["choices"]:
-		return _fail("choices mismatch between path A and B")
-	if run_a["slots_placed"] != run_b["slots_placed"]:
-		return _fail("slots_placed mismatch between path A and B")
-	if run_a["flags"] != run_b["flags"]:
-		return _fail("flags mismatch between path A and B")
-	if run_a["switches"] != run_b["switches"]:
-		return _fail("switches mismatch between path A and B")
-	if run_a["relations"] != run_b["relations"]:
-		return _fail("relations mismatch between path A and B")
-	if run_a["action_spent"] != run_b["action_spent"]:
-		return _fail("action_spent mismatch between path A and B")
-
-	# 兩者都應該獲得了 info_acai_walk
-	if not (run_a["hand"] as Array).has("info_acai_walk") or not (run_b["hand"] as Array).has("info_acai_walk"):
+	# 兩者都應該在 hand 獲得 info_acai_walk
+	var hand_a: Array = serialized_a["run"]["hand"]
+	var hand_b: Array = serialized_b["run"]["hand"]
+	if not hand_a.has("info_acai_walk") or not hand_b.has("info_acai_walk"):
 		return _fail("info_acai_walk missing in hand for one of the paths")
+
+	# 兩路徑除了 hand 差事先給予的 equip_polaroid 外，整包 run/meta 欄位必須完全相同（K-21）
+	var run_a_copy: Dictionary = (serialized_a["run"] as Dictionary).duplicate(true)
+	var run_b_copy: Dictionary = (serialized_b["run"] as Dictionary).duplicate(true)
+	run_a_copy.erase("hand")
+	run_b_copy.erase("hand")
+
+	if run_a_copy != run_b_copy:
+		return _fail("run layer mismatch between path A and B (excluding hand): %s vs %s" % [str(run_a_copy), str(run_b_copy)])
+	if serialized_a.get("meta") != serialized_b.get("meta"):
+		return _fail("meta layer mismatch between path A and B: %s vs %s" % [str(serialized_a.get("meta")), str(serialized_b.get("meta"))])
 
 	_ok("direct and with-card selection leave completely identical state (aside from held card)")
 	return 0
@@ -473,59 +468,87 @@ func _test_choice_serialize_roundtrip(gs: Node) -> int:
 
 
 func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
-	_reset_gs(gs)
-	print("--- 9. UI location_panel button generation and clicking ---")
+	print("--- 9. UI location_panel button generation and clicking (direct & card) ---")
+	var panel_scene: PackedScene = load("res://scenes/ui/location_panel.tscn")
 
+	# 9a: 直選按鈕點擊測試
+	_reset_gs(gs)
 	gs.set("day", 22)
 	gs.set("phase", "afternoon")
 	gs.call("set_flag", "acai_obs_knee", true)
 	gs.call("gain_card", "equip_polaroid")
 
-	var panel_scene: PackedScene = load("res://scenes/ui/location_panel.tscn")
-	var panel: Node = panel_scene.instantiate()
-	get_root().add_child(panel)
-
-	# 顯示 sanquan 地點
-	panel.call("show_location", "sanquan")
+	var panel_a: Node = panel_scene.instantiate()
+	get_root().add_child(panel_a)
+	panel_a.call("show_location", "sanquan")
 	await process_frame
 
-	var beat_container: Node = panel.get_node("BeatContainer")
-	var buttons: Array[Button] = []
-	for child in beat_container.get_children():
-		if child is Button:
-			buttons.append(child as Button)
-
-	# 在 sanquan 中：
-	# work (accepts protagonist): 1 個放入按鈕（如果主角卡在手）
-	# obs_walk (choice_group, accepts polaroid/box): 1 個選擇按鈕 + 1 個放入拍立得按鈕
-	# obs_hands (LOCKED): 0 按鈕
-	# obs_talk (choice_group): 1 個選擇按鈕 + 1 個放入拍立得按鈕
-	# dismiss (choice_group): 1 個選擇按鈕 + 1 個放入拍立得按鈕
-	if buttons.is_empty():
-		panel.queue_free()
-		return _fail("expected choice and place buttons in location_panel, found none")
-
-	# 找出「選擇：① 他走路的方式」或「放入：拍立得」按鈕並點擊
-	var target_btn: Button = null
-	for btn in buttons:
-		if btn.text.contains("他走路的方式"):
-			target_btn = btn
+	var beat_container_a: Node = panel_a.get_node("BeatContainer")
+	var direct_btn: Button = null
+	for child in beat_container_a.get_children():
+		if child is Button and (child as Button).text.contains("選擇：① 他走路的方式"):
+			direct_btn = child as Button
 			break
 
-	if target_btn == null:
-		panel.queue_free()
-		return _fail("target choice button for obs_walk not found")
+	if direct_btn == null:
+		panel_a.queue_free()
+		return _fail("direct choice button '選擇：① 他走路的方式' not found")
 
-	# 模擬點擊
-	target_btn.emit_signal("pressed")
+	direct_btn.emit_signal("pressed")
 	await process_frame
 
-	# 驗證選擇完成
-	var choices: Dictionary = gs.get("choices") as Dictionary
-	if choices.get("d22_pm_sandbags::acai_read") != "obs_walk":
-		panel.queue_free()
-		return _fail("clicking choice button did not write to choices")
+	var choices_a: Dictionary = gs.get("choices") as Dictionary
+	if choices_a.get("d22_pm_sandbags::acai_read") != "obs_walk":
+		panel_a.queue_free()
+		return _fail("clicking direct choice button did not write to choices")
+	if not (gs.get("slots_placed") as Dictionary).has("d22_pm_sandbags::obs_walk"):
+		panel_a.queue_free()
+		return _fail("clicking direct choice button did not write to slots_placed")
+	panel_a.queue_free()
+	_ok("UI direct choice button click verified")
 
-	panel.queue_free()
-	_ok("location_panel generated direct/card choice buttons and button click successfully resolved choice")
+	# 9b: 帶卡按鈕點擊測試（K-20）
+	_reset_gs(gs)
+	gs.set("day", 22)
+	gs.set("phase", "afternoon")
+	gs.call("set_flag", "acai_obs_knee", true)
+	gs.call("gain_card", "equip_polaroid")
+
+	var panel_b: Node = panel_scene.instantiate()
+	get_root().add_child(panel_b)
+	panel_b.call("show_location", "sanquan")
+	await process_frame
+
+	var beat_container_b: Node = panel_b.get_node("BeatContainer")
+	var found_obs_walk_label := false
+	var card_btn: Button = null
+	for child in beat_container_b.get_children():
+		if child is Label and (child as Label).text.contains("① 他走路的方式"):
+			found_obs_walk_label = true
+			continue
+		if found_obs_walk_label and child is Button and (child as Button).text.contains("拍立得"):
+			card_btn = child as Button
+			break
+
+	if card_btn == null:
+		panel_b.queue_free()
+		return _fail("card choice button for obs_walk containing '拍立得' not found")
+
+	card_btn.emit_signal("pressed")
+	await process_frame
+
+	var choices_b: Dictionary = gs.get("choices") as Dictionary
+	if choices_b.get("d22_pm_sandbags::acai_read") != "obs_walk":
+		panel_b.queue_free()
+		return _fail("clicking card choice button did not write to choices")
+	if not (gs.get("slots_placed") as Dictionary).has("d22_pm_sandbags::obs_walk"):
+		panel_b.queue_free()
+		return _fail("clicking card choice button did not write to slots_placed")
+	if not bool(gs.call("has_card", "info_acai_walk")):
+		panel_b.queue_free()
+		return _fail("clicking card choice button did not grant info_acai_walk")
+
+	panel_b.queue_free()
+	_ok("UI card choice button click verified (K-20)")
+
 	return 0
