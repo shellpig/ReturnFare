@@ -28,6 +28,18 @@ func _initialize() -> void:
 	var actions_taken := 0
 	var illegal_phases := 0
 
+	var stats := {
+		"placed": 0,
+		"all_fixed": 0,
+		"condition_locked": 0,
+		"requires_locked": 0,
+		"slot_requires_locked": 0,
+		"empty_by_design": 0,
+		"choice_only_by_design": 0,
+		"compare_only": 0,
+		"illegal": 0,
+	}
+
 	# 走查第 1 天至第 45 天
 	for d in range(1, 46):
 		day_counter = d
@@ -35,20 +47,37 @@ func _initialize() -> void:
 		# 1. Morning
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "morning", "時間同步錯誤 (morning)")
 		var res_m := _execute_action_phase(gs, data_node, d, "morning")
-		if res_m < 0:
-			illegal_phases += 1
+		var cat_m: String = str(res_m.get("category", "illegal"))
+		if stats.has(cat_m):
+			stats[cat_m] += 1
 		else:
-			actions_taken += res_m
+			stats["illegal"] += 1
+		if not res_m.get("ok", false):
+			illegal_phases += 1
+		if res_m.get("placed", false):
+			actions_taken += 1
 		gs.advance_phase()
 
 		# 2. Afternoon
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "afternoon", "時間同步錯誤 (afternoon)")
 		var res_a := _execute_action_phase(gs, data_node, d, "afternoon")
-		if res_a < 0:
-			illegal_phases += 1
+		var cat_a: String = str(res_a.get("category", "illegal"))
+		if stats.has(cat_a):
+			stats[cat_a] += 1
 		else:
-			actions_taken += res_a
+			stats["illegal"] += 1
+		if not res_a.get("ok", false):
+			illegal_phases += 1
+		if res_a.get("placed", false):
+			actions_taken += 1
 		gs.advance_phase()
+
+		# 印出單日早下午行動狀態（K-25 缺口 1）
+		print("  第 %2d 天 | morning: %-32s | afternoon: %-32s" % [
+			d,
+			str(res_m.get("summary", "")),
+			str(res_a.get("summary", ""))
+		])
 
 		# 3. Evening
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "evening", "時間同步錯誤 (evening)")
@@ -63,6 +92,23 @@ func _initialize() -> void:
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "night", "時間同步錯誤 (night)")
 		_execute_night_phase(gs, data_node, d)
 		gs.advance_phase()
+
+	# ── 統計表輸出（K-25 缺口 1） ──
+	print("\n=== 45 天行動時段統計表（共 90 時段）===")
+	print("  成功放置主角卡:          %2d 格" % stats["placed"])
+	print("  全 fixed 敘事時段:       %2d 格" % stats["all_fixed"])
+	print("  條件分支未解鎖 (HIDDEN): %2d 格" % stats["condition_locked"])
+	print("  前置門檻未達成 (LOCKED): %2d 格 (beat: %d, slot: %d)" % [
+		stats["requires_locked"] + stats["slot_requires_locked"],
+		stats["requires_locked"],
+		stats["slot_requires_locked"]
+	])
+	print("  刻意留空時段 (名單內):     %2d 格" % stats["empty_by_design"])
+	print("  純選擇題時段 (豁免名單):   %2d 格" % stats["choice_only_by_design"])
+	print("  純比對槽時段:             %2d 格" % stats["compare_only"])
+	if stats["illegal"] > 0:
+		print("  異常/非法空時段:          %2d 格" % stats["illegal"])
+	print("=========================================\n")
 
 	# ── 驗收迴圈重置狀態 ──
 	print("=== 45 天走查完畢，驗收重置狀態 ===")
@@ -127,7 +173,7 @@ func _on_run_ended(ending_id: String) -> void:
 	_last_ending_id = ending_id
 
 
-func _execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -> int:
+func _execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -> Dictionary:
 	var locs := PanelBuilder.available_locations(gs, data_node)
 	var placed := false
 	var placed_info := ""
@@ -161,15 +207,30 @@ func _execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -
 			break
 
 	if placed:
-		return 1
+		return {
+			"ok": true,
+			"placed": true,
+			"category": "placed",
+			"detail": placed_info,
+			"summary": "放置 [%s]" % placed_info
+		}
 
 	# 放不下主角卡時，進行合法性診斷與分類（K-25）
 	var diag := _diagnose_unplaced_phase(data_node, day, phase, gs)
-	if not diag.get("ok", false):
-		push_error("FAIL: 第 %d 天 %s 未放置主角卡且為非法狀態：%s" % [day, phase, diag.get("detail", "")])
-		return -1
+	var ok: bool = bool(diag.get("ok", false))
+	var cat: String = str(diag.get("category", "illegal"))
+	var detail: String = str(diag.get("detail", ""))
 
-	return 0
+	if not ok:
+		push_error("FAIL: 第 %d 天 %s 未放置主角卡且為非法狀態：%s" % [day, phase, detail])
+
+	return {
+		"ok": ok,
+		"placed": false,
+		"category": cat,
+		"detail": detail,
+		"summary": "[%s] %s" % [cat, detail]
+	}
 
 
 ## 診斷未放卡時段的合法性（K-25：從資料推導全 fixed 時段、比對名單與條件/門檻限制）
@@ -185,20 +246,23 @@ func _diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node
 	if DataFacts.is_choice_only_phase_by_design(day, phase):
 		return { "ok": true, "category": "choice_only_by_design", "detail": "純選擇題時段（已豁免）" }
 
-	# 3. 該時段所有 beat 均為 fixed（全 fixed 敘事時段，不吃行動格）
-	if not beats.is_empty():
-		var all_fixed := true
-		for b in beats:
-			if not b.get("fixed", false):
-				all_fixed = false
-				break
-		if all_fixed:
-			var beat_ids: PackedStringArray = []
-			for b in beats:
-				beat_ids.append(str(b.get("id", "")))
-			return { "ok": true, "category": "all_fixed", "detail": "全 fixed 敘事時段 (%s)" % ", ".join(beat_ids) }
+	# 3. 檢查非法空時段（K-25 缺口 2：完全無 beat 且不在留空名單中）
+	if beats.is_empty():
+		return { "ok": false, "category": "illegal", "detail": "異常：該時段無任何 beat 且未列入刻意留空名單" }
 
-	# 4. 條件分支未解鎖（HIDDEN）或前置門檻未達成（LOCKED）
+	# 4. 該時段所有 beat 均為 fixed（全 fixed 敘事時段，不吃行動格）
+	var all_fixed := true
+	for b in beats:
+		if not b.get("fixed", false):
+			all_fixed = false
+			break
+	if all_fixed:
+		var beat_ids: PackedStringArray = []
+		for b in beats:
+			beat_ids.append(str(b.get("id", "")))
+		return { "ok": true, "category": "all_fixed", "detail": "全 fixed (%s)" % ", ".join(beat_ids) }
+
+	# 5. 條件分支未解鎖（HIDDEN）或前置門檻未達成（LOCKED）
 	var active_beats: Array[Dictionary] = []
 	var locked_reasons: PackedStringArray = []
 	for b in beats:
@@ -211,13 +275,13 @@ func _diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node
 
 	if active_beats.is_empty():
 		if not locked_reasons.is_empty():
-			return { "ok": true, "category": "requires_locked", "detail": "前置門檻未達成：%s" % ", ".join(locked_reasons) }
+			return { "ok": true, "category": "requires_locked", "detail": "門檻未達: %s" % ", ".join(locked_reasons) }
 		var all_cond_beats: PackedStringArray = []
 		for b in beats:
 			all_cond_beats.append(str(b.get("id", "")))
-		return { "ok": true, "category": "condition_locked", "detail": "條件分支未解鎖 (%s)" % ", ".join(all_cond_beats) }
+		return { "ok": true, "category": "condition_locked", "detail": "條件未解鎖: %s" % ", ".join(all_cond_beats) }
 
-	# 檢查 active_beats 的槽：是否所有可放主角卡的槽都處於 requires LOCKED，或僅有純比對槽
+	# 6. 檢查 active_beats 的槽：是否所有可放主角卡的槽都處於 requires LOCKED，或僅有純比對槽
 	var has_open_protag_slot := false
 	var has_only_non_protag_slots := true
 	for b in active_beats:
@@ -230,12 +294,12 @@ func _diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node
 					break
 
 	if has_only_non_protag_slots:
-		return { "ok": true, "category": "compare_only", "detail": "當前 active beat 僅有非主角卡槽（比對槽）" }
+		return { "ok": true, "category": "compare_only", "detail": "純比對槽時段" }
 
 	if not has_open_protag_slot:
-		return { "ok": true, "category": "slot_requires_locked", "detail": "主角卡槽前置門檻未達成 (slot requires LOCKED)" }
+		return { "ok": true, "category": "slot_requires_locked", "detail": "主角卡槽門檻未達 (slot requires LOCKED)" }
 
-	return { "ok": false, "category": "illegal_empty", "detail": "異常：有 active beat 且有 OPEN 主角卡槽卻未能放置" }
+	return { "ok": false, "category": "illegal", "detail": "異常：有 active beat 且有 OPEN 主角卡槽卻未能放置" }
 
 
 func _execute_evening_phase(gs: Node, _data_node: Node, day: int) -> void:
