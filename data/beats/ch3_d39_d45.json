@@ -423,6 +423,23 @@
     },
 
     {
+      "id": "d42_pm_inn",
+      "location": "sanquan",
+      "when": { "day": 42, "phase": "afternoon" },
+      "title": "顧旅館",
+      "text": "叔叔不在，店還是要開。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": null,
+          "label": "做完今天的",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "帳結完，房間也整理好了。你今天沒有去別的地方。" }
+        }
+      ],
+      "note": "刻意無關痛癢：不給卡、不寫旗標、不推開關。它存在的唯一理由是讓沒有鑰匙的玩家也有地方放主角卡——同時當那間房的機會成本，選了它就等於今天沒去開門"
+    },
+    {
       "id": "d42_pm_room",
       "location": "oldhouse_room",
       "when": { "day": 42, "phase": "afternoon" },
