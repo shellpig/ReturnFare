@@ -4,7 +4,7 @@
 
 最後更新：2026-08-14
 
-> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-F 已全部實作並 headless 全綠，45 天可貪心自動走查到底並正確回到第 1 天**。
+> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-F 已全部實作並 headless 全綠，45 天可貪心自動走查到底並正確回到第 1 天**；P1-F 收尾的待修條目（K-27～K-29、K-31、K-36、K-37、K-40）已全數修完。**P1 只剩一件事：`測試指南.md > Phase 1` 的 35 條手動操作驗收還沒跑過——人還沒真的玩過一次。**
 
 ---
 
@@ -37,7 +37,7 @@ Steam 買斷制、單人、敘事驅動的**卡牌經營／調查／迴圈敘事
 
 ## 資料層現況
 
-headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點（白天 20＋夜間 28）／18 個 NPC／252 個 beat**；引用 0 錯誤；地點三分類 10／10／16；第 1–45 天行動格全覆蓋（第 1 天上午下午、第 32 天下午為刻意留空，名單抽至 `scripts/core/data_facts.gd` 共用）。
+headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點（白天 20＋夜間 28）／18 個 NPC／257 個 beat**；引用 0 錯誤；地點三分類 10／10／16；lint 1／2／3／5／7／8 全 0 錯誤（lint 3 為 4 筆已豁免警告）；第 1–45 天行動格全覆蓋（第 1 天上午下午、第 32 天下午為刻意留空，名單抽至 `scripts/core/data_facts.gd` 共用）。貪心走查 90 個行動時段用掉 56 格，其餘 34 格逐格分類並印出原因（`playthrough_greedy.gd`）。
 
 ## Phase 進度
 
@@ -52,7 +52,7 @@ headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點�
 | P1-C 地圖、面板與三態 | ✅ | 面板聚合、三態求值、fixed beat 與 on_enter |
 | P1-D 放置與效果結算 | ✅ | 放卡、on_place 結算、行動格消耗、條件求值器、語彙 lint（`test_p1d.gd` 全綠） |
 | P1-E choice_group | ✅ | 互斥選擇題、選定即定案、雙入口、選後唯讀 RESOLVED 展示（`test_p1e.gd` 全綠） |
-| P1-F 45 天全程走通 | ✅ | 殘響播出、夜間 stub、結局 coda、迴圈重置、貪心走查（`playthrough_greedy.gd` / `test_p1f.gd` 全綠） |
+| P1-F 45 天全程走通 | 🟦 | 殘響播出、夜間 stub、結局 coda、迴圈重置、貪心走查（`playthrough_greedy.gd` / `test_p1f.gd` 全綠）；收尾 K 條目已清。**待手動操作驗收** |
 | P2 發狂時鐘與縱慾 | ⬜ | 驗收＝headless 重演 `subdocs/驗證/發狂卡機制模擬.md` 三種玩家 |
 | P3 夜間層真值化 | ⬜ | 標記收費、對位改名、meta 免費 |
 | P4 委託與遭遇 | ⬜ | 人物卡外出／回報、遭遇回合循環 |
@@ -102,7 +102,9 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 
 ## 下一步
 
-- **P1-F 動工**（契約見 `開發設計方針.md > P1-F`）。依賴線性：A → B → C → D → E → F。45 天全程走通、evening 殘響播出、夜間 stub、結局 coda 與 stub、迴圈重置、貪心走查腳本 `playthrough_greedy.gd`。
+- **跑 `測試指南.md > Phase 1` 的 35 條手動操作驗收**（45 條裡有 10 條標 headless，那 10 條已有測試且全綠）。這是 P1 唯一剩下的事，也是唯一還沒有人做過的事——目前是走查腳本走完 45 天，人還沒玩過。K-28（結局文字被狀態列蓋掉）就是這一層漏出來的：十套 headless 全綠也看不到畫面。跑完把 checkbox 打勾，發現的問題照慣例進 `驗證後已知問題.md`。
+- **P1 之後不擋、可順手做的文件小事**：K-24、K-32（純措辭與錯 id，下次動 `實作規格書.md` / `測試指南.md` 時一起改）。**明確排到後面 Phase 的**：K-30／K-33／K-34／K-35 全部等 P3 夜間層真值化（現在改是改在 stub 上），K-08 等 i18n 管線。
+- 2026-08-14：**P1-F 收尾完成**——K-31（`verify_data` 重複檢查刪除）、K-27（lint 3 改以 `(day, phase, location)` 面板分組並更名 `lint_free_slot_rules()`，`d28_morning_xiaowu` 補主角卡槽）、K-29（補齊 K-17／K-18／K-19／K-22 回歸測試）、K-36（走查抽 `run_greedy_walk()` 供 `test_p1f` 共用）、K-28（`FlowText` 接線，殘響／入夜 fixed／結局 stub 三種文字共用容器）、K-37、K-40（`FlowText` 改 `ScrollContainer` ＋ `clip_contents`，夜間文字不再蓋到地點清單與地點面板）。十套 headless 全綠，`main.tscn` 開機無錯誤。
 - 2026-08-14：**P1-E 完成**——`GameState.choose()` 原子化唯一選擇入口（驗證未結算、三態 OPEN、帶卡持有與 accepts 檢查、`on_place` 結算、寫入 `choices` 與 `slots_placed`）、`PanelBuilder.build()` 互斥收起與唯讀（RESOLVED）展示、`try_place()` 轉導 `choose()`、`location_panel.gd` 雙入口按鈕支援（直接選擇與帶卡放置）、狀態序列化往返。`test_p1e.gd` 9 項驗證全綠（含真實資料 `d22_pm_sandbags`）。全部既有 headless 測試無迴歸。
 - 2026-08-14：**建立 `驗證後已知問題.md`**——P1-A～P1-D 實作 review 的產出，12 條待修（K-01～K-12）＋3 條已接受的邊界決定（B-01～B-03），含優先度與建議批次。最高優先是 K-01：白天面板的 `on_enter` 結算住在 UI 層，headless 走查那條路沒有，屬於七套測試全綠也涵蓋不到的路徑。
 - 2026-08-14：`開發設計方針.md > P1-F` 與 `測試指南.md > P1-F` 補上結局收尾的歸屬——`advance_phase()` 自己呼叫 `end_run()`，不把收尾丟給 `run_ended` 的 listener（否則 `main.gd` 與走查腳本各要寫一份順序），並加一條「`run_ended` 一輪恰好發射一次」的驗收。
