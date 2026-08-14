@@ -25,7 +25,7 @@ Steam 買斷制、單人、敘事驅動的**卡牌經營／調查／迴圈敘事
 ├── data/                    # 全部遊戲內容與可調數值（單一事實來源）
 │   ├── SCHEMA.md            # 欄位定義
 │   ├── tuning.json          # 全部可調數值
-│   ├── cards.json / locations.json / npcs.json
+│   ├── cards.json / card_types.json / locations.json / npcs.json
 │   └── beats/               # 三章逐日事件，10 檔
 ├── scenes/main.tscn         # 目前為空殼，P1-A 起長出宿主
 ├── scripts/
@@ -53,6 +53,7 @@ headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點�
 | P1-D 放置與效果結算 | ✅ | 放卡、on_place 結算、行動格消耗、條件求值器、語彙 lint（`test_p1d.gd` 全綠） |
 | P1-E choice_group | ✅ | 互斥選擇題、選定即定案、雙入口、選後唯讀 RESOLVED 展示（`test_p1e.gd` 全綠） |
 | P1-F 45 天全程走通 | 🟦 | 殘響播出、夜間 stub、結局 coda、迴圈重置、貪心走查（`playthrough_greedy.gd` / `test_p1f.gd` 全綠）；收尾 K 條目已清。**待手動操作驗收** |
+| P1-G 面板互動模型 | 📐 | 進地點＝beat 依序演出、演完才開放卡槽；槽標型別＋右鍵預覽；無卡可放時高亮推進鈕。**回頭改 P1-C／P1-D 的面板行為**，三份文件已寫到可動工、程式未開工 |
 | P2 發狂時鐘與縱慾 | ⬜ | 驗收＝headless 重演 `subdocs/驗證/發狂卡機制模擬.md` 三種玩家 |
 | P3 夜間層真值化 | ⬜ | 標記收費、對位改名、meta 免費 |
 | P4 委託與遭遇 | ⬜ | 人物卡外出／回報、遭遇回合循環 |
@@ -102,6 +103,7 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 
 ## 下一步
 
+- 2026-08-14：**P1-G 開案，三份文件已寫完，等實作者動工**。起因是手動驗收第一天就撞到的兩件事：光是好奇點進一個地點，`on_enter` 就結算了（看一眼要付代價）；而放卡之前完全看不到那一格收什麼。**不可逆本身是對的——那是本作的核心張力——錯的是把不可逆放在「進門」而不是「出手」。** P1-G 只搬這條界線，不給後悔藥：進地點改成 beat 依序演出、演完才開放卡槽互動，槽常駐標型別（新 `data/card_types.json`）並支援右鍵預覽，沒有卡放得下去時高亮推進鈕但不自動推進。白天夜間同一套。**規格書第四、五、六節同步改寫，P1-C／P1-D 段落不動**（已通過驗收，改掉會讓哪一版驗收過講不清楚）。連帶新增：`locations.json` 的 `desc` 欄位（48 個地點文字待填）、`SCHEMA.md` 的可翻譯欄位清單、lint 9。
 - **跑 `測試指南.md > Phase 1` 的 35 條手動操作驗收**（45 條裡有 10 條標 headless，那 10 條已有測試且全綠）。這是 P1 唯一剩下的事，也是唯一還沒有人做過的事——目前是走查腳本走完 45 天，人還沒玩過。K-28（結局文字被狀態列蓋掉）就是這一層漏出來的：十套 headless 全綠也看不到畫面。跑完把 checkbox 打勾，發現的問題照慣例進 `驗證後已知問題.md`。
 - **P1 之後不擋、可順手做的文件小事**：K-24、K-32（純措辭與錯 id，下次動 `實作規格書.md` / `測試指南.md` 時一起改）。**明確排到後面 Phase 的**：K-30／K-33／K-34／K-35 全部等 P3 夜間層真值化（現在改是改在 stub 上），K-08 等 i18n 管線。
 - 2026-08-14：**P1-F 收尾完成**——K-31（`verify_data` 重複檢查刪除）、K-27（lint 3 改以 `(day, phase, location)` 面板分組並更名 `lint_free_slot_rules()`，`d28_morning_xiaowu` 補主角卡槽）、K-29（補齊 K-17／K-18／K-19／K-22 回歸測試）、K-36（走查抽 `run_greedy_walk()` 供 `test_p1f` 共用）、K-28（`FlowText` 接線，殘響／入夜 fixed／結局 stub 三種文字共用容器）、K-37、K-40（`FlowText` 改 `ScrollContainer` ＋ `clip_contents`，夜間文字不再蓋到地點清單與地點面板）。十套 headless 全綠，`main.tscn` 開機無錯誤。
