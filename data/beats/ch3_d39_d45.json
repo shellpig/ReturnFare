@@ -263,6 +263,77 @@
     },
 
     {
+      "id": "d42_morning_clinic",
+      "location": "clinic",
+      "when": { "day": 42, "phase": "morning" },
+      "title": "診所",
+      "text": "還有三天他就出院了。",
+      "slots": [
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "陪叔叔",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "他今天話少。你問他要不要幫忙收東西，他說再等等。",
+            "switch_progress": { "s6": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "d42_morning_her",
+      "location": "sanquan",
+      "when": { "day": 42, "phase": "morning" },
+      "condition": { "flag": "she_returned" },
+      "title": "她",
+      "text": "她在前台。她今天心情好。",
+      "slots": [
+        {
+          "id": "with_her",
+          "occupant": null,
+          "label": "跟她待一個上午",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你陪了她一個上午。你什麼都沒問，她也什麼都沒說。" }
+        }
+      ],
+      "note": "承第 41 天那一格：玩家不是在陪她，是在檢查她。這一格同樣不給卡"
+    },
+    {
+      "id": "d42_morning_inn",
+      "location": "sanquan",
+      "when": { "day": 42, "phase": "morning" },
+      "title": "顧旅館",
+      "text": "叔叔大後天回來。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": null,
+          "label": "做完今天的",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "阿財把重的都先搬完了。你到的時候只剩輕的。" }
+        }
+      ]
+    },
+    {
+      "id": "d42_morning_dig",
+      "location": "registry_office",
+      "when": { "day": 42, "phase": "morning" },
+      "title": "查",
+      "text": "戶籍室。你想看的是自己家那幾年。",
+      "slots": [
+        {
+          "id": "search",
+          "occupant": null,
+          "label": "翻自己家那幾年",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "你爸媽的資料就在那裡，跟你記得的一樣。\n沒有一個欄位寫他們本來要去哪裡。" }
+        }
+      ],
+      "note": "不給卡，也不設門檻。這一格的作用是把玩家的注意力放到父母身上，讓當天下午那間房的抽屜有落點；真正的東西在下午"
+    },
+
+    {
       "id": "d43_morning_clinic",
       "location": "clinic",
       "when": { "day": 43, "phase": "morning" },
@@ -380,9 +451,9 @@
       "note": "契書在行李裡，是因為父母知道那份要帶走；只是主角還沒到十六歲，還不能還願。他們打算走，但沒打算解約。\n第一輪不能燒契書——燒它需要「你還在契約裡」的知識，那要等主角死過一次"
     },
     {
-      "id": "d42_morning_ask_paper",
+      "id": "d43_morning_ask_paper",
       "location": "temple",
-      "when": { "day": 42, "phase": "morning" },
+      "when": { "day": 43, "phase": "morning" },
       "condition": { "has_card": "item_old_paper" },
       "title": "拿那張紙去問",
       "text": "蓋著廟印，總有人看得懂。",

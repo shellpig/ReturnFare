@@ -17,11 +17,14 @@ const BY_DESIGN_CHOICE_ONLY_PHASES: Array[Dictionary] = [
 	{ "day": 43, "phase": "afternoon" },
 ]
 
-## 違反 SCHEMA 同面板規約但已接受豁免的 choice beat 名單（K-16，lint 3 豁免名單）
+## 違反 SCHEMA 同面板規約但已接受豁免的免費槽 beat 名單（K-16、K-27，lint 3 豁免名單）
+## 前三個是 choice 槽；d43_morning_ask_paper 是比對槽——lint 3 目前只查 choice 槽，
+## 要等 K-27 把判斷放寬成「不收 protagonist 的槽」之後才看得到它。
 const BY_DESIGN_CHOICE_ONLY_BEATS: PackedStringArray = [
 	"d35_pm_answer",
 	"d40_tell_someone",
 	"d43_conclusion",
+	"d43_morning_ask_paper",
 ]
 
 
