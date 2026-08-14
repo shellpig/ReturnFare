@@ -1,6 +1,6 @@
 extends VBoxContainer
 
-## 白天地點清單。只渲染 PanelBuilder.available_locations() 的結果，自己不過濾。
+## 地點清單（白天與夜間共用）。只渲染 PanelBuilder.available_locations() 的結果，自己不過濾。
 ## 每次 refresh() 清空重建按鈕。
 
 signal location_selected(id: String)

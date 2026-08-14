@@ -93,6 +93,8 @@ func _refresh_status() -> void:
 func _route_view() -> void:
 	if _is_showing_ending:
 		_flow_text.visible = true
+		_flow_text.offset_top = 0.0
+		_flow_text.offset_bottom = 400.0
 		_map_list.visible = false
 		_location_panel.visible = false
 		_advance_btn.visible = true
@@ -102,6 +104,8 @@ func _route_view() -> void:
 	match phase:
 		"morning", "afternoon":
 			_map_list.visible = true
+			_map_list.offset_top = 0.0
+			_map_list.offset_bottom = 400.0
 			_location_panel.visible = false
 			_flow_text.visible = false
 			_map_list.call("refresh")
@@ -111,11 +115,21 @@ func _route_view() -> void:
 			_location_panel.visible = false
 			_play_evening()
 			_flow_text.visible = true
+			_flow_text.offset_top = 0.0
+			_flow_text.offset_bottom = 400.0
 			_advance_btn.visible = true
 		"night":
-			_map_list.visible = true
 			_location_panel.visible = false
 			_play_night_fixed()
+			_map_list.visible = true
+			if _flow_text.visible:
+				_flow_text.offset_top = 0.0
+				_flow_text.offset_bottom = 120.0
+				_map_list.offset_top = 130.0
+				_map_list.offset_bottom = 400.0
+			else:
+				_map_list.offset_top = 0.0
+				_map_list.offset_bottom = 400.0
 			_map_list.call("refresh")
 			_advance_btn.visible = true
 
