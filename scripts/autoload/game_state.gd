@@ -473,7 +473,7 @@ func _result_reason(result: Dictionary) -> String:
 	return str(result.get("reason_code", ""))
 
 
-## 當前時段是否仍有任一張卡能合法放置。純查詢，不推進時段。
+## 當前時段是否仍有任一動作可做（合法卡放置或未結算選擇題）。純查詢，不推進時段。
 func has_any_legal_placement() -> bool:
 	var locations := PanelBuilder.available_locations(self, Data)
 	for location_id: String in locations:
@@ -485,6 +485,8 @@ func has_any_legal_placement() -> bool:
 			for slot_view: Dictionary in beat_view.get("slots", []) as Array:
 				if int(slot_view.get("tri", -1)) != PanelBuilder.TriState.OPEN:
 					continue
+				if bool(slot_view.get("is_choice", false)):
+					return true
 				var slot_id := str((slot_view["slot"] as Dictionary).get("id", ""))
 				if not placeable_cards(beat_id, slot_id).is_empty():
 					return true

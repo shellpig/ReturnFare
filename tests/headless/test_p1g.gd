@@ -3,6 +3,7 @@ extends SceneTree
 ## P1-G 規則層與兩階段面板回歸測試。
 ## 跑法：Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p1g.gd
 
+const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
 
 func _initialize() -> void:
 	await process_frame
@@ -17,6 +18,7 @@ func _initialize() -> void:
 	failed += _test_three_rule_entries(gs, data_node)
 	failed += await _test_two_stage_location_panel(gs)
 	failed += _test_type_preview_and_fallback(gs, data_node)
+	failed += _test_choice_only_action_prompt(gs)
 
 	if failed > 0:
 		push_error("P1-G: %d test(s) failed" % failed)
@@ -136,6 +138,77 @@ func _test_type_preview_and_fallback(gs: Node, data_node: Node) -> int:
 		failed += _ok("locked slot preview is empty with a reason")
 	else:
 		failed += _fail("locked slot preview mismatch: %s" % str(locked_preview))
+	return failed
+
+
+func _test_choice_only_action_prompt(gs: Node) -> int:
+	print("--- P1-G action prompt counts unresolved choice_group slots ---")
+	var cases: Array[Dictionary] = [
+		{
+			"label": "第 35 天下午",
+			"day": 35,
+			"phase": "afternoon",
+			"location": "clinic",
+			"beat": "d35_pm_answer",
+			"slot": "accept",
+			"card": "",
+			"flag": "inheritance_offered",
+		},
+		{
+			"label": "第 40 天上午",
+			"day": 40,
+			"phase": "morning",
+			"location": "sanquan",
+			"beat": "d40_tell_someone",
+			"slot": "tell_her",
+			"card": "info_something_off",
+			"flag": "",
+		},
+		{
+			"label": "第 43 天下午",
+			"day": 43,
+			"phase": "afternoon",
+			"location": "sanquan",
+			"beat": "d43_conclusion",
+			"slot": "theory_exchange",
+			"cards": ["info_something_off", "info_acai_walk", "info_jinghe_pool"],
+			"flag": "",
+		},
+	]
+
+	var failed := 0
+	for test_case: Dictionary in cases:
+		_reset_gs(gs)
+		gs.set("day", int(test_case.get("day", -1)))
+		gs.set("phase", str(test_case.get("phase", "")))
+		var flag_id := str(test_case.get("flag", ""))
+		if not flag_id.is_empty():
+			gs.call("set_flag", flag_id, true)
+		var cards: Array = test_case.get("cards", []) as Array
+		var card_id := str(test_case.get("card", ""))
+		if not card_id.is_empty():
+			cards.append(card_id)
+		for card_to_gain: Variant in cards:
+			gs.call("gain_card", str(card_to_gain))
+		var beat_id := str(test_case.get("beat", ""))
+		var slot_id := str(test_case.get("slot", ""))
+		gs.play_beat(beat_id)
+
+		var view: Dictionary = gs.build_panel(str(test_case.get("location", "")))
+		var beat_view := _find_beat(view, beat_id)
+		var slot_view := _find_slot(beat_view, slot_id)
+		var slot_is_open := int(slot_view.get("tri", -1)) == PanelBuilder.TriState.OPEN
+		var slot_is_choice := bool(slot_view.get("is_choice", false))
+		if not slot_is_open or not slot_is_choice:
+			failed += _fail("%s choice slot is not OPEN: %s" % [str(test_case.get("label", "")), str(slot_view)])
+			continue
+		if not (gs.placeable_cards(beat_id, slot_id)).is_empty():
+			failed += _fail("%s unexpectedly has a legal card placement" % str(test_case.get("label", "")))
+			continue
+		if gs.has_any_legal_placement():
+			failed += _ok("%s remains actionable through direct choice" % str(test_case.get("label", "")))
+		else:
+			failed += _fail("%s was reported as having no action" % str(test_case.get("label", "")))
 	return failed
 
 
