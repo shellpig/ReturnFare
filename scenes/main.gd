@@ -7,7 +7,7 @@ const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 const _MSG_DATA_ERROR := "資料載入失敗，詳情見 Output。"
 const _MSG_ENDING_STUB := "[結局 stub]"
 const _MSG_ADVANCE := "推進時段"
-const _MSG_ADVANCE_HINT := "推進時段（目前無可放卡）"
+const _MSG_ADVANCE_HINT := "推進時段（目前無可做動作）"
 const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 
 @onready var _error_label: Label = $ErrorLabel
@@ -103,9 +103,9 @@ func _refresh_status() -> void:
 
 func _refresh_advance_hint() -> void:
 	if GameState.phase == "morning" or GameState.phase == "afternoon":
-		var has_placement: bool = GameState.has_any_legal_placement()
-		_advance_btn.text = _MSG_ADVANCE if has_placement else _MSG_ADVANCE_HINT
-		_advance_btn.modulate = Color.WHITE if has_placement else Color(1.0, 0.82, 0.4)
+		var has_action: bool = GameState.has_any_legal_action()
+		_advance_btn.text = _MSG_ADVANCE if has_action else _MSG_ADVANCE_HINT
+		_advance_btn.modulate = Color.WHITE if has_action else Color(1.0, 0.82, 0.4)
 	else:
 		_advance_btn.text = _MSG_ADVANCE
 		_advance_btn.modulate = Color.WHITE

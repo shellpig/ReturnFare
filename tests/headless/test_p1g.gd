@@ -205,10 +205,19 @@ func _test_choice_only_action_prompt(gs: Node) -> int:
 		if not (gs.placeable_cards(beat_id, slot_id)).is_empty():
 			failed += _fail("%s unexpectedly has a legal card placement" % str(test_case.get("label", "")))
 			continue
-		if gs.has_any_legal_placement():
+		if gs.has_any_legal_action():
 			failed += _ok("%s remains actionable through direct choice" % str(test_case.get("label", "")))
 		else:
 			failed += _fail("%s was reported as having no action" % str(test_case.get("label", "")))
+
+		if str(test_case.get("beat", "")) == "d40_tell_someone":
+			var choice_result: Dictionary = gs.choose("d40_tell_someone", "d40_tell", "tell_her", "")
+			if not choice_result.get("ok", false):
+				failed += _fail("第 40 天上午 direct choice failed: %s" % str(choice_result))
+			elif gs.has_any_legal_action():
+				failed += _fail("第 40 天上午 remained actionable after choice resolved")
+			else:
+				failed += _ok("第 40 天上午 is no longer actionable after choice resolved")
 	return failed
 
 

@@ -474,7 +474,7 @@ func _result_reason(result: Dictionary) -> String:
 
 
 ## 當前時段是否仍有任一動作可做（合法卡放置或未結算選擇題）。純查詢，不推進時段。
-func has_any_legal_placement() -> bool:
+func has_any_legal_action() -> bool:
 	var locations := PanelBuilder.available_locations(self, Data)
 	for location_id: String in locations:
 		var view := build_panel(location_id)
