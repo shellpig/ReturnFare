@@ -176,18 +176,52 @@ func _test_main_scene_enters_normal_branch() -> int:
 	else:
 		failed += _ok("關閉地點面板後 FlowText 與 MapList 正確恢復顯示且無重疊")
 
-	# 驗證 K-40: FlowText 為 ScrollContainer 具備 clip_contents，且版面底邊不大於 MapList 頂邊
+	# 驗證 K-40: FlowText 為 ScrollContainer 具備 clip_contents，且夜間不蓋住 MapList。
+	# **比的是實際矩形，不是 offset。** 只比 offset 會漏掉錨點落差——FlowText 曾經帶
+	# anchors_preset = 15（anchor_bottom = 1.0），offset_bottom = 120 的實際意思是
+	# 「父節點底邊再往下 120」，兩個數字比得過，但整張地圖被蓋住、地點按鈕全部點不到。
 	gs.set("day", 1)
 	gs.set("phase", "night")
 	main.call("_route_view")
+	await process_frame
 	if not (flow_text is ScrollContainer):
 		failed += _fail("FlowText 根節點不是 ScrollContainer (K-40)")
 	elif not flow_text.clip_contents:
 		failed += _fail("FlowText 未開啟 clip_contents (K-40)")
-	elif flow_text.offset_bottom > map_list.offset_top:
-		failed += _fail("FlowText 底邊 (%f) 超出 MapList 頂邊 (%f)" % [flow_text.offset_bottom, map_list.offset_top])
 	else:
-		failed += _ok("FlowText 是 ScrollContainer、開啟 clip_contents 且與 MapList 分區正確 (K-40)")
+		var flow_rect: Rect2 = flow_text.get_global_rect()
+		var map_rect: Rect2 = (map_list as Control).get_global_rect()
+		if flow_rect.intersects(map_rect):
+			failed += _fail("FlowText 實際矩形 %s 與 MapList %s 重疊，會蓋掉地點按鈕 (K-40)"
+				% [str(flow_rect), str(map_rect)])
+		else:
+			failed += _ok("FlowText 是 ScrollContainer、開啟 clip_contents，實際矩形與 MapList 不重疊 (K-40)")
+
+	# 驗證 [出席] 行印的是槽上 authored 的 label，沒有把 occupant 的卡 id 漏到畫面上。
+	# occupant 是**卡 id**（`npc_ajie`），122 個 occupant 槽只有 4 個查得到卡片，
+	# 任何「拿 occupant 去查名字」的寫法都會在其餘 18 個身上退回印出原始 id。
+	gs.set("day", 2)
+	gs.set("phase", "morning")
+	main.call("_on_location_selected", "sanquan")
+	await process_frame
+	var occupant_lines := PackedStringArray()
+	for child in loc_panel.get_node("BeatContainer").get_children():
+		var lbl := child as Label
+		if lbl != null and lbl.text.contains("[出席]"):
+			occupant_lines.append(lbl.text)
+	if occupant_lines.is_empty():
+		failed += _fail("第 2 天上午山泉閣面板沒有任何 [出席] 行，斷言前提不成立")
+	else:
+		var leaked := PackedStringArray()
+		for line in occupant_lines:
+			if line.contains("npc_"):
+				leaked.append(line)
+		if not leaked.is_empty():
+			failed += _fail("[出席] 把原始卡 id 漏到畫面上：%s" % ", ".join(leaked))
+		else:
+			failed += _ok("[出席] 印的是 label，沒有漏卡 id（%d 行）：%s"
+				% [occupant_lines.size(), ", ".join(occupant_lines)])
+	main.call("_on_panel_closed")
 
 	# 驗證 run_ended 結局 stub 在 FlowText 顯示且保持可見
 	main.call("_on_run_ended", "ending_default")

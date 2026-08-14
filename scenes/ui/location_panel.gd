@@ -11,7 +11,7 @@ signal closed
 const _LABEL_NO_TITLE := "（無標題）"
 const _FMT_BEAT_TITLE := "== %s =="
 const _FMT_BEAT_LOCKED_SUFFIX := "  [%s]"
-const _FMT_SLOT_OCCUPIED := "  [出席] %s（%s）"
+const _PREFIX_SLOT_OCCUPIED := "  [出席] "
 const _PREFIX_SLOT_EMPTY := "  [空槽] "
 const _FMT_SLOT_LOCKED := "  [灰] %s  %s"
 const _PREFIX_SLOT_RESOLVED := "  [已放] "
@@ -98,9 +98,11 @@ func _rebuild() -> void:
 			match stri:
 				PanelBuilder.TriState.OPEN:
 					if occupant != null:
-						var npc: Dictionary = Data.loader.npcs.get(str(occupant), {}) as Dictionary
-						var npc_name: String = str(npc.get("name", occupant))
-						slot_lbl.text = _FMT_SLOT_OCCUPIED % [npc_name, label_text]
+						# 只印槽上的 label，不查 occupant 的名字。occupant 是**卡 id**，
+						# 而 122 個 occupant 槽裡只有 4 個有對應卡片（其餘人物卡等 P4 委託
+						# 才發），拿它去查 cards 或 npcs 多數查不到，會退回印出原始 id。
+						# label 是逐槽 authored 的，122 個全都有，而且比卡名更貼該場戲。
+						slot_lbl.text = _PREFIX_SLOT_OCCUPIED + label_text
 					else:
 						slot_lbl.text = _PREFIX_SLOT_EMPTY + label_text
 				PanelBuilder.TriState.LOCKED:
