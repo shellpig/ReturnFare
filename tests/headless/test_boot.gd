@@ -152,6 +152,30 @@ func _test_main_scene_enters_normal_branch() -> int:
 	else:
 		failed += _ok("Day 24 night fixed (d24_night_laozeng) 成功渲染進 FlowText")
 
+	# 驗證夜間開啟地點面板時 FlowText 被隱藏，關閉面板後恢復顯示
+	var map_list: Node = main.get_node_or_null("ContentView/MapList")
+	var loc_panel: Node = main.get_node_or_null("ContentView/LocationPanel")
+	gs.set("day", 1)
+	gs.set("phase", "night")
+	main.call("_route_view")
+	if not flow_text.visible:
+		failed += _fail("Day 1 night route_view FlowText 未顯示")
+	main.call("_on_location_selected", "n_corridor_1")
+	if flow_text.visible:
+		failed += _fail("開啟地點面板時 FlowText 未被隱藏（疊字 bug）")
+	elif not loc_panel.visible:
+		failed += _fail("開啟地點面板時 LocationPanel 未顯示")
+	else:
+		failed += _ok("開啟地點面板時 FlowText 正確隱藏、LocationPanel 顯示")
+
+	main.call("_on_panel_closed")
+	if not flow_text.visible or not map_list.visible:
+		failed += _fail("關閉地點面板後 FlowText 或 MapList 未恢復顯示")
+	elif loc_panel.visible:
+		failed += _fail("關閉地點面板後 LocationPanel 未隱藏")
+	else:
+		failed += _ok("關閉地點面板後 FlowText 與 MapList 正確恢復顯示且無重疊")
+
 	# 驗證 run_ended 結局 stub 在 FlowText 顯示且保持可見
 	main.call("_on_run_ended", "ending_default")
 	if not flow_text.visible or not flow_text.get_text().contains("[結局 stub]"):

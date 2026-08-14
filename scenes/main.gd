@@ -74,6 +74,7 @@ func _on_run_ended(_ending_id: String) -> void:
 
 
 func _on_location_selected(loc_id: String) -> void:
+	_flow_text.visible = false
 	_map_list.visible = false
 	_location_panel.visible = true
 	_location_panel.call("show_location", loc_id)
@@ -81,7 +82,7 @@ func _on_location_selected(loc_id: String) -> void:
 
 func _on_panel_closed() -> void:
 	_location_panel.visible = false
-	_map_list.visible = true
+	_route_view()
 
 
 func _refresh_status() -> void:
