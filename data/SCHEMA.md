@@ -131,7 +131,50 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 **出口不是獨立資料，就是某些地點的卡槽 `accepts` 裡有 `madness`。** 沒有縱慾選單。
 
-六個出口見企劃書第七節；強制縱慾的挑選演算法、無條件出口保底、泡湯特例：`實作規格書.md > 發狂時鐘與縱慾`。
+六個出口見企劃書第七節；強制縱慾的挑選演算法、無條件出口保底、泡湯特例：`實作規格書.md > 發狂時鐘與縱慾`。出口的實際落點見 `開發設計方針.md > P2-B`，資料住 `data/beats/indulgence_exits.json`。
+
+`accepts` 含 `madness` 的槽多兩個欄位（P2）：
+
+```json
+{ "id": "x_smash", "label": "砸東西",
+  "accepts": ["madness"],
+  "condition": { "madness_at_least": 1 },
+  "indulgence": { "weight": 1 },
+  "on_place": { "text": "……", "flag": { "inn_damaged": true } },
+  "on_place_by_level": {
+    "normal": { "relation": { "npc": "uncle", "delta": -1 } },
+    "heavy":  { "relation": { "npc": "uncle", "delta": -2 } }
+  } }
+```
+
+| 欄位 | 說明 |
+|---|---|
+| `indulgence.weight` | 代價權重，整數，越大越重。**強制縱慾挑條件成立的出口中權重最大的那個**；同分取資料順序第一個（決定論，不得引入亂數） |
+| `indulgence.auto` | 選填，預設 `true`。`false` ＝**永不進強制挑選池**。全作只有泡湯是 `false` |
+| `indulgence.soak` | 選填，預設 `false`。`true` ＝套泡湯特例：只在 morning 發動、吃 `tuning.indulgence.soak_phase_cost` 格、清 `soak_cards_cleared` 張。**數值住 `tuning.json`，本欄只標身分** |
+| `on_place_by_level` | 選填。強度級的**追加**效果，鍵只能是 `light` / `normal` / `heavy`，值的內部鍵同 `on_place`。**基底 `on_place` 照常先套，再套當次那一級**；缺級＝該級無追加 |
+
+> **為什麼是「基底＋追加」不是三份完整替換。** 企劃書第七節寫的是副作用**疊加**；三份替換會讓內容期改一句文字要改三處，而且看不出三份之間差在哪。
+
+> **`condition` 用 `madness_at_least: 1` 而不是留白**：手上沒有發狂卡的玩家不需要看到「砸東西」這一格。這是三態裡「不顯示」那一態的正當用法——他不缺鑰匙，他只是還沒有那張卡。
+
+### 常駐白天 beat（`when.day_from` / `day_to`）
+
+縱慾出口是地點的**常駐設施**，不是某一天的事件——但 `when.day` 綁死單日，寫 45 份複本不可行。所以 `when` 支援第二種寫法：
+
+```json
+{ "when": { "day_from": 1, "day_to": 45, "phase": ["morning", "afternoon"] } }
+```
+
+| | |
+|---|---|
+| `day` 存在 | 舊寫法，只在那一天成立。**故事 beat 一律用這個** |
+| `day` 不存在、`day_from` / `day_to` 存在 | 區間內每一天的該時段都成立。`day_from` 預設 1、`day_to` 預設 45 |
+| `phase` | 可以是字串或字串陣列。陣列＝這幾個時段都成立 |
+
+> **兩種寫法不得混用在同一個 `when` 裡**（有 `day` 又有 `day_from` ＝資料錯誤）。
+>
+> **為什麼不另開一個 `data/indulgence_exits.json` 頂層檔**：出口要走的是同一套 beat／槽／三態／`on_place` 機制，另開檔等於多一條解析路徑，而它們的差別只有「哪幾天成立」這一件事。擴 `when` 只動一個判斷式。
 
 ## `cards.json`
 
@@ -240,7 +283,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 |---|---|
 | `id` | 唯一鍵 |
 | `location` | 掛在哪個地點 |
-| `when` | `{day, phase}`；`phase` ＝ `morning` / `afternoon` / `evening` / `night`。**沒有 `when` 的 beat 是夜間章節變體**——掛在夜間地點上，開放與否由地點的 `earliest_night` / `requires` 決定。`phase: "night"` 的**定日夜 beat** 也存在（引導夜、颱風夜等）；兩者的解析順序住 `實作規格書.md > 夜間層` |
+| `when` | `{day, phase}`；`phase` ＝ `morning` / `afternoon` / `evening` / `night`。**常駐白天 beat 改用 `{day_from, day_to, phase}`**（見下方專節，P2 新增）。**沒有 `when` 的 beat 是夜間章節變體**——掛在夜間地點上，開放與否由地點的 `earliest_night` / `requires` 決定。`phase: "night"` 的**定日夜 beat** 也存在（引導夜、颱風夜等）；兩者的解析順序住 `實作規格書.md > 夜間層` |
 | `fixed` | `true` ＝ 一定發生且**不吃行動格** |
 | `condition` | 出現條件，不成立則整個 beat 不存在 |
 | `requires` / `reject_reason` | beat 級門檻：不成立時整個 beat 灰掉＋理由（語意同槽級） |
@@ -285,6 +328,8 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `requires` | 額外條件；不成立則灰掉 |
 | `reject_reason` | 灰掉時那一行字 |
 | `on_place` | 放進去產生什麼 |
+| `indulgence` | **只有縱慾出口槽有**：`{weight, auto, soak}`，見上方「縱慾出口」 |
+| `on_place_by_level` | **只有縱慾出口槽有**：強度級的追加效果，見上方「縱慾出口」 |
 | `choice_group` | 同組的槽互斥，見下 |
 | `attention_npc` | 此槽消耗主角行動時，投入帳記給哪位 NPC（選填；未標＝不計。供「不邀任何人時系統挑誰」判定，規格書第十二節） |
 | `note` | 設計註記，引擎不讀 |
