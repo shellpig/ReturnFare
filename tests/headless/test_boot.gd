@@ -176,6 +176,19 @@ func _test_main_scene_enters_normal_branch() -> int:
 	else:
 		failed += _ok("關閉地點面板後 FlowText 與 MapList 正確恢復顯示且無重疊")
 
+	# 驗證 K-40: FlowText 為 ScrollContainer 具備 clip_contents，且版面底邊不大於 MapList 頂邊
+	gs.set("day", 1)
+	gs.set("phase", "night")
+	main.call("_route_view")
+	if not (flow_text is ScrollContainer):
+		failed += _fail("FlowText 根節點不是 ScrollContainer (K-40)")
+	elif not flow_text.clip_contents:
+		failed += _fail("FlowText 未開啟 clip_contents (K-40)")
+	elif flow_text.offset_bottom > map_list.offset_top:
+		failed += _fail("FlowText 底邊 (%f) 超出 MapList 頂邊 (%f)" % [flow_text.offset_bottom, map_list.offset_top])
+	else:
+		failed += _ok("FlowText 是 ScrollContainer、開啟 clip_contents 且與 MapList 分區正確 (K-40)")
+
 	# 驗證 run_ended 結局 stub 在 FlowText 顯示且保持可見
 	main.call("_on_run_ended", "ending_default")
 	if not flow_text.visible or not flow_text.get_text().contains("[結局 stub]"):

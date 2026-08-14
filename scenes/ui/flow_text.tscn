@@ -2,10 +2,17 @@
 
 [ext_resource type="Script" path="res://scenes/ui/flow_text.gd" id="1_flow"]
 
-[node name="FlowText" type="VBoxContainer"]
+[node name="FlowText" type="ScrollContainer"]
+clip_contents = true
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+horizontal_scroll_mode = 0
 script = ExtResource("1_flow")
+
+[node name="LinesContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
