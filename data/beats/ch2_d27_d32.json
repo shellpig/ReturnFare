@@ -235,7 +235,13 @@
       "title": "小武泡完湯了",
       "text": "他說水好燙，他不喜歡。他媽媽說「以後就習慣了」。",
       "slots": [
-        { "id": "xiaowu", "occupant": "npc_xiaowu", "label": "小武", "accepts": [] }
+        {
+          "id": "listen",
+          "occupant": "npc_xiaowu",
+          "label": "聽他講",
+          "accepts": ["protagonist"],
+          "on_place": { "text": "他媽媽在旁邊擦乾淨他的頭髮，笑著說「小孩子第一次都這樣」。" }
+        }
       ],
       "note": "雜訊。他還沒到十六歲，所以還沒進簿子——六年後才輪到他。第二輪玩家會意識到那件事不在這 45 天裡"
     },

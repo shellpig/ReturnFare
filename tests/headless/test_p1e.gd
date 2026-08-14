@@ -116,6 +116,16 @@ func _test_choice_direct_selection(gs: Node, data_node: Node) -> int:
 	if slots_before.size() < 2:
 		return _fail("expected at least 2 slots in invitation group before choosing, got %d" % slots_before.size())
 
+	# K-19: 驗證 choice 槽 view model 帶有 is_choice == true
+	var all_slots_have_is_choice := true
+	for sv: Dictionary in slots_before:
+		if not sv.get("is_choice", false):
+			all_slots_have_is_choice = false
+			break
+	if not all_slots_have_is_choice:
+		return _fail("choice slots in view model missing is_choice == true (K-19)")
+	_ok("choice slot view models have is_choice == true (K-19)")
+
 	# 直接選擇 invite_none（不帶卡）
 	var res: Dictionary = gs.call("choose", "d29_pm_invitation", "invitation", "invite_none", "")
 	if not res.get("ok", false):
@@ -351,6 +361,15 @@ func _test_choice_locked_slot(gs: Node, _data_node: Node) -> int:
 		return _fail("failed choose wrote to choices")
 
 	_ok("locked choice slot rejected with locked reason_code and reason_text")
+
+	# K-18: 越時選擇阻擋（在第 1 天 morning 呼叫第 29 天下午的選擇題）
+	gs.set("day", 1)
+	gs.set("phase", "morning")
+	var wrong_time_res: Dictionary = gs.call("choose", "d29_pm_invitation", "invitation", "invite_none", "")
+	if wrong_time_res.get("ok", false) or str(wrong_time_res.get("reason_code", "")) != "hidden":
+		return _fail("choose on wrong day/phase expected ok=false reason_code=hidden, got %s (K-18)" % str(wrong_time_res))
+	_ok("choose on wrong day/phase rejected with reason_code=hidden (K-18)")
+
 	return 0
 
 

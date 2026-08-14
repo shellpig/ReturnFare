@@ -9,6 +9,7 @@ const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 const EffectApply := preload("res://scripts/core/effect_apply.gd")
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
 const DataFacts := preload("res://scripts/core/data_facts.gd")
+const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 
 
 func _initialize() -> void:
@@ -480,71 +481,28 @@ func _test_second_loop_arrival_gain_idempotent(gs: Node, data_node: Node) -> int
 	return failed
 
 
-# ── 10. 45 天貪心走查腳本 ───────────────────────────────────────────────────
+# ── 10. 45 天貪心走查腳本（共用 PlaythroughGreedy，K-36）────────────────────
 
 func _test_greedy_playthrough_45_days(gs: Node, data_node: Node) -> int:
-	print("--- 10. 45-day greedy playthrough ---")
+	print("--- 10. 45-day greedy playthrough (via PlaythroughGreedy) ---")
 	var failed := 0
 
 	_reset_gs(gs)
-	var run_ended_box := [0]
-	var cb := func(_eid: String): run_ended_box[0] += 1
-	gs.run_ended.connect(cb)
+	var res: Dictionary = PlaythroughGreedy.run_greedy_walk(gs, data_node, false)
 
-	for d in range(1, 46):
-		# morning
-		_execute_greedy_phase(gs, data_node)
-		gs.advance_phase()
-		# afternoon
-		_execute_greedy_phase(gs, data_node)
-		gs.advance_phase()
-		# evening
-		gs.play_evening()
-		gs.advance_phase()
-		if d == 45:
-			break
-		# night
-		gs.play_night_fixed()
-		gs.sleep_night()
-		gs.advance_phase()
-
-	if run_ended_box[0] == 1:
-		failed += _ok("45 天走查結束且 run_ended 恰好發射 1 次")
+	if int(res.get("illegal_phases", 0)) > 0:
+		failed += _fail("存在 %d 個未放置且未列入合法原因之行動格 (K-25)" % int(res.get("illegal_phases", 0)))
 	else:
-		failed += _fail("45 天走查 run_ended 發射次數不為 1 (實際: %d)" % run_ended_box[0])
+		failed += _ok("全 90 個行動時段均已完成合法性分類與驗證 (K-25)")
+
+	if int(res.get("run_ended_count", 0)) == 1:
+		failed += _ok("45 天走查結束且 run_ended 恰好發射 1 次 (K-36)")
+	else:
+		failed += _fail("45 天走查 run_ended 發射次數不為 1 (實際: %d)" % int(res.get("run_ended_count", 0)))
 
 	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
 		failed += _ok("45 天走查後成功回到第 1 天 morning")
 	else:
 		failed += _fail("45 天走查後未回到第 1 天 morning")
 
-	gs.run_ended.disconnect(cb)
 	return failed
-
-
-func _execute_greedy_phase(gs: Node, data_node: Node) -> void:
-	var locs := PanelBuilder.available_locations(gs, data_node)
-	for loc_id in locs:
-		gs.open_panel(loc_id)
-	for loc_id in locs:
-		var view: Dictionary = PanelBuilder.build(loc_id, gs, data_node)
-		var placed := false
-		for bv: Dictionary in view.get("beats", []) as Array:
-			if int(bv.get("tri", -1)) != PanelBuilder.TriState.OPEN:
-				continue
-			var bid: String = str(bv["beat"].get("id", ""))
-			for sv: Dictionary in bv.get("slots", []) as Array:
-				if int(sv.get("tri", -1)) != PanelBuilder.TriState.OPEN:
-					continue
-				var slot: Dictionary = sv["slot"] as Dictionary
-				var sid: String = str(slot.get("id", ""))
-				var accepts: Array = slot.get("accepts", []) as Array
-				if accepts.has("protagonist"):
-					var res: Dictionary = gs.try_place("protagonist", bid, sid)
-					if res.get("ok", false):
-						placed = true
-						break
-			if placed:
-				break
-		if placed:
-			break

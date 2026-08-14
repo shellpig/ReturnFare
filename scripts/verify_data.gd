@@ -53,21 +53,6 @@ func _initialize() -> void:
 		day_total - paired.size(), paired.size(), night_only,
 	])
 
-	# 45 天每一格都要有東西——這是第一輪資料完整的最低標準。
-	var empty: PackedStringArray = []
-	for day in range(1, 46):
-		for phase in ["morning", "afternoon"]:
-			if loader.beats_at(day, phase).is_empty() and not DataFacts.is_empty_phase_by_design(day, phase):
-				empty.append("第 %d 天 %s" % [day, phase])
-
-	if empty.size() > 0:
-		print("\n沒有任何 beat 的行動格 %d 個：" % empty.size())
-		for e in empty:
-			print("  " + e)
-		quit(1)
-		return
-	print("行動格覆蓋　第 1-45 天全滿（3 格刻意留空）")
-
 	# Lint 1: 語彙封閉性
 	var vocab_errs := DataLoader.lint_vocabulary(loader.beats)
 	if vocab_errs.size() > 0:
@@ -108,7 +93,7 @@ func _initialize() -> void:
 			print("  " + e)
 		quit(1)
 		return
-	print("行動格供需 (Lint 5)　0 錯誤")
+	print("行動格供需 (Lint 5)　0 錯誤（第 1-45 天全滿，3 格刻意留空）")
 
 	# Lint 7: 夜間可達性
 	var night_errs := DataLoader.lint_night_reachability(loader)

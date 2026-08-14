@@ -335,6 +335,13 @@ func _test_try_place_rejections(gs: Node) -> int:
 	else:
 		failed += _ok("try_place unheld card: slots_placed unchanged (empty)")
 
+	# 空卡 id：try_place 傳入空字串 → not_held (K-17)
+	var empty_card: Dictionary = gs.call("try_place", "", "d3_pm_sanquan", "show_version")
+	if empty_card.get("ok", false) or str(empty_card.get("reason_code")) != "not_held":
+		failed += _fail("try_place empty card id: expected ok=false reason_code=not_held, got %s" % str(empty_card))
+	else:
+		failed += _ok("try_place empty card id → ok=false reason_code=not_held (K-17)")
+
 	# 不符 accepts：主角卡放進不收主角卡的比對槽（先持有 info 卡讓 requires 過，才單獨測 accepts）
 	gs.call("gain_card", "protagonist")
 	gs.call("gain_card", "info_husband_version")
@@ -555,5 +562,37 @@ func _test_lint_vocabulary() -> int:
 			missing_reasons.size(), str(missing_reasons[0])])
 	else:
 		failed += _ok("lint_missing_reject_reason: real data has 0 missing reject_reason warnings")
+
+	# lint_choice_rules / lint_free_slot_rules: choice 槽接受 protagonist 必須報錯 (K-22)
+	var bad_choice_beat: Array[Dictionary] = [{
+		"id": "synthetic_bad_choice",
+		"when": { "day": 10, "phase": "morning" },
+		"location": "sanquan",
+		"slots": [
+			{ "id": "c1", "choice_group": "test_grp", "accepts": ["protagonist"] },
+		],
+	}]
+	var choice_err_res := DataLoader.lint_choice_rules(bad_choice_beat)
+	var choice_err_list: PackedStringArray = choice_err_res.get("errors", PackedStringArray())
+	if choice_err_list.is_empty():
+		failed += _fail("lint_choice_rules: choice slot accepting protagonist should be caught as error (K-22)")
+	else:
+		failed += _ok("lint_choice_rules: choice slot accepting protagonist caught as error (K-22)")
+
+	# lint_free_slot_rules: 非 fixed 面板僅有免費槽且未列入豁免名單必須報錯 (K-27)
+	var bad_free_panel_beat: Array[Dictionary] = [{
+		"id": "synthetic_unexempted_free_beat",
+		"when": { "day": 12, "phase": "morning" },
+		"location": "temple",
+		"slots": [
+			{ "id": "compare_only", "accepts": ["info_registry"] },
+		],
+	}]
+	var free_panel_err_res := DataLoader.lint_free_slot_rules(bad_free_panel_beat)
+	var free_panel_err_list: PackedStringArray = free_panel_err_res.get("errors", PackedStringArray())
+	if free_panel_err_list.is_empty():
+		failed += _fail("lint_free_slot_rules: unexempted panel without protagonist slot should be caught as error (K-27)")
+	else:
+		failed += _ok("lint_free_slot_rules: unexempted panel without protagonist slot caught as error (K-27)")
 
 	return failed

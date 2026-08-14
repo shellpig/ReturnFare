@@ -212,48 +212,76 @@ static func lint_missing_reject_reason(beats_list: Array[Dictionary]) -> PackedS
 	return warnings
 
 
-## lint 3：免費槽／選擇題同面板規約（SCHEMA規約、K-16、K-22）。
+## lint 3：免費槽／選擇題同面板規約（SCHEMA規約、K-16、K-22、K-27）。
 ## 回傳 Dictionary { "errors": PackedStringArray, "warnings": PackedStringArray }
-static func lint_choice_rules(beats_list: Array[Dictionary]) -> Dictionary:
+static func lint_free_slot_rules(beats_list: Array[Dictionary]) -> Dictionary:
 	var errs: PackedStringArray = []
 	var warns: PackedStringArray = []
 
+	# 1. 檢查 choice 槽不可收 protagonist（K-22）
 	for b in beats_list:
 		var bid: String = str(b.get("id", "?"))
-		var is_fixed: bool = bool(b.get("fixed", false))
-		var slots: Array = b.get("slots", []) as Array
-		if slots.is_empty():
-			continue
-
-		var has_choice := false
-		var has_protagonist_slot := false
-		var all_choice_slots := true
-
-		for s: Dictionary in slots:
+		for s: Dictionary in b.get("slots", []) as Array:
 			var cg: Variant = s.get("choice_group")
 			var is_choice := cg != null and not str(cg).is_empty()
 			var accepts: Array = s.get("accepts", []) as Array
-			var accepts_protag := accepts.has("protagonist")
+			if is_choice and accepts.has("protagonist"):
+				errs.append("%s [slot:%s]：choice 槽的 accepts 不得包含 protagonist" % [bid, str(s.get("id", "?"))])
 
-			if is_choice:
-				has_choice = true
-				# K-22: choice 槽不得接受 protagonist
-				if accepts_protag:
-					errs.append("%s [slot:%s]：choice 槽的 accepts 不得包含 protagonist" % [bid, str(s.get("id", "?"))])
+	# 2. 同面板規約（K-27）：以 (day, phase, location) 為單位檢查非 fixed 面板是否至少有一格收主角卡
+	var panels_map := {}
+	for b in beats_list:
+		var w: Variant = b.get("when")
+		if not w is Dictionary:
+			continue
+		var phase_str: String = str((w as Dictionary).get("phase", ""))
+		if not phase_str in ["morning", "afternoon"]:
+			continue
+		var day_num: int = int((w as Dictionary).get("day", -1))
+		var loc_id: String = str(b.get("location", ""))
+		if loc_id.is_empty():
+			continue
+
+		var pkey := "第 %d 天 %s・%s" % [day_num, phase_str, loc_id]
+		if not panels_map.has(pkey):
+			panels_map[pkey] = []
+		(panels_map[pkey] as Array).append(b)
+
+	for pkey: String in panels_map:
+		var pbeats: Array = panels_map[pkey] as Array
+		var all_fixed := true
+		var has_protag_slot := false
+		var beat_ids: PackedStringArray = []
+
+		for b: Dictionary in pbeats:
+			beat_ids.append(str(b.get("id", "?")))
+			if not bool(b.get("fixed", false)):
+				all_fixed = false
+			for s: Dictionary in b.get("slots", []) as Array:
+				var accepts: Array = s.get("accepts", []) as Array
+				if accepts.has("protagonist"):
+					has_protag_slot = true
+					break
+
+		if all_fixed:
+			continue
+
+		if not has_protag_slot:
+			var all_exempt := true
+			for bid in beat_ids:
+				if not DataFacts.BY_DESIGN_CHOICE_ONLY_BEATS.has(bid):
+					all_exempt = false
+					break
+			if all_exempt:
+				warns.append("%s (%s)：面板僅有免費槽（已列入 DataFacts 豁免名單）" % [", ".join(beat_ids), pkey])
 			else:
-				all_choice_slots = false
-
-			if accepts_protag:
-				has_protagonist_slot = true
-
-		# K-16 同面板規約：非 fixed beat 若全部都是 choice 槽且無主角卡槽
-		if has_choice and all_choice_slots and not is_fixed:
-			if DataFacts.BY_DESIGN_CHOICE_ONLY_BEATS.has(bid):
-				warns.append("%s：非 fixed beat 僅有 choice 槽（已列入 DataFacts 豁免名單）" % bid)
-			else:
-				errs.append("%s：非 fixed beat 僅有 choice 槽，違反 SCHEMA 同面板規約" % bid)
+				errs.append("%s (%s)：非 fixed 面板無任何主角卡槽，違反 SCHEMA 同面板規約" % [", ".join(beat_ids), pkey])
 
 	return { "errors": errs, "warnings": warns }
+
+
+static func lint_choice_rules(beats_list: Array[Dictionary]) -> Dictionary:
+	return lint_free_slot_rules(beats_list)
 
 
 ## lint 5：行動格覆蓋與地點時段支援檢查（規格書第十七節 lint 5、K-16）。

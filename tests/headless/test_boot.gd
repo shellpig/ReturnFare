@@ -126,5 +126,38 @@ func _test_main_scene_enters_normal_branch() -> int:
 	else:
 		failed += _ok("StatusLabel 是 _refresh_status() 寫的：「%s」" % status_label.text)
 
+	# 驗證 FlowText 節點在 main.tscn 存在 (K-28)
+	var flow_text: FlowText = main.get_node_or_null("ContentView/FlowText")
+	if flow_text == null:
+		failed += _fail("ContentView/FlowText 不存在")
+	else:
+		failed += _ok("ContentView/FlowText 存在")
+
+	# 驗證 Day 1 night fixed 演出 (n_corridor_ch1) 在 FlowText 顯示
+	var gs: Node = get_root().get_node("GameState")
+	gs.set("day", 1)
+	gs.set("phase", "night")
+	main.call("_route_view")
+	if not flow_text.visible or flow_text.get_lines().is_empty():
+		failed += _fail("Day 1 night fixed 文字未能寫入 FlowText")
+	else:
+		failed += _ok("Day 1 night fixed (n_corridor_ch1) 成功渲染進 FlowText")
+
+	# 驗證 Day 24 night fixed 演出 (d24_night_laozeng) 在 FlowText 顯示
+	gs.set("day", 24)
+	gs.set("phase", "night")
+	main.call("_route_view")
+	if not flow_text.visible or flow_text.get_lines().is_empty():
+		failed += _fail("Day 24 night fixed 文字未能寫入 FlowText")
+	else:
+		failed += _ok("Day 24 night fixed (d24_night_laozeng) 成功渲染進 FlowText")
+
+	# 驗證 run_ended 結局 stub 在 FlowText 顯示且保持可見
+	main.call("_on_run_ended", "ending_default")
+	if not flow_text.visible or not flow_text.get_text().contains("[結局 stub]"):
+		failed += _fail("結局 stub 未能寫入 FlowText")
+	else:
+		failed += _ok("結局 stub 成功寫入 FlowText 且保持可見")
+
 	main.queue_free()
 	return failed

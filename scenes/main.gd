@@ -1,6 +1,6 @@
 extends Control
 
-## 主場景。P1-F：白天/夜間地圖、晚間演出（fixed beats + 殘響）、夜間解析與結局迴圈。
+## 主場景。P1-F：白天/夜間地圖、晚間演出（fixed beats + 殘響）、夜間解析、結局迴圈與 FlowText 容器（K-28）。
 
 const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 
@@ -13,8 +13,9 @@ const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 @onready var _advance_btn: Button = $AdvanceButton
 @onready var _map_list: Node = $ContentView/MapList
 @onready var _location_panel: Node = $ContentView/LocationPanel
-@onready var _evening_label: Label = $ContentView/EveningLabel
-@onready var _night_label: Label = $ContentView/NightLabel
+@onready var _flow_text: FlowText = $ContentView/FlowText
+
+var _is_showing_ending := false
 
 
 func _ready() -> void:
@@ -38,6 +39,11 @@ func _ready() -> void:
 
 
 func _on_advance_pressed() -> void:
+	if _is_showing_ending:
+		_is_showing_ending = false
+		_route_view()
+		return
+
 	if GameState.phase == "night":
 		GameState.sleep_night()
 	GameState.advance_phase()
@@ -45,7 +51,8 @@ func _on_advance_pressed() -> void:
 
 func _on_phase_changed(_day: int, _phase: String) -> void:
 	_refresh_status()
-	_route_view()
+	if not _is_showing_ending:
+		_route_view()
 
 
 func _on_day_changed(_day: int) -> void:
@@ -57,7 +64,13 @@ func _on_chapter_changed(_chapter: int) -> void:
 
 
 func _on_run_ended(_ending_id: String) -> void:
-	_status_label.text += "\n" + _MSG_ENDING_STUB
+	_is_showing_ending = true
+	_flow_text.clear()
+	_flow_text.append_line(_MSG_ENDING_STUB)
+	_flow_text.visible = true
+	_map_list.visible = false
+	_location_panel.visible = false
+	_advance_btn.visible = true
 
 
 func _on_location_selected(loc_id: String) -> void:
@@ -78,36 +91,46 @@ func _refresh_status() -> void:
 
 
 func _route_view() -> void:
+	if _is_showing_ending:
+		_flow_text.visible = true
+		_map_list.visible = false
+		_location_panel.visible = false
+		_advance_btn.visible = true
+		return
+
 	var phase: String = GameState.phase
 	match phase:
 		"morning", "afternoon":
 			_map_list.visible = true
 			_location_panel.visible = false
-			_evening_label.visible = false
-			_night_label.visible = false
+			_flow_text.visible = false
 			_map_list.call("refresh")
 			_advance_btn.visible = true
 		"evening":
 			_map_list.visible = false
 			_location_panel.visible = false
-			_evening_label.visible = true
-			_night_label.visible = false
 			_play_evening()
+			_flow_text.visible = true
 			_advance_btn.visible = true
 		"night":
 			_map_list.visible = true
 			_location_panel.visible = false
-			_evening_label.visible = false
-			_night_label.visible = false
 			_play_night_fixed()
 			_map_list.call("refresh")
 			_advance_btn.visible = true
 
 
 func _play_evening() -> void:
+	_flow_text.clear()
 	var lines := GameState.play_evening()
-	_evening_label.text = "\n\n".join(lines)
+	_flow_text.append_lines(lines)
 
 
 func _play_night_fixed() -> void:
-	GameState.play_night_fixed()
+	_flow_text.clear()
+	var lines := GameState.play_night_fixed()
+	if lines.size() > 0:
+		_flow_text.append_lines(lines)
+		_flow_text.visible = true
+	else:
+		_flow_text.visible = false

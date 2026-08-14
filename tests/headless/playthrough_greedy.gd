@@ -1,6 +1,6 @@
 extends SceneTree
 
-## 45 天貪心走查測試腳本（P1-F 驗收）。
+## 45 天貪心走查測試腳本（P1-F 驗收、K-36 走查入口共用）。
 ## 策略：每個行動時段將主角卡放進第一個可放的 OPEN 槽，晚間結算，夜間直接睡。
 ## 走完 45 天結局 coda 並驗證回到第 1 天 morning。
 ## 跑法：
@@ -10,122 +10,31 @@ extends SceneTree
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
 const DataFacts := preload("res://scripts/core/data_facts.gd")
 
-var _run_ended_count := 0
-var _last_ending_id := ""
-
 
 func _initialize() -> void:
 	await process_frame
 
-	var data_node := _setup_data()
-	var gs := _setup_game_state(data_node)
+	var data_node := setup_data(self)
+	var gs := setup_game_state(self, data_node)
 
-	gs.run_ended.connect(_on_run_ended)
-
-	print("=== 開始 45 天貪心走查 ===")
-
-	var day_counter := 0
-	var actions_taken := 0
-	var illegal_phases := 0
-
-	var stats := {
-		"placed": 0,
-		"all_fixed": 0,
-		"condition_locked": 0,
-		"requires_locked": 0,
-		"slot_requires_locked": 0,
-		"empty_by_design": 0,
-		"choice_only_by_design": 0,
-		"compare_only": 0,
-		"illegal": 0,
-	}
-
-	# 走查第 1 天至第 45 天
-	for d in range(1, 46):
-		day_counter = d
-
-		# 1. Morning
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "morning", "時間同步錯誤 (morning)")
-		var res_m := _execute_action_phase(gs, data_node, d, "morning")
-		var cat_m: String = str(res_m.get("category", "illegal"))
-		if stats.has(cat_m):
-			stats[cat_m] += 1
-		else:
-			stats["illegal"] += 1
-		if not res_m.get("ok", false):
-			illegal_phases += 1
-		if res_m.get("placed", false):
-			actions_taken += 1
-		gs.advance_phase()
-
-		# 2. Afternoon
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "afternoon", "時間同步錯誤 (afternoon)")
-		var res_a := _execute_action_phase(gs, data_node, d, "afternoon")
-		var cat_a: String = str(res_a.get("category", "illegal"))
-		if stats.has(cat_a):
-			stats[cat_a] += 1
-		else:
-			stats["illegal"] += 1
-		if not res_a.get("ok", false):
-			illegal_phases += 1
-		if res_a.get("placed", false):
-			actions_taken += 1
-		gs.advance_phase()
-
-		# 印出單日早下午行動狀態（K-25 缺口 1）
-		print("  第 %2d 天 | morning: %-32s | afternoon: %-32s" % [
-			d,
-			str(res_m.get("summary", "")),
-			str(res_a.get("summary", ""))
-		])
-
-		# 3. Evening
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "evening", "時間同步錯誤 (evening)")
-		_execute_evening_phase(gs, data_node, d)
-		gs.advance_phase()
-
-		# 第 45 天 evening 推進後已自動呼叫 end_run()，不進第 45 夜
-		if d == 45:
-			break
-
-		# 4. Night
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "night", "時間同步錯誤 (night)")
-		_execute_night_phase(gs, data_node, d)
-		gs.advance_phase()
-
-	# ── 統計表輸出（K-25 缺口 1） ──
-	print("\n=== 45 天行動時段統計表（共 90 時段）===")
-	print("  成功放置主角卡:          %2d 格" % stats["placed"])
-	print("  全 fixed 敘事時段:       %2d 格" % stats["all_fixed"])
-	print("  條件分支未解鎖 (HIDDEN): %2d 格" % stats["condition_locked"])
-	print("  前置門檻未達成 (LOCKED): %2d 格 (beat: %d, slot: %d)" % [
-		stats["requires_locked"] + stats["slot_requires_locked"],
-		stats["requires_locked"],
-		stats["slot_requires_locked"]
-	])
-	print("  刻意留空時段 (名單內):     %2d 格" % stats["empty_by_design"])
-	print("  純選擇題時段 (豁免名單):   %2d 格" % stats["choice_only_by_design"])
-	print("  純比對槽時段:             %2d 格" % stats["compare_only"])
-	if stats["illegal"] > 0:
-		print("  異常/非法空時段:          %2d 格" % stats["illegal"])
-	print("=========================================\n")
+	var res := run_greedy_walk(gs, data_node, true)
 
 	# ── 驗收迴圈重置狀態 ──
 	print("=== 45 天走查完畢，驗收重置狀態 ===")
 
 	var failed := 0
 
-	if illegal_phases > 0:
-		push_error("FAIL: 存在 %d 個未放置且未列入合法原因之行動格 (K-25)" % illegal_phases)
+	if int(res.get("illegal_phases", 0)) > 0:
+		push_error("FAIL: 存在 %d 個未放置且未列入合法原因之行動格 (K-25)" % int(res.get("illegal_phases", 0)))
 		failed += 1
 	else:
 		print("  ok  全 90 個行動時段均已完成合法性分類與驗證 (K-25)")
 
-	if _run_ended_count != 1:
-		push_error("FAIL: run_ended 發射次數不為 1（實際為 %d）" % _run_ended_count)
+	if int(res.get("run_ended_count", 0)) != 1:
+		push_error("FAIL: run_ended 發射次數不為 1（實際為 %d）" % int(res.get("run_ended_count", 0)))
 		failed += 1
 	else:
-		print("  ok  run_ended 恰好發射 1 次 (ending_id: %s)" % _last_ending_id)
+		print("  ok  run_ended 恰好發射 1 次 (ending_id: %s)" % str(res.get("last_ending_id", "")))
 
 	if int(gs.get("day")) != 1 or str(gs.get("phase")) != "morning":
 		push_error("FAIL: 迴圈重置後時間不為第 1 天 morning (實際: 第 %d 天 %s)" % [int(gs.get("day")), str(gs.get("phase"))])
@@ -160,20 +69,127 @@ func _initialize() -> void:
 	else:
 		print("  ok  重置後 run 層狀態（flags, switches, relations, slots_placed, choices, beats_entered）全部清空")
 
-	if failed > 0:
+	if failed > 0 or not bool(res.get("ok", false)):
 		push_error("playthrough_greedy: %d assertion(s) failed" % failed)
 		quit(1)
 	else:
-		print("=== 45 天貪心走查測試全部通過 (總行動數: %d) ===" % actions_taken)
+		print("=== 45 天貪心走查測試全部通過 (總行動數: %d) ===" % int(res.get("actions_taken", 0)))
 		quit(0)
 
 
-func _on_run_ended(ending_id: String) -> void:
-	_run_ended_count += 1
-	_last_ending_id = ending_id
+## 執行 45 天貪心走查（K-36：供 test_p1f 與本腳本共用）
+static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) -> Dictionary:
+	var run_ended_box := [0]
+	var last_ending_box := [""]
+	var cb := func(eid: String):
+		run_ended_box[0] += 1
+		last_ending_box[0] = eid
+
+	gs.run_ended.connect(cb)
+
+	if verbose:
+		print("=== 開始 45 天貪心走查 ===")
+
+	var day_counter := 0
+	var actions_taken := 0
+	var illegal_phases := 0
+
+	var stats := {
+		"placed": 0,
+		"all_fixed": 0,
+		"condition_locked": 0,
+		"requires_locked": 0,
+		"slot_requires_locked": 0,
+		"empty_by_design": 0,
+		"choice_only_by_design": 0,
+		"compare_only": 0,
+		"illegal": 0,
+	}
+
+	for d in range(1, 46):
+		day_counter = d
+
+		# 1. Morning
+		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "morning", "時間同步錯誤 (morning)")
+		var res_m := execute_action_phase(gs, data_node, d, "morning")
+		var cat_m: String = str(res_m.get("category", "illegal"))
+		if stats.has(cat_m):
+			stats[cat_m] += 1
+		else:
+			stats["illegal"] += 1
+		if not res_m.get("ok", false):
+			illegal_phases += 1
+		if res_m.get("placed", false):
+			actions_taken += 1
+		gs.advance_phase()
+
+		# 2. Afternoon
+		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "afternoon", "時間同步錯誤 (afternoon)")
+		var res_a := execute_action_phase(gs, data_node, d, "afternoon")
+		var cat_a: String = str(res_a.get("category", "illegal"))
+		if stats.has(cat_a):
+			stats[cat_a] += 1
+		else:
+			stats["illegal"] += 1
+		if not res_a.get("ok", false):
+			illegal_phases += 1
+		if res_a.get("placed", false):
+			actions_taken += 1
+		gs.advance_phase()
+
+		if verbose:
+			print("  第 %2d 天 | morning: %-32s | afternoon: %-32s" % [
+				d,
+				str(res_m.get("summary", "")),
+				str(res_a.get("summary", ""))
+			])
+
+		# 3. Evening
+		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "evening", "時間同步錯誤 (evening)")
+		execute_evening_phase(gs, data_node, d)
+		gs.advance_phase()
+
+		# 第 45 天 evening 推進後已自動呼叫 end_run()，不進第 45 夜
+		if d == 45:
+			break
+
+		# 4. Night
+		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "night", "時間同步錯誤 (night)")
+		execute_night_phase(gs, data_node, d)
+		gs.advance_phase()
+
+	gs.run_ended.disconnect(cb)
+
+	if verbose:
+		print("\n=== 45 天行動時段統計表（共 90 時段）===")
+		print("  成功放置主角卡:          %2d 格" % stats["placed"])
+		print("  全 fixed 敘事時段:       %2d 格" % stats["all_fixed"])
+		print("  條件分支未解鎖 (HIDDEN): %2d 格" % stats["condition_locked"])
+		print("  前置門檻未達成 (LOCKED): %2d 格 (beat: %d, slot: %d)" % [
+			stats["requires_locked"] + stats["slot_requires_locked"],
+			stats["requires_locked"],
+			stats["slot_requires_locked"]
+		])
+		print("  刻意留空時段 (名單內):     %2d 格" % stats["empty_by_design"])
+		print("  純選擇題時段 (豁免名單):   %2d 格" % stats["choice_only_by_design"])
+		print("  純比對槽時段:             %2d 格" % stats["compare_only"])
+		if stats["illegal"] > 0:
+			print("  異常/非法空時段:          %2d 格" % stats["illegal"])
+		print("=========================================\n")
+
+	var is_walk_ok: bool = (illegal_phases == 0 and int(run_ended_box[0]) == 1 and int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning")
+
+	return {
+		"ok": is_walk_ok,
+		"actions_taken": actions_taken,
+		"illegal_phases": illegal_phases,
+		"stats": stats,
+		"run_ended_count": run_ended_box[0],
+		"last_ending_id": last_ending_box[0],
+	}
 
 
-func _execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -> Dictionary:
+static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -> Dictionary:
 	var locs := PanelBuilder.available_locations(gs, data_node)
 	var placed := false
 	var placed_info := ""
@@ -216,7 +232,7 @@ func _execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -
 		}
 
 	# 放不下主角卡時，進行合法性診斷與分類（K-25）
-	var diag := _diagnose_unplaced_phase(data_node, day, phase, gs)
+	var diag := diagnose_unplaced_phase(data_node, day, phase, gs)
 	var ok: bool = bool(diag.get("ok", false))
 	var cat: String = str(diag.get("category", "illegal"))
 	var detail: String = str(diag.get("detail", ""))
@@ -234,7 +250,7 @@ func _execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -
 
 
 ## 診斷未放卡時段的合法性（K-25：從資料推導全 fixed 時段、比對名單與條件/門檻限制）
-func _diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node) -> Dictionary:
+static func diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node) -> Dictionary:
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 	var beats: Array[Dictionary] = loader.beats_at(day, phase)
 
@@ -302,7 +318,7 @@ func _diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node
 	return { "ok": false, "category": "illegal", "detail": "異常：有 active beat 且有 OPEN 主角卡槽卻未能放置" }
 
 
-func _execute_evening_phase(gs: Node, _data_node: Node, day: int) -> void:
+static func execute_evening_phase(gs: Node, _data_node: Node, day: int) -> void:
 	# 統一走 GameState.play_evening() 結算 fixed beat 與殘響（K-26）
 	gs.play_evening()
 
@@ -312,7 +328,7 @@ func _execute_evening_phase(gs: Node, _data_node: Node, day: int) -> void:
 			gs.try_place("info_registry", "d45_then", "compare_registry")
 
 
-func _execute_night_phase(gs: Node, _data_node: Node, _day: int) -> void:
+static func execute_night_phase(gs: Node, _data_node: Node, _day: int) -> void:
 	# 統一走 GameState.play_night_fixed() 結算入夜 fixed beat（K-26）
 	gs.play_night_fixed()
 
@@ -320,22 +336,22 @@ func _execute_night_phase(gs: Node, _data_node: Node, _day: int) -> void:
 	gs.sleep_night()
 
 
-func _setup_data() -> Node:
-	var data_node: Node = get_root().get_node_or_null("Data")
+static func setup_data(tree: SceneTree) -> Node:
+	var data_node: Node = tree.get_root().get_node_or_null("Data")
 	if data_node == null:
 		data_node = load("res://scripts/autoload/data.gd").new()
 		data_node.name = "Data"
-		get_root().add_child(data_node)
+		tree.get_root().add_child(data_node)
 		Engine.register_singleton("Data", data_node)
 	return data_node
 
 
-func _setup_game_state(data_node: Node) -> Node:
-	var gs: Node = get_root().get_node_or_null("GameState")
+static func setup_game_state(tree: SceneTree, data_node: Node) -> Node:
+	var gs: Node = tree.get_root().get_node_or_null("GameState")
 	if gs == null:
 		gs = load("res://scripts/autoload/game_state.gd").new()
 		gs.name = "GameState"
 		gs.set("Data", data_node)
-		get_root().add_child(gs)
+		tree.get_root().add_child(gs)
 		Engine.register_singleton("GameState", gs)
 	return gs
