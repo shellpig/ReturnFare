@@ -1,6 +1,8 @@
 class_name DataLoader
 extends RefCounted
 
+const DataFacts := preload("res://scripts/core/data_facts.gd")
+
 ## 把 data/ 底下的 JSON 全部讀進來並建索引。
 ## 欄位定義見 data/SCHEMA.md——這裡不重複，只負責讀進來與檢查引用。
 ## data_dir 可選參數供壞資料 fixture 測試使用（全域結構決策的唯一豁免）。
@@ -208,6 +210,129 @@ static func lint_missing_reject_reason(beats_list: Array[Dictionary]) -> PackedS
 			if s.has("requires") and str(s.get("reject_reason", "")).is_empty():
 				warnings.append("%s [slot:%s]：有 requires 但沒有 reject_reason" % [bid, str(s.get("id", "?"))])
 	return warnings
+
+
+## lint 3：免費槽／選擇題同面板規約（SCHEMA規約、K-16、K-22）。
+## 回傳 Dictionary { "errors": PackedStringArray, "warnings": PackedStringArray }
+static func lint_choice_rules(beats_list: Array[Dictionary]) -> Dictionary:
+	var errs: PackedStringArray = []
+	var warns: PackedStringArray = []
+
+	for b in beats_list:
+		var bid: String = str(b.get("id", "?"))
+		var is_fixed: bool = bool(b.get("fixed", false))
+		var slots: Array = b.get("slots", []) as Array
+		if slots.is_empty():
+			continue
+
+		var has_choice := false
+		var has_protagonist_slot := false
+		var all_choice_slots := true
+
+		for s: Dictionary in slots:
+			var cg: Variant = s.get("choice_group")
+			var is_choice := cg != null and not str(cg).is_empty()
+			var accepts: Array = s.get("accepts", []) as Array
+			var accepts_protag := accepts.has("protagonist")
+
+			if is_choice:
+				has_choice = true
+				# K-22: choice 槽不得接受 protagonist
+				if accepts_protag:
+					errs.append("%s [slot:%s]：choice 槽的 accepts 不得包含 protagonist" % [bid, str(s.get("id", "?"))])
+			else:
+				all_choice_slots = false
+
+			if accepts_protag:
+				has_protagonist_slot = true
+
+		# K-16 同面板規約：非 fixed beat 若全部都是 choice 槽且無主角卡槽
+		if has_choice and all_choice_slots and not is_fixed:
+			if DataFacts.BY_DESIGN_CHOICE_ONLY_BEATS.has(bid):
+				warns.append("%s：非 fixed beat 僅有 choice 槽（已列入 DataFacts 豁免名單）" % bid)
+			else:
+				errs.append("%s：非 fixed beat 僅有 choice 槽，違反 SCHEMA 同面板規約" % bid)
+
+	return { "errors": errs, "warnings": warns }
+
+
+## lint 5：行動格覆蓋檢查（規格書第十七節 lint 5、K-16）。
+## 驗證每一天每個行動時段（morning / afternoon）皆有 beat（刻意留空者除外）。
+static func lint_action_phases(loader: DataLoader) -> PackedStringArray:
+	var errs: PackedStringArray = []
+	for d in range(1, 46):
+		for p in ["morning", "afternoon"]:
+			if DataFacts.is_empty_phase_by_design(d, p):
+				continue
+			var beats_in_phase := loader.beats_at(d, p)
+			if beats_in_phase.is_empty():
+				errs.append("第 %d 天 %s：沒有任何 beat" % [d, p])
+	return errs
+
+
+## lint 7：夜間可達性檢查（規格書第十七節 lint 7）。
+static func lint_night_reachability(loader: DataLoader) -> PackedStringArray:
+	var errs: PackedStringArray = []
+	for b in loader.beats:
+		var bid: String = str(b.get("id", "?"))
+		var loc_id: String = str(b.get("location", ""))
+		var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
+		var is_fixed: bool = bool(b.get("fixed", false))
+		var w: Variant = b.get("when")
+		var is_night := false
+
+		if w is Dictionary and str((w as Dictionary).get("phase", "")) == "night":
+			is_night = true
+			var night_day: int = int((w as Dictionary).get("day", -1))
+			var earliest: int = int(loc.get("earliest_night", 1))
+			if night_day < earliest:
+				errs.append("%s：定日夜 beat 日期（%d）早於地點 %s 的 earliest_night（%d）" % [
+					bid, night_day, loc_id, earliest
+				])
+
+		if is_night or b.has("chapter") or (not b.has("when") and str(loc.get("layer", "")) == "night"):
+			# 非 fixed 的夜間 beat 必須掛在 night layer 地點或旅館（sanquan）
+			if not is_fixed:
+				var layer: String = str(loc.get("layer", ""))
+				if layer != "night" and loc_id != "sanquan":
+					errs.append("%s：非 fixed 夜間 beat 掛在非夜間地點且非 sanquan（%s）" % [bid, loc_id])
+	return errs
+
+
+## lint 8：殘響可播出性（規格書第十七節 lint 8）。
+static func lint_echoes(beats_list: Array[Dictionary]) -> PackedStringArray:
+	var errs: PackedStringArray = []
+	var seen_echo_texts: Dictionary = {}
+
+	for b in beats_list:
+		var bid: String = str(b.get("id", "?"))
+		var echo_raw: Variant = b.get("echo")
+		if echo_raw == null:
+			continue
+		if not echo_raw is Dictionary:
+			errs.append("%s：echo 不是 Dictionary" % bid)
+			continue
+		var echo := echo_raw as Dictionary
+		if not echo.has("day") or not (echo["day"] is int or echo["day"] is float) or int(echo["day"]) <= 0:
+			errs.append("%s：echo 缺少有效的 day 欄位" % bid)
+			continue
+
+		var echo_day: int = int(echo["day"])
+		var w: Variant = b.get("when")
+		if w is Dictionary:
+			var beat_day: int = int((w as Dictionary).get("day", -1))
+			if beat_day > 0 and echo_day <= beat_day:
+				errs.append("%s：echo.day（%d）必須大於 beat.when.day（%d）" % [bid, echo_day, beat_day])
+
+		var text: String = str(echo.get("text", "")).strip_edges()
+		if text.is_empty():
+			errs.append("%s：echo.text 為空" % bid)
+		elif seen_echo_texts.has(text):
+			errs.append("%s：echo.text 與 %s 重複" % [bid, str(seen_echo_texts[text])])
+		else:
+			seen_echo_texts[text] = bid
+
+	return errs
 
 
 ## 某一天某個時段有哪些 beat（不解 condition，只挑時間對的）。

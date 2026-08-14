@@ -56,7 +56,7 @@ func chapter() -> int:
 func advance_phase() -> void:
 	var prev_ch := chapter()
 
-	# 第 45 天特殊路徑：afternoon → evening（結局 coda）→ run_ended，不進 night
+	# 第 45 天特殊路徑：afternoon → evening（結局 coda）→ end_run 回第 1 天 morning，不進 night
 	if day == LAST_DAY and phase == "afternoon":
 		phase = "evening"
 		action_spent = false
@@ -64,7 +64,7 @@ func advance_phase() -> void:
 		return
 
 	if day == LAST_DAY and phase == "evening":
-		run_ended.emit("stub")
+		end_run("ending_default")
 		return
 
 	# 一般推進
@@ -83,6 +83,76 @@ func advance_phase() -> void:
 	var new_ch := chapter()
 	if new_ch != prev_ch:
 		chapter_changed.emit(new_ch)
+
+
+## 輪結束結算與迴圈重置（規格書第十六節、P1-F、B-02）。
+## 順序固定：發射 run_ended -> meta 層保留 -> run 層重置 -> 回第 1 天 morning。
+func end_run(ending_id: String = "ending_default") -> void:
+	run_ended.emit(ending_id)
+
+	day = 1
+	phase = PHASES[0]
+	action_spent = false
+	hand.clear()
+	hand.append("protagonist")
+	flags.clear()
+	switches.clear()
+	switch_progress.clear()
+	relations.clear()
+	slots_placed.clear()
+	choices.clear()
+	beats_entered.clear()
+	npc_action_counts.clear()
+	madness_clock.clear()
+	_madness_counter = 0
+
+	day_changed.emit(day)
+	phase_changed.emit(day, phase)
+	chapter_changed.emit(chapter())
+	hand_changed.emit()
+
+
+## 直接睡＝解析旅館（sanquan）的當夜定日 beat（規格書第九節、P1-F）。
+func sleep_night() -> PackedStringArray:
+	var cur_day: int = day
+	for b in Data.loader.beats:
+		if str(b.get("location", "")) != "sanquan":
+			continue
+		var w: Variant = b.get("when")
+		if not w is Dictionary:
+			continue
+		var wd := w as Dictionary
+		if int(wd.get("day", -1)) != cur_day or str(wd.get("phase", "")) != "night":
+			continue
+		if bool(b.get("fixed", false)):
+			continue
+		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
+			return enter_beat(str(b.get("id", "")))
+	return PackedStringArray()
+
+
+## 檢查 beat 在當前天與時段是否屬於合法範圍（K-18）。
+func _is_beat_time_valid(beat: Dictionary) -> bool:
+	var cur_day: int = day
+	var cur_phase: String = phase
+	var cur_ch: int = chapter()
+	if cur_phase != "night":
+		var w: Variant = beat.get("when")
+		if not w is Dictionary:
+			return false
+		var wd := w as Dictionary
+		return int(wd.get("day", -1)) == cur_day and str(wd.get("phase", "")) == cur_phase
+	else:
+		# Night phase
+		var w: Variant = beat.get("when")
+		if w is Dictionary:
+			var wd := w as Dictionary
+			return int(wd.get("day", -1)) == cur_day and str(wd.get("phase", "")) == "night"
+		var ch: Variant = beat.get("chapter")
+		if ch != null:
+			return int(ch) <= cur_ch
+		# Additional night beat (no when, no chapter)
+		return true
 
 
 # ── 手牌操作 ────────────────────────────────────────────────────────────────
@@ -193,43 +263,32 @@ func enter_beat(beat_id: String) -> PackedStringArray:
 	return lines
 
 
-## 開啟地點面板的規則層入口（UI 與走查共用，規格書第四、五節）。
-## 依序：
-## 1. 找出該地點在當前 day 與 phase 符合條件的所有 beat
-## 2. 若 beat 判斷為 OPEN（condition 與 requires 皆成立），呼叫 enter_beat() 結算 on_enter 並記錄 beats_entered
-## 3. 在所有 on_enter 結算完成後，呼叫 PanelBuilder.build() 取得最新 view model 並回傳
+## 開啟地點面板的規則層入口（UI 與走查共用，規格書第四、五節，K-14）。
+## 統一委派 PanelBuilder.build() 計算 view model，並為所有 OPEN beat 結算 enter_beat()。
 func open_panel(location_id: String) -> Dictionary:
 	var loader: DataLoader = Data.loader
 	if loader == null:
 		return { "beats": [] }
 
-	var cur_day: int = day
-	var cur_phase: String = phase
 	var lines_by_beat: Dictionary = {}
-
-	# 連鎖結算：處理可能由前面 on_enter 觸發後續 beat 變 OPEN 的情況
 	var changed := true
+	var view: Dictionary = {}
+
+	# 連鎖結算：若前面 on_enter 觸發同面板後續 beat 變 OPEN，重新 build 直到穩定
 	while changed:
 		changed = false
-		for b in loader.beats:
-			if str(b.get("location", "")) != location_id:
-				continue
-			if not b.has("when"):
-				continue
-			var w: Dictionary = b.get("when", {}) as Dictionary
-			if int(w.get("day", -1)) != cur_day or str(w.get("phase", "")) != cur_phase:
-				continue
-			var beat_id: String = str(b.get("id", ""))
-			if beats_entered.has(beat_id):
-				continue
-			if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-				var res_lines := enter_beat(beat_id)
-				lines_by_beat[beat_id] = res_lines
-				changed = true
-				break
+		view = PanelBuilder.build(location_id, self, Data)
+		for bv: Dictionary in view.get("beats", []) as Array:
+			var bid: String = str(bv["beat"].get("id", ""))
+			if int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
+				if not beats_entered.has(bid):
+					var res_lines := enter_beat(bid)
+					lines_by_beat[bid] = res_lines
+					changed = true
+					break
 
-	var view: Dictionary = PanelBuilder.build(location_id, self, Data)
-	for bv: Dictionary in view.get("beats", []):
+	view = PanelBuilder.build(location_id, self, Data)
+	for bv: Dictionary in view.get("beats", []) as Array:
 		var bid: String = str(bv["beat"].get("id", ""))
 		if lines_by_beat.has(bid):
 			bv["lines"] = lines_by_beat[bid]
@@ -353,6 +412,10 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 	if beat.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_BEAT, "reason_text": "", "lines": PackedStringArray() }
 
+	# K-18: 檢查當前時間合法性
+	if not _is_beat_time_valid(beat):
+		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "", "lines": PackedStringArray() }
+
 	var slot: Dictionary = {}
 	for s: Dictionary in beat.get("slots", []) as Array:
 		if str(s.get("id", "")) == slot_id and str(s.get("choice_group", "")) == group_id:
@@ -403,6 +466,10 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 ## 任一步不過 → { ok=false, reason_code, reason_text, lines=[] }，GameState 零變化。
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
 func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
+	# K-17: 空卡 id 走 try_place 直接擋下，不轉導 choose
+	if card_id.is_empty():
+		return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "", "lines": PackedStringArray() }
+
 	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
 	if beat.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_BEAT, "reason_text": "", "lines": PackedStringArray() }
@@ -414,6 +481,10 @@ func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
 			break
 	if slot.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_SLOT, "reason_text": "", "lines": PackedStringArray() }
+
+	# K-18: 檢查當前時間合法性
+	if not _is_beat_time_valid(beat):
+		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "", "lines": PackedStringArray() }
 
 	var choice_group: Variant = slot.get("choice_group")
 	if choice_group != null and not str(choice_group).is_empty():

@@ -45,6 +45,6 @@ static func apply(effect: Variant, gs: Node) -> PackedStringArray:
 	if e.has("flag"):
 		var f: Dictionary = e["flag"] as Dictionary
 		for flag_name: String in f.keys():
-			gs.call("set_flag", flag_name, bool(f[flag_name]))
+			gs.call("set_flag", flag_name, true if f[flag_name] else false)
 
 	return lines

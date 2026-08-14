@@ -216,10 +216,11 @@ func _test_advance_day45() -> int:
 		failed += _ok("day45 evening advance: run_ended emitted")
 
 	var phase_final: String = gs.get("phase")
-	if phase_final != "evening":
-		failed += _fail("day45 after run_ended: phase changed to %s (should stay evening)" % phase_final)
+	var day_final: int = int(gs.get("day"))
+	if phase_final != "morning" or day_final != 1:
+		failed += _fail("day45 after run_ended: state should reset to Day 1 morning, got Day %d %s" % [day_final, phase_final])
 	else:
-		failed += _ok("day45 after run_ended: phase stays evening (no night)")
+		failed += _ok("day45 after run_ended: resets to Day 1 morning (P1-F B-02)")
 
 	(gs as Node).queue_free()
 	return failed

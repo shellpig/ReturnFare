@@ -113,22 +113,19 @@ func _rebuild() -> void:
 
 			if stri == PanelBuilder.TriState.OPEN:
 				var slot_id: String = str(slot.get("id", ""))
-				var choice_group: Variant = slot.get("choice_group")
-				var is_choice := choice_group != null and not str(choice_group).is_empty()
+				var is_choice: bool = bool(slot_view.get("is_choice", false))
 
 				if is_choice:
+					var choice_group: String = str(slot.get("choice_group", ""))
 					var choose_btn := Button.new()
 					choose_btn.text = _FMT_CHOOSE_BUTTON % label_text
-					choose_btn.pressed.connect(_on_choose_pressed.bind(beat_id, str(choice_group), slot_id, ""))
+					choose_btn.pressed.connect(_on_choose_pressed.bind(beat_id, choice_group, slot_id, ""))
 					_beat_container.add_child(choose_btn)
 
 				for card_id in GameState.placeable_cards(beat_id, slot_id):
 					var place_btn := Button.new()
 					place_btn.text = _FMT_PLACE_BUTTON % _card_display_name(card_id)
-					if is_choice:
-						place_btn.pressed.connect(_on_choose_pressed.bind(beat_id, str(choice_group), slot_id, card_id))
-					else:
-						place_btn.pressed.connect(_on_place_pressed.bind(beat_id, slot_id, card_id))
+					place_btn.pressed.connect(_on_place_pressed.bind(beat_id, slot_id, card_id))
 					_beat_container.add_child(place_btn)
 
 		_beat_container.add_child(HSeparator.new())

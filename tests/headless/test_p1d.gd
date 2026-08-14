@@ -375,6 +375,7 @@ func _test_attention_npc(gs: Node, data_node: Node) -> int:
 	var loader: DataLoader = real_data.get("loader") as DataLoader
 	loader.beats_by_id["p1d_synthetic_attn_day"] = {
 		"id": "p1d_synthetic_attn_day",
+		"when": { "day": 5, "phase": "morning" },
 		"slots": [
 			{ "id": "s1", "accepts": ["protagonist"], "attention_npc": "npc_synth_test",
 			  "on_place": { "text": "test" } },

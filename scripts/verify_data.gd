@@ -4,6 +4,8 @@ extends SceneTree
 ##   Godot_v4.6.3-stable_win64_console.exe --headless --script res://scripts/verify_data.gd
 ## 有問題回傳 exit code 1。
 
+const DataFacts := preload("res://scripts/core/data_facts.gd")
+
 func _initialize() -> void:
 	var loader := DataLoader.new()
 	var ok := loader.load_all()
@@ -52,17 +54,10 @@ func _initialize() -> void:
 	])
 
 	# 45 天每一格都要有東西——這是第一輪資料完整的最低標準。
-	# 三格是刻意留空的：第 1 天是搭車上山（只有傍晚與夜），
-	# 第 32 天下午整個被慶典的連續選項鏈吃掉。
-	var by_design := {
-		"1|morning": true,
-		"1|afternoon": true,
-		"32|afternoon": true,
-	}
 	var empty: PackedStringArray = []
 	for day in range(1, 46):
 		for phase in ["morning", "afternoon"]:
-			if loader.beats_at(day, phase).is_empty() and not by_design.has("%d|%s" % [day, phase]):
+			if loader.beats_at(day, phase).is_empty() and not DataFacts.is_empty_phase_by_design(day, phase):
 				empty.append("第 %d 天 %s" % [day, phase])
 
 	if empty.size() > 0:
@@ -72,6 +67,68 @@ func _initialize() -> void:
 		quit(1)
 		return
 	print("行動格覆蓋　第 1-45 天全滿（3 格刻意留空）")
+
+	# Lint 1: 語彙封閉性
+	var vocab_errs := DataLoader.lint_vocabulary(loader.beats)
+	if vocab_errs.size() > 0:
+		print("\n語彙封閉性錯誤 %d 筆：" % vocab_errs.size())
+		for e in vocab_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("語彙封閉性 (Lint 1)　0 錯誤")
+
+	# Lint 2: reject_reason 完整性（warnings）
+	var missing_reason_warns := DataLoader.lint_missing_reject_reason(loader.beats)
+	if missing_reason_warns.size() > 0:
+		print("reject_reason 警告 %d 筆" % missing_reason_warns.size())
+	else:
+		print("reject_reason 完整性 (Lint 2)　0 警告")
+
+	# Lint 3: 選擇題 / 免費槽同面板規約 (K-16, K-22)
+	var choice_res := DataLoader.lint_choice_rules(loader.beats)
+	var choice_errs: PackedStringArray = choice_res.get("errors", PackedStringArray())
+	var choice_warns: PackedStringArray = choice_res.get("warnings", PackedStringArray())
+	if choice_errs.size() > 0:
+		print("\n選擇題規約錯誤 %d 筆：" % choice_errs.size())
+		for e in choice_errs:
+			print("  " + e)
+		quit(1)
+		return
+	if choice_warns.size() > 0:
+		print("選擇題規約 (Lint 3)　0 錯誤（%d 筆已豁免警告）" % choice_warns.size())
+	else:
+		print("選擇題規約 (Lint 3)　0 錯誤")
+
+	# Lint 5: 行動格供需檢查
+	var action_errs := DataLoader.lint_action_phases(loader)
+	if action_errs.size() > 0:
+		print("\n行動格供需錯誤 %d 筆：" % action_errs.size())
+		for e in action_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("行動格供需 (Lint 5)　0 錯誤")
+
+	# Lint 7: 夜間可達性
+	var night_errs := DataLoader.lint_night_reachability(loader)
+	if night_errs.size() > 0:
+		print("\n夜間可達性錯誤 %d 筆：" % night_errs.size())
+		for e in night_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("夜間可達性 (Lint 7)　0 錯誤")
+
+	# Lint 8: 殘響可播出性
+	var echo_errs := DataLoader.lint_echoes(loader.beats)
+	if echo_errs.size() > 0:
+		print("\n殘響可播出性錯誤 %d 筆：" % echo_errs.size())
+		for e in echo_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("殘響可播出性 (Lint 8)　0 錯誤")
 
 	print("\ntuning：手牌 %d／發狂上限 %d／倒數 %d 天／視野門檻 %d" % [
 		loader.tuning.get("hand_size", -1),
