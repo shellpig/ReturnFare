@@ -1,5 +1,9 @@
 /_舊文件/
 
+# UI 模擬驗證的暫存產物（狀態 JSON、UI dump、截圖、log、報告）
+# 契約見 開發設計方針.md > UI 模擬驗證 > 產物分工
+/_qa/
+
 # Godot
 /.godot/
 /android/
