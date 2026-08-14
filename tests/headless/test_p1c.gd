@@ -181,21 +181,21 @@ func _test_condition_eval(gs: Node) -> int:
 	return failed
 
 
-# ── enter_beat：第 1 天到站事件（on_enter 冪等）──────────────────────────────
+# ── play_beat：第 1 天到站事件（on_enter 冪等）───────────────────────────────
 
 func _test_enter_beat_d1_arrival(gs: Node) -> int:
-	print("--- enter_beat d1_arrival ---")
+	print("--- play_beat d1_arrival ---")
 	_reset(gs)
 	gs.set("day", 1)
 	gs.set("phase", "evening")
 	var failed := 0
 
-	var lines: PackedStringArray = gs.call("enter_beat", "d1_arrival")
+	var lines: PackedStringArray = gs.call("play_beat", "d1_arrival")
 
 	if lines.is_empty():
-		failed += _fail("enter_beat d1_arrival: returned no text lines")
+		failed += _fail("play_beat d1_arrival: returned no text lines")
 	else:
-		failed += _ok("enter_beat d1_arrival: returned %d text line(s)" % lines.size())
+		failed += _ok("play_beat d1_arrival: returned %d text line(s)" % lines.size())
 
 	if not (gs.get("beats_entered") as Dictionary).has("d1_arrival"):
 		failed += _fail("beats_entered should contain d1_arrival")
@@ -209,10 +209,10 @@ func _test_enter_beat_d1_arrival(gs: Node) -> int:
 
 	# 第二次呼叫：on_enter 不重複，手牌不增
 	var size_before: int = (gs.get("hand") as Array).size()
-	gs.call("enter_beat", "d1_arrival")
+	gs.call("play_beat", "d1_arrival")
 	var size_after: int = (gs.get("hand") as Array).size()
 	if size_after != size_before:
-		failed += _fail("enter_beat d1_arrival second call: on_enter re-ran (expected idempotent)")
+		failed += _fail("play_beat d1_arrival second call: on_enter re-ran (expected idempotent)")
 	else:
 		failed += _ok("enter_beat d1_arrival second call: on_enter idempotent")
 

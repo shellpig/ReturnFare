@@ -194,13 +194,27 @@ static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: Str
 	var placed := false
 	var placed_info := ""
 
-	# 先打開所有可用地點（結算 fixed beat 之 on_enter）
-	for loc_id in locs:
-		gs.open_panel(loc_id)
+	# 依地點順序演出所有成立 beat；UI 與走查共用 play_beat()。
+	# 每演出一個重新求值，讓 on_enter 解鎖的後續 beat 也能進佇列。
+	var played_beats: Dictionary = {}
+	var changed := true
+	while changed:
+		changed = false
+		for loc_id in locs:
+			var play_view: Dictionary = gs.build_panel(loc_id)
+			for play_bv: Dictionary in play_view.get("beats", []) as Array:
+				if int(play_bv.get("tri", -1)) != PanelBuilder.TriState.OPEN:
+					continue
+				var play_bid := str((play_bv["beat"] as Dictionary).get("id", ""))
+				if played_beats.has(play_bid):
+					continue
+				gs.play_beat(play_bid)
+				played_beats[play_bid] = true
+				changed = true
 
 	# 貪心尋找第一個可放主角卡的 OPEN 槽
 	for loc_id in locs:
-		var view: Dictionary = PanelBuilder.build(loc_id, gs, data_node)
+		var view: Dictionary = gs.build_panel(loc_id)
 		for bv: Dictionary in view.get("beats", []) as Array:
 			var bid: String = str(bv["beat"].get("id", ""))
 			if int(bv.get("tri", -1)) != PanelBuilder.TriState.OPEN:

@@ -8,4 +8,15 @@ script = ExtResource("1_loc_panel")
 [node name="BackButton" type="Button" parent="."]
 text = "← 返回"
 
+[node name="AdvanceBeatButton" type="Button" parent="."]
+visible = false
+text = "繼續演出"
+
+[node name="LocationTitle" type="Label" parent="."]
+text = "地點"
+
+[node name="DescriptionLabel" type="Label" parent="."]
+visible = false
+autowrap_mode = 2
+
 [node name="BeatContainer" type="VBoxContainer" parent="."]

@@ -58,7 +58,7 @@ static func available_locations(gs: Node, data: Node) -> Array[String]:
 static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 	var loader: DataLoader = data.get("loader") as DataLoader
 	if loader == null:
-		return { "beats": [] }
+		return { "location": {}, "beats": [] }
 
 	var current_day: int = int(gs.get("day"))
 	var current_phase: String = str(gs.get("phase"))
@@ -83,6 +83,7 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 		if madness_cost > 0:
 			# 收費地點在 P1 呈灰鎖定附 stub 理由
 			return {
+				"location": loc,
 				"beats": [
 					{
 						"beat": {
@@ -186,6 +187,7 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 					"tri": slot_tri,
 					"reason": slot_reason,
 					"is_choice": is_choice, # K-19
+					"accept_types": _accept_types(s, loader, data),
 				})
 
 		# beat 級 requires 語意相同：成立前整個 beat 呈灰卡狀態＋理由，內部槽不可互動
@@ -204,4 +206,27 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 			"slots": slots_result,
 		})
 
-	return { "beats": beats_result }
+	return {
+		"location": loader.locations.get(location_id, {}),
+		"beats": beats_result,
+	}
+
+
+## 把槽的 accepts 換成去重、保序的顯示型別名稱。
+## 具體卡 id 只反查 type，絕不把卡名暴露在槽標籤上。
+static func _accept_types(slot: Dictionary, loader: DataLoader, data: Node) -> PackedStringArray:
+	var result := PackedStringArray()
+	var seen: Dictionary = {}
+	for accepted: Variant in slot.get("accepts", []) as Array:
+		var accepted_id := str(accepted)
+		var type_id := accepted_id
+		if loader.cards.has(accepted_id):
+			type_id = str((loader.cards[accepted_id] as Dictionary).get("type", ""))
+		if type_id.is_empty() or seen.has(type_id):
+			continue
+		seen[type_id] = true
+		var display_name := str(data.call("card_type_name", type_id))
+		if display_name.is_empty():
+			display_name = type_id
+		result.append(display_name)
+	return result

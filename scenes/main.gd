@@ -6,6 +6,8 @@ const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 
 const _MSG_DATA_ERROR := "資料載入失敗，詳情見 Output。"
 const _MSG_ENDING_STUB := "[結局 stub]"
+const _MSG_ADVANCE := "推進時段"
+const _MSG_ADVANCE_HINT := "推進時段（目前無可放卡）"
 const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 
 @onready var _error_label: Label = $ErrorLabel
@@ -33,6 +35,7 @@ func _ready() -> void:
 
 	_map_list.location_selected.connect(_on_location_selected)
 	_location_panel.closed.connect(_on_panel_closed)
+	_location_panel.state_changed.connect(_on_location_panel_state_changed)
 
 	_refresh_status()
 	_route_view()
@@ -77,18 +80,35 @@ func _on_location_selected(loc_id: String) -> void:
 	_flow_text.visible = false
 	_map_list.visible = false
 	_location_panel.visible = true
+	_advance_btn.disabled = true
 	_location_panel.call("show_location", loc_id)
 
 
 func _on_panel_closed() -> void:
 	_location_panel.visible = false
+	_advance_btn.disabled = false
 	_route_view()
+
+
+func _on_location_panel_state_changed() -> void:
+	_refresh_advance_hint()
 
 
 func _refresh_status() -> void:
 	_status_label.text = _FMT_STATUS % [
 		GameState.day, GameState.phase, GameState.chapter()
 	]
+	_refresh_advance_hint()
+
+
+func _refresh_advance_hint() -> void:
+	if GameState.phase == "morning" or GameState.phase == "afternoon":
+		var has_placement: bool = GameState.has_any_legal_placement()
+		_advance_btn.text = _MSG_ADVANCE if has_placement else _MSG_ADVANCE_HINT
+		_advance_btn.modulate = Color.WHITE if has_placement else Color(1.0, 0.82, 0.4)
+	else:
+		_advance_btn.text = _MSG_ADVANCE
+		_advance_btn.modulate = Color.WHITE
 
 
 func _route_view() -> void:

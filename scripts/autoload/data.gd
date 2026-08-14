@@ -46,6 +46,13 @@ func load_data(data_dir: String = "res://data/") -> bool:
 			push_error("[Data] " + e)
 		return false
 
+	# lint 9：卡片 type 與顯示型別定義封閉。
+	var card_type_problems := DataLoader.lint_card_types(loader)
+	if not card_type_problems.is_empty():
+		for e in card_type_problems:
+			push_error("[Data] " + e)
+		return false
+
 	# lint 2：有 requires 卻沒填 reject_reason，只警告不擋開機。
 	for w in DataLoader.lint_missing_reject_reason(loader.beats):
 		push_warning("[Data] " + w)
@@ -98,3 +105,12 @@ func tuning(key: String, fallback: Variant = null) -> Variant:
 		else:
 			return fallback
 	return node
+
+
+## 卡槽顯示型別查詢。缺少定義時退回 type id，讓 UI 仍可顯示而不崩潰；
+## 正式資料由 lint 9 保證每個已使用型別都有定義。
+func card_type_name(type_id: String) -> String:
+	if loader == null:
+		return type_id
+	var card_type: Dictionary = loader.card_types.get(type_id, {}) as Dictionary
+	return str(card_type.get("name", type_id))

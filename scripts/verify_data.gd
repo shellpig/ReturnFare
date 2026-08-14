@@ -63,6 +63,16 @@ func _initialize() -> void:
 		return
 	print("語彙封閉性 (Lint 1)　0 錯誤")
 
+	# Lint 9：卡片 type 與 card_types.json 顯示型別封閉性。
+	var card_type_errs := DataLoader.lint_card_types(loader)
+	if card_type_errs.size() > 0:
+		print("\n卡片型別封閉性錯誤 %d 筆：" % card_type_errs.size())
+		for e in card_type_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("卡片型別封閉性 (Lint 9)　0 錯誤")
+
 	# Lint 2: reject_reason 完整性（warnings）
 	var missing_reason_warns := DataLoader.lint_missing_reject_reason(loader.beats)
 	if missing_reason_warns.size() > 0:

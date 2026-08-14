@@ -114,7 +114,7 @@ func end_run(ending_id: String = "ending_default") -> void:
 
 ## 晚間演出規則層唯一入口（UI、走查腳本、測試共用，規格書第十一節、K-26）。
 ## 依序：
-## 1. 依陣列順序結算當日 evening fixed beat 之 enter_beat()
+## 1. 依陣列順序結算當日 evening fixed beat 之 play_beat()
 ## 2. 掃描當日成立之殘響（echo.day == day）並收集文字
 ## 回傳全部要播放的文字行（PackedStringArray）。
 func play_evening() -> PackedStringArray:
@@ -129,7 +129,7 @@ func play_evening() -> PackedStringArray:
 		if not b.get("fixed", false):
 			continue
 		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-			var beat_lines := enter_beat(str(b.get("id", "")))
+			var beat_lines := play_beat(str(b.get("id", "")))
 			lines.append_array(beat_lines)
 
 	# 2. 當日殘響
@@ -159,7 +159,7 @@ func play_night_fixed() -> PackedStringArray:
 		if not b.get("fixed", false):
 			continue
 		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-			var beat_lines := enter_beat(str(b.get("id", "")))
+			var beat_lines := play_beat(str(b.get("id", "")))
 			lines.append_array(beat_lines)
 
 	return lines
@@ -180,7 +180,7 @@ func sleep_night() -> PackedStringArray:
 		if bool(b.get("fixed", false)):
 			continue
 		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-			return enter_beat(str(b.get("id", "")))
+			return play_beat(str(b.get("id", "")))
 	return PackedStringArray()
 
 
@@ -289,14 +289,14 @@ func hand_slots_used() -> int:
 
 # ── Beat 呈現 ───────────────────────────────────────────────────────────────
 
-## Beat 呈現的唯一入口（規格書第四節）。
+## Beat 演出的規則層入口（P1-G）。
 ## 一次性判定：beats_entered 記錄是否第一次。
 ## on_enter 效果走正式 EffectApply（規格書第十四節）。
 ## 回傳要播的文字行（PackedStringArray）。
-func enter_beat(beat_id: String) -> PackedStringArray:
+func play_beat(beat_id: String) -> PackedStringArray:
 	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
 	if beat.is_empty():
-		push_error("enter_beat: unknown beat id '%s'" % beat_id)
+		push_error("play_beat: unknown beat id '%s'" % beat_id)
 		return PackedStringArray()
 
 	var is_first := not beats_entered.has(beat_id)
@@ -316,41 +316,42 @@ func enter_beat(beat_id: String) -> PackedStringArray:
 	return lines
 
 
-## 開啟地點面板的規則層入口（UI 與走查共用，規格書第四、五節，K-14）。
-## 統一委派 PanelBuilder.build() 計算 view model，並為所有 OPEN beat 結算 enter_beat()。
-func open_panel(location_id: String) -> Dictionary:
-	var loader: DataLoader = Data.loader
-	if loader == null:
-		return { "beats": [] }
+## 面板求值的規則層入口（P1-G）。純計算，不結算 on_enter、不改 GameState。
+func build_panel(location_id: String) -> Dictionary:
+	return PanelBuilder.build(location_id, self, Data)
 
-	var lines_by_beat: Dictionary = {}
-	var changed := true
-	var view: Dictionary = {}
 
-	# 連鎖結算：若前面 on_enter 觸發同面板後續 beat 變 OPEN，重新 build 直到穩定
-	while changed:
-		changed = false
-		view = PanelBuilder.build(location_id, self, Data)
-		for bv: Dictionary in view.get("beats", []) as Array:
-			var bid: String = str(bv["beat"].get("id", ""))
-			if int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
-				if not beats_entered.has(bid):
-					var res_lines := enter_beat(bid)
-					lines_by_beat[bid] = res_lines
-					changed = true
-					break
+## 右鍵預覽的規則層入口（P1-G）。純查詢，不結算任何效果。
+## 回傳 { "cards": Array[String], "reason": String }。
+func preview_slot(beat_id: String, slot_id: String) -> Dictionary:
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
+	if beat.is_empty():
+		return { "cards": [], "reason": _REASON_UNKNOWN_BEAT }
+	var slot: Dictionary = _find_slot(beat, slot_id)
+	if slot.is_empty():
+		return { "cards": [], "reason": _REASON_UNKNOWN_SLOT }
 
-	view = PanelBuilder.build(location_id, self, Data)
-	for bv: Dictionary in view.get("beats", []) as Array:
-		var bid: String = str(bv["beat"].get("id", ""))
-		if lines_by_beat.has(bid):
-			bv["lines"] = lines_by_beat[bid]
-		elif int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
-			bv["lines"] = enter_beat(bid)
-		else:
-			bv["lines"] = PackedStringArray()
+	var state_result := _check_slot_state(beat, slot)
+	if not state_result.get("ok", false):
+		return {
+			"cards": [],
+			"reason": _result_reason(state_result),
+		}
 
-	return view
+	var cards_result := placeable_cards(beat_id, slot_id)
+	if not cards_result.is_empty():
+		return { "cards": cards_result, "reason": "" }
+
+	# OPEN 槽沒有可用卡時仍維持唯讀空清單；若是 action_spent 等狀態，
+	# 用同一個規則檢查取得理由，避免預覽與實放分岔。
+	var candidates := _held_cards()
+	for card_id: String in candidates:
+		var check_result := _check_place(card_id, beat, slot)
+		if not check_result.get("ok", false):
+			var reason := _result_reason(check_result)
+			if not reason.is_empty() and reason != _REASON_NOT_HELD:
+				return { "cards": [], "reason": reason }
+	return { "cards": [], "reason": "" }
 
 
 # ── 放置與效果結算（P1-D）───────────────────────────────────────────────────
@@ -396,56 +397,113 @@ func consume_action() -> void:
 	action_spent = true
 
 
+func _find_slot(beat: Dictionary, slot_id: String) -> Dictionary:
+	for slot: Dictionary in beat.get("slots", []) as Array:
+		if str(slot.get("id", "")) == slot_id:
+			return slot
+	return {}
+
+
+func _held_cards() -> Array[String]:
+	var result: Array[String] = []
+	for card_id: String in hand:
+		result.append(card_id)
+	for knowledge_id: Variant in (knowledge as Dictionary).keys():
+		result.append(str(knowledge_id))
+	return result
+
+
+## 只檢查槽當前三態與時間，不檢查傳入卡片。
+## _check_place() 與 preview_slot() 共用這段，確保灰槽理由一致。
+func _check_slot_state(beat: Dictionary, slot: Dictionary) -> Dictionary:
+	var beat_id := str(beat.get("id", ""))
+	var slot_id := str(slot.get("id", ""))
+	if not _is_beat_time_valid(beat):
+		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "" }
+	if not ConditionEval.eval(beat.get("condition"), self):
+		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "" }
+	if not ConditionEval.eval(beat.get("requires"), self):
+		return {
+			"ok": false,
+			"reason_code": _REASON_LOCKED,
+			"reason_text": str(beat.get("reject_reason", _REASON_LOCKED_FALLBACK)),
+		}
+	if not ConditionEval.eval(slot.get("condition"), self):
+		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "" }
+	var slot_key := beat_id + "::" + slot_id
+	if slots_placed.has(slot_key):
+		return { "ok": false, "reason_code": _REASON_RESOLVED, "reason_text": "" }
+	var choice_group: String = str(slot.get("choice_group", ""))
+	if not choice_group.is_empty() and choices.has(beat_id + "::" + choice_group):
+		return { "ok": false, "reason_code": _REASON_RESOLVED, "reason_text": "" }
+	if not ConditionEval.eval(slot.get("requires"), self):
+		return {
+			"ok": false,
+			"reason_code": _REASON_LOCKED,
+			"reason_text": str(slot.get("reject_reason", _REASON_LOCKED_FALLBACK)),
+		}
+	return { "ok": true, "reason_code": "", "reason_text": "" }
+
+
+## 放置前共用判斷。try_place() 與 preview_slot() 必須走同一條規則。
+func _check_place(card_id: String, beat: Dictionary, slot: Dictionary) -> Dictionary:
+	if card_id.is_empty() or not has_card(card_id):
+		return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "" }
+	var state_result := _check_slot_state(beat, slot)
+	if not state_result.get("ok", false):
+		return state_result
+
+	var base_id := _card_base_id(card_id)
+	var card: Dictionary = Data.loader.cards.get(base_id, {})
+	var accepts: Array = slot.get("accepts", []) as Array
+	var card_type := str(card.get("type", ""))
+	if not (accepts.has(base_id) or accepts.has(card_type)):
+		return { "ok": false, "reason_code": _REASON_NOT_ACCEPTED, "reason_text": "" }
+
+	var is_protagonist := card_type == "protagonist"
+	if is_protagonist and ACTION_PHASES.has(phase) and action_spent:
+		return { "ok": false, "reason_code": _REASON_ACTION_SPENT, "reason_text": "" }
+	return { "ok": true, "reason_code": "", "reason_text": "" }
+
+
+func _result_reason(result: Dictionary) -> String:
+	var reason_text := str(result.get("reason_text", ""))
+	if not reason_text.is_empty():
+		return reason_text
+	return str(result.get("reason_code", ""))
+
+
+## 當前時段是否仍有任一張卡能合法放置。純查詢，不推進時段。
+func has_any_legal_placement() -> bool:
+	var locations := PanelBuilder.available_locations(self, Data)
+	for location_id: String in locations:
+		var view := build_panel(location_id)
+		for beat_view: Dictionary in view.get("beats", []) as Array:
+			if int(beat_view.get("tri", -1)) != PanelBuilder.TriState.OPEN:
+				continue
+			var beat_id := str((beat_view["beat"] as Dictionary).get("id", ""))
+			for slot_view: Dictionary in beat_view.get("slots", []) as Array:
+				if int(slot_view.get("tri", -1)) != PanelBuilder.TriState.OPEN:
+					continue
+				var slot_id := str((slot_view["slot"] as Dictionary).get("id", ""))
+				if not placeable_cards(beat_id, slot_id).is_empty():
+					return true
+	return false
+
+
 ## 取得某個槽當前可放置的手牌或知識卡 id 列表（UI 專用查詢，規則層統一計算）。
-## 沿用 try_place() 的第①③④步判斷（持有、accepts、action_spent）。
+## 與 try_place() 共用 _check_place()，不在 UI 重複判斷。
 func placeable_cards(beat_id: String, slot_id: String) -> Array[String]:
 	var result: Array[String] = []
 	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
 	if beat.is_empty():
 		return result
-
-	var slot: Dictionary = {}
-	for s: Dictionary in beat.get("slots", []) as Array:
-		if str(s.get("id", "")) == slot_id:
-			slot = s
-			break
+	var slot := _find_slot(beat, slot_id)
 	if slot.is_empty():
 		return result
-
-	var slot_key := beat_id + "::" + slot_id
-	if slots_placed.has(slot_key):
-		return result
-
-	var choice_group: Variant = slot.get("choice_group")
-	if choice_group != null and not str(choice_group).is_empty():
-		var group_key := beat_id + "::" + str(choice_group)
-		if choices.has(group_key):
-			return result
-
-	var accepts: Array = slot.get("accepts", []) as Array
-	var in_action_phase := ACTION_PHASES.has(phase)
-
-	# 候選卡：hand + knowledge.keys()（保持 hand 原有順序，知識在後）
-	var candidates: Array[String] = []
-	for c_id in hand:
-		candidates.append(c_id)
-	for k_id in (knowledge as Dictionary).keys():
-		candidates.append(str(k_id))
-
-	for card_id in candidates:
-		var base_id := _card_base_id(card_id)
-		var card: Dictionary = Data.loader.cards.get(base_id, {})
-		var card_type := str(card.get("type", ""))
-
-		# ③ accepts
-		if not (accepts.has(base_id) or accepts.has(card_type)):
-			continue
-
-		# ④ 行動格主角卡消耗檢查
-		if card_type == "protagonist" and in_action_phase and action_spent:
-			continue
-
-		result.append(card_id)
+	for card_id: String in _held_cards():
+		if _check_place(card_id, beat, slot).get("ok", false):
+			result.append(card_id)
 
 	return result
 
@@ -465,46 +523,35 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 	if beat.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_BEAT, "reason_text": "", "lines": PackedStringArray() }
 
-	# K-18: 檢查當前時間合法性
-	if not _is_beat_time_valid(beat):
-		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "", "lines": PackedStringArray() }
-
-	var slot: Dictionary = {}
-	for s: Dictionary in beat.get("slots", []) as Array:
-		if str(s.get("id", "")) == slot_id and str(s.get("choice_group", "")) == group_id:
-			slot = s
-			break
+	var slot: Dictionary = _find_slot(beat, slot_id)
+	if str(slot.get("choice_group", "")) != group_id:
+		slot = {}
 	if slot.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_SLOT, "reason_text": "", "lines": PackedStringArray() }
 
-	# 三態必須 OPEN
-	if not ConditionEval.eval(beat.get("condition"), self):
-		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "", "lines": PackedStringArray() }
-	if not ConditionEval.eval(beat.get("requires"), self):
-		var beat_reason := str(beat.get("reject_reason", _REASON_LOCKED_FALLBACK))
-		return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": beat_reason, "lines": PackedStringArray() }
-	if not ConditionEval.eval(slot.get("condition"), self):
-		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "", "lines": PackedStringArray() }
-	var slot_key := beat_id + "::" + slot_id
-	if slots_placed.has(slot_key):
-		return { "ok": false, "reason_code": _REASON_RESOLVED, "reason_text": "", "lines": PackedStringArray() }
-	if not ConditionEval.eval(slot.get("requires"), self):
-		var slot_reason := str(slot.get("reject_reason", _REASON_LOCKED_FALLBACK))
-		return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": slot_reason, "lines": PackedStringArray() }
+	var state_result := _check_slot_state(beat, slot)
+	if not state_result.get("ok", false):
+		return {
+			"ok": false,
+			"reason_code": str(state_result.get("reason_code", "")),
+			"reason_text": str(state_result.get("reason_text", "")),
+			"lines": PackedStringArray(),
+		}
 
 	# 帶卡檢查（若傳入 card_id）
 	if not card_id.is_empty():
-		if not has_card(card_id):
-			return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "", "lines": PackedStringArray() }
-		var base_id := _card_base_id(card_id)
-		var card: Dictionary = Data.loader.cards.get(base_id, {})
-		var accepts: Array = slot.get("accepts", []) as Array
-		var card_type := str(card.get("type", ""))
-		if not (accepts.has(base_id) or accepts.has(card_type)):
-			return { "ok": false, "reason_code": _REASON_NOT_ACCEPTED, "reason_text": "", "lines": PackedStringArray() }
+		var place_result := _check_place(card_id, beat, slot)
+		if not place_result.get("ok", false):
+			return {
+				"ok": false,
+				"reason_code": str(place_result.get("reason_code", "")),
+				"reason_text": str(place_result.get("reason_text", "")),
+				"lines": PackedStringArray(),
+			}
 
 	# 效果結算（原子操作）
 	var lines: PackedStringArray = EffectApply.apply(slot.get("on_place", {}), self)
+	var slot_key := beat_id + "::" + slot_id
 	choices[choice_key] = slot_id
 	slots_placed[slot_key] = true
 
@@ -527,58 +574,29 @@ func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
 	if beat.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_BEAT, "reason_text": "", "lines": PackedStringArray() }
 
-	var slot: Dictionary = {}
-	for s: Dictionary in beat.get("slots", []) as Array:
-		if str(s.get("id", "")) == slot_id:
-			slot = s
-			break
+	var slot := _find_slot(beat, slot_id)
 	if slot.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_SLOT, "reason_text": "", "lines": PackedStringArray() }
-
-	# K-18: 檢查當前時間合法性
-	if not _is_beat_time_valid(beat):
-		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "", "lines": PackedStringArray() }
 
 	var choice_group: Variant = slot.get("choice_group")
 	if choice_group != null and not str(choice_group).is_empty():
 		return choose(beat_id, str(choice_group), slot_id, card_id)
 
-	# ① 持有：傳入的卡此刻必須在手牌或知識集合（UI 是零規則顯示層，不能靠它擋非法卡 id）。
-	if not has_card(card_id):
-		return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "", "lines": PackedStringArray() }
+	var check_result := _check_place(card_id, beat, slot)
+	if not check_result.get("ok", false):
+		return {
+			"ok": false,
+			"reason_code": str(check_result.get("reason_code", "")),
+			"reason_text": str(check_result.get("reason_text", "")),
+			"lines": PackedStringArray(),
+		}
 
 	var base_id := _card_base_id(card_id)
 	var card: Dictionary = Data.loader.cards.get(base_id, {})
 	var slot_key := beat_id + "::" + slot_id
-
-	# ② 三態必須 OPEN（含一次性未放過）。beat 級 condition/requires 語意相同——
-	# beat 不可互動時，內部槽一律不可放（規格書第五節），不能只靠 PanelBuilder 的 view model
-	# 擋（UI 是零規則顯示層，規則層要能獨立擋下非法呼叫）。
-	if not ConditionEval.eval(beat.get("condition"), self):
-		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "", "lines": PackedStringArray() }
-	if not ConditionEval.eval(beat.get("requires"), self):
-		var beat_reason := str(beat.get("reject_reason", _REASON_LOCKED_FALLBACK))
-		return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": beat_reason, "lines": PackedStringArray() }
-	if not ConditionEval.eval(slot.get("condition"), self):
-		return { "ok": false, "reason_code": _REASON_HIDDEN, "reason_text": "", "lines": PackedStringArray() }
-	if slots_placed.has(slot_key):
-		return { "ok": false, "reason_code": _REASON_RESOLVED, "reason_text": "", "lines": PackedStringArray() }
-	if not ConditionEval.eval(slot.get("requires"), self):
-		var slot_reason := str(slot.get("reject_reason", _REASON_LOCKED_FALLBACK))
-		return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": slot_reason, "lines": PackedStringArray() }
-
-	# ③ accepts：型別名或卡 id。
-	var accepts: Array = slot.get("accepts", []) as Array
 	var card_type := str(card.get("type", ""))
-	if not (accepts.has(base_id) or accepts.has(card_type)):
-		return { "ok": false, "reason_code": _REASON_NOT_ACCEPTED, "reason_text": "", "lines": PackedStringArray() }
-
-	# ④ 主角卡在行動格（morning/afternoon）時，同一時段不能放第二次。
-	# night 時段放主角卡不消耗行動格（規格書第六節），所以不受這一步限制。
 	var is_protagonist := card_type == "protagonist"
 	var in_action_phase := ACTION_PHASES.has(phase)
-	if is_protagonist and in_action_phase and action_spent:
-		return { "ok": false, "reason_code": _REASON_ACTION_SPENT, "reason_text": "", "lines": PackedStringArray() }
 
 	# 全過 → 效果結算（原子操作：全部套完才重求值）。
 	var lines: PackedStringArray = EffectApply.apply(slot.get("on_place", {}), self)

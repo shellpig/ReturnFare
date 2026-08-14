@@ -17,6 +17,7 @@ var BEATS_DIR: String
 
 var tuning: Dictionary = {}
 var relation_scale: Dictionary = {} ## 狀態名 -> 最低整數值（規格書第十二節單軸暫行案）
+var card_types: Dictionary = {}     ## id -> card type definition
 var cards: Dictionary = {}          ## id -> card
 var locations: Dictionary = {}      ## id -> location（白天與夜間合在一起，id 全域唯一）
 var npcs: Dictionary = {}           ## id -> npc
@@ -36,6 +37,13 @@ func load_all() -> bool:
 
 	tuning = _read_json(DATA_DIR + "tuning.json")
 	relation_scale = _read_json(DATA_DIR + "relation_scale.json")
+
+	var card_types_file := _read_json(DATA_DIR + "card_types.json")
+	for card_type in card_types_file.get("card_types", []):
+		var type_id: String = str(card_type.get("id", ""))
+		if card_types.has(type_id):
+			errors.append("卡片型別 id 重複：%s" % type_id)
+		card_types[type_id] = card_type
 
 	var cards_file := _read_json(DATA_DIR + "cards.json")
 	for c in cards_file.get("cards", []):
@@ -117,6 +125,23 @@ func verify_references() -> PackedStringArray:
 			for a in s.get("accepts", []):
 				if not cards.has(a) and not CARD_TYPES.has(a):
 					problems.append("%s [%s]：accepts 既不是卡也不是 type → %s" % [bid, where, a])
+
+	return problems
+
+
+## lint 9：卡片 type 與 card_types.json 的顯示型別封閉性。
+## 每張卡使用的 type 必須有定義；資料檔定義的 id 也必須是合法型別名。
+static func lint_card_types(loader: DataLoader) -> PackedStringArray:
+	var problems: PackedStringArray = []
+	for card_id: String in loader.cards:
+		var card: Dictionary = loader.cards[card_id] as Dictionary
+		var type_id: String = str(card.get("type", ""))
+		if not loader.card_types.has(type_id):
+			problems.append("卡片 %s：type 未在 card_types.json 定義 → %s" % [card_id, type_id])
+
+	for type_id: String in loader.card_types:
+		if not CARD_TYPES.has(type_id):
+			problems.append("card_types.json：未知型別 id → %s" % type_id)
 
 	return problems
 

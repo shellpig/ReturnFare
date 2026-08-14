@@ -309,7 +309,7 @@ func _test_choice_leave_panel_unselected(gs: Node, _data_node: Node) -> int:
 	gs.set("phase", "afternoon")
 
 	# 打開面板
-	var view1: Dictionary = gs.call("open_panel", "sanquan")
+	var view1: Dictionary = PanelBuilder.build("sanquan", gs, _data_node)
 	var bv1: Dictionary = {}
 	for bv in view1.get("beats", []):
 		if str(bv["beat"].get("id", "")) == "d29_pm_invitation":
@@ -323,7 +323,7 @@ func _test_choice_leave_panel_unselected(gs: Node, _data_node: Node) -> int:
 	if not choices.is_empty():
 		return _fail("choices should remain empty without choosing")
 
-	var view2: Dictionary = gs.call("open_panel", "sanquan")
+	var view2: Dictionary = PanelBuilder.build("sanquan", gs, _data_node)
 	var bv2: Dictionary = {}
 	for bv in view2.get("beats", []):
 		if str(bv["beat"].get("id", "")) == "d29_pm_invitation":
@@ -501,6 +501,10 @@ func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
 	get_root().add_child(panel_a)
 	panel_a.call("show_location", "sanquan")
 	await process_frame
+	var advance_a: Button = panel_a.get_node("AdvanceBeatButton")
+	while advance_a.visible:
+		panel_a.call("_on_advance_beat_pressed")
+		await process_frame
 
 	var beat_container_a: Node = panel_a.get_node("BeatContainer")
 	var direct_btn: Button = null
@@ -537,6 +541,10 @@ func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
 	get_root().add_child(panel_b)
 	panel_b.call("show_location", "sanquan")
 	await process_frame
+	var advance_b: Button = panel_b.get_node("AdvanceBeatButton")
+	while advance_b.visible:
+		panel_b.call("_on_advance_beat_pressed")
+		await process_frame
 
 	var beat_container_b: Node = panel_b.get_node("BeatContainer")
 	var found_obs_walk_label := false

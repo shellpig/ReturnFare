@@ -204,6 +204,11 @@ func _test_main_scene_enters_normal_branch() -> int:
 	gs.set("phase", "morning")
 	main.call("_on_location_selected", "sanquan")
 	await process_frame
+	# P1-G：先把演出佇列逐一播放完，常態階段才建立 occupant 槽。
+	var beat_advance_btn: Button = loc_panel.get_node("AdvanceBeatButton")
+	while beat_advance_btn.visible:
+		loc_panel.call("_on_advance_beat_pressed")
+		await process_frame
 	var occupant_lines := PackedStringArray()
 	for child in loc_panel.get_node("BeatContainer").get_children():
 		var lbl := child as Label

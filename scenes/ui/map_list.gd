@@ -22,7 +22,7 @@ func refresh() -> void:
 	var locs: Array[String] = PanelBuilder.available_locations(GameState, Data)
 	for loc_id in locs:
 		var loc: Dictionary = Data.loader.locations.get(loc_id, {}) as Dictionary
-		var view: Dictionary = PanelBuilder.build(loc_id, GameState, Data)
+		var view: Dictionary = GameState.build_panel(loc_id)
 		var is_empty: bool = (view.get("beats", []) as Array).is_empty()
 		var btn := Button.new()
 		btn.text = str(loc.get("name", loc_id)) + (_SUFFIX_EMPTY if is_empty else "")

@@ -246,7 +246,7 @@ func _test_night_resolution_and_free_locations(gs: Node, data_node: Node) -> int
 	var n1_corridor_found := false
 	for b in n1_beats:
 		if b.get("id") == "n_corridor_ch1" and b.get("fixed", false):
-			var lines: PackedStringArray = gs.enter_beat("n_corridor_ch1")
+			var lines: PackedStringArray = gs.play_beat("n_corridor_ch1")
 			if lines.size() > 0:
 				n1_corridor_found = true
 				break
@@ -303,7 +303,7 @@ func _test_night_sleep_resolution(gs: Node, data_node: Node) -> int:
 	var fixed_entered := false
 	for b in n24_beats:
 		if b.get("id") == "d24_night_laozeng" and b.get("fixed", false):
-			var lines: PackedStringArray = gs.enter_beat("d24_night_laozeng")
+			var lines: PackedStringArray = gs.play_beat("d24_night_laozeng")
 			if lines.size() > 0:
 				fixed_entered = true
 				break
@@ -364,7 +364,7 @@ func _test_day45_ending_coda_and_loop_reset(gs: Node, data_node: Node) -> int:
 	gs.set_flag("final_day", true)
 
 	# 1. d45_then 播出
-	var lines: PackedStringArray = gs.enter_beat("d45_then")
+	var lines: PackedStringArray = gs.play_beat("d45_then")
 	if lines.size() > 0 and lines[0].contains("是他自己"):
 		failed += _ok("第 45 天 evening d45_then 成功播出")
 	else:

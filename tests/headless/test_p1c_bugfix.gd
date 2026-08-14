@@ -1,9 +1,9 @@
 extends SceneTree
 
 ## P1-C / P1-D 修 bug 回歸測試（K-01～K-04）：
-## A1：location_panel.show_location() 透過 GameState.open_panel() 呈現 beat 並結算 on_enter。
+## A1：location_panel.show_location() 透過 GameState.play_beat() 呈現 beat 並結算 on_enter。
 ## A2：beat 級 requires 不成立時，內部槽三態要一併降為 LOCKED（規格書第五節）。
-## A3 (K-01+K-02)：GameState.open_panel() 規則層獨立入口，先結算 on_enter 再求值（Day 23 上午山泉閣連鎖解鎖）。
+## A3 (K-01+K-02)：GameState.build_panel()/play_beat() 拆分後，演出再重新求值（Day 23 上午山泉閣連鎖解鎖）。
 ## A4 (K-03+K-04)：GameState.placeable_cards() 規則層過濾＋try_place() reason_code/reason_text 分離。
 ##
 ## 跑法：
@@ -23,11 +23,11 @@ func _initialize() -> void:
 		return
 
 	var failed := 0
-	failed += await _test_a1_location_panel_calls_enter_beat()
+	failed += await _test_a1_location_panel_calls_play_beat()
 	failed += _test_a2_beat_requires_cascades_to_slots()
-	failed += _test_a3_open_panel_rule_layer_and_intra_panel()
+	failed += _test_a3_split_panel_and_play_beat()
 	failed += _test_a4_placeable_cards_and_try_place_reason_code()
-	failed += _test_a5_enter_beat_unknown_id()
+	failed += _test_a5_play_beat_unknown_id()
 	failed += _test_a6_locked_beat_preserves_resolved_slots()
 	failed += await _test_a7_on_enter_text_rendered_in_panel()
 
@@ -66,10 +66,10 @@ func _reset_gs(gs: Node) -> void:
 	gs.set("action_spent", false)
 
 
-# ── A1：show_location() 要透過 open_panel() 呈現 beat ───────────────────────
+# ── A1：show_location() 要透過 play_beat() 呈現 beat ─────────────────────────
 
-func _test_a1_location_panel_calls_enter_beat() -> int:
-	print("--- A1: location_panel.show_location() calls open_panel / enter_beat ---")
+func _test_a1_location_panel_calls_play_beat() -> int:
+	print("--- A1: location_panel.show_location() calls play_beat ---")
 	var failed := 0
 
 	var gs: Node = get_root().get_node("GameState")
@@ -83,11 +83,15 @@ func _test_a1_location_panel_calls_enter_beat() -> int:
 	await process_frame
 
 	panel.call("show_location", "busstop")
+	var advance_btn: Button = panel.get_node("AdvanceBeatButton")
+	while advance_btn.visible:
+		panel.call("_on_advance_beat_pressed")
+		await process_frame
 
 	if not (gs.get("beats_entered") as Dictionary).has("d1_arrival"):
 		failed += _fail("show_location(busstop) did not run enter_beat: beats_entered missing d1_arrival")
 	else:
-		failed += _ok("show_location(busstop) ran enter_beat: beats_entered has d1_arrival")
+		failed += _ok("show_location(busstop) ran play_beat: beats_entered has d1_arrival")
 
 	if not (gs.get("hand") as Array).has("protagonist"):
 		failed += _fail("show_location(busstop): d1_arrival.on_enter.gain(protagonist) did not run")
@@ -180,10 +184,10 @@ func _test_a2_beat_requires_cascades_to_slots() -> int:
 	return failed
 
 
-# ── A3 (K-01+K-02)：open_panel 規則層入口與同面板連鎖求值 ─────────────────────
+# ── A3 (K-01+K-02)：拆分入口與同面板重新求值 ─────────────────────────────────
 
-func _test_a3_open_panel_rule_layer_and_intra_panel() -> int:
-	print("--- A3: GameState.open_panel() rule layer & intra-panel on_enter (d23 AM sanquan) ---")
+func _test_a3_split_panel_and_play_beat() -> int:
+	print("--- A3: build_panel/play_beat split & intra-panel re-evaluation (d23 AM sanquan) ---")
 	var failed := 0
 
 	var gs: Node = get_root().get_node("GameState")
@@ -192,29 +196,31 @@ func _test_a3_open_panel_rule_layer_and_intra_panel() -> int:
 	gs.set("day", 23)
 	gs.set("phase", "morning")
 
-	# 不 instantiate 任何 UI，直接呼叫 GameState.open_panel("sanquan")
-	var view: Dictionary = gs.call("open_panel", "sanquan")
+	# 先純求值；演出第一個 beat 後再重新求值，驗證連鎖解鎖。
+	var view: Dictionary = gs.call("build_panel", "sanquan")
+	gs.call("play_beat", "d23_morning_awei_knocks")
+	view = gs.call("build_panel", "sanquan")
 
 	# ① 驗證 d23_morning_awei_knocks 已被 enter_beat，flag awei_sheltering 已寫入
 	if not (gs.get("beats_entered") as Dictionary).has("d23_morning_awei_knocks"):
-		failed += _fail("open_panel(sanquan): beats_entered missing d23_morning_awei_knocks")
+		failed += _fail("play_beat(d23_morning_awei_knocks): beats_entered missing")
 	else:
-		failed += _ok("open_panel(sanquan): beats_entered has d23_morning_awei_knocks")
+		failed += _ok("play_beat(d23_morning_awei_knocks): beats_entered has beat")
 
 	if not bool((gs.get("flags") as Dictionary).get("awei_sheltering", false)):
-		failed += _fail("open_panel(sanquan): on_enter flag awei_sheltering not set")
+		failed += _fail("play_beat(sanquan): on_enter flag awei_sheltering not set")
 	else:
-		failed += _ok("open_panel(sanquan): on_enter flag awei_sheltering = true")
+		failed += _ok("play_beat(sanquan): on_enter flag awei_sheltering = true")
 
 	# ② 驗證依賴 awei_sheltering 的 d23_am_settle_grandma 在同一回傳的 view model 中已呈 OPEN
 	var grandma_beat: Dictionary = _find_beat(view, "d23_am_settle_grandma")
 	if grandma_beat.is_empty():
-		failed += _fail("open_panel(sanquan): d23_am_settle_grandma missing from view (evaluated before on_enter?)")
+		failed += _fail("build_panel(sanquan): d23_am_settle_grandma missing after play_beat")
 	else:
 		if int(grandma_beat.get("tri", -1)) != PanelBuilder.TriState.OPEN:
-			failed += _fail("open_panel(sanquan): d23_am_settle_grandma tri expected OPEN, got %d" % int(grandma_beat.get("tri", -1)))
+			failed += _fail("build_panel(sanquan): d23_am_settle_grandma tri expected OPEN, got %d" % int(grandma_beat.get("tri", -1)))
 		else:
-			failed += _ok("open_panel(sanquan): d23_am_settle_grandma is OPEN on first open")
+			failed += _ok("build_panel(sanquan): d23_am_settle_grandma is OPEN after play")
 
 	return failed
 
@@ -279,25 +285,25 @@ func _test_a4_placeable_cards_and_try_place_reason_code() -> int:
 	return failed
 
 
-# ── A5 (K-09)：enter_beat 未知 id 不得寫入 beats_entered ─────────────────────
+# ── A5 (K-09)：play_beat 未知 id 不得寫入 beats_entered ─────────────────────
 
-func _test_a5_enter_beat_unknown_id() -> int:
-	print("--- A5: GameState.enter_beat() unknown id does not write beats_entered ---")
+func _test_a5_play_beat_unknown_id() -> int:
+	print("--- A5: GameState.play_beat() unknown id does not write beats_entered ---")
 	var failed := 0
 
 	var gs: Node = get_root().get_node("GameState")
 	_reset_gs(gs)
 
-	var lines: PackedStringArray = gs.call("enter_beat", "totally_bogus_beat_id")
+	var lines: PackedStringArray = gs.call("play_beat", "totally_bogus_beat_id")
 	if not lines.is_empty():
 		failed += _fail("enter_beat bogus id: expected empty lines, got %s" % str(lines))
 	else:
-		failed += _ok("enter_beat bogus id returned empty lines")
+		failed += _ok("play_beat bogus id returned empty lines")
 
 	if (gs.get("beats_entered") as Dictionary).has("totally_bogus_beat_id"):
 		failed += _fail("enter_beat bogus id should NOT write beats_entered")
 	else:
-		failed += _ok("enter_beat bogus id did not write beats_entered")
+		failed += _ok("play_beat bogus id did not write beats_entered")
 
 	return failed
 
@@ -344,10 +350,10 @@ func _test_a6_locked_beat_preserves_resolved_slots() -> int:
 	return failed
 
 
-# ── A7 (K-13)：open_panel() 保留 on_enter.text 並由 location_panel 呈現 ──────────
+# ── A7 (K-13)：play_beat() 回傳 on_enter.text 並由 location_panel 呈現 ─────────
 
 func _test_a7_on_enter_text_rendered_in_panel() -> int:
-	print("--- A7: open_panel() and location_panel render on_enter.text (d15_pm_clinic) ---")
+	print("--- A7: play_beat() and location_panel render on_enter.text (d15_pm_clinic) ---")
 	var failed := 0
 
 	var gs: Node = get_root().get_node("GameState")
@@ -355,25 +361,20 @@ func _test_a7_on_enter_text_rendered_in_panel() -> int:
 	gs.set("day", 15)
 	gs.set("phase", "afternoon")
 
-	# ① 驗證 GameState.open_panel() 的 view model 中 lines 包含 on_enter.text
-	var view: Dictionary = gs.call("open_panel", "clinic")
-	var bv: Dictionary = _find_beat(view, "d15_pm_clinic")
-	if bv.is_empty():
-		return _fail("d15_pm_clinic not found in panel")
-
-	var lines: PackedStringArray = bv.get("lines", PackedStringArray())
+	# ① 驗證 GameState.play_beat() 回傳 beat 主文與 on_enter.text
+	var lines: PackedStringArray = gs.call("play_beat", "d15_pm_clinic")
 	if lines.size() < 2:
-		failed += _fail("open_panel(clinic): expected at least 2 lines (beat text + on_enter text), got %d: %s" % [lines.size(), str(lines)])
+		failed += _fail("play_beat(clinic): expected at least 2 lines (beat text + on_enter text), got %d: %s" % [lines.size(), str(lines)])
 	else:
 		if lines[0] != "陳醫師溫和地解釋，說是老毛病，要多休息。":
-			failed += _fail("open_panel(clinic): line[0] wrong: %s" % lines[0])
+			failed += _fail("play_beat(clinic): line[0] wrong: %s" % lines[0])
 		else:
-			failed += _ok("open_panel(clinic): line[0] is beat main text")
+			failed += _ok("play_beat(clinic): line[0] is beat main text")
 
 		if lines[1] != "走出來的時候阿薇站在外面。「我媽以前也是這樣。」":
-			failed += _fail("open_panel(clinic): line[1] wrong: %s" % lines[1])
+			failed += _fail("play_beat(clinic): line[1] wrong: %s" % lines[1])
 		else:
-			failed += _ok("open_panel(clinic): line[1] is on_enter.text")
+			failed += _ok("play_beat(clinic): line[1] is on_enter.text")
 
 	# ② 驗證 location_panel UI 確實建立文字 Label 渲染所有 lines
 	var scene: PackedScene = load("res://scenes/ui/location_panel.tscn")
@@ -385,6 +386,8 @@ func _test_a7_on_enter_text_rendered_in_panel() -> int:
 	gs.set("day", 15)
 	gs.set("phase", "afternoon")
 	panel.call("show_location", "clinic")
+	panel.call("_on_advance_beat_pressed")
+	await process_frame
 
 	var beat_container: VBoxContainer = panel.get_node("BeatContainer")
 	var all_labels_text: Array[String] = []
@@ -419,4 +422,3 @@ func _find_beat(view: Dictionary, beat_id: String) -> Dictionary:
 		if str((entry as Dictionary)["beat"]["id"]) == beat_id:
 			return entry as Dictionary
 	return {}
-
