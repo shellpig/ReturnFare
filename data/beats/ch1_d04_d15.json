@@ -165,7 +165,7 @@
           }
         }
       ],
-      "note": "第一章第一次殘響的落點是第 3 天下午那格（d3_pm_couple.echo，day 5），不是這裡。這格原本掛過一份同文的 echo 複本，但引擎掃的是 echo.day，複本沒有 day 欄、永遠不播，已移除"
+      "note": "第一章第一次殘響的落點是第 3 天下午那格（d3_pm_sanquan.echo，day 5），不是這裡。這格原本掛過一份同文的 echo 複本，但引擎掃的是 echo.day，複本沒有 day 欄、永遠不播，已移除"
     },
     {
       "id": "d5_pm_photos",
