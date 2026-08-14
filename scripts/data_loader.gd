@@ -256,8 +256,9 @@ static func lint_choice_rules(beats_list: Array[Dictionary]) -> Dictionary:
 	return { "errors": errs, "warnings": warns }
 
 
-## lint 5：行動格覆蓋檢查（規格書第十七節 lint 5、K-16）。
-## 驗證每一天每個行動時段（morning / afternoon）皆有 beat（刻意留空者除外）。
+## lint 5：行動格覆蓋與地點時段支援檢查（規格書第十七節 lint 5、K-16）。
+## 1. 驗證每一天每個行動時段（morning / afternoon）皆有 beat（刻意留空者除外）。
+## 2. 驗證所有白天 beat 所屬地點的 phases 均支援該 beat 的時段。
 static func lint_action_phases(loader: DataLoader) -> PackedStringArray:
 	var errs: PackedStringArray = []
 	for d in range(1, 46):
@@ -267,6 +268,21 @@ static func lint_action_phases(loader: DataLoader) -> PackedStringArray:
 			var beats_in_phase := loader.beats_at(d, p)
 			if beats_in_phase.is_empty():
 				errs.append("第 %d 天 %s：沒有任何 beat" % [d, p])
+
+	for b in loader.beats:
+		var w: Variant = b.get("when")
+		if not w is Dictionary:
+			continue
+		var phase_str: String = str((w as Dictionary).get("phase", ""))
+		if phase_str in ["morning", "afternoon"]:
+			var loc_id: String = str(b.get("location", ""))
+			var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
+			var loc_phases: Array = loc.get("phases", []) as Array
+			if not loc_phases.has(phase_str):
+				errs.append("%s：beat 時段為 %s，但所屬地點 %s 的 phases 僅有 %s" % [
+					str(b.get("id", "")), phase_str, loc_id, str(loc_phases)
+				])
+
 	return errs
 
 

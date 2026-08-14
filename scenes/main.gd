@@ -105,36 +105,9 @@ func _route_view() -> void:
 
 
 func _play_evening() -> void:
-	var lines := PackedStringArray()
-
-	# 1. Fixed beats of today in array order (K-14)
-	for b in Data.loader.beats_at(GameState.day, "evening"):
-		if not b.get("fixed", false):
-			continue
-		if ConditionEval.eval(b.get("condition"), GameState) and ConditionEval.eval(b.get("requires"), GameState):
-			var beat_lines: PackedStringArray = GameState.enter_beat(str(b.get("id", "")))
-			lines.append_array(beat_lines)
-
-	# 2. Echoes of today
-	for b in Data.loader.beats:
-		var echo_raw: Variant = b.get("echo")
-		if not echo_raw is Dictionary:
-			continue
-		var echo := echo_raw as Dictionary
-		if int(echo.get("day", -1)) != GameState.day:
-			continue
-		if ConditionEval.eval(echo.get("condition"), GameState) and ConditionEval.eval(echo.get("requires"), GameState):
-			var text: String = str(echo.get("text", "")).strip_edges()
-			if not text.is_empty():
-				lines.append(text)
-
+	var lines := GameState.play_evening()
 	_evening_label.text = "\n\n".join(lines)
 
 
 func _play_night_fixed() -> void:
-	# 入夜 fixed 定日 beat 強制播（規格書第九節第 1 步）
-	for b in Data.loader.beats_at(GameState.day, "night"):
-		if not b.get("fixed", false):
-			continue
-		if ConditionEval.eval(b.get("condition"), GameState) and ConditionEval.eval(b.get("requires"), GameState):
-			GameState.enter_beat(str(b.get("id", "")))
+	GameState.play_night_fixed()

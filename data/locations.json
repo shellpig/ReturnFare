@@ -65,7 +65,8 @@
       "id": "clinic",
       "name": "診所",
       "phases": [
-        "morning"
+        "morning",
+        "afternoon"
       ],
       "layer": "day",
       "chapter": 1,
@@ -93,6 +94,7 @@
       "id": "columbarium",
       "name": "納骨塔",
       "phases": [
+        "morning",
         "afternoon"
       ],
       "layer": "day",
@@ -178,7 +180,8 @@
       "id": "police",
       "name": "派出所",
       "phases": [
-        "morning"
+        "morning",
+        "afternoon"
       ],
       "layer": "day",
       "chapter": 1,
@@ -207,7 +210,8 @@
       "id": "registry_office",
       "name": "鎮公所戶籍室",
       "phases": [
-        "morning"
+        "morning",
+        "afternoon"
       ],
       "layer": "day",
       "chapter": 2,

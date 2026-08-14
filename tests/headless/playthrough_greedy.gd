@@ -26,6 +26,7 @@ func _initialize() -> void:
 
 	var day_counter := 0
 	var actions_taken := 0
+	var illegal_phases := 0
 
 	# 走查第 1 天至第 45 天
 	for d in range(1, 46):
@@ -33,12 +34,20 @@ func _initialize() -> void:
 
 		# 1. Morning
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "morning", "時間同步錯誤 (morning)")
-		actions_taken += _execute_action_phase(gs, data_node, d, "morning")
+		var res_m := _execute_action_phase(gs, data_node, d, "morning")
+		if res_m < 0:
+			illegal_phases += 1
+		else:
+			actions_taken += res_m
 		gs.advance_phase()
 
 		# 2. Afternoon
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "afternoon", "時間同步錯誤 (afternoon)")
-		actions_taken += _execute_action_phase(gs, data_node, d, "afternoon")
+		var res_a := _execute_action_phase(gs, data_node, d, "afternoon")
+		if res_a < 0:
+			illegal_phases += 1
+		else:
+			actions_taken += res_a
 		gs.advance_phase()
 
 		# 3. Evening
@@ -59,6 +68,12 @@ func _initialize() -> void:
 	print("=== 45 天走查完畢，驗收重置狀態 ===")
 
 	var failed := 0
+
+	if illegal_phases > 0:
+		push_error("FAIL: 存在 %d 個未放置且未列入合法原因之行動格 (K-25)" % illegal_phases)
+		failed += 1
+	else:
+		print("  ok  全 90 個行動時段均已完成合法性分類與驗證 (K-25)")
 
 	if _run_ended_count != 1:
 		push_error("FAIL: run_ended 發射次數不為 1（實際為 %d）" % _run_ended_count)
@@ -115,6 +130,7 @@ func _on_run_ended(ending_id: String) -> void:
 func _execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -> int:
 	var locs := PanelBuilder.available_locations(gs, data_node)
 	var placed := false
+	var placed_info := ""
 
 	# 先打開所有可用地點（結算 fixed beat 之 on_enter）
 	for loc_id in locs:
@@ -137,21 +153,94 @@ func _execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -
 					var res: Dictionary = gs.try_place("protagonist", bid, sid)
 					if res.get("ok", false):
 						placed = true
+						placed_info = "%s::%s" % [bid, sid]
 						break
 			if placed:
 				break
 		if placed:
 			break
 
-	return 1 if placed else 0
+	if placed:
+		return 1
+
+	# 放不下主角卡時，進行合法性診斷與分類（K-25）
+	var diag := _diagnose_unplaced_phase(data_node, day, phase, gs)
+	if not diag.get("ok", false):
+		push_error("FAIL: 第 %d 天 %s 未放置主角卡且為非法狀態：%s" % [day, phase, diag.get("detail", "")])
+		return -1
+
+	return 0
 
 
-func _execute_evening_phase(gs: Node, data_node: Node, day: int) -> void:
-	# 結算 evening fixed beats
+## 診斷未放卡時段的合法性（K-25：從資料推導全 fixed 時段、比對名單與條件/門檻限制）
+func _diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node) -> Dictionary:
 	var loader: DataLoader = data_node.get("loader") as DataLoader
-	for b in loader.beats_at(day, "evening"):
-		if b.get("fixed", false):
-			gs.enter_beat(str(b.get("id", "")))
+	var beats: Array[Dictionary] = loader.beats_at(day, phase)
+
+	# 1. 刻意留空
+	if DataFacts.is_empty_phase_by_design(day, phase):
+		return { "ok": true, "category": "empty_by_design", "detail": "刻意留空時段" }
+
+	# 2. 刻意 choice-only
+	if DataFacts.is_choice_only_phase_by_design(day, phase):
+		return { "ok": true, "category": "choice_only_by_design", "detail": "純選擇題時段（已豁免）" }
+
+	# 3. 該時段所有 beat 均為 fixed（全 fixed 敘事時段，不吃行動格）
+	if not beats.is_empty():
+		var all_fixed := true
+		for b in beats:
+			if not b.get("fixed", false):
+				all_fixed = false
+				break
+		if all_fixed:
+			var beat_ids: PackedStringArray = []
+			for b in beats:
+				beat_ids.append(str(b.get("id", "")))
+			return { "ok": true, "category": "all_fixed", "detail": "全 fixed 敘事時段 (%s)" % ", ".join(beat_ids) }
+
+	# 4. 條件分支未解鎖（HIDDEN）或前置門檻未達成（LOCKED）
+	var active_beats: Array[Dictionary] = []
+	var locked_reasons: PackedStringArray = []
+	for b in beats:
+		if not ConditionEval.eval(b.get("condition"), gs):
+			continue
+		if not ConditionEval.eval(b.get("requires"), gs):
+			locked_reasons.append("%s (beat requires LOCKED)" % str(b.get("id", "")))
+			continue
+		active_beats.append(b)
+
+	if active_beats.is_empty():
+		if not locked_reasons.is_empty():
+			return { "ok": true, "category": "requires_locked", "detail": "前置門檻未達成：%s" % ", ".join(locked_reasons) }
+		var all_cond_beats: PackedStringArray = []
+		for b in beats:
+			all_cond_beats.append(str(b.get("id", "")))
+		return { "ok": true, "category": "condition_locked", "detail": "條件分支未解鎖 (%s)" % ", ".join(all_cond_beats) }
+
+	# 檢查 active_beats 的槽：是否所有可放主角卡的槽都處於 requires LOCKED，或僅有純比對槽
+	var has_open_protag_slot := false
+	var has_only_non_protag_slots := true
+	for b in active_beats:
+		for s: Dictionary in b.get("slots", []) as Array:
+			var accepts: Array = s.get("accepts", []) as Array
+			if accepts.has("protagonist"):
+				has_only_non_protag_slots = false
+				if ConditionEval.eval(s.get("requires"), gs):
+					has_open_protag_slot = true
+					break
+
+	if has_only_non_protag_slots:
+		return { "ok": true, "category": "compare_only", "detail": "當前 active beat 僅有非主角卡槽（比對槽）" }
+
+	if not has_open_protag_slot:
+		return { "ok": true, "category": "slot_requires_locked", "detail": "主角卡槽前置門檻未達成 (slot requires LOCKED)" }
+
+	return { "ok": false, "category": "illegal_empty", "detail": "異常：有 active beat 且有 OPEN 主角卡槽卻未能放置" }
+
+
+func _execute_evening_phase(gs: Node, _data_node: Node, day: int) -> void:
+	# 統一走 GameState.play_evening() 結算 fixed beat 與殘響（K-26）
+	gs.play_evening()
 
 	# 第 45 天 evening 特殊比對槽處理
 	if day == 45:
@@ -159,12 +248,9 @@ func _execute_evening_phase(gs: Node, data_node: Node, day: int) -> void:
 			gs.try_place("info_registry", "d45_then", "compare_registry")
 
 
-func _execute_night_phase(gs: Node, data_node: Node, day: int) -> void:
-	# 入夜 fixed beat 自動結算
-	var loader: DataLoader = data_node.get("loader") as DataLoader
-	for b in loader.beats_at(day, "night"):
-		if b.get("fixed", false):
-			gs.enter_beat(str(b.get("id", "")))
+func _execute_night_phase(gs: Node, _data_node: Node, _day: int) -> void:
+	# 統一走 GameState.play_night_fixed() 結算入夜 fixed beat（K-26）
+	gs.play_night_fixed()
 
 	# 直接睡
 	gs.sleep_night()

@@ -87,26 +87,9 @@ func _reset_gs(gs: Node) -> void:
 	gs.set("_madness_counter", 0)
 
 
-func _collect_evening_echoes(gs: Node, data_node: Node, day: int) -> PackedStringArray:
-	var lines := PackedStringArray()
-	var loader: DataLoader = data_node.get("loader") as DataLoader
-	for b in loader.beats:
-		var echo_raw: Variant = b.get("echo")
-		if not echo_raw is Dictionary:
-			continue
-		var echo := echo_raw as Dictionary
-		if int(echo.get("day", -1)) != day:
-			continue
-		if ConditionEval.eval(echo.get("condition"), gs) and ConditionEval.eval(echo.get("requires"), gs):
-			var text: String = str(echo.get("text", "")).strip_edges()
-			if not text.is_empty():
-				lines.append(text)
-	return lines
-
-
 # ── 1. 錯過的 beat 的 echo 在正確的天播出 ────────────────────────────────────
 
-func _test_evening_echo_missed_vs_attended(gs: Node, data_node: Node) -> int:
+func _test_evening_echo_missed_vs_attended(gs: Node, _data_node: Node) -> int:
 	print("--- 1. evening echo missed vs attended (d3_pm_sanquan -> d5 evening) ---")
 	var failed := 0
 
@@ -117,16 +100,16 @@ func _test_evening_echo_missed_vs_attended(gs: Node, data_node: Node) -> int:
 	# 不放卡，直接推到第 5 天 evening
 	gs.set("day", 5)
 	gs.set("phase", "evening")
-	var echoes_missed := _collect_evening_echoes(gs, data_node, 5)
+	var echoes_missed: PackedStringArray = gs.play_evening()
 	var found_missed := false
 	for l in echoes_missed:
 		if l.contains("旁邊有人提起第 3 天下午發生過的一件小事"):
 			found_missed = true
 			break
 	if found_missed:
-		failed += _ok("錯過第 3 天阿宏：第 5 天 evening 成功播出殘響")
+		failed += _ok("錯過第 3 天阿宏：第 5 天 evening 成功播出殘響 (via GameState.play_evening)")
 	else:
-		failed += _fail("錯過第 3 天阿宏：第 5 天 evening 未播出殘響（殘響清單: %s）" % str(echoes_missed))
+		failed += _fail("錯過第 3 天阿宏：第 5 天 evening 未播出殘響（演出輸出: %s）" % str(echoes_missed))
 
 	# 狀況 B：到場第 3 天下午阿宏（放置 help_ahong 槽）
 	_reset_gs(gs)
@@ -137,7 +120,7 @@ func _test_evening_echo_missed_vs_attended(gs: Node, data_node: Node) -> int:
 		failed += _fail("放置 d3_pm_sanquan::help_ahong 失敗: %s" % str(place_res))
 	gs.set("day", 5)
 	gs.set("phase", "evening")
-	var echoes_attended := _collect_evening_echoes(gs, data_node, 5)
+	var echoes_attended: PackedStringArray = gs.play_evening()
 	var found_attended := false
 	for l in echoes_attended:
 		if l.contains("旁邊有人提起第 3 天下午發生過的一件小事"):
@@ -153,48 +136,54 @@ func _test_evening_echo_missed_vs_attended(gs: Node, data_node: Node) -> int:
 
 # ── 2. 第一章三次殘響全數播出 ────────────────────────────────────────────────
 
-func _test_chapter1_three_echoes(gs: Node, data_node: Node) -> int:
+func _test_chapter1_three_echoes(gs: Node, _data_node: Node) -> int:
 	print("--- 2. chapter 1 three echoes (d5, d8, d13) ---")
 	var failed := 0
-	var loader: DataLoader = data_node.get("loader") as DataLoader
 
 	# 1. 第 5 天殘響 (d3_pm_sanquan.echo)
 	_reset_gs(gs)
-	var d5_echoes := _collect_evening_echoes(gs, data_node, 5)
-	if d5_echoes.size() > 0 and d5_echoes[0].contains("第 3 天下午"):
-		failed += _ok("第 5 天殘響播出成功")
+	gs.set("day", 5)
+	gs.set("phase", "evening")
+	var d5_lines: PackedStringArray = gs.play_evening()
+	var d5_found := false
+	for l in d5_lines:
+		if l.contains("第 3 天下午"):
+			d5_found = true
+			break
+	if d5_found:
+		failed += _ok("第 5 天殘響播出成功 (via GameState.play_evening)")
 	else:
-		failed += _fail("第 5 天殘響未播出")
+		failed += _fail("第 5 天殘響未播出 (輸出: %s)" % str(d5_lines))
 
 	# 2. 第 8 天 evening 殘響 (d8_echo_bathhouse - fixed beat)
 	_reset_gs(gs)
 	gs.set("day", 8)
 	gs.set("phase", "evening")
-	var d8_beats := loader.beats_at(8, "evening")
-	var d8_echo_found := false
-	for b in d8_beats:
-		if b.get("id") == "d8_echo_bathhouse" and b.get("fixed", false):
-			var lines: PackedStringArray = gs.enter_beat("d8_echo_bathhouse")
-			if lines.size() > 0 and lines[0].contains("浴場"):
-				d8_echo_found = true
-				break
-	if d8_echo_found:
-		failed += _ok("第 8 天 evening 浴場殘響 (fixed beat) 播出成功")
+	var d8_lines: PackedStringArray = gs.play_evening()
+	var d8_found := false
+	for l in d8_lines:
+		if l.contains("浴場"):
+			d8_found = true
+			break
+	if d8_found:
+		failed += _ok("第 8 天 evening 浴場殘響 (fixed beat) 播出成功 (via GameState.play_evening)")
 	else:
-		failed += _fail("第 8 天 evening 浴場殘響未正確播出")
+		failed += _fail("第 8 天 evening 浴場殘響未正確播出 (輸出: %s)" % str(d8_lines))
 
 	# 3. 第 13 天殘響 (d12_pm_awei.echo)
 	_reset_gs(gs)
-	var d13_echoes := _collect_evening_echoes(gs, data_node, 13)
+	gs.set("day", 13)
+	gs.set("phase", "evening")
+	var d13_lines: PackedStringArray = gs.play_evening()
 	var d13_found := false
-	for l in d13_echoes:
+	for l in d13_lines:
 		if l.contains("阿薇那天一個人搬到天黑"):
 			d13_found = true
 			break
 	if d13_found:
-		failed += _ok("第 13 天殘響 (阿薇搬東西) 播出成功")
+		failed += _ok("第 13 天殘響 (阿薇搬東西) 播出成功 (via GameState.play_evening)")
 	else:
-		failed += _fail("第 13 天殘響未播出")
+		failed += _fail("第 13 天殘響未播出 (輸出: %s)" % str(d13_lines))
 
 	return failed
 
@@ -229,11 +218,8 @@ func _test_evening_execution_order_d27(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("第 27 天 evening 陣列順序錯誤: %s" % str(beat_ids))
 
-	# 依序結算：第一個 beat 寫入 dodger_awei_cleared，第二個 beat 成功讀取
-	for bid in beat_ids:
-		var b: Dictionary = loader.beats_by_id.get(bid, {})
-		if ConditionEval.eval(b.get("condition"), gs) and ConditionEval.eval(b.get("requires"), gs):
-			gs.enter_beat(bid)
+	# 依序結算：透過 GameState.play_evening() 統一結算
+	gs.play_evening()
 
 	if gs.has_knowledge("k_town_covers"):
 		failed += _ok("依序結算後 d27_evening_cover_knowledge 成功獲得知識卡 k_town_covers")
@@ -513,16 +499,12 @@ func _test_greedy_playthrough_45_days(gs: Node, data_node: Node) -> int:
 		_execute_greedy_phase(gs, data_node)
 		gs.advance_phase()
 		# evening
-		for b in (data_node.get("loader") as DataLoader).beats_at(d, "evening"):
-			if b.get("fixed", false):
-				gs.enter_beat(str(b.get("id", "")))
+		gs.play_evening()
 		gs.advance_phase()
 		if d == 45:
 			break
 		# night
-		for b in (data_node.get("loader") as DataLoader).beats_at(d, "night"):
-			if b.get("fixed", false):
-				gs.enter_beat(str(b.get("id", "")))
+		gs.play_night_fixed()
 		gs.sleep_night()
 		gs.advance_phase()
 

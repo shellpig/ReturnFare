@@ -112,6 +112,59 @@ func end_run(ending_id: String = "ending_default") -> void:
 	hand_changed.emit()
 
 
+## 晚間演出規則層唯一入口（UI、走查腳本、測試共用，規格書第十一節、K-26）。
+## 依序：
+## 1. 依陣列順序結算當日 evening fixed beat 之 enter_beat()
+## 2. 掃描當日成立之殘響（echo.day == day）並收集文字
+## 回傳全部要播放的文字行（PackedStringArray）。
+func play_evening() -> PackedStringArray:
+	var lines := PackedStringArray()
+	if Data == null or Data.loader == null:
+		return lines
+
+	var cur_day: int = day
+
+	# 1. 當日 evening fixed beats（依陣列順序，保證連鎖條件如 d27 正確生效）
+	for b in Data.loader.beats_at(cur_day, "evening"):
+		if not b.get("fixed", false):
+			continue
+		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
+			var beat_lines := enter_beat(str(b.get("id", "")))
+			lines.append_array(beat_lines)
+
+	# 2. 當日殘響
+	for b in Data.loader.beats:
+		var echo_raw: Variant = b.get("echo")
+		if not echo_raw is Dictionary:
+			continue
+		var echo := echo_raw as Dictionary
+		if int(echo.get("day", -1)) != cur_day:
+			continue
+		if ConditionEval.eval(echo.get("condition"), self) and ConditionEval.eval(echo.get("requires"), self):
+			var text: String = str(echo.get("text", "")).strip_edges()
+			if not text.is_empty():
+				lines.append(text)
+
+	return lines
+
+
+## 夜間定日 fixed beat 強制播之唯一入口（UI、走查共用，規格書第九節第 1 步、K-26）。
+func play_night_fixed() -> PackedStringArray:
+	var lines := PackedStringArray()
+	if Data == null or Data.loader == null:
+		return lines
+
+	var cur_day: int = day
+	for b in Data.loader.beats_at(cur_day, "night"):
+		if not b.get("fixed", false):
+			continue
+		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
+			var beat_lines := enter_beat(str(b.get("id", "")))
+			lines.append_array(beat_lines)
+
+	return lines
+
+
 ## 直接睡＝解析旅館（sanquan）的當夜定日 beat（規格書第九節、P1-F）。
 func sleep_night() -> PackedStringArray:
 	var cur_day: int = day
