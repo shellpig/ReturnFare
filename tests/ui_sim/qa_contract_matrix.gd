@@ -42,5 +42,23 @@ const SPECIAL_EVIDENCE := {
 	"p1af_33_full_walk": ["full_walk_d45", "first_round_reset", "second_round_arrival", "second_round_protagonist_exactly_one"],
 }
 
+## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。
+## 沒列的變體＝要自己提供整份契約 token。runner 兩層都查：
+## 變體層防「某個變體少送 token 卻被同契約另一個變體補掉」，契約層防變體漏跑。
+const VARIANT_EVIDENCE := {
+	"p1af_29_night_d1_fixed": ["night_fixed_priority"],
+	"p1af_29_night_resolution": [
+		"night_free_interaction", "night_chapter_and_additional_order",
+		"night_paid_locked", "night_no_madness",
+	],
+}
+
+
 static func required_evidence(contract_id: String) -> Array:
 	return (SPECIAL_EVIDENCE.get(contract_id, ["case_ok"]) as Array).duplicate()
+
+
+static func required_variant_evidence(case_id: String, contract_id: String) -> Array:
+	if VARIANT_EVIDENCE.has(case_id):
+		return (VARIANT_EVIDENCE[case_id] as Array).duplicate()
+	return required_evidence(contract_id)

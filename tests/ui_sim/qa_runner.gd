@@ -70,6 +70,10 @@ func _initialize() -> void:
 	# 強制內嵌子視窗（防止 AcceptDialog 分離到獨立 OS 視窗）。
 	get_root().gui_embed_subwindows = true
 
+	# 關掉滑鼠事件累積。開著的話 Godot 會把移動事件併到下一次處理才送，
+	# hover 狀態因此落後一拍，`gui_get_hovered_control()` 會回報上一個位置的舊值（K-48）。
+	Input.use_accumulated_input = false
+
 	var main_res := load("res://scenes/main.tscn")
 	if main_res == null:
 		_fail_before_scene(case_id, run_dir, "無法載入 res://scenes/main.tscn", case_obj, "scene_load")
@@ -208,6 +212,7 @@ func _write_case_manifest(output_path: String) -> void:
 			"required_data_root": case_obj.required_data_root,
 			"comparison_group": case_obj.comparison_group,
 			"required_evidence": QAContractMatrixClass.required_evidence(case_obj.contract_id),
+			"required_variant_evidence": QAContractMatrixClass.required_variant_evidence(case_obj.id, case_obj.contract_id),
 		})
 	var absolute_path := output_path.replace("\\", "/")
 	var parent := absolute_path.get_base_dir()

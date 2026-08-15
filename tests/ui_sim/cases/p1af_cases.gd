@@ -140,6 +140,44 @@ class UiCase extends CaseBaseClass:
 	func _run(tree: SceneTree) -> Dictionary:
 		return _state(tree).get("run", {}) as Dictionary
 
+	## a 有而 b 沒有的卡（重複張數也算），排序後回傳。
+	func _card_diff(a: Array, b: Array) -> Array:
+		var result: Array = []
+		var pool: Array = b.duplicate()
+		for item: Variant in a:
+			if pool.has(item):
+				pool.erase(item)
+			else:
+				result.append(item)
+		result.sort()
+		return result
+
+	## before 到 after 之間改掉的欄位；鍵是點路徑，值是 after 的 JSON 字串。
+	func _state_diff(before: Dictionary, after: Dictionary) -> Dictionary:
+		var flat_before := _flatten(before, "")
+		var flat_after := _flatten(after, "")
+		var result := {}
+		for key: Variant in flat_after.keys():
+			if not flat_before.has(key) or str(flat_before[key]) != str(flat_after[key]):
+				result[str(key)] = flat_after[key]
+		for key: Variant in flat_before.keys():
+			if not flat_after.has(key):
+				result[str(key)] = "<removed>"
+		return result
+
+	func _flatten(node: Dictionary, prefix: String) -> Dictionary:
+		var result := {}
+		var keys: Array = node.keys()
+		keys.sort()
+		for key: Variant in keys:
+			var path := (prefix + "." + str(key)) if not prefix.is_empty() else str(key)
+			var value: Variant = node[key]
+			if value is Dictionary:
+				result.merge(_flatten(value as Dictionary, path))
+			else:
+				result[path] = JSON.stringify(value)
+		return result
+
 	func _texts(root: Node) -> Array[String]:
 		var result: Array[String] = []
 		for item: Dictionary in QADiagnosticsClass.dump_ui_tree(root):
@@ -433,34 +471,22 @@ class UiCase extends CaseBaseClass:
 		else:
 			await _click(tree, "choose::d22_pm_sandbags::acai_read::obs_walk")
 		var after := _state(tree)
-		var after_run := after.get("run", {}) as Dictionary
-		var comparable := {
-			"choice": (after_run.get("choices", {}) as Dictionary).get("d22_pm_sandbags::acai_read", ""),
-			"slot_placed": (after_run.get("slots_placed", {}) as Dictionary).get("d22_pm_sandbags::obs_walk", false),
-			"knowledge": after.get("meta", {}).get("knowledge", {}).get("info_acai_walk", false),
-		}
-		var norm_state := (after.duplicate(true) as Dictionary)
-		var norm_run := norm_state.get("run", {}) as Dictionary
-		var norm_hand: Array = (norm_run.get("hand", []) as Array).duplicate()
-		norm_hand.erase("equip_polaroid")
-		norm_hand.erase("info_ahong_private")
-		norm_hand.sort()
-		norm_run["hand"] = norm_hand
-		var norm_flags := (norm_run.get("flags", {}) as Dictionary).duplicate()
-		norm_flags.erase("ahong_last_normal_contact")
-		norm_run["flags"] = norm_flags
-		var norm_slots := (norm_run.get("slots_placed", {}) as Dictionary).duplicate()
-		norm_slots.erase("d3_pm_sanquan::help_ahong")
-		norm_slots.erase("d3_pm_sanquan::handle_couple")
-		norm_run["slots_placed"] = norm_slots
-		norm_state["run"] = norm_run
+		# 比對「這個動作改了什麼」，不是「最後狀態長什麼樣」。
+		# 兩份 fixture 的取得路徑差異住在 before，做差之後自動抵銷，不需要維護排除清單。
+		var result_diff := _state_diff(before, after)
+		# 手牌整份比會把 fixture 差異一起比進去（帶卡那份手上多一張拍立得），
+		# 所以手牌改記「進了哪幾張、出了哪幾張」，兩條入口的增減必須逐字相同。
+		var hand_before: Array = ((before.get("run", {}) as Dictionary).get("hand", []) as Array)
+		var hand_after: Array = ((after.get("run", {}) as Dictionary).get("hand", []) as Array)
+		result_diff.erase("run.hand")
+		result_diff["run.hand+"] = JSON.stringify(_card_diff(hand_after, hand_before))
+		result_diff["run.hand-"] = JSON.stringify(_card_diff(hand_before, hand_after))
 		if comparison_group == "p1af_22_choice_equivalence":
 			return { "ok": errors.is_empty(), "errors": errors, "observations": {
-				"choice_result_normalized": norm_state,
-				"choice_result_projection": comparable,
+				"choice_result_diff": result_diff,
 				"fixture_causality": {
 					"with_card": with_card,
-					"source_hand": before.get("run", {}).get("hand", []),
+					"source_hand": hand_before,
 				},
 				"evidence": ["choice_equivalence_complete"],
 			} }

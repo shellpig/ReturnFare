@@ -2,7 +2,8 @@ class_name P1GCases
 extends RefCounted
 
 ## P1-G 驗收案例集（依 實作規格書.md > P1-G 與 開發設計方針.md > UI 模擬驗證 實作）
-## 包含 17 個獨立案例變體，嚴禁在測試開始後直呼 GameState 規則層（如 preview_slot），一律經由真實輸入事件進行。
+## P1-G 自己 18 個案例變體，另 append `p1af_cases.gd` 的變體湊成全套。
+## 嚴禁在測試開始後直呼 GameState 規則層（如 preview_slot），一律經由真實輸入事件進行。
 
 const CaseBaseClass := preload("res://tests/ui_sim/cases/case_base.gd")
 const P1AFCasesClass := preload("res://tests/ui_sim/cases/p1af_cases.gd")

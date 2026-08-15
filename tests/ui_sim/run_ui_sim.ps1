@@ -381,6 +381,7 @@ foreach ($caseDef in $caseDefs) {
 $normalEvidenceFailures = @()
 $contractEvidence = @{}
 $contractCaseReports = @{}
+$contractVariantEvidenceFailures = @{}
 foreach ($caseDef in $caseDefs) {
     $caseId = [string]$caseDef.id
     $contractId = [string]$caseDef.contract_id
@@ -398,6 +399,13 @@ foreach ($caseDef in $caseDefs) {
     $existingEvidence = @($contractEvidence[$contractId])
     $incomingEvidence = @($report.evidence)
     $contractEvidence[$contractId] = @($existingEvidence + $incomingEvidence) | Sort-Object -Unique
+    # 變體層：每個變體要自己送齊分派給它的 token，不能靠同契約的其他變體補。
+    $requiredVariantEvidence = @($caseDef.required_variant_evidence)
+    $missingVariantEvidence = @($requiredVariantEvidence | Where-Object { $_ -notin $incomingEvidence })
+    if ($missingVariantEvidence.Count -gt 0) {
+        $normalEvidenceFailures += "[$caseId] missing variant evidence: $($missingVariantEvidence -join ',')"
+        $contractVariantEvidenceFailures[$contractId] = $true
+    }
     if (-not [bool]$report.ok) {
         $normalEvidenceFailures += "[$caseId] report is not ok"
     }
@@ -422,12 +430,17 @@ foreach ($contractId in $executedContractIds) {
     $requiredEvidence = @($catalogVariants[0].required_evidence)
     $presentEvidence = @($contractEvidence[$contractId])
     $missingEvidence = @($requiredEvidence | Where-Object { $_ -notin $presentEvidence })
+    # 這個契約一份報告都沒讀到時，$contractCaseReports 裡根本沒有這個 key。
+    # 不補這個防護，下一行索引 $null 會讓 launcher 自己爆掉，
+    # 蓋掉「子程序沒產出報告」這個最該看清楚的失敗。
     $contractReportMap = $contractCaseReports[$contractId]
+    if ($null -eq $contractReportMap) { $contractReportMap = @{} }
     $failedVariants = @($executedVariants | Where-Object {
         $r = $contractReportMap[[string]$_.id]
         $null -eq $r -or -not [bool]$r.ok
     })
-    if ($missingVariants.Count -eq 0 -and $failedVariants.Count -eq 0 -and $missingEvidence.Count -eq 0) {
+    $variantEvidenceFailed = [bool]$contractVariantEvidenceFailures[$contractId]
+    if ($missingVariants.Count -eq 0 -and $failedVariants.Count -eq 0 -and $missingEvidence.Count -eq 0 -and -not $variantEvidenceFailed) {
         $completedContractCount++
     } else {
         $contractFailures += [pscustomobject]@{
@@ -435,6 +448,7 @@ foreach ($contractId in $executedContractIds) {
             MissingVariants = @($missingVariants | ForEach-Object { [string]$_.id })
             FailedVariants = @($failedVariants | ForEach-Object { [string]$_.id })
             MissingEvidence = $missingEvidence
+            VariantEvidenceFailed = $variantEvidenceFailed
         }
     }
 }
@@ -459,10 +473,8 @@ foreach ($group in $groups) {
         }
     }
     $signatures = @($groupReports | ForEach-Object {
-        if ($null -ne $_.observations.choice_result_normalized) {
-            $_.observations.choice_result_normalized | ConvertTo-Json -Compress -Depth 30
-        } elseif ($null -ne $_.observations.choice_result_projection) {
-            $_.observations.choice_result_projection | ConvertTo-Json -Compress -Depth 30
+        if ($null -ne $_.observations.choice_result_diff) {
+            $_.observations.choice_result_diff | ConvertTo-Json -Compress -Depth 30
         } else {
             ""
         }

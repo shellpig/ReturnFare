@@ -6,6 +6,9 @@ extends RefCounted
 
 const QADiagnosticsClass := preload("res://tests/ui_sim/qa_diagnostics.gd")
 
+## hover 同步的重試上限。排版與 hover 不保證在同一幀就位，送一次不夠（K-48）。
+const HOVER_SYNC_ATTEMPTS := 5
+
 static var _interim_enabled := false
 static var _interim_tree: SceneTree
 static var _interim_root: Node
@@ -36,6 +39,18 @@ static func end_interim_capture() -> void:
 
 static func get_interim_failures() -> Array[String]:
 	return _interim_failures.duplicate()
+
+
+## 送一發真實輸入事件並立刻讓引擎處理掉。
+##
+## `Input.parse_input_event()` 只是把事件排進佇列；Godot 預設還會把滑鼠事件累積到
+## 下一次處理才送（`use_accumulated_input`）。兩者相加的結果是「事件送出去了，
+## `gui_get_hovered_control()` 回報的還是上一個位置的舊 hover」——K-48 那些
+## 「預期 AdvanceButton、實際 HandBar」的誤報就是這樣來的，兩者矩形差了 440 像素。
+## 累積開關由 `qa_runner.gd` 在建場景前關掉，這裡負責每一發都 flush。
+static func send_input(event: InputEvent) -> void:
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
 
 
 ## 依 qa_id 遞迴搜尋所有 Control 節點（支援 internal 節點與萬用字元）
@@ -165,48 +180,54 @@ static func click(
 		p_scroll = p_scroll.get_parent()
 	await wait_draw_frames(tree, 2)
 
-	# 3. 計算螢幕/視口真實中心點與子視窗轉換
+	# 3～5. 算中心點、送滑鼠移動、核驗 hover 命中。
+	#
+	# 這三步綁在同一個迴圈裡重試（K-48）。Container 的排版是 `queue_sort()` 延後套用的，
+	# hover 也不保證跟事件同一幀更新，所以每一輪都要**重讀矩形**再重送事件——
+	# 只重送事件會拿到舊 hover，只重讀矩形則抓不到 hover 落後的那一拍。
 	var target_vp := target.get_viewport()
-	var screen_pos: Vector2 = target.get_screen_position()
-	var rect_size: Vector2 = target.size
-	if rect_size.x <= 0 or rect_size.y <= 0:
-		rect_size = target.get_global_rect().size
-
-	if rect_size.x <= 0 or rect_size.y <= 0:
-		result["error"] = "目標元件尺寸為 0 (size: %s)" % str(rect_size)
-		return result
-
-	var screen_center: Vector2 = screen_pos + rect_size * 0.5
-	result["target_pos"] = screen_center
-
-	# 邊界檢查：中心點必須落在主視口範圍內 (1280x720)
 	var root_rect := Rect2(Vector2.ZERO, root.get_visible_rect().size)
-	if not root_rect.has_point(screen_center):
-		result["error"] = "目標中心點越界 (點: %s, 視口: %s)" % [str(screen_center), str(root_rect.size)]
-		return result
-
-	# 4. 送 InputEventMouseMotion 並等候 2 幀更新 Hover 狀態
-	var motion := InputEventMouseMotion.new()
-	motion.position = screen_center
-	motion.global_position = screen_center
-	Input.parse_input_event(motion)
-	await wait_draw_frames(tree, 2)
-
-	# 5. 核驗 Hover 命中：目標所屬 Viewport 實際 Hover 之 Control 必須為目標或其子孫
-	var hovered: Control = target_vp.gui_get_hovered_control()
-	result["hovered_before"] = _control_info(hovered)
-
+	var screen_center := Vector2.ZERO
+	var hovered: Control = null
 	var hit_ok := false
-	if hovered == target or (hovered != null and target.is_ancestor_of(hovered)):
-		hit_ok = true
-	else:
-		# 重試一次滑鼠移動事件並等待 2 幀以應對佈局剛更新之情況
-		Input.parse_input_event(motion)
+	var geometry_error := ""
+
+	for attempt in range(HOVER_SYNC_ATTEMPTS):
+		geometry_error = ""
+		var rect_size: Vector2 = target.size
+		if rect_size.x <= 0 or rect_size.y <= 0:
+			rect_size = target.get_global_rect().size
+
+		if rect_size.x <= 0 or rect_size.y <= 0:
+			geometry_error = "目標元件尺寸為 0 (size: %s)" % str(rect_size)
+			await wait_draw_frames(tree, 2)
+			continue
+
+		screen_center = target.get_screen_position() + rect_size * 0.5
+
+		# 邊界檢查：中心點必須落在主視口範圍內 (1280x720)
+		if not root_rect.has_point(screen_center):
+			geometry_error = "目標中心點越界 (點: %s, 視口: %s)" % [str(screen_center), str(root_rect.size)]
+			await wait_draw_frames(tree, 2)
+			continue
+
+		var motion := InputEventMouseMotion.new()
+		motion.position = screen_center
+		motion.global_position = screen_center
+		send_input(motion)
 		await wait_draw_frames(tree, 2)
+
 		hovered = target_vp.gui_get_hovered_control()
-		result["hovered_before"] = _control_info(hovered)
 		if hovered == target or (hovered != null and target.is_ancestor_of(hovered)):
 			hit_ok = true
+			break
+
+	result["target_pos"] = screen_center
+	result["hovered_before"] = _control_info(hovered)
+
+	if not geometry_error.is_empty():
+		result["error"] = geometry_error
+		return result
 
 	if not hit_ok:
 		var hovered_name: String = str(hovered.name) if hovered != null else "null"
@@ -223,7 +244,7 @@ static func click(
 	press_event.pressed = true
 	press_event.position = screen_center
 	press_event.global_position = screen_center
-	Input.parse_input_event(press_event)
+	send_input(press_event)
 	await wait_draw_frames(tree, 2)
 
 	# 7. 送 InputEventMouseButton (pressed = false)
@@ -232,7 +253,7 @@ static func click(
 	release_event.pressed = false
 	release_event.position = screen_center
 	release_event.global_position = screen_center
-	Input.parse_input_event(release_event)
+	send_input(release_event)
 	await wait_draw_frames(tree, 2)
 
 	# 8. 紀錄點擊後 Hover 狀態
@@ -277,7 +298,7 @@ static func scroll_into_view(tree: SceneTree, scroll_container: ScrollContainer,
 	var motion := InputEventMouseMotion.new()
 	motion.position = wheel_pos
 	motion.global_position = wheel_pos
-	Input.parse_input_event(motion)
+	send_input(motion)
 	await wait_draw_frames(tree, 1)
 
 	var last_target_y := INF
@@ -307,13 +328,13 @@ static func scroll_into_view(tree: SceneTree, scroll_container: ScrollContainer,
 		press.pressed = true
 		press.position = wheel_pos
 		press.global_position = wheel_pos
-		Input.parse_input_event(press)
+		send_input(press)
 		var release := InputEventMouseButton.new()
 		release.button_index = button_index
 		release.pressed = false
 		release.position = wheel_pos
 		release.global_position = wheel_pos
-		Input.parse_input_event(release)
+		send_input(release)
 		# Container 的重新排版是 queue_sort() 延遲處理，1 幀不一定夠讓捲動後的
 		# 新位置真正落地；等不夠幀會在下一輪誤讀到舊座標，被「位置沒變」的
 		# 收斂判斷誤認成捲動已到底而提早失敗。全檔其餘輸入步驟統一等 2 幀，這裡跟著對齊。
