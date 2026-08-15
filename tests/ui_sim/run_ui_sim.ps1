@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Case = "",
     [string]$GodotBin = "C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe",
     [int]$TimeoutSeconds = 180,
@@ -69,6 +69,25 @@ function Read-JsonFile {
     }
 }
 
+function New-IsolatedRunDirectory {
+    param([string]$Root)
+    for ($attempt = 0; $attempt -lt 12; $attempt++) {
+        $shortGuid = [Guid]::NewGuid().ToString("N").Substring(0, 8)
+        $runIdCandidate = "{0}-p{1}-{2}" -f (Get-Date).ToString("yyyyMMdd-HHmmss-fff"), $PID, $shortGuid
+        $path = Join-Path $Root $runIdCandidate
+        try {
+            # 不使用 -Force：同名時讓建立動作失敗並重試，避免平行 launcher 共用目錄。
+            New-Item -ItemType Directory -Path $path -ErrorAction Stop | Out-Null
+            return [pscustomobject]@{ Id = $runIdCandidate; Path = $path }
+        } catch {
+            if (-not (Test-Path $path)) {
+                throw
+            }
+        }
+    }
+    throw "無法建立碰撞安全的 UI QA run directory: $Root"
+}
+
 function Invoke-NegativeTests {
     param(
         [string]$RunDir,
@@ -83,58 +102,83 @@ function Invoke-NegativeTests {
     $validJson = Get-Content -Path $validState -Raw -Encoding utf8
     $validObject = $validJson | ConvertFrom-Json
 
-    $malformedPath = Join-Path $negativeDir "malformed.json"
-    Set-Content -Path $malformedPath -Value "{ not-json" -Encoding utf8
-
-    $shapePath = Join-Path $negativeDir "invalid-shape.json"
-    Set-Content -Path $shapePath -Value '{"run":{}}' -Encoding utf8
-
-    $badDay = $validObject | ConvertTo-Json -Depth 30
-    $badDayObject = $badDay | ConvertFrom-Json
-    $badDayObject.run.day = 46
-    $badDayPath = Join-Path $negativeDir "invalid-day.json"
-    $badDayObject | ConvertTo-Json -Depth 30 | Set-Content -Path $badDayPath -Encoding utf8
-
-    $badPhaseObject = $validJson | ConvertFrom-Json
-    $badPhaseObject.run.phase = "invalid"
-    $badPhasePath = Join-Path $negativeDir "invalid-phase.json"
-    $badPhaseObject | ConvertTo-Json -Depth 30 | Set-Content -Path $badPhasePath -Encoding utf8
-
     $negativeDefs = @(
-        @{ Id = "missing_state"; CaseId = "p1af_08_map_filter"; State = (Join-Path $negativeDir "missing.json"); IncludeRunDir = $true },
-        @{ Id = "malformed_json"; CaseId = "p1af_08_map_filter"; State = $malformedPath; IncludeRunDir = $true },
-        @{ Id = "invalid_shape"; CaseId = "p1af_08_map_filter"; State = $shapePath; IncludeRunDir = $true },
-        @{ Id = "invalid_day"; CaseId = "p1af_08_map_filter"; State = $badDayPath; IncludeRunDir = $true },
-        @{ Id = "invalid_phase"; CaseId = "p1af_08_map_filter"; State = $badPhasePath; IncludeRunDir = $true },
-        @{ Id = "unknown_case"; CaseId = "case_does_not_exist"; State = ""; IncludeRunDir = $true },
-        @{ Id = "missing_run_dir"; CaseId = "p1af_08_map_filter"; State = $validState; IncludeRunDir = $false }
+        @{ Id = "missing_state"; CaseId = "p1af_08_map_filter"; StateKind = "missing"; ExpectedPattern = "--state 檔案不存在"; IncludeRunDir = $true },
+        @{ Id = "malformed_json"; CaseId = "p1af_08_map_filter"; StateKind = "malformed"; ExpectedPattern = "--state JSON 解析失敗"; IncludeRunDir = $true },
+        @{ Id = "invalid_shape"; CaseId = "p1af_08_map_filter"; StateKind = "shape"; ExpectedPattern = "必要欄位遺失"; IncludeRunDir = $true },
+        @{ Id = "invalid_day"; CaseId = "p1af_08_map_filter"; StateKind = "day"; ExpectedPattern = "run.day 超出範圍"; IncludeRunDir = $true },
+        @{ Id = "invalid_phase"; CaseId = "p1af_08_map_filter"; StateKind = "phase"; ExpectedPattern = "run.phase 不合法"; IncludeRunDir = $true },
+        @{ Id = "invalid_noninteger"; CaseId = "p1af_08_map_filter"; StateKind = "noninteger"; ExpectedPattern = "應為有限整數|應為整數"; IncludeRunDir = $true },
+        @{ Id = "state_case_mismatch"; CaseId = "p1af_01_boot"; StateKind = "valid"; ExpectedPattern = "案例不接受 --state"; IncludeRunDir = $true },
+        @{ Id = "unknown_case"; CaseId = "case_does_not_exist"; StateKind = "none"; ExpectedPattern = "找不到案例 id"; IncludeRunDir = $true },
+        @{ Id = "invalid_data_root"; CaseId = "p1af_01_boot"; StateKind = "none"; ExpectedPattern = "--data-root 資料不合法"; IncludeRunDir = $true; InvalidDataRoot = $true },
+        @{ Id = "missing_case_arg"; CaseId = ""; StateKind = "none"; ExpectedPattern = "缺少必要參數 --case"; IncludeRunDir = $true },
+        @{ Id = "missing_run_dir"; CaseId = "p1af_08_map_filter"; StateKind = "valid"; ExpectedPattern = "缺少必要參數 --run-dir"; IncludeRunDir = $false }
     )
 
     $results = @()
     foreach ($negative in $negativeDefs) {
-        $logPath = Join-Path $negativeDir ($negative.Id + ".log")
+        $negativeRunDir = Join-Path $negativeDir $negative.Id
+        New-Item -ItemType Directory -Force -Path $negativeRunDir | Out-Null
+        $negativeStatesDir = Join-Path $negativeRunDir "states"
+        New-Item -ItemType Directory -Force -Path $negativeStatesDir | Out-Null
+        $statePath = Join-Path $negativeStatesDir "d2_morning.json"
+        switch ($negative.StateKind) {
+            "valid" { Set-Content -Path $statePath -Value $validJson -Encoding utf8 }
+            "malformed" { Set-Content -Path $statePath -Value "{ not-json" -Encoding utf8 }
+            "shape" { Set-Content -Path $statePath -Value '{"run":{}}' -Encoding utf8 }
+            "day" {
+                $badDayObject = $validJson | ConvertFrom-Json
+                $badDayObject.run.day = 46
+                $badDayObject | ConvertTo-Json -Depth 30 | Set-Content -Path $statePath -Encoding utf8
+            }
+            "phase" {
+                $badPhaseObject = $validJson | ConvertFrom-Json
+                $badPhaseObject.run.phase = "invalid"
+                $badPhaseObject | ConvertTo-Json -Depth 30 | Set-Content -Path $statePath -Encoding utf8
+            }
+            "noninteger" {
+                $badNumberObject = $validJson | ConvertFrom-Json
+                $badNumberObject.run.day = 2.5
+                $badNumberObject | ConvertTo-Json -Depth 30 | Set-Content -Path $statePath -Encoding utf8
+            }
+        }
+        $logPath = Join-Path $negativeRunDir ($negative.Id + ".log")
         $args = @(
             "--path", ".",
             "--script", "res://tests/ui_sim/qa_runner.gd",
             "--log-file", $logPath,
-            "--",
-            "--case", $negative.CaseId
+            "--"
         )
-        if (-not [string]::IsNullOrEmpty($negative.State)) {
-            $args += @("--state", $negative.State)
+        if (-not [string]::IsNullOrEmpty($negative.CaseId)) {
+            $args += @("--case", $negative.CaseId)
+        }
+        if ($negative.StateKind -in @("valid", "malformed", "shape", "day", "phase", "noninteger", "missing")) {
+            $args += @("--state", $statePath)
         }
         if ($negative.IncludeRunDir) {
-            $args += @("--run-dir", $RunDir)
+            $args += @("--run-dir", $negativeRunDir)
+        }
+        if ($negative.InvalidDataRoot) {
+            $args += @("--data-root", (Join-Path $negativeRunDir "missing-data"))
         }
         $runResult = Invoke-GodotProcess -Binary $GodotBinary -ArgumentList $args -TimeoutSec $TimeoutSec
         $logText = if (Test-Path $logPath) { Get-Content -Path $logPath -Raw -Encoding utf8 } else { "" }
-        $leak = $logText -match "ObjectDB instances leaked|resources still in use"
-        $ok = (-not $runResult.Timeout) -and ($runResult.ExitCode -ne 0) -and (-not $leak)
+        $leak = $logText -match "ObjectDB instances leaked|resources still in use|SCRIPT ERROR"
+        $expected = $logText -match $negative.ExpectedPattern
+        $reportPath = Join-Path $negativeRunDir ("reports\{0}.json" -f $negative.CaseId)
+        $report = Read-JsonFile $reportPath
+        if (-not $expected -and $null -ne $report -and $report.errors) {
+            $expected = (@($report.errors) -join "`n") -match $negative.ExpectedPattern
+        }
+        $ok = (-not $runResult.Timeout) -and ($runResult.ExitCode -ne 0) -and $expected -and (-not $leak)
         $error = ""
         if ($runResult.Timeout) {
             $error = "unexpected timeout"
         } elseif ($runResult.ExitCode -eq 0) {
             $error = "invalid input unexpectedly exited 0"
+        } elseif (-not $expected) {
+            $error = "expected error pattern not found: $($negative.ExpectedPattern)"
         } elseif ($leak) {
             $error = "lifecycle warning leaked into negative diagnostic"
         }
@@ -143,14 +187,19 @@ function Invoke-NegativeTests {
             Ok = $ok
             ExitCode = $runResult.ExitCode
             Error = $error
+            ReportPath = $reportPath
+            RunDir = $negativeRunDir
         }
     }
     return $results
 }
 
-$runId = (Get-Date).ToString("yyyyMMdd-HHmmss-fff")
 $qaDir = Join-Path $projectRoot "_qa"
-$runDir = Join-Path $qaDir "runs\$runId"
+$runRoot = Join-Path $qaDir "runs"
+New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
+$runInfo = New-IsolatedRunDirectory -Root $runRoot
+$runId = $runInfo.Id
+$runDir = $runInfo.Path
 $statesDir = Join-Path $runDir "states"
 $dataVariantsDir = Join-Path $runDir "data_variants"
 
@@ -229,9 +278,13 @@ if ($null -eq $manifest -or $null -eq $manifest.cases) {
     exit 1
 }
 $allCaseDefs = @($manifest.cases)
-$contractCount = @($allCaseDefs | ForEach-Object { $_.contract_id } | Sort-Object -Unique).Count
-if ($contractCount -ne 47) {
-    Write-Host "ERROR: Runner contract count is $contractCount, expected 47." -ForegroundColor Red
+$matrixContractIds = @($manifest.contract_matrix | ForEach-Object { [string]$_ } | Sort-Object -Unique)
+$catalogContractCount = $matrixContractIds.Count
+$actualCatalogIds = @($allCaseDefs | ForEach-Object { [string]$_.contract_id } | Sort-Object -Unique)
+$missingCatalogIds = @($matrixContractIds | Where-Object { $_ -notin $actualCatalogIds })
+$unexpectedCatalogIds = @($actualCatalogIds | Where-Object { $_ -notin $matrixContractIds })
+if ($catalogContractCount -ne 47 -or $missingCatalogIds.Count -gt 0 -or $unexpectedCatalogIds.Count -gt 0) {
+    Write-Host "ERROR: Contract matrix/catalog mismatch. matrix=$catalogContractCount missing=$($missingCatalogIds -join ',') unexpected=$($unexpectedCatalogIds -join ',')" -ForegroundColor Red
     exit 1
 }
 $caseDefs = $allCaseDefs
@@ -241,9 +294,15 @@ if (-not [string]::IsNullOrEmpty($Case)) {
         Write-Host "ERROR: Case not found: $Case" -ForegroundColor Red
         exit 1
     }
+    $selectedGroup = [string]$caseDefs[0].comparison_group
+    if (-not [string]::IsNullOrEmpty($selectedGroup)) {
+        $caseDefs = @($allCaseDefs | Where-Object { $_.comparison_group -eq $selectedGroup })
+        Write-Host "  Case selection expands comparison group [$selectedGroup] to $($caseDefs.Count) variants." -ForegroundColor DarkGray
+    }
 }
+$executedContractCount = @($caseDefs | ForEach-Object { [string]$_.contract_id } | Sort-Object -Unique).Count
 
-Write-Host "[3/4] Executing $($caseDefs.Count) UI variants ($contractCount contracts)..." -ForegroundColor Yellow
+Write-Host "[3/4] Executing $($caseDefs.Count) UI variants (catalog $catalogContractCount, executed $executedContractCount contracts)..." -ForegroundColor Yellow
 $results = @()
 $failedCount = 0
 foreach ($caseDef in $caseDefs) {
@@ -310,11 +369,79 @@ foreach ($caseDef in $caseDefs) {
     }
 }
 
+$normalEvidenceFailures = @()
+$contractEvidence = @{}
+$contractCaseReports = @{}
+foreach ($caseDef in $caseDefs) {
+    $caseId = [string]$caseDef.id
+    $contractId = [string]$caseDef.contract_id
+    $reportPath = Join-Path $runDir "reports\$caseId.json"
+    $report = Read-JsonFile $reportPath
+    if ($null -eq $report) {
+        $normalEvidenceFailures += "[$caseId] report missing or invalid"
+        continue
+    }
+    if (-not $contractCaseReports.ContainsKey($contractId)) {
+        $contractCaseReports[$contractId] = @{}
+        $contractEvidence[$contractId] = @()
+    }
+    $contractCaseReports[$contractId][$caseId] = $report
+    $existingEvidence = @($contractEvidence[$contractId])
+    $incomingEvidence = @($report.evidence)
+    $contractEvidence[$contractId] = @($existingEvidence + $incomingEvidence) | Sort-Object -Unique
+    if (-not [bool]$report.ok) {
+        $normalEvidenceFailures += "[$caseId] report is not ok"
+    }
+    if ([string]$report.contract_id -ne $contractId) {
+        $normalEvidenceFailures += "[$caseId] contract_id mismatch"
+    }
+    foreach ($artifact in @("shot_file", "dump_file")) {
+        $artifactPath = [string]$report.$artifact
+        if ([string]::IsNullOrEmpty($artifactPath) -or -not (Test-Path $artifactPath)) {
+            $normalEvidenceFailures += "[$caseId] missing $artifact"
+        }
+    }
+}
+
+$contractFailures = @()
+$completedContractCount = 0
+$executedContractIds = @($caseDefs | ForEach-Object { [string]$_.contract_id } | Sort-Object -Unique)
+foreach ($contractId in $executedContractIds) {
+    $catalogVariants = @($allCaseDefs | Where-Object { [string]$_.contract_id -eq $contractId })
+    $executedVariants = @($caseDefs | Where-Object { [string]$_.contract_id -eq $contractId })
+    $missingVariants = @($catalogVariants | Where-Object { $_.id -notin @($executedVariants | ForEach-Object { $_.id }) })
+    $requiredEvidence = @($catalogVariants[0].required_evidence)
+    $presentEvidence = @($contractEvidence[$contractId])
+    $missingEvidence = @($requiredEvidence | Where-Object { $_ -notin $presentEvidence })
+    $contractReportMap = $contractCaseReports[$contractId]
+    $failedVariants = @($executedVariants | Where-Object {
+        $r = $contractReportMap[[string]$_.id]
+        $null -eq $r -or -not [bool]$r.ok
+    })
+    if ($missingVariants.Count -eq 0 -and $failedVariants.Count -eq 0 -and $missingEvidence.Count -eq 0) {
+        $completedContractCount++
+    } else {
+        $contractFailures += [pscustomobject]@{
+            ContractId = $contractId
+            MissingVariants = @($missingVariants | ForEach-Object { [string]$_.id })
+            FailedVariants = @($failedVariants | ForEach-Object { [string]$_.id })
+            MissingEvidence = $missingEvidence
+        }
+    }
+}
+
 $comparisonResults = @()
 $comparisonFailures = 0
 $groups = @($caseDefs | Where-Object { -not [string]::IsNullOrEmpty([string]$_.comparison_group) } | Group-Object comparison_group)
 foreach ($group in $groups) {
-    $groupReports = @()
+	$expectedGroup = @($allCaseDefs | Where-Object { $_.comparison_group -eq $group.Name })
+	if ($group.Group.Count -lt $expectedGroup.Count) {
+		$comparisonResults += [pscustomobject]@{ Group = $group.Name; Ok = $false; Status = "SKIPPED_INCOMPLETE_GROUP"; Cases = @($group.Group.id) }
+		$comparisonFailures++
+		Write-Host "  -> Comparison [$($group.Name)] SKIPPED_INCOMPLETE_GROUP" -ForegroundColor Red
+		continue
+	}
+	$groupReports = @()
     foreach ($member in $group.Group) {
         $path = Join-Path $runDir "reports\$([string]$member.id).json"
         $memberReport = Read-JsonFile $path
@@ -323,10 +450,11 @@ foreach ($group in $groups) {
         }
     }
     $signatures = @($groupReports | ForEach-Object {
-        if ($null -eq $_.observations.state_without_hand) { "" } else { $_.observations.state_without_hand | ConvertTo-Json -Compress -Depth 30 }
+        if ($null -eq $_.observations.choice_result_projection) { "" } else { $_.observations.choice_result_projection | ConvertTo-Json -Compress -Depth 30 }
     } | Sort-Object -Unique)
     $same = ($groupReports.Count -eq $group.Group.Count) -and ($signatures.Count -eq 1) -and (-not [string]::IsNullOrEmpty($signatures[0]))
-    $comparisonResults += [pscustomobject]@{ Group = $group.Name; Ok = $same; Cases = @($group.Group.id) }
+	$comparisonStatus = if ($same) { "OK" } else { "FAIL" }
+	$comparisonResults += [pscustomobject]@{ Group = $group.Name; Ok = $same; Status = $comparisonStatus; Cases = @($group.Group.id) }
     if (-not $same) {
         $comparisonFailures++
         Write-Host "  -> Comparison [$($group.Name)] FAIL" -ForegroundColor Red
@@ -351,26 +479,33 @@ if ([string]::IsNullOrEmpty($Case) -and -not $SkipNegative) {
 }
 
 $negativeFailures = @($negativeResults | Where-Object { -not $_.Ok }).Count
-$totalFailures = $failedCount + $comparisonFailures + $negativeFailures
+$contractFailureCount = $contractFailures.Count
+$totalFailures = $failedCount + $comparisonFailures + $negativeFailures + $normalEvidenceFailures.Count + $contractFailureCount
 $summary = [ordered]@{
     RunId = $runId
     Timestamp = (Get-Date).ToString("o")
     VariantCount = $caseDefs.Count
-    ContractCount = $contractCount
+    CatalogContractCount = $catalogContractCount
+    ExecutedContractCount = $executedContractCount
+    CompletedContractCount = $completedContractCount
     PassedVariants = $caseDefs.Count - $failedCount
     FailedVariants = $failedCount
     ComparisonFailures = $comparisonFailures
     NegativeFailures = $negativeFailures
+    EvidenceFailures = $normalEvidenceFailures.Count
+    ContractFailures = $contractFailureCount
     TotalFailures = $totalFailures
     Results = $results
     ComparisonResults = $comparisonResults
     NegativeTests = $negativeResults
+    NormalEvidenceFailures = $normalEvidenceFailures
+    ContractFailureDetails = $contractFailures
 }
 $summaryPath = Join-Path $runDir "report.json"
 $summary | ConvertTo-Json -Depth 30 | Set-Content -Path $summaryPath -Encoding utf8
 
 Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "UI Simulation Summary: variants $($caseDefs.Count), contracts $contractCount, failed checks $totalFailures"
+Write-Host "UI Simulation Summary: variants $($caseDefs.Count), catalog contracts $catalogContractCount, executed contracts $executedContractCount, completed contracts $completedContractCount, failed checks $totalFailures"
 Write-Host "Report saved to: $summaryPath"
 Write-Host "=========================================" -ForegroundColor Cyan
 if ($totalFailures -gt 0) {

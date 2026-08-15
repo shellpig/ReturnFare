@@ -270,7 +270,7 @@ func _card_display_name(card_id: String) -> String:
 func _on_place_pressed(beat_id: String, slot_id: String, card_id: String) -> void:
 	var result: Dictionary = GameState.try_place(card_id, beat_id, slot_id)
 	if result.get("ok", false):
-		_status_label.text = ""
+		_status_label.text = "\n".join(result.get("lines", PackedStringArray()))
 		state_changed.emit()
 	else:
 		_set_failure_status(result)
@@ -280,7 +280,7 @@ func _on_place_pressed(beat_id: String, slot_id: String, card_id: String) -> voi
 func _on_choose_pressed(beat_id: String, group_id: String, slot_id: String, card_id: String) -> void:
 	var result: Dictionary = GameState.choose(beat_id, group_id, slot_id, card_id)
 	if result.get("ok", false):
-		_status_label.text = ""
+		_status_label.text = "\n".join(result.get("lines", PackedStringArray()))
 		state_changed.emit()
 	else:
 		_set_failure_status(result)

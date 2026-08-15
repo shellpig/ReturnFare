@@ -14,6 +14,8 @@ const _LABEL_KNOWLEDGE_PREFIX := "知識："
 
 
 func _ready() -> void:
+	if not Data.ok or Data.loader == null:
+		return
 	_slots_label.set_meta("qa_id", "hand_slots")
 	_hand_label.set_meta("qa_id", "hand_cards")
 	_knowledge_label.set_meta("qa_id", "knowledge_cards")

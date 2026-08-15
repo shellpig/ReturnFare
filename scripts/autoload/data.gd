@@ -26,58 +26,59 @@ func _ready() -> void:
 
 
 func load_data(data_dir: String = "res://data/") -> bool:
-	ok = false
-	loader = DataLoader.new(data_dir)
-	if not loader.load_all():
-		for e in loader.errors:
-			push_error("[Data] " + e)
+	var candidate := DataLoader.new(data_dir)
+	var validation := _validate_loader(candidate)
+	for e in validation.errors:
+		push_error("[Data] " + str(e))
+	for w in validation.warnings:
+		push_warning("[Data] " + str(w))
+	if not validation.errors.is_empty():
 		return false
-
-	var refs := loader.verify_references()
-	if not refs.is_empty():
-		for e in refs:
-			push_error("[Data] " + e)
-		return false
-
-	# 語彙封閉性 lint 1（規格書第十七節）：未知 condition/effect 鍵擋開機。
-	var vocab_problems := DataLoader.lint_vocabulary(loader.beats)
-	if not vocab_problems.is_empty():
-		for e in vocab_problems:
-			push_error("[Data] " + e)
-		return false
-
-	# lint 9：卡片 type 與顯示型別定義封閉。
-	var card_type_problems := DataLoader.lint_card_types(loader)
-	if not card_type_problems.is_empty():
-		for e in card_type_problems:
-			push_error("[Data] " + e)
-		return false
-
-	# lint 2：有 requires 卻沒填 reject_reason，只警告不擋開機。
-	for w in DataLoader.lint_missing_reject_reason(loader.beats):
-		push_warning("[Data] " + w)
-
-	# tuning 必要鍵存在性檢查（規格書第二節、已知問題 K-07）
-	for key: String in REQUIRED_TUNING_KEYS:
-		if tuning(key) == null:
-			push_error("[Data] tuning.json 缺少必要鍵：%s" % key)
-			return false
-
-	# tuning.phases_per_day 只是一致性驗證，它本身不是可調數值（規格書第二節）
-	var ppd: Variant = loader.tuning.get("phases_per_day")
-	var gs_node := _find_game_state()
-	if gs_node == null:
-		push_error("[Data] GameState not found (既非 Engine singleton，/root 底下也沒有)")
-		return false
-	var expected_count: int = gs_node.ACTION_PHASES.size()
-	if ppd != expected_count:
-		push_error("[Data] tuning.phases_per_day=%s ≠ ACTION_PHASES count=%d" % [
-			str(ppd), expected_count
-		])
-		return false
-
+	loader = candidate
 	ok = true
 	return true
+
+
+## QA runner 在建立主場景前使用；失敗時不替換目前有效 loader。
+func validate_data_root(data_dir: String) -> PackedStringArray:
+	var candidate := DataLoader.new(data_dir)
+	return _validate_loader(candidate).errors
+
+
+func _validate_loader(candidate: DataLoader) -> Dictionary:
+	var errors: PackedStringArray = []
+	var warnings: PackedStringArray = []
+	if not candidate.load_all():
+		errors.append_array(candidate.errors)
+		return {"errors": errors, "warnings": warnings}
+
+	errors.append_array(candidate.verify_references())
+	errors.append_array(DataLoader.lint_vocabulary(candidate.beats))
+	errors.append_array(DataLoader.lint_card_types(candidate))
+	warnings.append_array(DataLoader.lint_missing_reject_reason(candidate.beats))
+	for key: String in REQUIRED_TUNING_KEYS:
+		if _candidate_tuning(candidate, key) == null:
+			errors.append("tuning.json 缺少必要鍵：%s" % key)
+
+	var ppd: Variant = candidate.tuning.get("phases_per_day")
+	var gs_node := _find_game_state()
+	if gs_node == null:
+		errors.append("GameState not found (既非 Engine singleton，/root 底下也沒有)")
+	else:
+		var expected_count: int = gs_node.ACTION_PHASES.size()
+		if ppd != expected_count:
+			errors.append("tuning.phases_per_day=%s ≠ ACTION_PHASES count=%d" % [str(ppd), expected_count])
+	return {"errors": errors, "warnings": warnings}
+
+
+func _candidate_tuning(candidate: DataLoader, key: String) -> Variant:
+	var node: Variant = candidate.tuning
+	for part in key.split("."):
+		if node is Dictionary and node.has(part):
+			node = node[part]
+		else:
+			return null
+	return node
 
 
 ## 取得 GameState，兩條路依序試。

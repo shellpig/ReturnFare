@@ -8,6 +8,8 @@ const CaseBaseClass := preload("res://tests/ui_sim/cases/case_base.gd")
 const P1GCasesClass := preload("res://tests/ui_sim/cases/p1g_cases.gd")
 const QAStepClass := preload("res://tests/ui_sim/qa_step.gd")
 const QADiagnosticsClass := preload("res://tests/ui_sim/qa_diagnostics.gd")
+const QAValidationClass := preload("res://tests/ui_sim/qa_validation.gd")
+const QAContractMatrixClass := preload("res://tests/ui_sim/qa_contract_matrix.gd")
 
 
 func _initialize() -> void:
@@ -23,6 +25,7 @@ func _initialize() -> void:
 	var case_id := str(parsed.get("case", ""))
 	var run_dir := str(parsed.get("run_dir", ""))
 	var state_path := str(parsed.get("state", ""))
+	var data_root := str(parsed.get("data_root", ""))
 
 	if case_id.is_empty():
 		printerr("qa_runner: 缺少必要參數 --case <case_id>")
@@ -40,17 +43,28 @@ func _initialize() -> void:
 
 	var case_obj: CaseBaseClass = P1GCasesClass.get_case_by_id(case_id)
 	if case_obj == null:
-		_fail_before_scene(case_id, run_dir, "找不到案例 id: %s" % case_id)
+		_fail_before_scene(case_id, run_dir, "找不到案例 id: %s" % case_id, null, "case_lookup")
 		return
+
+	if not data_root.is_empty():
+		data_root = _normalize_dir(data_root)
+		var data_node := get_root().get_node_or_null("Data")
+		if data_node == null:
+			_fail_before_scene(case_id, run_dir, "Data autoload 尚未建立", case_obj, "data_root")
+			return
+		var data_errors: PackedStringArray = data_node.call("validate_data_root", data_root)
+		if not data_errors.is_empty():
+			_fail_before_scene(case_id, run_dir, "--data-root 資料不合法: %s" % "; ".join(data_errors), case_obj, "data_root")
+			return
 
 	var mapping_error := _validate_case_mapping(case_obj, state_path)
 	if not mapping_error.is_empty():
-		_fail_before_scene(case_id, run_dir, mapping_error)
+		_fail_before_scene(case_id, run_dir, mapping_error, case_obj, "case_mapping")
 		return
 
 	var state_error := _validate_state_file(state_path)
 	if not state_error.is_empty():
-		_fail_before_scene(case_id, run_dir, state_error)
+		_fail_before_scene(case_id, run_dir, state_error, case_obj, "state_validation")
 		return
 
 	# 強制內嵌子視窗（防止 AcceptDialog 分離到獨立 OS 視窗）。
@@ -58,7 +72,7 @@ func _initialize() -> void:
 
 	var main_res := load("res://scenes/main.tscn")
 	if main_res == null:
-		_fail_before_scene(case_id, run_dir, "無法載入 res://scenes/main.tscn")
+		_fail_before_scene(case_id, run_dir, "無法載入 res://scenes/main.tscn", case_obj, "scene_load")
 		return
 
 	var main_node: Control = main_res.instantiate() as Control
@@ -72,6 +86,10 @@ func _initialize() -> void:
 	var res: Dictionary = await case_obj.run(self, main_node, run_dir)
 	var is_ok: bool = bool(res.get("ok", false))
 	var errors: Array = res.get("errors", []) as Array
+	var observations: Dictionary = res.get("observations", {}) as Dictionary
+	var evidence: Array = res.get("evidence", observations.get("evidence", [])) as Array
+	if evidence.is_empty() and errors.is_empty():
+		evidence = ["case_ok"]
 	for interim_error in QAStepClass.get_interim_failures():
 		errors.append(str(interim_error))
 	is_ok = is_ok and QAStepClass.get_interim_failures().is_empty()
@@ -112,7 +130,8 @@ func _initialize() -> void:
 		"ok": is_ok and errors.is_empty(),
 		"errors": errors,
 		"geometry": geo_res,
-		"observations": res.get("observations", {}),
+		"observations": observations,
+		"evidence": evidence,
 		"shot_file": shot_file,
 		"dump_file": dump_file,
 	}
@@ -143,6 +162,7 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 		"run_dir": "",
 		"output": "",
 		"list_cases": false,
+		"data_root": "",
 	}
 	var i := 0
 	while i < args.size():
@@ -158,6 +178,10 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 			"--run-dir":
 				if i + 1 < args.size():
 					result["run_dir"] = args[i + 1]
+					i += 1
+			"--data-root":
+				if i + 1 < args.size() and not args[i + 1].begins_with("--"):
+					result["data_root"] = args[i + 1]
 					i += 1
 			"--list-cases":
 				result["list_cases"] = true
@@ -183,6 +207,7 @@ func _write_case_manifest(output_path: String) -> void:
 			"required_state": case_obj.required_state,
 			"required_data_root": case_obj.required_data_root,
 			"comparison_group": case_obj.comparison_group,
+			"required_evidence": QAContractMatrixClass.required_evidence(case_obj.contract_id),
 		})
 	var absolute_path := output_path.replace("\\", "/")
 	var parent := absolute_path.get_base_dir()
@@ -193,7 +218,10 @@ func _write_case_manifest(output_path: String) -> void:
 		printerr("qa_runner: 無法寫入案例 manifest: %s" % absolute_path)
 		quit(1)
 		return
-	file.store_string(JSON.stringify({ "cases": cases }, "\t"))
+	file.store_string(JSON.stringify({
+		"cases": cases,
+		"contract_matrix": QAContractMatrixClass.CONTRACT_IDS,
+	}, "\t"))
 	file.close()
 	print("qa_runner: 已寫入案例 manifest (%d variants)" % cases.size())
 	quit(0)
@@ -219,57 +247,12 @@ func _validate_state_file(state_path: String) -> String:
 	var json_val: Variant = JSON.parse_string(text)
 	if json_val == null or not (json_val is Dictionary):
 		return "--state JSON 解析失敗: %s" % state_path
-	var err_msg := _validate_state_json(json_val as Dictionary)
-	if not err_msg.is_empty():
-		return "--state 狀態檔不合法: %s (%s)" % [err_msg, state_path]
-	return ""
-
-
-func _validate_state_json(data: Dictionary) -> String:
 	var gs := get_root().get_node_or_null("GameState")
 	if gs == null:
 		return "GameState autoload 尚未建立"
-	var template: Dictionary = gs.call("serialize") as Dictionary
-	var dict_err := _validate_dict_shape(data, template, "")
-	if not dict_err.is_empty():
-		return dict_err
-	var run: Dictionary = data.get("run", {}) as Dictionary
-	var day_val: Variant = run.get("day")
-	if day_val == null:
-		return "run.day 遺失"
-	var day_int := int(day_val)
-	if day_int < 1 or day_int > 45:
-		return "run.day 超出範圍 (1..45): %d" % day_int
-	var phase_val: Variant = run.get("phase")
-	if phase_val == null or not (str(phase_val) in ["morning", "afternoon", "evening", "night"]):
-		return "run.phase 不合法: %s" % str(phase_val)
-	return ""
-
-
-func _validate_dict_shape(data: Dictionary, template: Dictionary, prefix: String) -> String:
-	for key: Variant in template.keys():
-		var k := str(key)
-		var full_key := (prefix + "." + k) if not prefix.is_empty() else k
-		if not data.has(k):
-			return "必要欄位遺失: %s" % full_key
-		var val: Variant = data[k]
-		var tpl_val: Variant = template[k]
-		if typeof(tpl_val) == TYPE_INT or typeof(tpl_val) == TYPE_FLOAT:
-			if typeof(val) != TYPE_INT and typeof(val) != TYPE_FLOAT:
-				return "欄位型別錯誤: %s 應為數字" % full_key
-		elif typeof(tpl_val) == TYPE_DICTIONARY:
-			if typeof(val) != TYPE_DICTIONARY:
-				return "欄位型別錯誤: %s 應為 Dictionary" % full_key
-			if not (tpl_val as Dictionary).is_empty():
-				var sub_err := _validate_dict_shape(val as Dictionary, tpl_val as Dictionary, full_key)
-				if not sub_err.is_empty():
-					return sub_err
-		elif typeof(tpl_val) == TYPE_ARRAY and typeof(val) != TYPE_ARRAY:
-			return "欄位型別錯誤: %s 應為 Array" % full_key
-		elif typeof(tpl_val) == TYPE_STRING and typeof(val) != TYPE_STRING:
-			return "欄位型別錯誤: %s 應為 String" % full_key
-		elif typeof(tpl_val) == TYPE_BOOL and typeof(val) != TYPE_BOOL:
-			return "欄位型別錯誤: %s 應為 bool" % full_key
+	var err_msg := QAValidationClass.validate_state_json(json_val as Dictionary, gs.call("serialize") as Dictionary, gs.PHASES)
+	if not err_msg.is_empty():
+		return "--state 狀態檔不合法: %s (%s)" % [err_msg, state_path]
 	return ""
 
 
@@ -280,16 +263,24 @@ func _normalize_dir(path: String) -> String:
 	return normalized
 
 
-func _fail_before_scene(case_id: String, run_dir: String, message: String) -> void:
+func _fail_before_scene(case_id: String, run_dir: String, message: String, case_obj: CaseBaseClass = null, stage: String = "preflight") -> void:
 	printerr("qa_runner: " + message)
 	if not run_dir.is_empty():
 		var report_dir := _normalize_dir(run_dir) + "reports/"
 		DirAccess.make_dir_recursive_absolute(report_dir)
 		var report := {
 			"case_id": case_id,
+			"description": "" if case_obj == null else case_obj.description,
+			"contract_id": "" if case_obj == null else case_obj.contract_id,
+			"required_state": "" if case_obj == null else case_obj.required_state,
+			"required_data_root": "" if case_obj == null else case_obj.required_data_root,
+			"stage": stage,
 			"ok": false,
 			"errors": [message],
 			"observations": {},
+			"evidence": [],
+			"shot_file": "",
+			"dump_file": "",
 		}
 		var file := FileAccess.open(report_dir + case_id + ".json", FileAccess.WRITE)
 		if file != null:
