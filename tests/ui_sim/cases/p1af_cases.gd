@@ -140,44 +140,6 @@ class UiCase extends CaseBaseClass:
 	func _run(tree: SceneTree) -> Dictionary:
 		return _state(tree).get("run", {}) as Dictionary
 
-	## a 有而 b 沒有的卡（重複張數也算），排序後回傳。
-	func _card_diff(a: Array, b: Array) -> Array:
-		var result: Array = []
-		var pool: Array = b.duplicate()
-		for item: Variant in a:
-			if pool.has(item):
-				pool.erase(item)
-			else:
-				result.append(item)
-		result.sort()
-		return result
-
-	## before 到 after 之間改掉的欄位；鍵是點路徑，值是 after 的 JSON 字串。
-	func _state_diff(before: Dictionary, after: Dictionary) -> Dictionary:
-		var flat_before := _flatten(before, "")
-		var flat_after := _flatten(after, "")
-		var result := {}
-		for key: Variant in flat_after.keys():
-			if not flat_before.has(key) or str(flat_before[key]) != str(flat_after[key]):
-				result[str(key)] = flat_after[key]
-		for key: Variant in flat_before.keys():
-			if not flat_after.has(key):
-				result[str(key)] = "<removed>"
-		return result
-
-	func _flatten(node: Dictionary, prefix: String) -> Dictionary:
-		var result := {}
-		var keys: Array = node.keys()
-		keys.sort()
-		for key: Variant in keys:
-			var path := (prefix + "." + str(key)) if not prefix.is_empty() else str(key)
-			var value: Variant = node[key]
-			if value is Dictionary:
-				result.merge(_flatten(value as Dictionary, path))
-			else:
-				result[path] = JSON.stringify(value)
-		return result
-
 	func _texts(root: Node) -> Array[String]:
 		var result: Array[String] = []
 		for item: Dictionary in QADiagnosticsClass.dump_ui_tree(root):
@@ -601,8 +563,14 @@ class UiCase extends CaseBaseClass:
 		for field in run_fields:
 			assert_true((after.get(field, {}) as Dictionary).is_empty(), "跨輪欄位清空: %s" % field)
 		assert_false(_has_text(tree.get_root(), "[結局 stub]"), "關閉結局 stub 後才進入新輪 UI")
-		while int(_run(tree).get("day", 0)) < 8:
+		# 步數上限的理由同 `QAStep.drain_beats`：推進一旦卡住，無上限的迴圈會空轉到
+		# launcher 逾時，回報只剩「逾時」而不是命中診斷。第 1 天到第 8 天上午是 29 個時段，
+		# 上限給 60 留足餘裕，真的卡住就在這裡紅。
+		var advance_steps := 0
+		while int(_run(tree).get("day", 0)) < 8 and advance_steps < 60:
 			await _advance(tree)
+			advance_steps += 1
+		assert_true(advance_steps < 60, "推進至第 8 天超過步數上限，流程可能卡住")
 		assert_eq(int(_run(tree).get("day", 0)), 8, "新輪推進至第 8 天")
 		assert_eq(str(_run(tree).get("phase", "")), "morning", "新輪推進至第 8 天 morning")
 		await _enter(tree, "jinghe")

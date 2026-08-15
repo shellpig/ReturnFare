@@ -440,7 +440,7 @@ func _test_attention_npc(gs: Node, data_node: Node) -> int:
 		"id": "p1d_synthetic_attn_reject",
 		"when": { "day": 5, "phase": "morning" },
 		"slots": [
-			{ "id": "s1", "accepts": ["equip_camera"], "attention_npc": "npc_synth_reject",
+			{ "id": "s1", "accepts": ["equip_polaroid"], "attention_npc": "npc_synth_reject",
 			  "on_place": { "text": "test" } },
 		],
 	}

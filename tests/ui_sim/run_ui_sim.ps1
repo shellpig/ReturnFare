@@ -473,12 +473,10 @@ foreach ($group in $groups) {
         }
     }
     $signatures = @($groupReports | ForEach-Object {
+        # 比對簽章只認 choice_result_normalized（案例送出的完整 serialize()）。
+        # 缺這個鍵就給空字串，讓下面的 $same 判定為 FAIL——寧可紅，不要靜靜比一個殘缺的投影。
         if ($null -ne $_.observations.choice_result_normalized) {
             $_.observations.choice_result_normalized | ConvertTo-Json -Compress -Depth 30
-        } elseif ($null -ne $_.observations.choice_result_diff) {
-            $_.observations.choice_result_diff | ConvertTo-Json -Compress -Depth 30
-        } elseif ($null -ne $_.observations.choice_result_projection) {
-            $_.observations.choice_result_projection | ConvertTo-Json -Compress -Depth 30
         } else {
             ""
         }
