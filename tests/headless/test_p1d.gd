@@ -435,8 +435,29 @@ func _test_attention_npc(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("attention_npc: night placement did not touch action_spent")
 
+	# 拒收/失敗放置：不計投入帳
+	loader.beats_by_id["p1d_synthetic_attn_reject"] = {
+		"id": "p1d_synthetic_attn_reject",
+		"when": { "day": 5, "phase": "morning" },
+		"slots": [
+			{ "id": "s1", "accepts": ["equip_camera"], "attention_npc": "npc_synth_reject",
+			  "on_place": { "text": "test" } },
+		],
+	}
+	gs.set("phase", "morning")
+	var reject_result: Dictionary = gs.call("try_place", "protagonist", "p1d_synthetic_attn_reject", "s1")
+	if reject_result.get("ok", true):
+		failed += _fail("attention_npc reject placement: expected rejected (ok=false), got ok=true")
+	else:
+		failed += _ok("attention_npc reject placement → ok=false")
+	if int((gs.get("npc_action_counts") as Dictionary).get("npc_synth_reject", 0)) != 0:
+		failed += _fail("attention_npc: rejected placement should not add to count (投入帳保持為 0)")
+	else:
+		failed += _ok("attention_npc: rejected placement kept count = 0")
+
 	loader.beats_by_id.erase("p1d_synthetic_attn_day")
 	loader.beats_by_id.erase("p1d_synthetic_attn_night")
+	loader.beats_by_id.erase("p1d_synthetic_attn_reject")
 
 	return failed
 

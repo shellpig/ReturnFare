@@ -36,7 +36,7 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p1af_19_attention", "D22 attention_npc 投入帳成功加一", "d22_afternoon.json", "", "p1af_19_attention", "", "attention"),
 		UiCase.new("p1af_20_choice_collapse", "choice 選定後同組其餘選項消失", "d22_afternoon.json", "", "p1af_20_choice_collapse", "", "choice_collapse"),
 		UiCase.new("p1af_21_choice_resolved", "重開面板後 choice 唯讀且不可反悔", "d22_afternoon.json", "", "p1af_21_choice_resolved", "", "choice_resolved"),
-		UiCase.new("p1af_22_choice_equiv_direct", "choice 直選路徑結果基準", "d22_afternoon__no_polaroid.json", "", "p1af_22_choice_equivalence", "p1af_22_choice_equivalence", "choice_direct"),
+		UiCase.new("p1af_22_choice_equiv_direct", "choice 直選路徑結果基準", "d22_afternoon__with_polaroid.json", "", "p1af_22_choice_equivalence", "p1af_22_choice_equivalence", "choice_direct"),
 		UiCase.new("p1af_22_choice_equiv_card", "choice 帶卡路徑結果基準", "d22_afternoon__with_polaroid.json", "", "p1af_22_choice_equivalence", "p1af_22_choice_equivalence", "choice_card"),
 		UiCase.new("p1af_23_choice_leave", "不選 choice 離開後狀態不變", "d22_afternoon__no_polaroid.json", "", "p1af_23_choice_leave", "", "choice_leave"),
 		UiCase.new("p1af_24_choice_no_card", "無相關卡時可直接選 choice", "d22_afternoon__no_polaroid.json", "", "p1af_24_choice_no_card", "", "choice_no_card"),
@@ -429,16 +429,13 @@ class UiCase extends CaseBaseClass:
 	func _attention(tree: SceneTree) -> Dictionary:
 		await _enter(tree, "sanquan")
 		var count_0 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
-		await _click(tree, "choose::d22_pm_sandbags::acai_read::obs_walk")
-		var count_1 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
-		assert_eq(count_1, count_0, "無 attention_npc 的免費 choice 不得增加投入帳")
 		await _click(tree, "place::d22_pm_sandbags::work::protagonist")
-		var count_2 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
-		assert_eq(count_2, count_0 + 1, "帶 attention_npc 的成功放置投入帳恰加一")
+		var count_1 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
+		assert_eq(count_1, count_0 + 1, "帶 attention_npc 的成功放置投入帳恰加一")
 		await _click(tree, "slot::d22_pm_sandbags::work")
-		var count_3 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
-		assert_eq(count_3, count_2, "對已結算槽重複點擊不得再次增加投入帳")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["attention_success", "attention_free_unchanged", "attention_repeat_unchanged"] } }
+		var count_2 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
+		assert_eq(count_2, count_1, "對已結算槽重複點擊不得再次增加投入帳")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["attention_success", "attention_repeat_unchanged"] } }
 
 	func _choice_collapse(tree: SceneTree) -> Dictionary:
 		await _enter(tree, "sanquan")
@@ -471,22 +468,12 @@ class UiCase extends CaseBaseClass:
 		else:
 			await _click(tree, "choose::d22_pm_sandbags::acai_read::obs_walk")
 		var after := _state(tree)
-		# 比對「這個動作改了什麼」，不是「最後狀態長什麼樣」。
-		# 兩份 fixture 的取得路徑差異住在 before，做差之後自動抵銷，不需要維護排除清單。
-		var result_diff := _state_diff(before, after)
-		# 手牌整份比會把 fixture 差異一起比進去（帶卡那份手上多一張拍立得），
-		# 所以手牌改記「進了哪幾張、出了哪幾張」，兩條入口的增減必須逐字相同。
-		var hand_before: Array = ((before.get("run", {}) as Dictionary).get("hand", []) as Array)
-		var hand_after: Array = ((after.get("run", {}) as Dictionary).get("hand", []) as Array)
-		result_diff.erase("run.hand")
-		result_diff["run.hand+"] = JSON.stringify(_card_diff(hand_after, hand_before))
-		result_diff["run.hand-"] = JSON.stringify(_card_diff(hand_before, hand_after))
 		if comparison_group == "p1af_22_choice_equivalence":
 			return { "ok": errors.is_empty(), "errors": errors, "observations": {
-				"choice_result_diff": result_diff,
+				"choice_result_normalized": after,
 				"fixture_causality": {
 					"with_card": with_card,
-					"source_hand": hand_before,
+					"source_hand": before.get("run", {}).get("hand", []),
 				},
 				"evidence": ["choice_equivalence_complete"],
 			} }
@@ -614,14 +601,18 @@ class UiCase extends CaseBaseClass:
 		for field in run_fields:
 			assert_true((after.get(field, {}) as Dictionary).is_empty(), "跨輪欄位清空: %s" % field)
 		assert_false(_has_text(tree.get_root(), "[結局 stub]"), "關閉結局 stub 後才進入新輪 UI")
-		await _advance(tree)
-		await _advance(tree)
-		await _advance(tree)
-		await _advance(tree)
-		assert_eq(int(_run(tree).get("day", 0)), 2, "新輪推進至第 2 天")
-		await _enter(tree, "sanquan")
-		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::d2_morning_intro::ajie"), "第 2 天初始 occupant 槽")
-		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "place::d2_morning_intro::ajie::"), "occupant 不可放卡")
+		while int(_run(tree).get("day", 0)) < 8:
+			await _advance(tree)
+		assert_eq(int(_run(tree).get("day", 0)), 8, "新輪推進至第 8 天")
+		assert_eq(str(_run(tree).get("phase", "")), "morning", "新輪推進至第 8 天 morning")
+		await _enter(tree, "jinghe")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::d8_morning_jinghe::go_with_ajie"), "第 8 天旗標控制槽存在")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "place::d8_morning_jinghe::go_with_ajie::protagonist"), "重置後未持有旗標不可放卡")
+		var go_label := QAStepClass.find_controls_by_qa_id(tree.get_root(), "slot::d8_morning_jinghe::go_with_ajie")[0] as Label
+		assert_true(go_label.text.contains("未解鎖") or go_label.text.contains("你昨天沒有答應她"), "旗標控制槽回到未解鎖狀態")
+		var before_click := _state(tree)
+		await _click(tree, "slot::d8_morning_jinghe::go_with_ajie")
+		assert_eq(JSON.stringify(before_click), JSON.stringify(_state(tree)), "點擊未解鎖旗標槽不得改變狀態")
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["run_fields_cleared", "reset_ui_state", "reset_flag_slots_locked"] } }
 

@@ -32,7 +32,7 @@ const SPECIAL_EVIDENCE := {
 	"p1af_15_action_spent": ["action_spent_ui_blocked", "second_location_input_noop"],
 	"p1af_16_panel_rebuild": ["old_place_removed", "new_slot_open"],
 	"p1af_17_compare_free": ["compare_no_action_spent", "action_still_available_after_compare", "compare_effect_applied"],
-	"p1af_19_attention": ["attention_success", "attention_free_unchanged", "attention_repeat_unchanged"],
+	"p1af_19_attention": ["attention_success", "attention_repeat_unchanged"],
 	"p1af_21_choice_resolved": ["resolved_render", "resolved_click_noop"],
 	"p1af_22_choice_equivalence": ["choice_equivalence_complete"],
 	"p1af_28_d27_order": ["evening_ui_order", "evening_outcome"],

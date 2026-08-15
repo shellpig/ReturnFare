@@ -473,8 +473,12 @@ foreach ($group in $groups) {
         }
     }
     $signatures = @($groupReports | ForEach-Object {
-        if ($null -ne $_.observations.choice_result_diff) {
+        if ($null -ne $_.observations.choice_result_normalized) {
+            $_.observations.choice_result_normalized | ConvertTo-Json -Compress -Depth 30
+        } elseif ($null -ne $_.observations.choice_result_diff) {
             $_.observations.choice_result_diff | ConvertTo-Json -Compress -Depth 30
+        } elseif ($null -ne $_.observations.choice_result_projection) {
+            $_.observations.choice_result_projection | ConvertTo-Json -Compress -Depth 30
         } else {
             ""
         }
