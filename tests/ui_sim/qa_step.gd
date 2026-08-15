@@ -119,6 +119,13 @@ static func click(
 			result["error"] = "按鈕 disabled 狀態與預期不符 (實際: %s, 預期: %s)" % [str(btn.disabled), str(expected_disabled)]
 			return result
 
+	# 2.5 若目標位於 ScrollContainer 內，調用 ensure_control_visible 滾動至可視範圍
+	var p_scroll: Node = target.get_parent()
+	while p_scroll != null:
+		if p_scroll is ScrollContainer:
+			(p_scroll as ScrollContainer).ensure_control_visible(target)
+		p_scroll = p_scroll.get_parent()
+	await wait_draw_frames(tree, 2)
 
 	# 3. 計算螢幕/視口真實中心點與子視窗轉換
 	var target_vp := target.get_viewport()
@@ -140,29 +147,35 @@ static func click(
 		result["error"] = "目標中心點越界 (點: %s, 視口: %s)" % [str(screen_center), str(root_rect.size)]
 		return result
 
-	# 4. 送 InputEventMouseMotion 並等候 1 幀更新 Hover 狀態
+	# 4. 送 InputEventMouseMotion 並等候 2 幀更新 Hover 狀態
 	var motion := InputEventMouseMotion.new()
 	motion.position = screen_center
 	motion.global_position = screen_center
 	Input.parse_input_event(motion)
-	await wait_draw_frames(tree, 1)
+	await wait_draw_frames(tree, 2)
 
 	# 5. 核驗 Hover 命中：目標所屬 Viewport 實際 Hover 之 Control 必須為目標或其子孫
 	var hovered: Control = target_vp.gui_get_hovered_control()
 	result["hovered_before"] = _control_info(hovered)
 
 	var hit_ok := false
-	if hovered == target:
+	if hovered == target or (hovered != null and target.is_ancestor_of(hovered)):
 		hit_ok = true
-	elif hovered != null and target.is_ancestor_of(hovered):
-		hit_ok = true
+	else:
+		# 重試一次滑鼠移動事件並等待 2 幀以應對佈局剛更新之情況
+		Input.parse_input_event(motion)
+		await wait_draw_frames(tree, 2)
+		hovered = target_vp.gui_get_hovered_control()
+		result["hovered_before"] = _control_info(hovered)
+		if hovered == target or (hovered != null and target.is_ancestor_of(hovered)):
+			hit_ok = true
 
 	if not hit_ok:
 		var hovered_name: String = str(hovered.name) if hovered != null else "null"
 		var hovered_path: String = str(hovered.get_path()) if hovered != null else "none"
 		var hovered_qa: String = str(hovered.get_meta("qa_id")) if hovered != null and hovered.has_meta("qa_id") else ""
-		result["error"] = "Hover 未命中目標 (預期: %s [%s], 實際: %s [%s, qa_id=%s])" % [
-			target.name, str(target.get_path()), hovered_name, hovered_path, hovered_qa
+		result["error"] = "Hover 未命中目標 (預期: %s [%s], 實際: %s [%s, qa_id=%s], pos=%s)" % [
+			target.name, str(target.get_path()), hovered_name, hovered_path, hovered_qa, str(screen_center)
 		]
 		return result
 
@@ -173,7 +186,7 @@ static func click(
 	press_event.position = screen_center
 	press_event.global_position = screen_center
 	Input.parse_input_event(press_event)
-	await wait_draw_frames(tree, 1)
+	await wait_draw_frames(tree, 2)
 
 	# 7. 送 InputEventMouseButton (pressed = false)
 	var release_event := InputEventMouseButton.new()
@@ -182,15 +195,15 @@ static func click(
 	release_event.position = screen_center
 	release_event.global_position = screen_center
 	Input.parse_input_event(release_event)
-
-	# 8. 等候兩次繪製幀以完成 UI 狀態刷新
 	await wait_draw_frames(tree, 2)
 
+	# 8. 紀錄點擊後 Hover 狀態
 	var hovered_after: Control = target_vp.gui_get_hovered_control()
 	result["hovered_after"] = _control_info(hovered_after)
-
-	# 9. 成功完成真實點擊
 	result["ok"] = true
+
+	# 9. 額外等候 2 幀讓狀態變更與 UI 重繪完全就緒
+	await wait_draw_frames(tree, 2)
 	return result
 
 

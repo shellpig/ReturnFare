@@ -54,7 +54,6 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		"d22_afternoon": { "day": 22, "phase": "afternoon" },
 		"d35_afternoon": { "day": 35, "phase": "afternoon" },
 		"d43_morning": { "day": 43, "phase": "morning" },
-		"d43_afternoon": { "day": 43, "phase": "afternoon" },
 		"d45_evening": { "day": 45, "phase": "evening" },
 	}
 
@@ -132,6 +131,15 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	]
 	var d40_cp: Dictionary = { "d40_morning": { "day": 40, "phase": "morning" } }
 	if not _run_walk_with_checkpoints(tree, data_node, d40_decisions, d40_cp, output_dir):
+		return false
+
+	# 7. 產生 D43 afternoon 同時開放 riverside (d43_pm_zhou) 與 sanquan (d43_conclusion)
+	var d43_decisions: Array[Dictionary] = [
+		{ "day": 3, "phase": "afternoon", "beat_id": "d3_pm_sanquan", "slot_id": "handle_couple", "card_id": "protagonist" },
+		{ "day": 22, "phase": "afternoon", "beat_id": "d22_pm_sandbags", "slot_id": "obs_walk", "card_id": "equip_polaroid", "group_id": "acai_read" }
+	]
+	var d43_cp: Dictionary = { "d43_afternoon": { "day": 43, "phase": "afternoon" } }
+	if not _run_walk_with_checkpoints(tree, data_node, d43_decisions, d43_cp, output_dir):
 		return false
 
 	return true
@@ -272,7 +280,7 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 		"d43_morning":
 			return day == 43 and phase == "morning"
 		"d43_afternoon":
-			return day == 43 and phase == "afternoon"
+			return day == 43 and phase == "afternoon" and hand.has("info_acai_walk")
 		"d45_evening":
 			return day == 45 and phase == "evening"
 		_:

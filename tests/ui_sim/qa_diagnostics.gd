@@ -182,6 +182,31 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 						"reason": "元件底部超出主視口邊界 (y2=%f > %f)" % [eff.position.y + eff.size.y, vp_size.y],
 					})
 
+			# 文字控制項 (Label/RichTextLabel/Button) 最小需求尺寸 vs 實際分配尺寸檢驗 (K-40 防線)
+			if ctrl is Label or ctrl is RichTextLabel or ctrl is Button:
+				var min_s := ctrl.get_combined_minimum_size()
+				var act_s := ctrl.size
+				# 若非位於可捲動容器內，且最小文字需求超過配置尺寸，即為文字遭到壓縮或溢出
+				var in_scroll := false
+				var p_node_scroll: Node = ctrl.get_parent()
+				while p_node_scroll != null and p_node_scroll is Control:
+					if p_node_scroll is ScrollContainer:
+						in_scroll = true
+						break
+					p_node_scroll = p_node_scroll.get_parent()
+				
+				if not in_scroll:
+					if min_s.x > act_s.x + 2.0 and act_s.x > 0:
+						overflow_issues.append({
+							"path": str(ctrl.get_path()),
+							"reason": "文字控制項水平最小尺寸 (%f) 大於實際配置寬度 (%f)，文字遭到截斷或溢出" % [min_s.x, act_s.x],
+						})
+					if min_s.y > act_s.y + 2.0 and act_s.y > 0:
+						overflow_issues.append({
+							"path": str(ctrl.get_path()),
+							"reason": "文字控制項垂直最小尺寸 (%f) 大於實際配置高度 (%f)，文字遭到截斷或溢出" % [min_s.y, act_s.y],
+						})
+
 			# 檢查元件 combined_minimum_size 與未裁切父容器之邊界
 			var raw_rect := ctrl.get_global_rect()
 			var p_node := ctrl.get_parent()
@@ -200,7 +225,7 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 							"reason": "元件底部 (%f) 溢出未裁切父容器 (%f)" % [raw_rect.position.y + raw_rect.size.y, p_raw.position.y + p_raw.size.y],
 						})
 
-			# 保護區檢查 (K-28 / K-40 防線): ContentView 內部內容不得侵入 StatusLabel/AdvanceButton 或 HandBar
+			# 保護區檢查 (K-28 / K-40 防線): ContentView 內部內容不得侵入 StatusLabel/AdvanceButton (0..170) 或 HandBar (580..720)
 			var path_str := str(ctrl.get_path())
 			if path_str.contains("/ContentView/") and not path_str.contains("/AcceptDialog"):
 				if raw_rect.position.y < 168.0:
@@ -208,16 +233,25 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 						"path": path_str,
 						"reason": "內容侵入上方狀態列/推進按鈕保護區 (y=%f < 168)" % raw_rect.position.y,
 					})
-				if raw_rect.position.y + raw_rect.size.y > 582.0 and not (ctrl is ScrollContainer):
-					# 若在 ScrollContainer 內部，只要父層 ScrollContainer 有 clip_contents 且在 580 內即可
+				if ctrl is ScrollContainer:
+					# ScrollContainer 自身外框絕對不得侵入 HandBar
+					if raw_rect.position.y + raw_rect.size.y > 582.0:
+						overflow_issues.append({
+							"path": path_str,
+							"reason": "ScrollContainer 容器本體侵入下方 HandBar 手牌保護區 (y2=%f > 582)" % (raw_rect.position.y + raw_rect.size.y),
+						})
+				else:
+					# 若在 ScrollContainer 內部，只要父層 ScrollContainer 有 clip_contents 且其外框在 582 內即可
 					var in_clipped_scroll := false
 					var p_check: Node = ctrl.get_parent()
 					while p_check != null and p_check is Control:
-						if p_check is ScrollContainer and (p_check as ScrollContainer).clip_contents:
-							in_clipped_scroll = true
-							break
+						if p_check is ScrollContainer:
+							var sc_parent := p_check as ScrollContainer
+							if sc_parent.clip_contents and (sc_parent.get_global_rect().position.y + sc_parent.get_global_rect().size.y <= 582.0):
+								in_clipped_scroll = true
+								break
 						p_check = p_check.get_parent()
-					if not in_clipped_scroll:
+					if not in_clipped_scroll and raw_rect.position.y + raw_rect.size.y > 582.0:
 						overflow_issues.append({
 							"path": path_str,
 							"reason": "未裁切內容侵入下方 HandBar 手牌保護區 (y2=%f > 582)" % (raw_rect.position.y + raw_rect.size.y),

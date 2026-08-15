@@ -386,6 +386,7 @@ func _test_a7_on_enter_text_rendered_in_panel() -> int:
 	gs.set("day", 15)
 	gs.set("phase", "afternoon")
 	panel.call("show_location", "clinic")
+	panel.call("_on_advance_beat_pressed")
 	await process_frame
 
 	var beat_container: VBoxContainer = panel.find_child("BeatContainer", true, false) as VBoxContainer

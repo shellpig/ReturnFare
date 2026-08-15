@@ -70,9 +70,8 @@ func show_location(location_id: String) -> void:
 	_current_beat_id = ""
 	_current_lines = PackedStringArray()
 	_current_played = false
-	_is_playing = false
 	_queue_open_beats()
-	_start_next_beat()
+	_is_playing = not _pending_beat_ids.is_empty()
 	_rebuild()
 
 
@@ -87,28 +86,22 @@ func _queue_open_beats() -> void:
 		_pending_beat_ids.append(beat_id)
 
 
-func _start_next_beat() -> void:
-	_queue_open_beats()
-	if _pending_beat_ids.is_empty():
+func _on_advance_beat_pressed() -> void:
+	if not _is_playing:
+		return
+	if not _pending_beat_ids.is_empty():
+		_current_beat_id = _pending_beat_ids.pop_front()
+		_visit_seen[_current_beat_id] = true
+		_current_lines = GameState.play_beat(_current_beat_id)
+		_current_played = true
+		state_changed.emit()
+		_rebuild()
+	else:
 		_is_playing = false
 		_current_beat_id = ""
 		_current_lines = PackedStringArray()
 		_current_played = false
-		return
-
-	_current_beat_id = _pending_beat_ids.pop_front()
-	_visit_seen[_current_beat_id] = true
-	_current_lines = GameState.play_beat(_current_beat_id)
-	_current_played = true
-	_is_playing = true
-	state_changed.emit()
-
-
-func _on_advance_beat_pressed() -> void:
-	if not _is_playing:
-		return
-	_start_next_beat()
-	_rebuild()
+		_rebuild()
 
 
 func _rebuild() -> void:
@@ -124,11 +117,13 @@ func _rebuild() -> void:
 	if _is_playing:
 		_description_label.visible = false
 		_advance_beat_btn.visible = true
-		var current_view := _find_beat(view, _current_beat_id)
-		if current_view.is_empty():
-			var beat: Dictionary = Data.loader.beats_by_id.get(_current_beat_id, {}) as Dictionary
-			current_view = { "beat": beat, "tri": PanelBuilder.TriState.OPEN, "reason": "", "slots": [] }
-		_render_beat(current_view, _current_lines, false)
+		_advance_beat_btn.text = "繼續演出"
+		if not _current_beat_id.is_empty():
+			var current_view := _find_beat(view, _current_beat_id)
+			if current_view.is_empty():
+				var beat: Dictionary = Data.loader.beats_by_id.get(_current_beat_id, {}) as Dictionary
+				current_view = { "beat": beat, "tri": PanelBuilder.TriState.OPEN, "reason": "", "slots": [] }
+			_render_beat(current_view, _current_lines, false)
 		return
 
 	_advance_beat_btn.visible = false
@@ -255,7 +250,7 @@ func _show_preview(beat_id: String, slot_id: String, label_text: String) -> void
 		var lines: Array[String] = ["可放置卡片："]
 		for card_id_val in cards:
 			var card_id := str(card_id_val)
-			lines.append("  • %s (%s)" % [_card_display_name(card_id), card_id])
+			lines.append("  • %s" % _card_display_name(card_id))
 		message = "\n".join(lines)
 	else:
 		var reason := str(result.get("reason", ""))
@@ -263,6 +258,8 @@ func _show_preview(beat_id: String, slot_id: String, label_text: String) -> void
 			message += "\n理由：" + _REASON_CODE_TEXTS.get(reason, reason)
 	_preview_dialog.title = _FMT_PREVIEW_TITLE % label_text if not label_text.is_empty() else "預覽"
 	_preview_dialog.dialog_text = message
+	_preview_dialog.set_meta("preview_card_ids", cards)
+	_preview_dialog.set_meta("preview_reason", str(result.get("reason", "")))
 	_preview_dialog.popup_centered()
 
 
