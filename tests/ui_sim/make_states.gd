@@ -6,6 +6,8 @@ extends SceneTree
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
 const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 
+static var _clean_state_template: Dictionary = {}
+
 
 func _initialize() -> void:
 	await process_frame
@@ -60,7 +62,6 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		return false
 
 	# 2. 產生 D32 邀請分支（阿婕、阿薇、無邀請）
-	# D29 邀請阿婕
 	var ajie_decisions: Array[Dictionary] = [
 		{ "day": 29, "phase": "afternoon", "beat_id": "d29_pm_invitation", "slot_id": "invite_ajie", "group_id": "invitation" }
 	]
@@ -68,7 +69,6 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _run_walk_with_checkpoints(tree, data_node, ajie_decisions, ajie_cp, output_dir):
 		return false
 
-	# D29 邀請阿薇
 	var awei_decisions: Array[Dictionary] = [
 		{ "day": 29, "phase": "afternoon", "beat_id": "d29_pm_invitation", "slot_id": "invite_awei", "group_id": "invitation" }
 	]
@@ -76,7 +76,6 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _run_walk_with_checkpoints(tree, data_node, awei_decisions, awei_cp, output_dir):
 		return false
 
-	# D29 不邀請任何人
 	var none_decisions: Array[Dictionary] = [
 		{ "day": 29, "phase": "afternoon", "beat_id": "d29_pm_invitation", "slot_id": "invite_none", "group_id": "invitation" }
 	]
@@ -85,7 +84,6 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		return false
 
 	# 3. 產生 D5 evening 殘響分支（到場陪阿宏 vs 錯過去老街）
-	# 到場山泉閣陪阿宏（獲得 ahong_last_normal_contact 旗標，D5 傍晚不播殘響）
 	var attend_d3_decisions: Array[Dictionary] = [
 		{ "day": 3, "phase": "afternoon", "beat_id": "d3_pm_sanquan", "slot_id": "help_ahong", "card_id": "protagonist" }
 	]
@@ -93,7 +91,6 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _run_walk_with_checkpoints(tree, data_node, attend_d3_decisions, d5_attend_cp, output_dir):
 		return false
 
-	# 錯過山泉閣去老街（無 ahong_last_normal_contact 旗標，D5 傍晚播出殘響）
 	var miss_d3_decisions: Array[Dictionary] = [
 		{ "day": 3, "phase": "afternoon", "beat_id": "d3_pm_oldstreet", "slot_id": "wander", "card_id": "protagonist" }
 	]
@@ -102,7 +99,6 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		return false
 
 	# 4. 產生 D22 拍立得分支（持有拍立得 vs 未持有）
-	# D3 下午選處理吵架夫妻（獲得 equip_polaroid）
 	var polaroid_decisions: Array[Dictionary] = [
 		{ "day": 3, "phase": "afternoon", "beat_id": "d3_pm_sanquan", "slot_id": "handle_couple", "card_id": "protagonist" }
 	]
@@ -223,53 +219,69 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 	var run: Dictionary = snapshot.get("run", {}) as Dictionary
 	var flags: Dictionary = run.get("flags", {}) as Dictionary
 	var choices: Dictionary = run.get("choices", {}) as Dictionary
+	var hand: Array = run.get("hand", []) as Array
+	var day := int(run.get("day", 0))
+	var phase := str(run.get("phase", ""))
 
 	match cp_name:
-		"d32_morning__ajie":
-			return flags.get("invited_ajie", false) == true and not bool(run.get("action_spent", false))
-		"d32_morning__awei":
-			return flags.get("invited_awei", false) == true and not bool(run.get("action_spent", false))
-		"d32_morning__none":
-			return (choices.get("d29_pm_invitation::invitation", "") == "invite_none" or flags.get("invited_none", false) == true) and not bool(run.get("action_spent", false))
+		"d2_morning":
+			return day == 2 and phase == "morning" and hand.has("protagonist")
+		"d3_afternoon":
+			return day == 3 and phase == "afternoon" and hand.has("protagonist")
+		"d5_evening":
+			return day == 5 and phase == "evening"
 		"d5_evening__attended":
-			var flags_map: Dictionary = run.get("flags", {}) as Dictionary
-			return flags_map.get("ahong_last_normal_contact", false) == true
+			return day == 5 and phase == "evening" and flags.get("ahong_last_normal_contact", false) == true
 		"d5_evening__miss_sanquan":
-			var flags_map: Dictionary = run.get("flags", {}) as Dictionary
-			return flags_map.get("ahong_last_normal_contact", false) == false
+			return day == 5 and phase == "evening" and flags.get("ahong_last_normal_contact", false) == false
+		"d9_afternoon":
+			return day == 9 and phase == "afternoon"
+		"d10_night":
+			return day == 10 and phase == "night"
+		"d17_morning":
+			return day == 17 and phase == "morning"
+		"d22_afternoon":
+			return day == 22 and phase == "afternoon"
 		"d22_afternoon__with_polaroid":
-			var hand_arr: Array = run.get("hand", []) as Array
-			return hand_arr.has("equip_polaroid")
+			return day == 22 and phase == "afternoon" and hand.has("equip_polaroid")
 		"d27_evening__both":
-			var flags_map: Dictionary = run.get("flags", {}) as Dictionary
-			return flags_map.get("awei_sheltering", false) == true
+			return day == 27 and phase == "evening" and flags.get("awei_sheltering", false) == true and flags.get("dodger_chen", false) == true
 		"d27_evening__partial":
-			var flags_map: Dictionary = run.get("flags", {}) as Dictionary
-			return flags_map.get("awei_sheltering", false) == true
+			return day == 27 and phase == "evening" and flags.get("awei_sheltering", false) == true and flags.get("dodger_chen", false) == false
+		"d32_morning__ajie":
+			return day == 32 and phase == "morning" and choices.get("d29_pm_invitation::invitation", "") == "invite_ajie"
+		"d32_morning__awei":
+			return day == 32 and phase == "morning" and choices.get("d29_pm_invitation::invitation", "") == "invite_awei"
+		"d32_morning__none":
+			return day == 32 and phase == "morning" and choices.get("d29_pm_invitation::invitation", "") == "invite_none"
+		"d35_afternoon":
+			return day == 35 and phase == "afternoon"
+		"d40_morning":
+			return day == 40 and phase == "morning"
+		"d43_morning":
+			return day == 43 and phase == "morning"
+		"d43_afternoon":
+			return day == 43 and phase == "afternoon"
+		"d45_evening":
+			return day == 45 and phase == "evening"
 		_:
 			return true
 
 
 static func _reset_state(gs: Node) -> void:
-	gs.deserialize({
-		"meta": {
-			"knowledge": {}
-		},
-		"run": {
-			"day": 1,
-			"phase": "morning",
-			"hand": ["protagonist"],
-			"madness_clock": {},
-			"_madness_counter": 0,
-			"beats_entered": {},
-			"slots_placed": {},
-			"choices": {},
-			"flags": {},
-			"switches": {},
-			"switch_progress": {},
-			"relations": {},
-			"action_spent": false,
-			"npc_action_counts": {}
-		}
-	})
-
+	if _clean_state_template.is_empty():
+		gs.set("day", 1)
+		gs.set("phase", "morning")
+		gs.set("hand", ["protagonist"])
+		gs.set("beats_entered", {})
+		gs.set("slots_placed", {})
+		gs.set("choices", {})
+		gs.set("flags", {})
+		gs.set("switches", {})
+		gs.set("switch_progress", {})
+		gs.set("relations", {})
+		gs.set("action_spent", false)
+		gs.set("npc_action_counts", {})
+		gs.set("knowledge", {})
+		_clean_state_template = (gs.call("serialize") as Dictionary).duplicate(true)
+	gs.call("deserialize", _clean_state_template.duplicate(true))

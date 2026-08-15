@@ -1,7 +1,7 @@
 class_name QAStep
 extends RefCounted
 
-## UI 模擬單步輸入 Helper（寫死在 開發設計方針.md > 固定輸入流程）。
+## UI 模擬單步輸入 Helper（依 開發設計方針.md > 固定輸入流程 實作）。
 ## 案例一律透過此 helper 進行互動，嚴禁自訂 timer 或呼叫 pressed.emit()。
 
 
@@ -41,7 +41,7 @@ static func has_visible_qa_id(root: Node, qa_id: String) -> bool:
 	return false
 
 
-## 執行固定 9 步輸入模擬流程
+## 執行固定 9 步真實輸入模擬流程（含子視窗座標轉換、Hover 命中核驗與邊界防呆）
 static func click(
 	tree: SceneTree,
 	qa_id: String,
@@ -62,7 +62,6 @@ static func click(
 	var root := tree.get_root()
 	var candidates := find_controls_by_qa_id(root, qa_id)
 
-	# 驗證唯一性
 	if candidates.is_empty():
 		result["error"] = "找不到 qa_id: %s (命中數 0)" % qa_id
 		return result
@@ -90,39 +89,85 @@ static func click(
 			result["error"] = "按鈕 disabled 狀態與預期不符 (實際: %s, 預期: %s)" % [str(btn.disabled), str(expected_disabled)]
 			return result
 
-	# 3. 計算中心點並送 InputEventMouseMotion
-	var rect := target.get_global_rect()
-	var center := rect.position + rect.size * 0.5
-	result["target_pos"] = center
+	# 若目標位於 ScrollContainer 內，自動捲動確保元件落於可視區
+	var p_scroll := target.get_parent()
+	while p_scroll != null and not (p_scroll is Window) and not (p_scroll is SubViewport):
+		if p_scroll is ScrollContainer:
+			(p_scroll as ScrollContainer).ensure_control_visible(target)
+			await wait_draw_frames(tree, 2)
+			break
+		p_scroll = p_scroll.get_parent()
 
+	# 3. 計算螢幕/視口真實中心點與子視窗轉換
+	var target_vp := target.get_viewport()
+	var screen_pos: Vector2 = target.get_screen_position()
+	var rect_size: Vector2 = target.size
+	if rect_size.x <= 0 or rect_size.y <= 0:
+		rect_size = target.get_global_rect().size
+
+	if rect_size.x <= 0 or rect_size.y <= 0:
+		result["error"] = "目標元件尺寸為 0 (size: %s)" % str(rect_size)
+		return result
+
+	var screen_center: Vector2 = screen_pos + rect_size * 0.5
+	result["target_pos"] = screen_center
+
+	# 邊界檢查：中心點必須落在主視口範圍內 (1280x720)
+	var root_rect := Rect2(Vector2.ZERO, root.get_visible_rect().size)
+	if not root_rect.has_point(screen_center):
+		result["error"] = "目標中心點越界 (點: %s, 視口: %s)" % [str(screen_center), str(root_rect.size)]
+		return result
+
+	# 4. 送 InputEventMouseMotion 並等候 1 幀更新 Hover 狀態
 	var motion := InputEventMouseMotion.new()
-	motion.position = center
-	motion.global_position = center
+	motion.position = screen_center
+	motion.global_position = screen_center
 	Input.parse_input_event(motion)
+	await wait_draw_frames(tree, 1)
 
-	# 4. 送 InputEventMouseButton (pressed = true)
+	# 5. 核驗 Hover 命中：目標所屬 Viewport 實際 Hover 之 Control 必須為目標或其子孫
+	var hovered: Control = target_vp.gui_get_hovered_control()
+	result["hovered_before"] = _control_info(hovered)
+
+	var hit_ok := false
+	if hovered == target:
+		hit_ok = true
+	elif hovered != null and (target.is_ancestor_of(hovered) or hovered.is_ancestor_of(target)):
+		hit_ok = true
+
+	if not hit_ok:
+		var hovered_name: String = str(hovered.name) if hovered != null else "null"
+		var hovered_path: String = str(hovered.get_path()) if hovered != null else "none"
+		var hovered_qa: String = str(hovered.get_meta("qa_id")) if hovered != null and hovered.has_meta("qa_id") else ""
+		result["error"] = "Hover 未命中目標 (預期: %s [%s], 實際: %s [%s, qa_id=%s])" % [
+			target.name, str(target.get_path()), hovered_name, hovered_path, hovered_qa
+		]
+		return result
+
+	# 6. 送 InputEventMouseButton (pressed = true)
 	var press_event := InputEventMouseButton.new()
 	press_event.button_index = button_index
 	press_event.pressed = true
-	press_event.position = center
-	press_event.global_position = center
+	press_event.position = screen_center
+	press_event.global_position = screen_center
 	Input.parse_input_event(press_event)
-
-	# 5. 等一次 frame_post_draw
 	await wait_draw_frames(tree, 1)
 
-	# 6. 送 InputEventMouseButton (pressed = false)
+	# 7. 送 InputEventMouseButton (pressed = false)
 	var release_event := InputEventMouseButton.new()
 	release_event.button_index = button_index
 	release_event.pressed = false
-	release_event.position = center
-	release_event.global_position = center
+	release_event.position = screen_center
+	release_event.global_position = screen_center
 	Input.parse_input_event(release_event)
 
-	# 7. 等兩次 frame_post_draw
+	# 8. 等候兩次繪製幀以完成 UI 狀態刷新
 	await wait_draw_frames(tree, 2)
 
-	# 8. 成功完成點擊
+	var hovered_after: Control = target_vp.gui_get_hovered_control()
+	result["hovered_after"] = _control_info(hovered_after)
+
+	# 9. 成功完成真實點擊
 	result["ok"] = true
 	return result
 
@@ -134,14 +179,20 @@ static func wait_draw_frames(tree: SceneTree, count: int = 1) -> void:
 		await tree.process_frame
 
 
-## 診斷當前 hover 之節點
+## 取得 Control 診斷摘要資訊
+static func _control_info(ctrl: Control) -> Dictionary:
+	if ctrl == null:
+		return { "path": "", "name": "", "qa_id": "", "type": "" }
+	return {
+		"path": str(ctrl.get_path()),
+		"name": ctrl.name,
+		"qa_id": str(ctrl.get_meta("qa_id")) if ctrl.has_meta("qa_id") else "",
+		"type": ctrl.get_class(),
+	}
+
+
+## 診斷當前 root viewport hover 之節點
 static func get_hovered_info(tree: SceneTree) -> Dictionary:
 	var vp := tree.get_root()
 	var hovered: Control = vp.gui_get_hovered_control()
-	if hovered == null:
-		return { "path": "", "qa_id": "", "type": "" }
-	return {
-		"path": str(hovered.get_path()),
-		"qa_id": str(hovered.get_meta("qa_id")) if hovered.has_meta("qa_id") else "",
-		"type": hovered.get_class(),
-	}
+	return _control_info(hovered)

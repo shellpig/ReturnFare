@@ -32,6 +32,7 @@ offset_bottom = 160.0
 text = "推進時段"
 
 [node name="ContentView" type="Control" parent="."]
+clip_contents = true
 offset_left = 0.0
 offset_top = 170.0
 offset_right = 1280.0

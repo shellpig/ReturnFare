@@ -21,6 +21,19 @@ static func get_game_state(tree: SceneTree) -> Node:
 	return tree.get_root().get_node("GameState")
 
 
+## 尋找當前可見之 AcceptDialog
+static func find_preview_dialog(tree: SceneTree) -> AcceptDialog:
+	var list := QAStep.find_controls_by_qa_id(tree.get_root(), "dialog_confirm::preview")
+	if list.is_empty():
+		return null
+	var curr: Node = list[0]
+	while curr != null:
+		if curr is AcceptDialog:
+			return curr as AcceptDialog
+		curr = curr.get_parent()
+	return null
+
+
 ## 由 runner 呼叫的主要執行進入點
 func run(_tree: SceneTree, _main_node: Control, _run_dir: String) -> Dictionary:
 	return { "ok": false, "errors": ["尚未實作 run()"] }

@@ -53,6 +53,16 @@ static func get_effective_visible_rect(ctrl: Control) -> Rect2:
 	return rect
 
 
+## 判斷節點是否位於獨立 Window/Popup 內
+static func _is_inside_window(node: Node) -> bool:
+	var curr: Node = node.get_parent()
+	while curr != null:
+		if curr is Window and not (curr is SubViewport):
+			return true
+		curr = curr.get_parent()
+	return false
+
+
 ## 執行幾何診斷（遮蔽診斷與溢出診斷）
 static func run_geometry_diagnostics(root: Node) -> Dictionary:
 	var visible_controls: Array[Control] = []
@@ -60,6 +70,9 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 
 	var occlusion_issues: Array[Dictionary] = []
 	var overflow_issues: Array[Dictionary] = []
+
+	var root_vp := root.get_viewport() if root is Control else null
+	var vp_size: Vector2 = root_vp.get_visible_rect().size if root_vp != null else Vector2(1280, 720)
 
 	# 1. 遮蔽診斷 (五條防呆)
 	for i in range(visible_controls.size()):
@@ -128,6 +141,21 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 					"reason": "內容垂直高度 (%d) 大於容器 (%d) 且垂直捲動被停用" % [int(min_s.y), int(act_s.y)],
 				})
 
+		# 檢查常規 Control 右側/底部是否溢出視口邊界（未在 ScrollContainer 內）
+		if _has_renderable_content(ctrl) and not _is_inside_window(ctrl):
+			var eff := get_effective_visible_rect(ctrl)
+			if eff.size.x > 0 and eff.size.y > 0:
+				if eff.position.x + eff.size.x > vp_size.x + 2.0:
+					overflow_issues.append({
+						"path": str(ctrl.get_path()),
+						"reason": "元件右側超出主視口邊界 (x2=%f > %f)" % [eff.position.x + eff.size.x, vp_size.x],
+					})
+				if eff.position.y + eff.size.y > vp_size.y + 2.0:
+					overflow_issues.append({
+						"path": str(ctrl.get_path()),
+						"reason": "元件底部超出主視口邊界 (y2=%f > %f)" % [eff.position.y + eff.size.y, vp_size.y],
+					})
+
 	return {
 		"ok": occlusion_issues.is_empty() and overflow_issues.is_empty(),
 		"occlusion_issues": occlusion_issues,
@@ -158,3 +186,16 @@ static func capture_screenshot(tree: SceneTree, file_path: String) -> bool:
 		return false
 	var err := img.save_png(file_path)
 	return err == OK
+
+
+## 中途狀態擷取（截圖 + UI dump）
+static func capture_interim_state(tree: SceneTree, root_node: Node, run_dir: String, case_id: String, stage_name: String) -> void:
+	var dump_path := run_dir + "dumps/" + case_id + "_" + stage_name + ".json"
+	var dump_data := dump_ui_tree(root_node)
+	var f := FileAccess.open(dump_path, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify(dump_data, "\t"))
+		f.close()
+
+	var shot_path := run_dir + "shots/" + case_id + "_" + stage_name + ".png"
+	capture_screenshot(tree, shot_path)

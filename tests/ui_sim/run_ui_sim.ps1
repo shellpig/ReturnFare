@@ -4,7 +4,7 @@ param(
     [int]$TimeoutSeconds = 30
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $projectRoot
@@ -36,32 +36,52 @@ $stateArgs = @(
     "--headless",
     "--path", ".",
     "--script", "res://tests/ui_sim/make_states.gd",
+    "--log-file", $stateGenLog,
     "--",
     "--output-dir", $statesDir
 )
 
-$proc = Start-Process -FilePath $GodotBin -ArgumentList $stateArgs -NoNewWindow -PassThru -Wait
-if ($proc.ExitCode -ne 0) {
-    Write-Host "ERROR: Failed to generate scenario states! Exit code: $($proc.ExitCode)" -ForegroundColor Red
+$proc = Start-Process -FilePath $GodotBin -ArgumentList $stateArgs -NoNewWindow -PassThru
+$stateFinished = $proc.WaitForExit($TimeoutSeconds * 1000)
+if (-not $stateFinished) {
+    try { $proc.Kill() } catch {}
+    Write-Host "ERROR: State generator timed out! ($TimeoutSeconds s)" -ForegroundColor Red
+    exit 1
+}
+
+$stateExitCode = 0
+try {
+    if ($proc.HasExited) {
+        $stateExitCode = $proc.ExitCode
+    }
+} catch {
+    $stateExitCode = 0
+}
+
+if ($null -ne $stateExitCode -and $stateExitCode -ne 0) {
+    Write-Host "ERROR: Failed to generate scenario states! Exit code: $stateExitCode" -ForegroundColor Red
     exit 1
 }
 Write-Host "  Scenario states generated successfully." -ForegroundColor Green
 
-# 3. Case definitions
+# 3. Case definitions (17 variants covering all P1-G requirements)
 $caseDefs = @(
-    @{ Id = "p1g_case_04_slot_types"; State = "d22_afternoon.json"; Desc = "Slot type indicator (equip, info)" },
+    @{ Id = "p1g_case_01a_beats_ajie"; State = "d32_morning__ajie.json"; Desc = "Beats play one by one (Ajie invited)" },
+    @{ Id = "p1g_case_01b_beats_alone"; State = "d32_morning__none.json"; Desc = "Beats play one by one (No invite)" },
+    @{ Id = "p1g_case_02_lock_interaction_during_play"; State = "d32_morning__ajie.json"; Desc = "Lock interaction during play" },
+    @{ Id = "p1g_case_03_reenter_no_duplicate_on_enter"; State = "d17_morning.json"; Desc = "Reenter no duplicate on_enter" },
+    @{ Id = "p1g_case_04_slot_types"; State = "d22_afternoon.json"; Desc = "Slot type indicator (all 4 slots)" },
     @{ Id = "p1g_case_05_protagonist_slot_type"; State = "d3_afternoon.json"; Desc = "Protagonist slot type indicator" },
     @{ Id = "p1g_case_06_no_spoiler"; State = "d3_afternoon.json"; Desc = "No spoiler for specific card accepts" },
     @{ Id = "p1g_case_07_right_click_preview"; State = "d22_afternoon.json"; Desc = "Right click preview state unchanged" },
-    @{ Id = "p1g_case_08_right_click_locked_preview"; State = "d22_afternoon.json"; Desc = "Right click locked slot preview" },
-    @{ Id = "p1g_case_09_preview_button_match_right_click"; State = "d22_afternoon.json"; Desc = "Preview button matches right click" },
+    @{ Id = "p1g_case_08_right_click_locked_preview"; State = "d22_afternoon.json"; Desc = "Right click locked slot preview with reason" },
+    @{ Id = "p1g_case_09_preview_button_match_right_click"; State = "d22_afternoon.json"; Desc = "Preview button matches right click verbatim" },
     @{ Id = "p1g_case_10_preview_placement_consistent_positive"; State = "d22_afternoon.json"; Desc = "Preview placement positive" },
     @{ Id = "p1g_case_11_preview_placement_consistent_negative"; State = "d22_afternoon.json"; Desc = "Preview placement negative" },
-    @{ Id = "p1g_case_01_beats_play_one_by_one"; State = "d32_morning__ajie.json"; Desc = "Beats play one by one" },
-    @{ Id = "p1g_case_02_lock_interaction_during_play"; State = "d32_morning__ajie.json"; Desc = "Lock interaction during play" },
-    @{ Id = "p1g_case_03_reenter_no_duplicate_on_enter"; State = "d17_morning.json"; Desc = "Reenter no duplicate on_enter" },
-    @{ Id = "p1g_case_12_advance_hint"; State = "d35_afternoon.json"; Desc = "Advance hint" },
-    @{ Id = "p1g_case_13_night_same_model"; State = "d10_night.json"; Desc = "Night same model" },
+    @{ Id = "p1g_case_12a_advance_d35"; State = "d35_afternoon.json"; Desc = "Advance hint (D35 choice-only)" },
+    @{ Id = "p1g_case_12b_advance_d40"; State = "d40_morning.json"; Desc = "Advance hint (D40 choice-only)" },
+    @{ Id = "p1g_case_12c_advance_d43"; State = "d43_afternoon.json"; Desc = "Advance hint (D43 choice-only)" },
+    @{ Id = "p1g_case_13_night_same_model"; State = "d10_night.json"; Desc = "Night same interaction model" },
     @{ Id = "p1g_case_14_location_desc"; State = "d2_morning.json"; Desc = "Location desc fallback" }
 )
 
@@ -96,8 +116,28 @@ foreach ($c in $caseDefs) {
         "--run-dir", $runDir
     )
 
-    $proc = Start-Process -FilePath $GodotBin -ArgumentList $caseArgs -NoNewWindow -PassThru -Wait
-    $exitCode = $proc.ExitCode
+    $proc = Start-Process -FilePath $GodotBin -ArgumentList $caseArgs -NoNewWindow -PassThru
+    $finished = $proc.WaitForExit($TimeoutSeconds * 1000)
+
+    if (-not $finished) {
+        try { $proc.Kill() } catch {}
+        Write-Host "TIMEOUT" -ForegroundColor Red
+        $failedCount++
+        $results += @{ Id = $cId; Ok = $false; Error = "Timeout ($TimeoutSeconds s)" }
+        continue
+    }
+
+    $exitCode = 0
+    if ($proc.HasExited) {
+        try {
+            $rawCode = $proc.ExitCode
+            if ($null -ne $rawCode) {
+                $exitCode = [int]$rawCode
+            }
+        } catch {
+            $exitCode = 0
+        }
+    }
 
     $repJsonPath = Join-Path $runDir "reports\$cId.json"
     $caseOk = $false
@@ -107,17 +147,19 @@ foreach ($c in $caseDefs) {
         try {
             $repObj = Get-Content -Path $repJsonPath -Raw -Encoding utf8 | ConvertFrom-Json
             $caseOk = [bool]$repObj.ok
-            if (-not $caseOk -and $repObj.errors) {
+            if ($repObj.errors) {
                 $caseErrors = $repObj.errors
             }
         } catch {
-            $caseOk = ($exitCode -eq 0)
+            $caseOk = false
+            $caseErrors = @("Failed to parse report JSON: $_")
         }
     } else {
-        $caseOk = ($exitCode -eq 0)
+        $caseOk = false
+        $caseErrors = @("Report file not found: $repJsonPath")
     }
 
-    if ($exitCode -eq 0 -and $caseOk) {
+    if ($caseOk -and $exitCode -eq 0) {
         Write-Host "OK" -ForegroundColor Green
         $results += @{ Id = $cId; Ok = $true; Error = "" }
     } else {

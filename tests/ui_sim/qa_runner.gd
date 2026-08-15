@@ -30,10 +30,14 @@ func _initialize() -> void:
 		i += 1
 
 	if case_id.is_empty():
-		case_id = "p1g_case_04_slot_types"
+		printerr("qa_runner: 缺少必要參數 --case <case_id>")
+		quit(1)
+		return
 
 	if run_dir.is_empty():
-		run_dir = "res://_qa/runs/latest/"
+		printerr("qa_runner: 缺少必要參數 --run-dir <run_dir>")
+		quit(1)
+		return
 
 	run_dir = run_dir.replace("\\", "/")
 	if not run_dir.ends_with("/"):
@@ -90,9 +94,15 @@ func _initialize() -> void:
 	if f_dump != null:
 		f_dump.store_string(JSON.stringify(ui_dump, "\t"))
 		f_dump.close()
+	else:
+		errors.append("無法寫入 dump 檔案: " + dump_file)
+		is_ok = false
 
 	var shot_file := run_dir + "shots/" + case_id + ".png"
-	QADiagnosticsClass.capture_screenshot(self, shot_file)
+	var shot_ok := QADiagnosticsClass.capture_screenshot(self, shot_file)
+	if not shot_ok:
+		errors.append("無法儲存截圖: " + shot_file)
+		is_ok = false
 
 	# 8. 寫入 Case 報告
 	var report := {
@@ -109,6 +119,10 @@ func _initialize() -> void:
 	if f_rep != null:
 		f_rep.store_string(JSON.stringify(report, "\t"))
 		f_rep.close()
+	else:
+		printerr("無法寫入報告檔案: " + rep_file)
+		quit(1)
+		return
 
 	if is_ok:
 		print("=== QA Runner: 案例 [%s] 通過 (OK) ===" % case_id)

@@ -56,13 +56,21 @@ func _process_cli_args() -> void:
 	while i < args.size():
 		match args[i]:
 			"--data-root":
-				if i + 1 < args.size():
+				if i + 1 < args.size() and not args[i + 1].begins_with("--"):
 					data_root = args[i + 1]
 					i += 1
+				else:
+					printerr("ERROR: --data-root 缺少有效路徑參數")
+					get_tree().quit(1)
+					return
 			"--state":
-				if i + 1 < args.size():
+				if i + 1 < args.size() and not args[i + 1].begins_with("--"):
 					state_path = args[i + 1]
 					i += 1
+				else:
+					printerr("ERROR: --state 缺少有效檔案路徑參數")
+					get_tree().quit(1)
+					return
 		i += 1
 
 	if not data_root.is_empty():

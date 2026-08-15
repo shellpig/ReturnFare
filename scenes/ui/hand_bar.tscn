@@ -10,6 +10,8 @@ text = "手牌 0 / 14"
 
 [node name="HandLabel" type="Label" parent="."]
 text = "(空)"
+autowrap_mode = 2
 
 [node name="KnowledgeLabel" type="Label" parent="."]
 text = "知識：(無)"
+autowrap_mode = 2
