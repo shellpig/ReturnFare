@@ -289,15 +289,24 @@ if ($catalogContractCount -ne 47 -or $missingCatalogIds.Count -gt 0 -or $unexpec
 }
 $caseDefs = $allCaseDefs
 if (-not [string]::IsNullOrEmpty($Case)) {
-    $caseDefs = @($allCaseDefs | Where-Object { $_.id -eq $Case })
-    if ($caseDefs.Count -eq 0) {
-        Write-Host "ERROR: Case not found: $Case" -ForegroundColor Red
+    $matched = @($allCaseDefs | Where-Object { $_.id -eq $Case })
+    if ($matched.Count -eq 0) {
+        $matched = @($allCaseDefs | Where-Object { $_.contract_id -eq $Case })
+    }
+    if ($matched.Count -eq 0) {
+        Write-Host "ERROR: Case/Contract not found: $Case" -ForegroundColor Red
         exit 1
     }
-    $selectedGroup = [string]$caseDefs[0].comparison_group
+    $selectedGroup = [string]$matched[0].comparison_group
+    $selectedContract = [string]$matched[0].contract_id
     if (-not [string]::IsNullOrEmpty($selectedGroup)) {
         $caseDefs = @($allCaseDefs | Where-Object { $_.comparison_group -eq $selectedGroup })
         Write-Host "  Case selection expands comparison group [$selectedGroup] to $($caseDefs.Count) variants." -ForegroundColor DarkGray
+    } else {
+        $caseDefs = @($allCaseDefs | Where-Object { $_.contract_id -eq $selectedContract })
+        if ($caseDefs.Count -gt 1) {
+            Write-Host "  Case selection expands contract [$selectedContract] to $($caseDefs.Count) variants." -ForegroundColor DarkGray
+        }
     }
 }
 $executedContractCount = @($caseDefs | ForEach-Object { [string]$_.contract_id } | Sort-Object -Unique).Count
@@ -450,7 +459,13 @@ foreach ($group in $groups) {
         }
     }
     $signatures = @($groupReports | ForEach-Object {
-        if ($null -eq $_.observations.choice_result_projection) { "" } else { $_.observations.choice_result_projection | ConvertTo-Json -Compress -Depth 30 }
+        if ($null -ne $_.observations.choice_result_normalized) {
+            $_.observations.choice_result_normalized | ConvertTo-Json -Compress -Depth 30
+        } elseif ($null -ne $_.observations.choice_result_projection) {
+            $_.observations.choice_result_projection | ConvertTo-Json -Compress -Depth 30
+        } else {
+            ""
+        }
     } | Sort-Object -Unique)
     $same = ($groupReports.Count -eq $group.Group.Count) -and ($signatures.Count -eq 1) -and (-not [string]::IsNullOrEmpty($signatures[0]))
 	$comparisonStatus = if ($same) { "OK" } else { "FAIL" }

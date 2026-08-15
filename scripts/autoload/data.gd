@@ -26,6 +26,7 @@ func _ready() -> void:
 
 
 func load_data(data_dir: String = "res://data/") -> bool:
+	ok = false
 	var candidate := DataLoader.new(data_dir)
 	var validation := _validate_loader(candidate)
 	for e in validation.errors:

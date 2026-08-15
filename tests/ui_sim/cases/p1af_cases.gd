@@ -31,7 +31,7 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p1af_14_place_effect", "D3 放主角卡後效果文字與狀態落帳", "d3_afternoon.json", "", "p1af_14_place_effect", "", "place_effect"),
 		UiCase.new("p1af_15_action_spent", "行動格用掉後第二地點不能再放主角卡", "d3_afternoon.json", "", "p1af_15_action_spent", "", "action_spent"),
 		UiCase.new("p1af_16_panel_rebuild", "放置後同面板立即重建控制項", "d3_afternoon.json", "", "p1af_16_panel_rebuild", "", "panel_rebuild"),
-		UiCase.new("p1af_17_compare_free", "D9 比對槽放情報卡不消耗行動格", "d9_afternoon.json", "", "p1af_17_compare_free", "", "compare_free"),
+		UiCase.new("p1af_17_compare_free", "比對槽放情報卡不消耗行動格且後續仍可放主角卡", "d3_afternoon.json", "", "p1af_17_compare_free", "", "compare_free"),
 		UiCase.new("p1af_18_incompatible_absent", "不符合 accepts 的卡沒有 place 控制項", "d22_afternoon.json", "", "p1af_18_incompatible_absent", "", "incompatible_absent"),
 		UiCase.new("p1af_19_attention", "D22 attention_npc 投入帳成功加一", "d22_afternoon.json", "", "p1af_19_attention", "", "attention"),
 		UiCase.new("p1af_20_choice_collapse", "choice 選定後同組其餘選項消失", "d22_afternoon.json", "", "p1af_20_choice_collapse", "", "choice_collapse"),
@@ -344,7 +344,11 @@ class UiCase extends CaseBaseClass:
 		await _close(tree)
 		await _enter(tree, "oldstreet")
 		assert_true(_visible_ids(tree, "place::").is_empty(), "第二地點不得再出現主角放卡入口")
-		return { "ok": errors.is_empty(), "errors": errors }
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::d3_pm_oldstreet::wander"), "第二地點仍顯示槽位")
+		var before := _state(tree)
+		await _click(tree, "slot::d3_pm_oldstreet::wander")
+		assert_eq(JSON.stringify(before), JSON.stringify(_state(tree)), "行動耗盡後對第二地點槽位真實輸入不得改變狀態")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["action_spent_ui_blocked", "second_location_input_noop"] } }
 
 	func _panel_rebuild(tree: SceneTree) -> Dictionary:
 		await _enter(tree, "sanquan")
@@ -355,18 +359,22 @@ class UiCase extends CaseBaseClass:
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["old_place_removed", "new_slot_open"] } }
 
 	func _compare_free(tree: SceneTree) -> Dictionary:
-		await _enter(tree, "columbarium")
-		assert_false((_state(tree).get("meta", {}) as Dictionary).get("knowledge", {}).has("k_forty_something"), "自然比較前不得預注入知識")
-		await _click(tree, "place::d9_pm_columbarium::count::protagonist")
+		await _enter(tree, "sanquan")
 		var before := _run(tree)
-		var compare_ids := _visible_ids(tree, "place::d9_pm_columbarium::compare_years::")
-		assert_true(not compare_ids.is_empty(), "D9 比對情報卡入口")
-		await _click(tree, compare_ids[0])
+		assert_false(bool(before.get("action_spent", false)), "比對前行動格未消耗")
+		var compare_ids := _visible_ids(tree, "place::d3_pm_sanquan::show_version::")
+		assert_true(not compare_ids.is_empty(), "D3 比對情報卡入口存在")
+		if not compare_ids.is_empty():
+			await _click(tree, compare_ids[0])
+		var mid := _run(tree)
+		assert_false(bool(mid.get("action_spent", false)), "比對槽結算後仍不消耗行動格")
+		assert_true(bool((mid.get("flags", {}) as Dictionary).get("couple_softened", false)), "比對槽效果正常落帳")
+		await _click(tree, "place::d3_pm_sanquan::help_ahong::protagonist")
 		var after := _run(tree)
-		assert_eq(bool(after.get("action_spent", false)), bool(before.get("action_spent", false)), "比對槽不新增行動消耗")
-		assert_true((_state(tree).get("meta", {}) as Dictionary).get("knowledge", {}).has("k_forty_something"), "比對後知識落帳")
-		assert_eq(int(after.get("day", 0)), int(before.get("day", 0)), "比對不推進時間")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["knowledge_absent_before", "knowledge_gained", "compare_no_extra_action"] } }
+		assert_true(bool(after.get("action_spent", false)), "比對後放置主角卡成功消耗行動格")
+		assert_true(bool((after.get("flags", {}) as Dictionary).get("ahong_last_normal_contact", false)), "主角卡效果落帳")
+		assert_eq(int(after.get("day", 0)), int(before.get("day", 0)), "比對與放置不推進時間")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["compare_no_action_spent", "action_still_available_after_compare", "compare_effect_applied"] } }
 
 	func _incompatible_absent(tree: SceneTree) -> Dictionary:
 		await _enter(tree, "sanquan")
@@ -382,15 +390,17 @@ class UiCase extends CaseBaseClass:
 
 	func _attention(tree: SceneTree) -> Dictionary:
 		await _enter(tree, "sanquan")
-		var before := _run(tree).get("npc_action_counts", {}) as Dictionary
-		await _click(tree, "place::d22_pm_sandbags::work::protagonist")
-		var after := _run(tree).get("npc_action_counts", {}) as Dictionary
-		assert_eq(int(after.get("acai", 0)), int(before.get("acai", 0)) + 1, "阿財投入帳恰加一")
-		var free_before := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
+		var count_0 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
 		await _click(tree, "choose::d22_pm_sandbags::acai_read::obs_walk")
-		var free_after := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
-		assert_eq(free_after, free_before, "免費 choice 不得增加 attention 投入帳")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["attention_success", "attention_free_unchanged"] } }
+		var count_1 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
+		assert_eq(count_1, count_0, "無 attention_npc 的免費 choice 不得增加投入帳")
+		await _click(tree, "place::d22_pm_sandbags::work::protagonist")
+		var count_2 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
+		assert_eq(count_2, count_0 + 1, "帶 attention_npc 的成功放置投入帳恰加一")
+		await _click(tree, "slot::d22_pm_sandbags::work")
+		var count_3 := int((_run(tree).get("npc_action_counts", {}) as Dictionary).get("acai", 0))
+		assert_eq(count_3, count_2, "對已結算槽重複點擊不得再次增加投入帳")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["attention_success", "attention_free_unchanged", "attention_repeat_unchanged"] } }
 
 	func _choice_collapse(tree: SceneTree) -> Dictionary:
 		await _enter(tree, "sanquan")
@@ -429,14 +439,30 @@ class UiCase extends CaseBaseClass:
 			"slot_placed": (after_run.get("slots_placed", {}) as Dictionary).get("d22_pm_sandbags::obs_walk", false),
 			"knowledge": after.get("meta", {}).get("knowledge", {}).get("info_acai_walk", false),
 		}
+		var norm_state := (after.duplicate(true) as Dictionary)
+		var norm_run := norm_state.get("run", {}) as Dictionary
+		var norm_hand: Array = (norm_run.get("hand", []) as Array).duplicate()
+		norm_hand.erase("equip_polaroid")
+		norm_hand.erase("info_ahong_private")
+		norm_hand.sort()
+		norm_run["hand"] = norm_hand
+		var norm_flags := (norm_run.get("flags", {}) as Dictionary).duplicate()
+		norm_flags.erase("ahong_last_normal_contact")
+		norm_run["flags"] = norm_flags
+		var norm_slots := (norm_run.get("slots_placed", {}) as Dictionary).duplicate()
+		norm_slots.erase("d3_pm_sanquan::help_ahong")
+		norm_slots.erase("d3_pm_sanquan::handle_couple")
+		norm_run["slots_placed"] = norm_slots
+		norm_state["run"] = norm_run
 		if comparison_group == "p1af_22_choice_equivalence":
 			return { "ok": errors.is_empty(), "errors": errors, "observations": {
+				"choice_result_normalized": norm_state,
 				"choice_result_projection": comparable,
 				"fixture_causality": {
 					"with_card": with_card,
 					"source_hand": before.get("run", {}).get("hand", []),
 				},
-				"evidence": ["case_ok"],
+				"evidence": ["choice_equivalence_complete"],
 			} }
 		assert_true((after.get("run", {}) as Dictionary).get("choices", {}).has("d22_pm_sandbags::acai_read"), "choice 結算")
 		assert_false(JSON.stringify(before) == JSON.stringify(after), "choice 結算應改變狀態")
@@ -490,7 +516,17 @@ class UiCase extends CaseBaseClass:
 	func _night_resolution(tree: SceneTree, main_node: Control) -> Dictionary:
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "D10 夜間免費地點")
 		await _enter(tree, "n_landmark")
-		assert_true(_has_text(tree.get_root(), "夜鎮裡有一個特殊的東西"), "D10 免費地點可真實進入")
+		var texts := _texts(tree.get_root())
+		var base_idx := -1
+		var add_idx := -1
+		for idx in range(texts.size()):
+			if texts[idx].contains("夜鎮裡有一個特殊的東西"):
+				base_idx = idx
+			if texts[idx].contains("某個地方擺著一個小玩具"):
+				add_idx = idx
+		assert_true(base_idx >= 0, "D10 免費地點主內容/章節變體演出")
+		assert_true(add_idx >= 0, "D10 附加 beat 並列演出")
+		assert_true(add_idx > base_idx, "主內容與附加 beat 播放順序正確")
 		await _close(tree)
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "D10 已到付費標記開放日")
 		await _enter(tree, "n_ahong_1")
@@ -500,7 +536,7 @@ class UiCase extends CaseBaseClass:
 		var hand := _run(tree).get("hand", []) as Array
 		for card_id in hand:
 			assert_false(str(card_id).begins_with("madness"), "夜間不應產生 madness 卡")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "locations": _visible_ids(tree, "location::"), "evidence": ["night_fixed_priority", "night_free_interaction", "night_paid_locked", "night_no_madness"] } }
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "locations": _visible_ids(tree, "location::"), "evidence": ["night_free_interaction", "night_chapter_and_additional_order", "night_paid_locked", "night_no_madness"] } }
 
 	func _night_resolution_d1(tree: SceneTree) -> Dictionary:
 		await _advance(tree)
@@ -508,7 +544,7 @@ class UiCase extends CaseBaseClass:
 		await _advance(tree)
 		assert_eq(str(_run(tree).get("phase", "")), "night", "D1 夜間起點")
 		assert_true(_has_text(tree.get_root(), "一條走廊，兩側都是門"), "D1 fixed night beat 優先演出")
-		return { "ok": errors.is_empty(), "errors": errors }
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["night_fixed_priority"] } }
 
 	func _sleep_d24(tree: SceneTree, main_node: Control) -> Dictionary:
 		assert_true(_has_text(main_node, "老曾") or (_run(tree).get("flags", {}) as Dictionary).get("laozeng_patrol_d24", false), "D24 night fixed beat")
@@ -552,7 +588,16 @@ class UiCase extends CaseBaseClass:
 		for field in run_fields:
 			assert_true((after.get(field, {}) as Dictionary).is_empty(), "跨輪欄位清空: %s" % field)
 		assert_false(_has_text(tree.get_root(), "[結局 stub]"), "關閉結局 stub 後才進入新輪 UI")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["run_fields_cleared", "reset_ui_state"] } }
+		await _advance(tree)
+		await _advance(tree)
+		await _advance(tree)
+		await _advance(tree)
+		assert_eq(int(_run(tree).get("day", 0)), 2, "新輪推進至第 2 天")
+		await _enter(tree, "sanquan")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::d2_morning_intro::ajie"), "第 2 天初始 occupant 槽")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "place::d2_morning_intro::ajie::"), "occupant 不可放卡")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["run_fields_cleared", "reset_ui_state", "reset_flag_slots_locked"] } }
 
 	func _full_walk(tree: SceneTree) -> Dictionary:
 		var safety := 0
