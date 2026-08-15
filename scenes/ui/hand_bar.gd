@@ -14,6 +14,9 @@ const _LABEL_KNOWLEDGE_PREFIX := "知識："
 
 
 func _ready() -> void:
+	_slots_label.set_meta("qa_id", "hand_slots")
+	_hand_label.set_meta("qa_id", "hand_cards")
+	_knowledge_label.set_meta("qa_id", "knowledge_cards")
 	GameState.hand_changed.connect(_refresh)
 	GameState.knowledge_changed.connect(_refresh)
 	_refresh()

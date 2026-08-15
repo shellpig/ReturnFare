@@ -5,10 +5,11 @@ extends RefCounted
 ## 包含 17 個獨立案例變體，嚴禁在測試開始後直呼 GameState 規則層（如 preview_slot），一律經由真實輸入事件進行。
 
 const CaseBaseClass := preload("res://tests/ui_sim/cases/case_base.gd")
+const P1AFCasesClass := preload("res://tests/ui_sim/cases/p1af_cases.gd")
 
 
 static func get_all_cases() -> Array[CaseBase]:
-	return [
+	var cases: Array[CaseBase] = [
 		Case01aBeatsAjie.new(),
 		Case01bBeatsAlone.new(),
 		Case02LockInteractionDuringPlay.new(),
@@ -26,7 +27,10 @@ static func get_all_cases() -> Array[CaseBase]:
 		Case12cAdvanceD43.new(),
 		Case13NightSameModel.new(),
 		Case14LocationDesc.new(),
+		Case14LocationDescPositive.new(),
 	]
+	cases.append_array(P1AFCasesClass.get_all_cases())
+	return cases
 
 
 static func get_case_by_id(case_id: String) -> CaseBase:
@@ -542,31 +546,24 @@ class Case10PreviewPlacementConsistentPositive extends CaseBaseClass:
 		assert_true(diag != null, "預覽彈窗必須開啟")
 		# 從彈窗實際顯示的 dialog_text（畫面上真的看得到的文字）反推卡片集合，
 		# 不讀隱藏 metadata——玩家只看得到畫面，metadata 可能與畫面顯示的內容脫鉤
-		var dialog_text := diag.dialog_text if diag != null else ""
-		var previewed_cards: Array[String] = []
-		for card_val in (run_state.get("hand", []) as Array):
-			var cid := str(card_val)
-			if dialog_text.contains("  • %s" % CaseBaseClass.card_display_name(tree, cid)):
-				previewed_cards.append(cid)
+		var previewed_names := CaseBaseClass.preview_bullet_names(diag)
 		await QAStep.click(tree, "dialog_confirm::preview")
 
-		assert_true(not previewed_cards.is_empty(), "預覽可放卡片集合不可為空")
+		assert_true(not previewed_names.is_empty(), "預覽可放卡片集合不可為空")
 
 		# 2. 解析畫面上實際存在的 place 按鈕集合
-		var button_cards: Array[String] = []
 		var prefix := "place::d22_pm_sandbags::work::"
-		for ctrl in QAStep.find_controls_by_qa_id_prefix(tree.get_root(), prefix):
-			if ctrl.has_meta("qa_id"):
-				var qid := str(ctrl.get_meta("qa_id"))
-				button_cards.append(qid.substr(prefix.length()))
-
-		previewed_cards.sort()
-		button_cards.sort()
-		assert_eq(JSON.stringify(button_cards), JSON.stringify(previewed_cards), "預覽卡片集合必須與畫面上可放按鈕集合完全一致")
+		var button_names := CaseBaseClass.place_button_names(tree, prefix)
+		previewed_names.sort()
+		button_names.sort()
+		assert_eq(JSON.stringify(button_names), JSON.stringify(previewed_names), "預覽卡片集合必須與畫面上可放按鈕集合完全一致")
 
 		# 3. 真實點擊放置按鈕
-		for card_id in previewed_cards:
-			var place_btn_qid := "place::d22_pm_sandbags::work::" + card_id
+		var place_controls := QAStep.find_controls_by_qa_id_prefix(tree.get_root(), prefix)
+		for place_ctrl in place_controls:
+			if not place_ctrl.is_visible_in_tree() or not place_ctrl.has_meta("qa_id"):
+				continue
+			var place_btn_qid := str(place_ctrl.get_meta("qa_id"))
 			var place_res := await QAStep.click(tree, place_btn_qid)
 			assert_true(place_res.get("ok", false), "點擊放置按鈕失敗: %s (%s)" % [place_btn_qid, str(place_res.get("error"))])
 
@@ -612,23 +609,24 @@ class Case11PreviewPlacementConsistentNegative extends CaseBaseClass:
 		var diag := find_preview_dialog(tree)
 		assert_true(diag != null, "預覽彈窗必須開啟")
 		# 從彈窗實際顯示的 dialog_text 反推卡片集合，不讀隱藏 metadata
-		var dialog_text := diag.dialog_text if diag != null else ""
+		var preview_names := CaseBaseClass.preview_bullet_names(diag)
 		var hand_cards: Array = run_state.get("hand", []) as Array
 		assert_true(not hand_cards.is_empty(), "手牌不可為空")
-		var compatible_cards: Array[String] = []
-		for card_val in hand_cards:
-			var cid := str(card_val)
-			if dialog_text.contains("  • %s" % CaseBaseClass.card_display_name(tree, cid)):
-				compatible_cards.append(cid)
 		await QAStep.click(tree, "dialog_confirm::preview")
 
-		assert_true(compatible_cards.has("protagonist"), "預覽必須包含「我」")
+		var place_prefix := "place::d22_pm_sandbags::work::"
+		var place_card_ids: Array[String] = []
+		for place_ctrl in QAStep.find_controls_by_qa_id_prefix(tree.get_root(), place_prefix):
+			if place_ctrl.is_visible_in_tree() and place_ctrl.has_meta("qa_id"):
+				place_card_ids.append(str(place_ctrl.get_meta("qa_id")).substr(place_prefix.length()))
+		assert_true(place_card_ids.has("protagonist"), "預覽必須包含主角卡的放置按鈕")
+		assert_true(not preview_names.is_empty(), "預覽文字必須至少列出一張卡")
 
-		# 3. 扣除 compatible_cards，取得不可放卡片
+		# 3. 以 serialize() 的手牌集合減去 UI 實際建立的 place 控制項，取得不可放卡片
 		var incompatible_cards: Array[String] = []
 		for card_val in hand_cards:
 			var cid := str(card_val)
-			if not compatible_cards.has(cid) and not incompatible_cards.has(cid):
+			if not place_card_ids.has(cid) and not incompatible_cards.has(cid):
 				incompatible_cards.append(cid)
 
 		assert_true(not incompatible_cards.is_empty(), "手牌必須包含不可放於 work 槽的卡片")
@@ -929,5 +927,29 @@ class Case14LocationDesc extends CaseBaseClass:
 		if not title_controls.is_empty():
 			var title_lbl := title_controls[0] as Label
 			assert_eq(title_lbl.text, "山泉閣", "LocationTitle 必須為「山泉閣」")
+
+		return { "ok": errors.is_empty(), "errors": errors }
+
+
+class Case14LocationDescPositive extends CaseBaseClass:
+	func _init() -> void:
+		super._init(
+			"p1g_case_14_location_desc_positive",
+			"locations.json 有 desc 時正確顯示地點描述",
+			"d2_morning.json",
+			"location_desc_positive"
+		)
+
+	func run(tree: SceneTree, _main_node: Control, _run_dir: String) -> Dictionary:
+		await QAStep.click(tree, "location::sanquan")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
+
+		var description_controls := QAStep.find_controls_by_name(tree.get_root(), "DescriptionLabel")
+		assert_true(not description_controls.is_empty(), "找不到 DescriptionLabel")
+		if not description_controls.is_empty():
+			var description_label := description_controls[0] as Label
+			assert_true(description_label.visible, "有 desc 時 DescriptionLabel 必須可見")
+			assert_eq(description_label.text, "QA fixture description", "DescriptionLabel 必須顯示資料中的 desc")
 
 		return { "ok": errors.is_empty(), "errors": errors }

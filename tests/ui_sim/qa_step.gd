@@ -4,6 +4,39 @@ extends RefCounted
 ## UI 模擬單步輸入 Helper（依 開發設計方針.md > 固定輸入流程 實作）。
 ## 案例一律透過此 helper 進行互動，嚴禁自訂 timer 或呼叫 pressed.emit()。
 
+const QADiagnosticsClass := preload("res://tests/ui_sim/qa_diagnostics.gd")
+
+static var _interim_enabled := false
+static var _interim_tree: SceneTree
+static var _interim_root: Node
+static var _interim_run_dir := ""
+static var _interim_case_id := ""
+static var _interim_step := 0
+static var _interim_failures: Array[String] = []
+
+
+static func begin_interim_capture(tree: SceneTree, root: Node, run_dir: String, case_id: String) -> void:
+	_interim_enabled = true
+	_interim_tree = tree
+	_interim_root = root
+	_interim_run_dir = run_dir
+	_interim_case_id = case_id
+	_interim_step = 0
+	_interim_failures.clear()
+
+
+static func end_interim_capture() -> void:
+	_interim_enabled = false
+	_interim_tree = null
+	_interim_root = null
+	_interim_run_dir = ""
+	_interim_case_id = ""
+	_interim_step = 0
+
+
+static func get_interim_failures() -> Array[String]:
+	return _interim_failures.duplicate()
+
 
 ## 依 qa_id 遞迴搜尋所有 Control 節點（支援 internal 節點與萬用字元）
 static func find_controls_by_qa_id(root: Node, qa_id_pattern: String) -> Array[Control]:
@@ -209,6 +242,22 @@ static func click(
 
 	# 9. 額外等候 2 幀讓狀態變更與 UI 重繪完全就緒
 	await wait_draw_frames(tree, 2)
+
+	# 每一次真實輸入都做一次中途幾何擷取。案例尾端的診斷無法捕捉
+	# AcceptDialog、演出中面板與其他一閃即逝的畫面。
+	if _interim_enabled and _interim_tree == tree:
+		_interim_step += 1
+		var stage := "step_%04d" % _interim_step
+		var capture_res := await QADiagnosticsClass.capture_interim_state(
+			tree, _interim_root, _interim_run_dir, _interim_case_id, stage
+		)
+		if not bool(capture_res.get("ok", false)):
+			_interim_failures.append("中途畫面擷取失敗 [%s]" % stage)
+		else:
+			var geometry: Dictionary = capture_res.get("geometry", {}) as Dictionary
+			if not bool(geometry.get("ok", false)):
+				_interim_failures.append("中途畫面幾何診斷失敗 [%s]: %s" % [stage, JSON.stringify(geometry)])
+
 	return result
 
 

@@ -588,6 +588,7 @@
           "occupant": "npc_acai",
           "label": "跟他一起扛一個下午",
           "accepts": ["protagonist"],
+          "attention_npc": "acai",
           "on_place": { "text": "整個下午。他一次都沒有停下來喘。" }
         },
         {

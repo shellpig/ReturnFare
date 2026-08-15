@@ -48,19 +48,54 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 
 	# 1. 產生標準走查路徑上的 checkpoints（無覆寫決策）
 	var standard_checkpoints: Dictionary = {
+		"d3_morning": { "day": 3, "phase": "morning" },
 		"d2_morning": { "day": 2, "phase": "morning" },
 		"d3_afternoon": { "day": 3, "phase": "afternoon" },
 		"d9_afternoon": { "day": 9, "phase": "afternoon" },
 		"d10_night": { "day": 10, "phase": "night" },
+		"d15_night": { "day": 15, "phase": "night" },
+		"d24_night": { "day": 24, "phase": "night" },
+		"d32_night": { "day": 32, "phase": "night" },
+		"d45_afternoon": { "day": 45, "phase": "afternoon" },
 		"d17_morning": { "day": 17, "phase": "morning" },
 		"d22_afternoon": { "day": 22, "phase": "afternoon" },
 		"d35_afternoon": { "day": 35, "phase": "afternoon" },
 		"d43_morning": { "day": 43, "phase": "morning" },
-		"d45_evening": { "day": 45, "phase": "evening" },
+		"d8_evening": { "day": 8, "phase": "evening" },
+		"d13_evening": { "day": 13, "phase": "evening" },
 	}
 
 	var res_std := _run_walk_with_checkpoints(tree, data_node, [], standard_checkpoints, output_dir)
 	if not res_std:
+		return false
+
+	# D3 的 requires 負向案例需要「尚未在 D2 下午拿到兩張情報」的合法起點；
+	# 仍由走查器建立，只在產生情境時刻意跳過那一個行動時段。
+	var d3_no_info_decisions: Array[Dictionary] = [
+		{ "day": 2, "phase": "afternoon", "skip": true }
+	]
+	var d3_no_info_cp: Dictionary = { "d3_afternoon__no_info": { "day": 3, "phase": "afternoon" } }
+	if not _run_walk_with_checkpoints(tree, data_node, d3_no_info_decisions, d3_no_info_cp, output_dir):
+		return false
+
+	# D9 的 UI 分流案例要有一張已取得的知識卡；這條分支只改變 D3 的
+	# 投入選擇，其餘仍由同一個走查策略走到 D9。
+	var d9_knowledge_decisions: Array[Dictionary] = [
+		{ "day": 3, "phase": "afternoon", "beat_id": "d3_pm_sanquan", "slot_id": "help_ahong", "card_id": "protagonist" }
+	]
+	var d9_knowledge_cp: Dictionary = { "d9_afternoon": { "day": 9, "phase": "afternoon" } }
+	if not _run_walk_with_checkpoints(tree, data_node, d9_knowledge_decisions, d9_knowledge_cp, output_dir):
+		return false
+	if not _write_state_with_knowledge(output_dir + "d9_afternoon.json", "k_forty_something"):
+		return false
+
+	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
+	# 「比對槽不存在」而不是結局的升級路徑。
+	var d45_coda_decisions: Array[Dictionary] = [
+		{ "day": 13, "phase": "afternoon", "beat_id": "d13_pm_registry", "slot_id": "read", "card_id": "protagonist" }
+	]
+	var d45_coda_cp: Dictionary = { "d45_evening": { "day": 45, "phase": "evening" } }
+	if not _run_walk_with_checkpoints(tree, data_node, d45_coda_decisions, d45_coda_cp, output_dir):
 		return false
 
 	# 2. 產生 D32 邀請分支（阿婕、阿薇、無邀請）
@@ -106,6 +141,8 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	]
 	var d22_polaroid_cp: Dictionary = { "d22_afternoon__with_polaroid": { "day": 22, "phase": "afternoon" } }
 	if not _run_walk_with_checkpoints(tree, data_node, polaroid_decisions, d22_polaroid_cp, output_dir):
+		return false
+	if not _write_state_without_hand_card(output_dir + "d22_afternoon__with_polaroid.json", output_dir + "d22_afternoon__no_polaroid.json", "equip_polaroid"):
 		return false
 
 	# 5. 產生 D27 evening 知識分流（收留阿薇且問陳醫師 vs 僅收留）
@@ -205,8 +242,12 @@ static func _run_walk_with_checkpoints(
 								changed = true
 
 					var overridden := false
+					var skipped := false
 					for dec in custom_decisions:
 						if int(dec.get("day", -1)) == d and str(dec.get("phase", "")) == phase:
+							if bool(dec.get("skip", false)):
+								skipped = true
+								break
 							var b_id := str(dec.get("beat_id", ""))
 							var s_id := str(dec.get("slot_id", ""))
 							var c_id := str(dec.get("card_id", ""))
@@ -223,7 +264,7 @@ static func _run_walk_with_checkpoints(
 									return false
 							overridden = true
 							break
-					if not overridden:
+					if not overridden and not skipped:
 						PlaythroughGreedy.execute_action_phase(gs, data_node, d, phase)
 					gs.advance_phase()
 				"evening":
@@ -247,6 +288,8 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 	match cp_name:
 		"d2_morning":
 			return day == 2 and phase == "morning" and hand.has("protagonist")
+		"d3_morning":
+			return day == 3 and phase == "morning" and hand.has("protagonist")
 		"d3_afternoon":
 			return day == 3 and phase == "afternoon" and hand.has("protagonist")
 		"d5_evening":
@@ -259,12 +302,24 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			return day == 9 and phase == "afternoon"
 		"d10_night":
 			return day == 10 and phase == "night"
+		"d15_night":
+			return day == 15 and phase == "night"
+		"d24_night":
+			return day == 24 and phase == "night"
+		"d32_night":
+			return day == 32 and phase == "night"
+		"d45_afternoon":
+			return day == 45 and phase == "afternoon" and flags.get("final_day", false) == true
 		"d17_morning":
 			return day == 17 and phase == "morning"
 		"d22_afternoon":
 			return day == 22 and phase == "afternoon"
 		"d22_afternoon__with_polaroid":
 			return day == 22 and phase == "afternoon" and hand.has("equip_polaroid")
+		"d22_afternoon__no_polaroid":
+			return day == 22 and phase == "afternoon" and not hand.has("equip_polaroid")
+		"d3_afternoon__no_info":
+			return day == 3 and phase == "afternoon" and not hand.has("info_husband_version") and not hand.has("info_wife_version")
 		"d27_evening__both":
 			return day == 27 and phase == "evening" and flags.get("awei_sheltering", false) == true and flags.get("dodger_chen", false) == true
 		"d27_evening__partial":
@@ -284,7 +339,11 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 		"d43_afternoon":
 			return day == 43 and phase == "afternoon" and hand.has("info_acai_walk")
 		"d45_evening":
-			return day == 45 and phase == "evening"
+			return day == 45 and phase == "evening" and hand.has("info_registry")
+		"d8_evening":
+			return day == 8 and phase == "evening"
+		"d13_evening":
+			return day == 13 and phase == "evening"
 		_:
 			return true
 
@@ -306,3 +365,48 @@ static func _reset_state(gs: Node) -> void:
 		gs.set("knowledge", {})
 		_clean_state_template = (gs.call("serialize") as Dictionary).duplicate(true)
 	gs.call("deserialize", _clean_state_template.duplicate(true))
+
+
+static func _write_state_without_hand_card(source_path: String, target_path: String, card_id: String) -> bool:
+	if not FileAccess.file_exists(source_path):
+		printerr("衍生狀態來源不存在: %s" % source_path)
+		return false
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(source_path))
+	if parsed == null or not (parsed is Dictionary):
+		printerr("衍生狀態 JSON 無法解析: %s" % source_path)
+		return false
+	var snapshot := parsed as Dictionary
+	var run := snapshot.get("run", {}) as Dictionary
+	var hand := run.get("hand", []) as Array
+	hand.erase(card_id)
+	run["hand"] = hand
+	var file := FileAccess.open(target_path, FileAccess.WRITE)
+	if file == null:
+		printerr("無法寫入衍生狀態: %s" % target_path)
+		return false
+	file.store_string(JSON.stringify(snapshot, "\t"))
+	file.close()
+	return true
+
+
+static func _write_state_with_knowledge(path: String, knowledge_id: String) -> bool:
+	if not FileAccess.file_exists(path):
+		printerr("知識情境來源不存在: %s" % path)
+		return false
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if parsed == null or not (parsed is Dictionary):
+		printerr("知識情境 JSON 無法解析: %s" % path)
+		return false
+	var snapshot := parsed as Dictionary
+	var meta := snapshot.get("meta", {}) as Dictionary
+	var knowledge := meta.get("knowledge", {}) as Dictionary
+	knowledge[knowledge_id] = true
+	meta["knowledge"] = knowledge
+	snapshot["meta"] = meta
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		printerr("無法寫入知識情境: %s" % path)
+		return false
+	file.store_string(JSON.stringify(snapshot, "\t"))
+	file.close()
+	return true

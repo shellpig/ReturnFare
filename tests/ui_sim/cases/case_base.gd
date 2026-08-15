@@ -6,14 +6,39 @@ extends RefCounted
 var id: String = ""
 var description: String = ""
 var required_state: String = ""
+var required_data_root: String = ""
+var contract_id: String = ""
+var comparison_group: String = ""
 var errors: Array[String] = []
 
 
-func _init(case_id: String, desc: String, req_state: String = "") -> void:
+func _init(
+	case_id: String,
+	desc: String,
+	req_state: String = "",
+	req_data_root: String = "",
+	req_contract_id: String = "",
+	compare_group: String = ""
+) -> void:
 	id = case_id
 	description = desc
 	required_state = req_state
+	required_data_root = req_data_root
+	contract_id = req_contract_id if not req_contract_id.is_empty() else _default_contract_id(case_id)
+	comparison_group = compare_group
 	errors = []
+
+
+func _default_contract_id(case_id: String) -> String:
+	# 既有 P1-G 變體以尾端 a/b/c 表示同一條驗收；其他案例 id 本身就是契約 id。
+	if case_id.begins_with("p1g_case_"):
+		var suffix := case_id.trim_prefix("p1g_case_")
+		var underscore := suffix.find("_")
+		var case_tag := suffix if underscore < 0 else suffix.substr(0, underscore)
+		if case_tag.length() > 0 and case_tag[-1] in ["a", "b", "c"]:
+			case_tag = case_tag.substr(0, case_tag.length() - 1)
+		return "p1g_case_" + case_tag
+	return case_id
 
 
 ## 取得 GameState 節點
@@ -21,17 +46,23 @@ static func get_game_state(tree: SceneTree) -> Node:
 	return tree.get_root().get_node("GameState")
 
 
-## 卡片顯示名稱（與 location_panel.gd 的 _card_display_name() 同一套規則），
-## 供案例從彈窗實際顯示的 dialog_text 反推卡片集合，不讀隱藏 metadata。
-## 透過 tree 取 Data autoload，不能用裸的 Data 識別字——--script headless 模式下
-## 這個檔案在 autoload 註冊成全域識別字之前就被 preload 編譯，直接寫 Data 會編譯失敗。
-static func card_display_name(tree: SceneTree, card_id: String) -> String:
-	var data_node: Node = tree.get_root().get_node("Data")
-	var loader: Variant = data_node.get("loader")
-	var cards: Dictionary = loader.get("cards") as Dictionary
-	var base_id: String = card_id.split("#")[0]
-	var card: Dictionary = cards.get(base_id, {}) as Dictionary
-	return str(card.get("name", card_id))
+## 從畫面上真的顯示出的預覽文字取卡片名稱；案例不讀 Data、cards.json 或任何規則層查詢。
+static func preview_bullet_names(dialog: AcceptDialog) -> Array[String]:
+	var names: Array[String] = []
+	for line in dialog.dialog_text.split("\n"):
+		var text := str(line)
+		if text.begins_with("  • "):
+			names.append(text.trim_prefix("  • "))
+	return names
+
+
+static func place_button_names(tree: SceneTree, prefix: String) -> Array[String]:
+	var names: Array[String] = []
+	for ctrl in QAStep.find_controls_by_qa_id_prefix(tree.get_root(), prefix):
+		if not ctrl.is_visible_in_tree() or not ctrl is Button:
+			continue
+		names.append((ctrl as Button).text.trim_prefix("放入："))
+	return names
 
 
 ## 尋找當前可見之 AcceptDialog

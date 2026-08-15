@@ -64,6 +64,14 @@ static func _is_inside_window(node: Node, tree_root: Node) -> bool:
 	return false
 
 
+static func _viewport_size_for(ctrl: Control, fallback: Vector2) -> Vector2:
+	var viewport := ctrl.get_viewport()
+	if viewport == null:
+		return fallback
+	var size := viewport.get_visible_rect().size
+	return fallback if size.x <= 0.0 or size.y <= 0.0 else size
+
+
 ## 計算 Control 的全域 Z-Index
 static func _get_global_z_index(ctrl: CanvasItem) -> int:
 	var z := 0
@@ -167,30 +175,45 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 			if content_ctrl != null:
 				var min_s := content_ctrl.get_combined_minimum_size()
 				var act_s := sc.size
-				if min_s.y > act_s.y and sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
-					overflow_issues.append({
-						"path": str(sc.get_path()),
-						"reason": "內容垂直高度 (%d) 大於容器 (%d) 且垂直捲動被停用" % [int(min_s.y), int(act_s.y)],
-					})
-				if min_s.x > act_s.x and sc.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
-					overflow_issues.append({
-						"path": str(sc.get_path()),
-						"reason": "內容水平寬度 (%d) 大於容器 (%d) 且水平捲動被停用" % [int(min_s.x), int(act_s.x)],
-					})
+				if min_s.y > act_s.y + 2.0:
+					if sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
+						overflow_issues.append({
+							"path": str(sc.get_path()),
+							"reason": "內容垂直高度 (%d) 大於容器 (%d) 且垂直捲動被停用" % [int(min_s.y), int(act_s.y)],
+						})
+					elif not _has_usable_scrollbar(sc, true):
+						overflow_issues.append({
+							"path": str(sc.get_path()),
+							"reason": "內容垂直高度 (%d) 大於容器 (%d)，但沒有可用的垂直捲軸" % [int(min_s.y), int(act_s.y)],
+						})
+				if min_s.x > act_s.x + 2.0:
+					if sc.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
+						overflow_issues.append({
+							"path": str(sc.get_path()),
+							"reason": "內容水平寬度 (%d) 大於容器 (%d) 且水平捲動被停用" % [int(min_s.x), int(act_s.x)],
+						})
+					elif not _has_usable_scrollbar(sc, false):
+						overflow_issues.append({
+							"path": str(sc.get_path()),
+							"reason": "內容水平寬度 (%d) 大於容器 (%d)，但沒有可用的水平捲軸" % [int(min_s.x), int(act_s.x)],
+						})
 
 		# 檢查常規 Control 視口邊界溢出
-		if _has_renderable_content(ctrl) and not _is_inside_window(ctrl, root):
+		if _has_renderable_content(ctrl):
 			var eff := get_effective_visible_rect(ctrl)
 			if eff.size.x > 0 and eff.size.y > 0:
-				if eff.position.x + eff.size.x > vp_size.x + 2.0:
+				# Popup / AcceptDialog 內的 Control 也必須檢查；它們的座標以
+				# 所屬 Viewport 為準，不能因為祖先是 Window 就整棵跳過。
+				var ctrl_vp_size := _viewport_size_for(ctrl, vp_size)
+				if eff.position.x + eff.size.x > ctrl_vp_size.x + 2.0:
 					overflow_issues.append({
 						"path": str(ctrl.get_path()),
-						"reason": "元件右側超出主視口邊界 (x2=%f > %f)" % [eff.position.x + eff.size.x, vp_size.x],
+						"reason": "元件右側超出所屬視口邊界 (x2=%f > %f)" % [eff.position.x + eff.size.x, ctrl_vp_size.x],
 					})
-				if eff.position.y + eff.size.y > vp_size.y + 2.0:
+				if eff.position.y + eff.size.y > ctrl_vp_size.y + 2.0:
 					overflow_issues.append({
 						"path": str(ctrl.get_path()),
-						"reason": "元件底部超出主視口邊界 (y2=%f > %f)" % [eff.position.y + eff.size.y, vp_size.y],
+						"reason": "元件底部超出所屬視口邊界 (y2=%f > %f)" % [eff.position.y + eff.size.y, ctrl_vp_size.y],
 					})
 
 			# 文字控制項 (Label/RichTextLabel/Button) 最小需求尺寸 vs 實際分配尺寸檢驗 (K-40 防線)
@@ -238,8 +261,9 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 
 			# 保護區檢查 (K-28 / K-40 防線): ContentView 內部內容不得侵入 StatusLabel/AdvanceButton (0..170) 或 HandBar (580..720)
 			var path_str := str(ctrl.get_path())
-			if path_str.contains("/ContentView/") and not path_str.contains("/AcceptDialog"):
-				if raw_rect.position.y < 168.0:
+			var in_clipped_scroll := _is_inside_clipped_scroll(ctrl)
+			if path_str.contains("/ContentView/") and not _is_inside_window(ctrl, root):
+				if raw_rect.position.y < 168.0 and not in_clipped_scroll:
 					overflow_issues.append({
 						"path": path_str,
 						"reason": "內容侵入上方狀態列/推進按鈕保護區 (y=%f < 168)" % raw_rect.position.y,
@@ -253,15 +277,6 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 						})
 				else:
 					# 若在 ScrollContainer 內部，只要父層 ScrollContainer 有 clip_contents 且其外框在 582 內即可
-					var in_clipped_scroll := false
-					var p_check: Node = ctrl.get_parent()
-					while p_check != null and p_check is Control:
-						if p_check is ScrollContainer:
-							var sc_parent := p_check as ScrollContainer
-							if sc_parent.clip_contents and (sc_parent.get_global_rect().position.y + sc_parent.get_global_rect().size.y <= 582.0):
-								in_clipped_scroll = true
-								break
-						p_check = p_check.get_parent()
 					if not in_clipped_scroll and raw_rect.position.y + raw_rect.size.y > 582.0:
 						overflow_issues.append({
 							"path": path_str,
@@ -273,6 +288,16 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 		"occlusion_issues": occlusion_issues,
 		"overflow_issues": overflow_issues,
 	}
+
+
+static func _is_inside_clipped_scroll(ctrl: Control) -> bool:
+	var curr: Node = ctrl.get_parent()
+	while curr != null and curr is Control:
+		if curr is ScrollContainer:
+			var sc := curr as ScrollContainer
+			return sc.clip_contents and (sc.get_global_rect().position.y + sc.get_global_rect().size.y <= 582.0)
+		curr = curr.get_parent()
+	return false
 
 
 static func _collect_visible_controls(node: Node, results: Array[Control]) -> void:
@@ -306,6 +331,15 @@ static func _get_scroll_content(sc: ScrollContainer) -> Control:
 		if child is Control:
 			return child as Control
 	return null
+
+
+static func _has_usable_scrollbar(sc: ScrollContainer, vertical: bool) -> bool:
+	var bar: ScrollBar = sc.get_v_scroll_bar() if vertical else sc.get_h_scroll_bar()
+	if bar == null or not bar.is_visible_in_tree():
+		return false
+	# max_value/page 是實際可滾動範圍；只看 scroll mode 會把隱藏或無法移動的
+	# scrollbar 誤判成可用。
+	return bar.max_value > bar.page + 1.0
 
 
 ## 擷取當前畫面截圖

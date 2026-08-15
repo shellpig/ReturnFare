@@ -256,13 +256,16 @@ func _route_view() -> void:
 			_map_list.call("refresh")
 			_advance_btn.visible = true
 		"evening":
-			_map_list.visible = false
-			_location_panel.visible = false
-			_play_evening()
-			_flow_text.visible = true
-			_flow_text.offset_top = 0.0
-			_flow_text.offset_bottom = 400.0
-			_advance_btn.visible = true
+			if GameState.day == GameState.LAST_DAY:
+				_show_final_coda()
+			else:
+				_map_list.visible = false
+				_location_panel.visible = false
+				_play_evening()
+				_flow_text.visible = true
+				_flow_text.offset_top = 0.0
+				_flow_text.offset_bottom = 400.0
+				_advance_btn.visible = true
 		"night":
 			_location_panel.visible = false
 			_play_night_fixed()
@@ -283,6 +286,29 @@ func _play_evening() -> void:
 	_flow_text.clear()
 	var lines := GameState.play_evening()
 	_flow_text.append_lines(lines)
+
+
+func _show_final_coda() -> void:
+	# d45_then 是 evening 的真 beat；它必須先經過地點面板，才能讓
+	# compare_registry 走正式 UI 放置入口，而不是由 headless 直接 try_place。
+	var placed: Dictionary = GameState.slots_placed as Dictionary
+	var coda_done := placed.has("d45_then::compare_registry")
+	_map_list.visible = false
+	_flow_text.visible = false
+	_advance_btn.visible = true
+	if not coda_done:
+		_location_panel.visible = true
+		_advance_btn.disabled = true
+		_location_panel.call("show_location", "jinghe_back")
+		return
+
+	_location_panel.visible = false
+	_flow_text.clear()
+	_flow_text.append_line("[結局 coda 已完成]")
+	_flow_text.visible = true
+	_flow_text.offset_top = 0.0
+	_flow_text.offset_bottom = 400.0
+	_advance_btn.disabled = false
 
 
 func _play_night_fixed() -> void:
