@@ -119,11 +119,16 @@ static func click(
 			result["error"] = "按鈕 disabled 狀態與預期不符 (實際: %s, 預期: %s)" % [str(btn.disabled), str(expected_disabled)]
 			return result
 
-	# 2.5 若目標位於 ScrollContainer 內，調用 ensure_control_visible 滾動至可視範圍
+	# 2.5 若目標位於 ScrollContainer 內，送真實滾輪事件捲動至可視範圍（嚴禁呼叫
+	# ensure_control_visible() 這種程式化 API 捷徑，那不是玩家能做的輸入，會掩蓋
+	# 捲軸被停用、目標捲不到等真實故障）
 	var p_scroll: Node = target.get_parent()
 	while p_scroll != null:
 		if p_scroll is ScrollContainer:
-			(p_scroll as ScrollContainer).ensure_control_visible(target)
+			var scroll_res := await scroll_into_view(tree, p_scroll as ScrollContainer, target)
+			if not scroll_res.get("ok", false):
+				result["error"] = "捲動至可視範圍失敗: %s" % str(scroll_res.get("error"))
+				return result
 		p_scroll = p_scroll.get_parent()
 	await wait_draw_frames(tree, 2)
 
@@ -205,6 +210,83 @@ static func click(
 	# 9. 額外等候 2 幀讓狀態變更與 UI 重繪完全就緒
 	await wait_draw_frames(tree, 2)
 	return result
+
+
+## 送出真實滑鼠滾輪事件，將 target 捲入 scroll_container 的可視範圍。
+## 每一輪都重新量測 target 相對可視範圍的位置，直到完全（或捲到底後盡量）可見，
+## 或達到步數上限。捲動已到極限（位置連兩輪不再移動）但目標仍不可見時視為失敗，
+## 讓呼叫端拿到明確錯誤，而不是悄悄放行一個玩家實際上摸不到的目標。
+static func scroll_into_view(tree: SceneTree, scroll_container: ScrollContainer, target: Control, max_ticks: int = 60) -> Dictionary:
+	var result := { "ok": false, "ticks": 0, "error": "" }
+
+	var sc_rect := scroll_container.get_global_rect()
+	if sc_rect.size.x <= 0 or sc_rect.size.y <= 0:
+		result["error"] = "ScrollContainer 尺寸為 0，無法定位滾輪事件座標"
+		return result
+	var wheel_pos: Vector2 = sc_rect.position + sc_rect.size * 0.5
+
+	var motion := InputEventMouseMotion.new()
+	motion.position = wheel_pos
+	motion.global_position = wheel_pos
+	Input.parse_input_event(motion)
+	await wait_draw_frames(tree, 1)
+
+	var last_target_y := INF
+	for i in range(max_ticks):
+		var visible_rect := QADiagnostics.get_effective_visible_rect(scroll_container)
+		var target_rect := target.get_global_rect()
+		var visible_h: float = visible_rect.intersection(target_rect).size.y
+
+		if visible_h >= min(target_rect.size.y, visible_rect.size.y) - 1.0:
+			result["ok"] = true
+			result["ticks"] = i
+			return result
+
+		if is_equal_approx(target_rect.position.y, last_target_y):
+			# 捲動已到極限（位置不再變化），目標仍未進入可視範圍即判失敗
+			result["ok"] = visible_h > 0.0
+			result["ticks"] = i
+			if not result["ok"]:
+				result["error"] = "捲動已到極限，目標仍不在可視範圍內"
+			return result
+		last_target_y = target_rect.position.y
+
+		var button_index: int = MOUSE_BUTTON_WHEEL_UP if target_rect.position.y < visible_rect.position.y else MOUSE_BUTTON_WHEEL_DOWN
+
+		var press := InputEventMouseButton.new()
+		press.button_index = button_index
+		press.pressed = true
+		press.position = wheel_pos
+		press.global_position = wheel_pos
+		Input.parse_input_event(press)
+		var release := InputEventMouseButton.new()
+		release.button_index = button_index
+		release.pressed = false
+		release.position = wheel_pos
+		release.global_position = wheel_pos
+		Input.parse_input_event(release)
+		# Container 的重新排版是 queue_sort() 延遲處理，1 幀不一定夠讓捲動後的
+		# 新位置真正落地；等不夠幀會在下一輪誤讀到舊座標，被「位置沒變」的
+		# 收斂判斷誤認成捲動已到底而提早失敗。全檔其餘輸入步驟統一等 2 幀，這裡跟著對齊。
+		await wait_draw_frames(tree, 2)
+
+	result["error"] = "捲動 %d 次仍未能將目標捲入可視範圍" % max_ticks
+	return result
+
+
+## 推進演出佇列直到 beat_advance 消失，遇到第一個點擊失敗立即返回，並設步數上限，
+## 避免案例在演出卡住時無限迴圈到 launcher timeout 才被發現，只得到「逾時」而非
+## 命中診斷。
+static func drain_beats(tree: SceneTree, max_steps: int = 20) -> Dictionary:
+	var steps := 0
+	while has_visible_qa_id(tree.get_root(), "beat_advance"):
+		if steps >= max_steps:
+			return { "ok": false, "steps": steps, "error": "beat_advance 推進次數超過上限 (%d)，疑似無限迴圈" % max_steps }
+		var click_res := await click(tree, "beat_advance")
+		if not click_res.get("ok", false):
+			return { "ok": false, "steps": steps, "error": "第 %d 次推進失敗: %s" % [steps + 1, str(click_res.get("error"))] }
+		steps += 1
+	return { "ok": true, "steps": steps, "error": "" }
 
 
 ## 等待指定次數的 frame_post_draw

@@ -19,12 +19,14 @@ func _initialize() -> void:
 		if args[i] == "--output-dir" and i + 1 < args.size():
 			output_dir = args[i + 1]
 			i += 1
-		elif not args[i].begins_with("--") and output_dir.is_empty():
-			output_dir = args[i]
 		i += 1
 
+	# 嚴禁 fallback 固定路徑：狀態產生失敗時 runner 若吃到上一次殘留在固定路徑
+	# 的舊檔案，會綠燈但驗的是舊狀態，比紅燈更危險（開發設計方針.md > P1-G）。
 	if output_dir.is_empty():
-		output_dir = "res://_qa/states/"
+		printerr("make_states: 缺少必要參數 --output-dir <dir>")
+		quit(1)
+		return
 
 	output_dir = output_dir.replace("\\", "/")
 	if not output_dir.ends_with("/"):

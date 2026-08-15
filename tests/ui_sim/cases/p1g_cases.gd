@@ -180,8 +180,8 @@ class Case02LockInteractionDuringPlay extends CaseBaseClass:
 						assert_true(false, "演出期間場景樹不得存在槽位互動節點: %s (路徑: %s)" % [qid, str(node.get_path())])
 
 		# 演畢進入常態
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		return { "ok": errors.is_empty(), "errors": errors }
 
@@ -211,8 +211,8 @@ class Case03ReenterNoDuplicateOnEnter extends CaseBaseClass:
 		# 第一次進入山泉閣
 		var c1 := await QAStep.click(tree, "location::sanquan")
 		assert_true(c1.get("ok", false), "第一次進山泉閣失敗: " + str(c1.get("error")))
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain1 := await QAStep.drain_beats(tree)
+		assert_true(drain1.get("ok", false), "第一次演出推進失敗: " + str(drain1.get("error", "")))
 
 		var dump1 := QADiagnostics.dump_ui_tree(main_node)
 		var state1: Dictionary = gs.call("serialize")
@@ -221,11 +221,31 @@ class Case03ReenterNoDuplicateOnEnter extends CaseBaseClass:
 		var back_res := await QAStep.click(tree, "panel_back")
 		assert_true(back_res.get("ok", false), "點擊返回失敗: " + str(back_res.get("error")))
 
-		# 第二次進入山泉閣
+		# 第二次進入山泉閣：先證明會重新排入演出佇列並真的重播 d17_morning_phone
+		# 本尊的標題與文字，而不是繞過演出直接跳到常態畫面（常態畫面剛好會顯示
+		# 同一個 beat 的靜態文字，光比對「畫面文字有沒有變」抓不出這種繞過）
 		var c2 := await QAStep.click(tree, "location::sanquan")
 		assert_true(c2.get("ok", false), "第二次進山泉閣失敗: " + str(c2.get("error")))
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"), "重進山泉閣必須再次顯示演出推進按鈕，證明重新排入演出佇列")
+
+		var adv_first := await QAStep.click(tree, "beat_advance")
+		assert_true(adv_first.get("ok", false), "重進後第一次點擊推進失敗: " + str(adv_first.get("error")))
+		var replay_dump := QADiagnostics.dump_ui_tree(main_node)
+		var replay_title_found := false
+		var replay_text_found := false
+		for item in replay_dump:
+			if not bool(item.get("visible_in_tree", false)):
+				continue
+			var t := str(item.get("text", ""))
+			if t == "== 訂房電話 ==":
+				replay_title_found = true
+			if t.contains("一個十四人的進香團"):
+				replay_text_found = true
+		assert_true(replay_title_found, "重進後演出畫面必須顯示 d17_morning_phone 標題「== 訂房電話 ==」")
+		assert_true(replay_text_found, "重進後演出畫面必須重播 d17_morning_phone 的文字內容")
+
+		var drain2 := await QAStep.drain_beats(tree)
+		assert_true(drain2.get("ok", false), "第二次演出推進失敗: " + str(drain2.get("error", "")))
 
 		var dump2 := QADiagnostics.dump_ui_tree(main_node)
 		var state2: Dictionary = gs.call("serialize")
@@ -268,8 +288,8 @@ class Case04SlotTypes extends CaseBaseClass:
 
 		var click_res := await QAStep.click(tree, "location::sanquan")
 		assert_true(click_res.get("ok", false), "進山泉閣失敗: " + str(click_res.get("error")))
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		var expected_markers: Dictionary = {
 			"slot::d22_pm_sandbags::work": "主角卡",
@@ -307,8 +327,8 @@ class Case05ProtagonistSlotType extends CaseBaseClass:
 		assert_eq(int(run_state.get("day", 1)), 22, "天數必須為 22")
 
 		await QAStep.click(tree, "location::sanquan")
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		var controls := QAStep.find_controls_by_qa_id(tree.get_root(), "slot::d22_pm_sandbags::work")
 		assert_true(not controls.is_empty(), "找不到 work 槽")
@@ -336,8 +356,8 @@ class Case06NoSpoiler extends CaseBaseClass:
 		assert_eq(int(run_state.get("day", 1)), 22, "天數必須為 22")
 
 		await QAStep.click(tree, "location::sanquan")
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		var controls := QAStep.find_controls_by_qa_id(tree.get_root(), "slot::d22_pm_sandbags::obs_walk")
 		assert_true(not controls.is_empty(), "找不到 obs_walk 槽")
@@ -373,8 +393,8 @@ class Case07RightClickPreview extends CaseBaseClass:
 		assert_eq(int(run_state.get("day", 1)), 22, "天數必須為 22")
 
 		await QAStep.click(tree, "location::sanquan")
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		var state_before: Dictionary = gs.call("serialize")
 
@@ -382,9 +402,12 @@ class Case07RightClickPreview extends CaseBaseClass:
 		var rclick_res := await QAStep.click(tree, "slot::d22_pm_sandbags::work", MOUSE_BUTTON_RIGHT)
 		assert_true(rclick_res.get("ok", false), "右鍵點擊槽失敗: " + str(rclick_res.get("error")))
 
-		# 擷取彈窗開啟之中途狀態並確認成功
-		var cap_ok := await QADiagnostics.capture_interim_state(tree, main_node, run_dir, id, "dialog_open")
-		assert_true(cap_ok, "中途截圖與 Dump 必須寫入成功")
+		# 擷取彈窗開啟之中途狀態並確認成功，同時對彈窗仍開啟中的畫面跑幾何診斷
+		# （不能只在案例結束、彈窗已關閉後才驗——那時真正要驗的畫面早就不在了）
+		var cap := await QADiagnostics.capture_interim_state(tree, main_node, run_dir, id, "dialog_open")
+		assert_true(bool(cap.get("ok", false)), "中途截圖與 Dump 必須寫入成功")
+		var cap_geo: Dictionary = cap.get("geometry", {})
+		assert_true(bool(cap_geo.get("ok", false)), "彈窗開啟中的畫面幾何診斷必須通過: %s" % JSON.stringify(cap_geo))
 
 		var diag := find_preview_dialog(tree)
 		assert_true(diag != null, "預覽彈窗必須開啟")
@@ -419,8 +442,8 @@ class Case08RightClickLockedPreview extends CaseBaseClass:
 		assert_eq(int(run_state.get("day", 1)), 22, "天數必須為 22")
 
 		await QAStep.click(tree, "location::sanquan")
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		var state_before: Dictionary = gs.call("serialize")
 
@@ -428,8 +451,10 @@ class Case08RightClickLockedPreview extends CaseBaseClass:
 		var rclick_res := await QAStep.click(tree, "slot::d22_pm_sandbags::obs_hands", MOUSE_BUTTON_RIGHT)
 		assert_true(rclick_res.get("ok", false), "右鍵點擊 LOCKED 槽失敗: " + str(rclick_res.get("error")))
 
-		var cap_ok := await QADiagnostics.capture_interim_state(tree, main_node, run_dir, id, "dialog_open")
-		assert_true(cap_ok, "中途截圖與 Dump 必須寫入成功")
+		var cap := await QADiagnostics.capture_interim_state(tree, main_node, run_dir, id, "dialog_open")
+		assert_true(bool(cap.get("ok", false)), "中途截圖與 Dump 必須寫入成功")
+		var cap_geo: Dictionary = cap.get("geometry", {})
+		assert_true(bool(cap_geo.get("ok", false)), "彈窗開啟中的畫面幾何診斷必須通過: %s" % JSON.stringify(cap_geo))
 
 		var diag := find_preview_dialog(tree)
 		assert_true(diag != null, "預覽彈窗必須開啟")
@@ -464,8 +489,8 @@ class Case09PreviewButtonMatchRightClick extends CaseBaseClass:
 		assert_eq(int(run_state.get("day", 1)), 22, "天數必須為 22")
 
 		await QAStep.click(tree, "location::sanquan")
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		# 1. 點擊預覽按鈕
 		var btn_click := await QAStep.click(tree, "preview::d22_pm_sandbags::work")
@@ -490,7 +515,7 @@ class Case09PreviewButtonMatchRightClick extends CaseBaseClass:
 
 
 # =========================================================================
-# Case 10: 預覽與實放一致（正向：結構化 metadata 解析預覽集合＝可放按鈕集合，實放結算）
+# Case 10: 預覽與實放一致（正向：從彈窗實際顯示的 dialog_text 解析預覽集合＝可放按鈕集合，實放結算）
 # =========================================================================
 class Case10PreviewPlacementConsistentPositive extends CaseBaseClass:
 	func _init() -> void:
@@ -506,8 +531,8 @@ class Case10PreviewPlacementConsistentPositive extends CaseBaseClass:
 		assert_eq(int(run_state.get("day", 1)), 22, "天數必須為 22")
 
 		await QAStep.click(tree, "location::sanquan")
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		# 1. 真實點擊 UI 預覽按鈕
 		var prev_click := await QAStep.click(tree, "preview::d22_pm_sandbags::work")
@@ -515,10 +540,14 @@ class Case10PreviewPlacementConsistentPositive extends CaseBaseClass:
 
 		var diag := find_preview_dialog(tree)
 		assert_true(diag != null, "預覽彈窗必須開啟")
-		var preview_meta: Array = diag.get_meta("preview_card_ids", []) as Array if diag != null else []
+		# 從彈窗實際顯示的 dialog_text（畫面上真的看得到的文字）反推卡片集合，
+		# 不讀隱藏 metadata——玩家只看得到畫面，metadata 可能與畫面顯示的內容脫鉤
+		var dialog_text := diag.dialog_text if diag != null else ""
 		var previewed_cards: Array[String] = []
-		for c in preview_meta:
-			previewed_cards.append(str(c))
+		for card_val in (run_state.get("hand", []) as Array):
+			var cid := str(card_val)
+			if dialog_text.contains("  • %s" % CaseBaseClass.card_display_name(tree, cid)):
+				previewed_cards.append(cid)
 		await QAStep.click(tree, "dialog_confirm::preview")
 
 		assert_true(not previewed_cards.is_empty(), "預覽可放卡片集合不可為空")
@@ -571,8 +600,8 @@ class Case11PreviewPlacementConsistentNegative extends CaseBaseClass:
 		if not click_res.get("ok", false):
 			return { "ok": false, "errors": ["點擊山泉閣失敗: " + str(click_res.get("error"))] }
 
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		# 1. 確認 work 槽存在
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "slot::d22_pm_sandbags::work"), "work 槽必須存在")
@@ -582,18 +611,20 @@ class Case11PreviewPlacementConsistentNegative extends CaseBaseClass:
 		assert_true(prev_click.get("ok", false), "點擊預覽按鈕失敗: " + str(prev_click.get("error")))
 		var diag := find_preview_dialog(tree)
 		assert_true(diag != null, "預覽彈窗必須開啟")
-		var preview_meta: Array = diag.get_meta("preview_card_ids", []) as Array if diag != null else []
+		# 從彈窗實際顯示的 dialog_text 反推卡片集合，不讀隱藏 metadata
+		var dialog_text := diag.dialog_text if diag != null else ""
+		var hand_cards: Array = run_state.get("hand", []) as Array
+		assert_true(not hand_cards.is_empty(), "手牌不可為空")
 		var compatible_cards: Array[String] = []
-		for c in preview_meta:
-			compatible_cards.append(str(c))
+		for card_val in hand_cards:
+			var cid := str(card_val)
+			if dialog_text.contains("  • %s" % CaseBaseClass.card_display_name(tree, cid)):
+				compatible_cards.append(cid)
 		await QAStep.click(tree, "dialog_confirm::preview")
 
 		assert_true(compatible_cards.has("protagonist"), "預覽必須包含「我」")
 
-		# 3. 取得手牌全部卡片，扣除 compatible_cards
-		var hand_cards: Array = run_state.get("hand", []) as Array
-		assert_true(not hand_cards.is_empty(), "手牌不可為空")
-
+		# 3. 扣除 compatible_cards，取得不可放卡片
 		var incompatible_cards: Array[String] = []
 		for card_val in hand_cards:
 			var cid := str(card_val)
@@ -621,7 +652,7 @@ class Case12aAdvanceD35 extends CaseBaseClass:
 			"d35_afternoon.json"
 		)
 
-	func run(tree: SceneTree, _main_node: Control, _run_dir: String) -> Dictionary:
+	func run(tree: SceneTree, main_node: Control, run_dir: String) -> Dictionary:
 		var gs := CaseBaseClass.get_game_state(tree)
 		var run_state: Dictionary = gs.call("serialize").get("run", {})
 		assert_eq(int(run_state.get("day", 1)), 35, "天數必須為 35")
@@ -638,11 +669,17 @@ class Case12aAdvanceD35 extends CaseBaseClass:
 		var click_clinic := await QAStep.click(tree, "location::clinic")
 		assert_true(click_clinic.get("ok", false), "進入診所失敗: " + str(click_clinic.get("error")))
 
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_clinic := await QAStep.drain_beats(tree)
+		assert_true(drain_clinic.get("ok", false), "診所演出推進失敗: " + str(drain_clinic.get("error", "")))
 
 		var choose_res := await QAStep.click(tree, "choose::d35_pm_answer::inheritance::accept")
 		assert_true(choose_res.get("ok", false), "選擇 accept 失敗: " + str(choose_res.get("error")))
+
+		# 選擇完成、面板仍開啟時的中途畫面幾何診斷
+		var cap_clinic := await QADiagnostics.capture_interim_state(tree, main_node, run_dir, id, "clinic_choice_resolved")
+		assert_true(bool(cap_clinic.get("ok", false)), "診所 choice 完成後畫面截圖與 Dump 必須寫入成功")
+		var geo_clinic: Dictionary = cap_clinic.get("geometry", {})
+		assert_true(bool(geo_clinic.get("ok", false)), "診所 choice 完成後畫面幾何診斷必須通過: %s" % JSON.stringify(geo_clinic))
 
 		# 3. 退出地點面板回到地圖
 		var back_res := await QAStep.click(tree, "panel_back")
@@ -680,7 +717,7 @@ class Case12bAdvanceD40 extends CaseBaseClass:
 			"d40_morning.json"
 		)
 
-	func run(tree: SceneTree, _main_node: Control, _run_dir: String) -> Dictionary:
+	func run(tree: SceneTree, main_node: Control, run_dir: String) -> Dictionary:
 		var gs := CaseBaseClass.get_game_state(tree)
 		var run_state: Dictionary = gs.call("serialize").get("run", {})
 		assert_eq(int(run_state.get("day", 1)), 40, "天數必須為 40")
@@ -697,11 +734,17 @@ class Case12bAdvanceD40 extends CaseBaseClass:
 		var click_sq := await QAStep.click(tree, "location::sanquan")
 		assert_true(click_sq.get("ok", false), "進入山泉閣失敗: " + str(click_sq.get("error")))
 
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_sq := await QAStep.drain_beats(tree)
+		assert_true(drain_sq.get("ok", false), "山泉閣演出推進失敗: " + str(drain_sq.get("error", "")))
 
 		var choose_res := await QAStep.click(tree, "choose::d40_tell_someone::d40_tell::tell_her")
 		assert_true(choose_res.get("ok", false), "選擇 tell_her 失敗: " + str(choose_res.get("error")))
+
+		# 選擇完成、面板仍開啟時的中途畫面幾何診斷
+		var cap_sq := await QADiagnostics.capture_interim_state(tree, main_node, run_dir, id, "sanquan_choice_resolved")
+		assert_true(bool(cap_sq.get("ok", false)), "山泉閣 choice 完成後畫面截圖與 Dump 必須寫入成功")
+		var geo_sq: Dictionary = cap_sq.get("geometry", {})
+		assert_true(bool(geo_sq.get("ok", false)), "山泉閣 choice 完成後畫面幾何診斷必須通過: %s" % JSON.stringify(geo_sq))
 
 		# 3. 退出地點面板回到地圖
 		var back_res := await QAStep.click(tree, "panel_back")
@@ -739,7 +782,7 @@ class Case12cAdvanceD43 extends CaseBaseClass:
 			"d43_afternoon.json"
 		)
 
-	func run(tree: SceneTree, _main_node: Control, _run_dir: String) -> Dictionary:
+	func run(tree: SceneTree, main_node: Control, run_dir: String) -> Dictionary:
 		var gs := CaseBaseClass.get_game_state(tree)
 		var run_state: Dictionary = gs.call("serialize").get("run", {})
 		assert_eq(int(run_state.get("day", 1)), 43, "天數必須為 43")
@@ -756,8 +799,8 @@ class Case12cAdvanceD43 extends CaseBaseClass:
 		var click_riv := await QAStep.click(tree, "location::riverside")
 		assert_true(click_riv.get("ok", false), "進入河邊失敗: " + str(click_riv.get("error")))
 
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_riv := await QAStep.drain_beats(tree)
+		assert_true(drain_riv.get("ok", false), "河邊演出推進失敗: " + str(drain_riv.get("error", "")))
 
 		var choose_res := await QAStep.click(tree, "choose::d43_pm_zhou::leaving::say_yes")
 		assert_true(choose_res.get("ok", false), "選擇 say_yes 失敗: " + str(choose_res.get("error")))
@@ -773,12 +816,18 @@ class Case12cAdvanceD43 extends CaseBaseClass:
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "location::sanquan"), "地圖山泉閣按鈕必須仍可見可互動")
 		var enter_sq := await QAStep.click(tree, "location::sanquan")
 		assert_true(enter_sq.get("ok", false), "走去別的地點（山泉閣）應成功: " + str(enter_sq.get("error")))
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_sq := await QAStep.drain_beats(tree)
+		assert_true(drain_sq.get("ok", false), "山泉閣演出推進失敗: " + str(drain_sq.get("error", "")))
 
 		# 完成山泉閣的 choice (theory_exchange)
 		var choose_sq := await QAStep.click(tree, "choose::d43_conclusion::theory::theory_exchange")
 		assert_true(choose_sq.get("ok", false), "選擇 theory_exchange 失敗: " + str(choose_sq.get("error")))
+
+		# 選擇完成、面板仍開啟時的中途畫面幾何診斷（P1-G 面板互動模型的實際驗收畫面）
+		var cap_sq := await QADiagnostics.capture_interim_state(tree, main_node, run_dir, id, "sanquan_choice_resolved")
+		assert_true(bool(cap_sq.get("ok", false)), "山泉閣 choice 完成後畫面截圖與 Dump 必須寫入成功")
+		var geo_sq: Dictionary = cap_sq.get("geometry", {})
+		assert_true(bool(geo_sq.get("ok", false)), "山泉閣 choice 完成後畫面幾何診斷必須通過: %s" % JSON.stringify(geo_sq))
 
 		var s_mid: Dictionary = gs.call("serialize").get("run", {})
 		assert_eq(int(s_mid.get("day", 1)), 43, "走去別的地點後天數不變")
@@ -808,7 +857,7 @@ class Case13NightSameModel extends CaseBaseClass:
 			"d10_night.json"
 		)
 
-	func run(tree: SceneTree, _main_node: Control, _run_dir: String) -> Dictionary:
+	func run(tree: SceneTree, main_node: Control, run_dir: String) -> Dictionary:
 		var gs := CaseBaseClass.get_game_state(tree)
 		var run_state: Dictionary = gs.call("serialize").get("run", {})
 		assert_eq(int(run_state.get("day", 1)), 10, "天數必須為 10")
@@ -819,8 +868,8 @@ class Case13NightSameModel extends CaseBaseClass:
 		assert_true(click_res.get("ok", false), "進入 n_landmark 失敗: " + str(click_res.get("error")))
 
 		# 演出固定 beat
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "夜間演出推進失敗: " + str(drain_res.get("error", "")))
 
 		# 演畢進入常態畫面，確認槽位可見
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "slot::n_take_something::take"), "夜間常態槽位 take 必須呈現")
@@ -830,6 +879,12 @@ class Case13NightSameModel extends CaseBaseClass:
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), place_qid), "夜間放置按鈕必須可見")
 		var place_res := await QAStep.click(tree, place_qid)
 		assert_true(place_res.get("ok", false), "夜間放置主角卡失敗: " + str(place_res.get("error")))
+
+		# 放卡結算完成、面板仍開啟時的中途畫面幾何診斷
+		var cap_night := await QADiagnostics.capture_interim_state(tree, main_node, run_dir, id, "night_slot_placed")
+		assert_true(bool(cap_night.get("ok", false)), "夜間放卡後畫面截圖與 Dump 必須寫入成功")
+		var geo_night: Dictionary = cap_night.get("geometry", {})
+		assert_true(bool(geo_night.get("ok", false)), "夜間放卡後畫面幾何診斷必須通過: %s" % JSON.stringify(geo_night))
 
 		# 斷言結算：slots_placed 記錄、旗標設定，且 action_spent 仍為 false
 		var s_after: Dictionary = gs.call("serialize").get("run", {})
@@ -865,8 +920,8 @@ class Case14LocationDesc extends CaseBaseClass:
 
 		# 第 2 天上午進山泉閣
 		await QAStep.click(tree, "location::sanquan")
-		while QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			await QAStep.click(tree, "beat_advance")
+		var drain_res := await QAStep.drain_beats(tree)
+		assert_true(drain_res.get("ok", false), "演出推進失敗: " + str(drain_res.get("error", "")))
 
 		# 驗證地點名稱正確顯示
 		var title_controls := QAStep.find_controls_by_name(tree.get_root(), "LocationTitle")

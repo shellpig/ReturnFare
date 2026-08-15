@@ -53,10 +53,11 @@ static func get_effective_visible_rect(ctrl: Control) -> Rect2:
 	return rect
 
 
-## 判斷節點是否位於獨立 Window/Popup 內
-static func _is_inside_window(node: Node) -> bool:
+## 判斷節點是否位於獨立 Window/Popup 內（不含最外層 SceneTree 根視窗本身，
+## 否則主場景每個節點往上一定會走到根 Window，導致視口邊界檢查永遠被跳過）
+static func _is_inside_window(node: Node, tree_root: Node) -> bool:
 	var curr: Node = node.get_parent()
-	while curr != null:
+	while curr != null and curr != tree_root:
 		if curr is Window and not (curr is SubViewport):
 			return true
 		curr = curr.get_parent()
@@ -81,17 +82,22 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 	var visible_controls: Array[Control] = []
 	_collect_visible_controls(root, visible_controls)
 
-	# 依 (Global Z-Index, Tree Order) 排序以確定繪製順序 (小的在下，大的在上)
+	# 依 (Global Z-Index, Tree Order) 排序以確定繪製順序 (小的在下，大的在上)。
+	# Array.sort_custom 不保證穩定排序，z-index 相同時必須靠明確記錄的原始
+	# tree index 當 tie-breaker，不能只靠比較器對相等項一律回傳 false 期待原序被保留。
 	var z_map: Dictionary = {}
-	for ctrl in visible_controls:
-		z_map[ctrl] = _get_global_z_index(ctrl)
+	var index_map: Dictionary = {}
+	for idx in range(visible_controls.size()):
+		var c: Control = visible_controls[idx]
+		z_map[c] = _get_global_z_index(c)
+		index_map[c] = idx
 
 	visible_controls.sort_custom(func(a: Control, b: Control) -> bool:
 		var za: int = z_map.get(a, 0)
 		var zb: int = z_map.get(b, 0)
 		if za != zb:
 			return za < zb
-		return false # 保持 scene tree 原序
+		return int(index_map.get(a, 0)) < int(index_map.get(b, 0))
 	)
 
 	var occlusion_issues: Array[Dictionary] = []
@@ -103,7 +109,7 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 	# 1. 遮蔽診斷 (排除祖先子孫，嚴格檢查同層與跨層覆蓋)
 	for i in range(visible_controls.size()):
 		var ctrl_a := visible_controls[i]
-		if not _has_renderable_content(ctrl_a):
+		if not _is_occlusion_content(ctrl_a):
 			continue
 		var rect_a := get_effective_visible_rect(ctrl_a)
 		if rect_a.size.x <= 0 or rect_a.size.y <= 0:
@@ -111,7 +117,7 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 
 		for j in range(i + 1, visible_controls.size()):
 			var ctrl_b := visible_controls[j]
-			if not _has_renderable_content(ctrl_b):
+			if not _is_occlusion_content(ctrl_b):
 				continue
 
 			# 排除祖先與子孫
@@ -154,21 +160,26 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 					"path": str(sc.get_path()),
 					"reason": "ScrollContainer 未開啟 clip_contents",
 				})
-			var min_s := sc.get_combined_minimum_size()
-			var act_s := sc.size
-			if min_s.y > act_s.y and sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
-				overflow_issues.append({
-					"path": str(sc.get_path()),
-					"reason": "內容垂直高度 (%d) 大於容器 (%d) 且垂直捲動被停用" % [int(min_s.y), int(act_s.y)],
-				})
-			if min_s.x > act_s.x and sc.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
-				overflow_issues.append({
-					"path": str(sc.get_path()),
-					"reason": "內容水平寬度 (%d) 大於容器 (%d) 且水平捲動被停用" % [int(min_s.x), int(act_s.x)],
-				})
+			# 比較內容子節點（實際要塞進去的內容）之需求尺寸，而非 ScrollContainer
+			# 自己的 combined minimum size——後者在捲動軸啟用時通常被引擎回報為
+			# 很小的值（因為捲動本來就是用來吸收超出的內容），拿它比較會恆不觸發。
+			var content_ctrl := _get_scroll_content(sc)
+			if content_ctrl != null:
+				var min_s := content_ctrl.get_combined_minimum_size()
+				var act_s := sc.size
+				if min_s.y > act_s.y and sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
+					overflow_issues.append({
+						"path": str(sc.get_path()),
+						"reason": "內容垂直高度 (%d) 大於容器 (%d) 且垂直捲動被停用" % [int(min_s.y), int(act_s.y)],
+					})
+				if min_s.x > act_s.x and sc.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
+					overflow_issues.append({
+						"path": str(sc.get_path()),
+						"reason": "內容水平寬度 (%d) 大於容器 (%d) 且水平捲動被停用" % [int(min_s.x), int(act_s.x)],
+					})
 
 		# 檢查常規 Control 視口邊界溢出
-		if _has_renderable_content(ctrl) and not _is_inside_window(ctrl):
+		if _has_renderable_content(ctrl) and not _is_inside_window(ctrl, root):
 			var eff := get_effective_visible_rect(ctrl)
 			if eff.size.x > 0 and eff.size.y > 0:
 				if eff.position.x + eff.size.x > vp_size.x + 2.0:
@@ -279,6 +290,24 @@ static func _has_renderable_content(ctrl: Control) -> bool:
 	return false
 
 
+## 遮蔽診斷專用：只算玩家需要讀取／點擊的內容（文字、按鈕、圖像）。
+## 排除 Panel／ColorRect／NinePatchRect——這些通常是背景裝飾，設計上就是要墊在
+## 別的內容底下（例如 AcceptDialog 自己的背景 Panel 一定蓋在訊息 Label 後面），
+## 拿它們當遮蔽診斷的參與者只會製造恆真的假警報，不是真正的畫面缺陷。
+static func _is_occlusion_content(ctrl: Control) -> bool:
+	if ctrl is Label or ctrl is Button or ctrl is TextureRect:
+		return true
+	return false
+
+
+## 取得 ScrollContainer 實際裝載內容的子節點（排除引擎內部捲軸）
+static func _get_scroll_content(sc: ScrollContainer) -> Control:
+	for child in sc.get_children():
+		if child is Control:
+			return child as Control
+	return null
+
+
 ## 擷取當前畫面截圖
 static func capture_screenshot(tree: SceneTree, file_path: String) -> bool:
 	var vp := tree.get_root()
@@ -289,14 +318,20 @@ static func capture_screenshot(tree: SceneTree, file_path: String) -> bool:
 	return err == OK
 
 
-## 中途狀態擷取（截圖 + UI dump）
-static func capture_interim_state(tree: SceneTree, root_node: Node, run_dir: String, case_id: String, stage_name: String) -> bool:
+## 中途狀態擷取（截圖 + UI dump + 幾何診斷）。
+## 幾何診斷不能只在案例結束後跑一次——彈窗、地點面板這類中途畫面案例結束前
+## 就已經關閉，只在案例尾端跑一次會漏掉真正需要驗的畫面。呼叫端應斷言
+## 回傳值的 geometry.ok，不能只看 ok（ok 只代表截圖與 dump 檔案寫入成功）。
+## 回傳 { "ok": bool, "geometry": Dictionary }。
+static func capture_interim_state(tree: SceneTree, root_node: Node, run_dir: String, case_id: String, stage_name: String) -> Dictionary:
+	var result := { "ok": false, "geometry": {} }
+
 	var dump_path := run_dir + "dumps/" + case_id + "_" + stage_name + ".json"
 	var dump_data := dump_ui_tree(root_node)
 	var f := FileAccess.open(dump_path, FileAccess.WRITE)
 	if f == null:
 		printerr("capture_interim_state: dump 寫入失敗: %s" % dump_path)
-		return false
+		return result
 	f.store_string(JSON.stringify(dump_data, "\t"))
 	f.close()
 
@@ -304,5 +339,15 @@ static func capture_interim_state(tree: SceneTree, root_node: Node, run_dir: Str
 	var shot_ok := capture_screenshot(tree, shot_path)
 	if not shot_ok:
 		printerr("capture_interim_state: 截圖寫入失敗: %s" % shot_path)
-		return false
-	return true
+		return result
+
+	var geo_res := run_geometry_diagnostics(root_node)
+	var geo_path := run_dir + "reports/" + case_id + "_" + stage_name + ".geometry.json"
+	var f_geo := FileAccess.open(geo_path, FileAccess.WRITE)
+	if f_geo != null:
+		f_geo.store_string(JSON.stringify(geo_res, "\t"))
+		f_geo.close()
+
+	result["ok"] = true
+	result["geometry"] = geo_res
+	return result

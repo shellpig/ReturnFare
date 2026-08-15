@@ -258,8 +258,6 @@ func _show_preview(beat_id: String, slot_id: String, label_text: String) -> void
 			message += "\n理由：" + _REASON_CODE_TEXTS.get(reason, reason)
 	_preview_dialog.title = _FMT_PREVIEW_TITLE % label_text if not label_text.is_empty() else "預覽"
 	_preview_dialog.dialog_text = message
-	_preview_dialog.set_meta("preview_card_ids", cards)
-	_preview_dialog.set_meta("preview_reason", str(result.get("reason", "")))
 	_preview_dialog.popup_centered()
 
 

@@ -21,6 +21,19 @@ static func get_game_state(tree: SceneTree) -> Node:
 	return tree.get_root().get_node("GameState")
 
 
+## 卡片顯示名稱（與 location_panel.gd 的 _card_display_name() 同一套規則），
+## 供案例從彈窗實際顯示的 dialog_text 反推卡片集合，不讀隱藏 metadata。
+## 透過 tree 取 Data autoload，不能用裸的 Data 識別字——--script headless 模式下
+## 這個檔案在 autoload 註冊成全域識別字之前就被 preload 編譯，直接寫 Data 會編譯失敗。
+static func card_display_name(tree: SceneTree, card_id: String) -> String:
+	var data_node: Node = tree.get_root().get_node("Data")
+	var loader: Variant = data_node.get("loader")
+	var cards: Dictionary = loader.get("cards") as Dictionary
+	var base_id: String = card_id.split("#")[0]
+	var card: Dictionary = cards.get(base_id, {}) as Dictionary
+	return str(card.get("name", card_id))
+
+
 ## 尋找當前可見之 AcceptDialog
 static func find_preview_dialog(tree: SceneTree) -> AcceptDialog:
 	var list := QAStep.find_controls_by_qa_id(tree.get_root(), "dialog_confirm::preview")
