@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Case = "",
     [string]$GodotBin = "C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe",
     [int]$TimeoutSeconds = 180,
@@ -9,6 +9,32 @@ $ErrorActionPreference = "Continue"
 
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $projectRoot
+
+function Get-OwnedProcessTree {
+    param([int]$RootPid)
+    $tree = New-Object System.Collections.Generic.List[int]
+    if ($RootPid -le 0) { return $tree }
+    $tree.Add($RootPid)
+    try {
+        $allProc = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+        if ($allProc.Count -gt 0) {
+            $queue = New-Object System.Collections.Generic.Queue[int]
+            $queue.Enqueue($RootPid)
+            while ($queue.Count -gt 0) {
+                $curr = $queue.Dequeue()
+                $children = @($allProc | Where-Object { $_.ParentProcessId -eq $curr })
+                foreach ($c in $children) {
+                    $cid = [int]$c.ProcessId
+                    if (-not $tree.Contains($cid)) {
+                        $tree.Add($cid)
+                        $queue.Enqueue($cid)
+                    }
+                }
+            }
+        }
+    } catch {}
+    return $tree
+}
 
 function Invoke-GodotProcess {
     param(
@@ -22,6 +48,8 @@ function Invoke-GodotProcess {
             ExitCode = 1
             Timeout = $false
             Error = "Godot binary not found: $Binary"
+            RootPid = 0
+            CleanupError = ""
         }
     }
     $formattedArgs = @()
@@ -37,23 +65,124 @@ function Invoke-GodotProcess {
     $psi.Arguments = ($formattedArgs -join " ")
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
-    $process = [System.Diagnostics.Process]::Start($psi)
-    $finished = $process.WaitForExit($TimeoutSec * 1000)
-    if (-not $finished) {
-        try { $process.Kill() } catch {}
+
+    $process = $null
+    $rootPid = 0
+    $timeoutOccurred = $false
+    $finished = $false
+    $exitCode = -1
+    $errorMsg = ""
+    $cleanupError = ""
+
+    try {
+        $process = [System.Diagnostics.Process]::Start($psi)
+        if ($null -eq $process) {
+            return @{
+                Finished = $false
+                ExitCode = 1
+                Timeout = $false
+                Error = "Failed to start Godot process: $Binary"
+                RootPid = 0
+                CleanupError = ""
+            }
+        }
+        $rootPid = $process.Id
+        $finished = $process.WaitForExit($TimeoutSec * 1000)
+        if (-not $finished) {
+            $timeoutOccurred = $true
+            $errorMsg = "Timeout ($TimeoutSec s)"
+        } else {
+            $process.WaitForExit()
+            $exitCode = $process.ExitCode
+        }
+    } catch {
+        $errorMsg = $_.Exception.Message
+    } finally {
+        if ($rootPid -gt 0) {
+            $ownedPids = Get-OwnedProcessTree -RootPid $rootPid
+            $pidsToKill = @()
+            foreach ($pidItem in ($ownedPids | Sort-Object -Descending)) {
+                try {
+                    $procObj = [System.Diagnostics.Process]::GetProcessById($pidItem)
+                    if (-not $procObj.HasExited) {
+                        $pidsToKill += $procObj
+                    }
+                } catch {}
+            }
+            if ($timeoutOccurred -or -not $finished -or $pidsToKill.Count -gt 0) {
+                foreach ($procObj in $pidsToKill) {
+                    try {
+                        $procObj.Kill()
+                    } catch {}
+                }
+            }
+
+            $deadline = (Get-Date).AddSeconds(3)
+            $stillAlive = @()
+            do {
+                $stillAlive = @()
+                foreach ($pidItem in $ownedPids) {
+                    try {
+                        $procObj = [System.Diagnostics.Process]::GetProcessById($pidItem)
+                        if (-not $procObj.HasExited) {
+                            $stillAlive += $pidItem
+                        }
+                    } catch {}
+                }
+                if ($stillAlive.Count -eq 0) { break }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+
+            if ($stillAlive.Count -gt 0) {
+                $cleanupError = "Failed to terminate owned process(es): PID(s) $($stillAlive -join ', ')"
+            }
+        }
+        if ($null -ne $process) {
+            try { $process.Dispose() } catch {}
+        }
+    }
+
+    if ($timeoutOccurred) {
         return @{
             Finished = $false
             ExitCode = -1
             Timeout = $true
-            Error = "Timeout ($TimeoutSec s)"
+            Error = $errorMsg
+            RootPid = $rootPid
+            CleanupError = $cleanupError
         }
     }
-    $process.WaitForExit()
+
+    if (-not [string]::IsNullOrEmpty($cleanupError)) {
+        return @{
+            Finished = $false
+            ExitCode = if ($exitCode -ne 0) { $exitCode } else { 1 }
+            Timeout = $false
+            Error = if (-not [string]::IsNullOrEmpty($errorMsg)) { "$errorMsg; $cleanupError" } else { $cleanupError }
+            RootPid = $rootPid
+            CleanupError = $cleanupError
+        }
+    }
+
     return @{
-        Finished = $true
-        ExitCode = $process.ExitCode
+        Finished = $finished
+        ExitCode = $exitCode
         Timeout = $false
-        Error = ""
+        Error = $errorMsg
+        RootPid = $rootPid
+        CleanupError = ""
+    }
+}
+
+function Assert-NoExistingGodotProcesses {
+    $existing = @(Get-CimInstance Win32_Process -Filter "Name LIKE 'Godot%'" -ErrorAction SilentlyContinue)
+    if ($existing.Count -gt 0) {
+        Write-Host "ERROR: Preflight detected $($existing.Count) running Godot process(es). Runner cannot proceed safely." -ForegroundColor Red
+        foreach ($proc in $existing) {
+            Write-Host ("  -> PID {0}: {1}`n     Command: {2}" -f $proc.ProcessId, $proc.ExecutablePath, $proc.CommandLine) -ForegroundColor Red
+        }
+        Write-Host "Please close or wait for existing Godot editor/test instances before starting UI simulation." -ForegroundColor Yellow
+        exit 1
     }
 }
 
@@ -163,6 +292,10 @@ function Invoke-NegativeTests {
             $args += @("--data-root", (Join-Path $negativeRunDir "missing-data"))
         }
         $runResult = Invoke-GodotProcess -Binary $GodotBinary -ArgumentList $args -TimeoutSec $TimeoutSec
+        if (-not [string]::IsNullOrEmpty($runResult.CleanupError)) {
+            Write-Host "FATAL: Process cleanup failed during negative test [$($negative.Id)] for PID $($runResult.RootPid): $($runResult.CleanupError)." -ForegroundColor Red
+            exit 1
+        }
         $logText = if (Test-Path $logPath) { Get-Content -Path $logPath -Raw -Encoding utf8 } else { "" }
         $leak = $logText -match "ObjectDB instances leaked|resources still in use|SCRIPT ERROR"
         $expected = $logText -match $negative.ExpectedPattern
@@ -193,6 +326,8 @@ function Invoke-NegativeTests {
     }
     return $results
 }
+
+Assert-NoExistingGodotProcesses
 
 $qaDir = Join-Path $projectRoot "_qa"
 $runRoot = Join-Path $qaDir "runs"
@@ -231,6 +366,10 @@ $stateArgs = @(
     "--output-dir", $statesDir
 )
 $stateRes = Invoke-GodotProcess -Binary $GodotBin -ArgumentList $stateArgs -TimeoutSec $TimeoutSeconds
+if (-not [string]::IsNullOrEmpty($stateRes.CleanupError)) {
+    Write-Host "FATAL: Process cleanup failed during state generation for PID $($stateRes.RootPid): $($stateRes.CleanupError)." -ForegroundColor Red
+    exit 1
+}
 if ($stateRes.Timeout -or $stateRes.ExitCode -ne 0) {
     Write-Host "ERROR: State generation failed (exit $($stateRes.ExitCode))." -ForegroundColor Red
     exit 1
@@ -257,6 +396,17 @@ foreach ($location in @($locationData.day)) {
 }
 $locationData | ConvertTo-Json -Depth 30 | Set-Content -Path $locationDescPath -Encoding utf8
 
+$longCardNameData = Join-Path $dataVariantsDir "long_card_name"
+Copy-Item -Path $dataSource -Destination $longCardNameData -Recurse -Force
+$longCardCardsPath = Join-Path $longCardNameData "cards.json"
+$longCardData = Get-Content -Path $longCardCardsPath -Raw -Encoding utf8 | ConvertFrom-Json
+foreach ($c in @($longCardData.cards)) {
+    if ([string]$c.id -eq "info_husband_version") {
+        $c.name = "這是一張名字非常非常非常長必定超出七格欄寬的測試情報卡說法"
+    }
+}
+$longCardData | ConvertTo-Json -Depth 30 | Set-Content -Path $longCardCardsPath -Encoding utf8
+
 $manifestPath = Join-Path $runDir "case-manifest.json"
 $manifestLog = Join-Path $runDir "case-manifest.log"
 $manifestArgs = @(
@@ -268,6 +418,10 @@ $manifestArgs = @(
     "--output", $manifestPath
 )
 $manifestRes = Invoke-GodotProcess -Binary $GodotBin -ArgumentList $manifestArgs -TimeoutSec $TimeoutSeconds
+if (-not [string]::IsNullOrEmpty($manifestRes.CleanupError)) {
+    Write-Host "FATAL: Process cleanup failed during manifest generation for PID $($manifestRes.RootPid): $($manifestRes.CleanupError)." -ForegroundColor Red
+    exit 1
+}
 if ($manifestRes.Timeout -or $manifestRes.ExitCode -ne 0) {
     Write-Host "ERROR: Case manifest generation failed." -ForegroundColor Red
     exit 1
@@ -283,7 +437,7 @@ $catalogContractCount = $matrixContractIds.Count
 $actualCatalogIds = @($allCaseDefs | ForEach-Object { [string]$_.contract_id } | Sort-Object -Unique)
 $missingCatalogIds = @($matrixContractIds | Where-Object { $_ -notin $actualCatalogIds })
 $unexpectedCatalogIds = @($actualCatalogIds | Where-Object { $_ -notin $matrixContractIds })
-if ($catalogContractCount -ne 47 -or $missingCatalogIds.Count -gt 0 -or $unexpectedCatalogIds.Count -gt 0) {
+if ($catalogContractCount -ne 53 -or $missingCatalogIds.Count -gt 0 -or $unexpectedCatalogIds.Count -gt 0) {
     Write-Host "ERROR: Contract matrix/catalog mismatch. matrix=$catalogContractCount missing=$($missingCatalogIds -join ',') unexpected=$($unexpectedCatalogIds -join ',')" -ForegroundColor Red
     exit 1
 }
@@ -347,6 +501,10 @@ foreach ($caseDef in $caseDefs) {
     }
 
     $runResult = Invoke-GodotProcess -Binary $GodotBin -ArgumentList $caseArgs -TimeoutSec $TimeoutSeconds
+    if (-not [string]::IsNullOrEmpty($runResult.CleanupError)) {
+        Write-Host "FATAL: Process cleanup failed for case [$caseId] (PID $($runResult.RootPid)): $($runResult.CleanupError). Halting suite to prevent failure contagion." -ForegroundColor Red
+        exit 1
+    }
     $reportPath = Join-Path $runDir "reports\$caseId.json"
     $report = Read-JsonFile $reportPath
     $caseOk = ($null -ne $report) -and [bool]$report.ok -and (-not $runResult.Timeout) -and ($runResult.ExitCode -eq 0)

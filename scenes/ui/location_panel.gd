@@ -229,7 +229,7 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 
 	for card_id: String in GameState.placeable_cards(beat_id, slot_id):
 		var place_btn := Button.new()
-		place_btn.text = _FMT_PLACE_BUTTON % _card_display_name(card_id)
+		place_btn.text = _FMT_PLACE_BUTTON % Data.card_display_name(card_id)
 		place_btn.set_meta("qa_id", "place::%s::%s::%s" % [beat_id, slot_id, card_id])
 		place_btn.pressed.connect(_on_place_pressed.bind(beat_id, slot_id, card_id))
 		_beat_container.add_child(place_btn)
@@ -250,7 +250,7 @@ func _show_preview(beat_id: String, slot_id: String, label_text: String) -> void
 		var lines: Array[String] = ["可放置卡片："]
 		for card_id_val in cards:
 			var card_id := str(card_id_val)
-			lines.append("  • %s" % _card_display_name(card_id))
+			lines.append("  • %s" % Data.card_display_name(card_id))
 		message = "\n".join(lines)
 	else:
 		var reason := str(result.get("reason", ""))
@@ -260,11 +260,6 @@ func _show_preview(beat_id: String, slot_id: String, label_text: String) -> void
 	_preview_dialog.dialog_text = message
 	_preview_dialog.popup_centered()
 
-
-func _card_display_name(card_id: String) -> String:
-	var base_id: String = card_id.split("#")[0]
-	var card: Dictionary = Data.loader.cards.get(base_id, {}) as Dictionary
-	return str(card.get("name", card_id))
 
 
 func _on_place_pressed(beat_id: String, slot_id: String, card_id: String) -> void:

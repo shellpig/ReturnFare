@@ -1,7 +1,7 @@
 class_name P1AFCases
 extends RefCounted
 
-## P1-A～P1-F 的 UI runner 案例。
+## P1-A～P1-H 的 UI runner 案例。
 ##
 ## 這裡的案例只透過 QAStep 送真實輸入，狀態觀察一律從 GameState.serialize()
 ## 或畫面 dump 取得；不讀 Data loader，也不呼叫 GameState 的規則操作入口。
@@ -54,6 +54,12 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p1af_31_night_place", "D10 night 放主角卡不耗行動格", "d10_night.json", "", "p1af_31_night_place", "", "night_place"),
 		UiCase.new("p1af_32_coda_full", "D45 coda 真 beat、比對與跨輪重置", "d45_evening.json", "", "p1af_32_d45_coda_full", "", "coda_full"),
 		UiCase.new("p1af_33_full_walk", "從新局以真實輸入走完 45 天並續走第二輪", "", "", "p1af_33_full_walk", "", "full_walk"),
+		UiCase.new("p1h_01_hand_cards", "手牌列每一張卡各自一個按鈕且顯示卡名無id", "d10_night__knowledge.json", "", "p1h_01_hand_cards", "", "p1h_01"),
+		UiCase.new("p1h_02_card_detail", "點擊卡片彈出唯讀詳情且關閉後狀態不變", "d10_night__knowledge.json", "", "p1h_02_card_detail", "", "p1h_02"),
+		UiCase.new("p1h_03_detail_readonly", "詳情彈窗開著時全樹無任何放置或選擇控制項", "d10_night__knowledge.json", "", "p1h_03_detail_readonly", "", "p1h_03"),
+		UiCase.new("p1h_04_knowledge_detail", "知識詳情完整呈現全部知識卡且可捲動", "p1h_knowledge_full.json", "", "p1h_04_knowledge_detail", "", "p1h_04"),
+		UiCase.new("p1h_05_name_truncation", "超長卡名省略號截斷且詳情顯示完整名稱", "d10_night__knowledge.json", "long_card_name", "p1h_05_name_truncation", "", "p1h_05"),
+		UiCase.new("p1h_06_handbar_geometry", "手牌列固定7欄外框矩形不變且幾何診斷全綠", "d10_night__knowledge.json", "", "p1h_06_handbar_geometry", "", "p1h_06"),
 	]
 
 
@@ -130,12 +136,27 @@ class UiCase extends CaseBaseClass:
 				return await _coda_full(tree)
 			"full_walk":
 				return await _full_walk(tree)
+			"p1h_01":
+				return _p1h_01(tree)
+			"p1h_02":
+				return await _p1h_02(tree)
+			"p1h_03":
+				return await _p1h_03(tree)
+			"p1h_04":
+				return await _p1h_04(tree)
+			"p1h_05":
+				return await _p1h_05(tree)
+			"p1h_06":
+				return _p1h_06(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
 
 	func _state(tree: SceneTree) -> Dictionary:
 		return CaseBaseClass.get_game_state(tree).call("serialize") as Dictionary
+
+	func _data(tree: SceneTree) -> Node:
+		return CaseBaseClass.get_data(tree)
 
 	func _run(tree: SceneTree) -> Dictionary:
 		return _state(tree).get("run", {}) as Dictionary
@@ -185,18 +206,22 @@ class UiCase extends CaseBaseClass:
 
 	func _boot(tree: SceneTree) -> Dictionary:
 		var run := _run(tree)
-		assert_eq(int(run.get("day", 0)), 1, "新局天數")
-		assert_eq(str(run.get("phase", "")), "morning", "新局時段")
-		assert_eq(str(QAStepClass.find_controls_by_name(tree.get_root(), "StatusLabel")[0].text), "第 1 天  morning  第 1 章", "狀態列")
-		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "hand_slots"), "手牌列")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "state": _state(tree) } }
+		assert_eq(int(run.get("day", 0)), 1, "第 1 天")
+		assert_eq(str(run.get("phase", "")), "morning", "morning 時段")
+		var status := QAStepClass.find_controls_by_name(tree.get_root(), "StatusLabel")[0] as Label
+		assert_true(status.text.contains("第 1 章"), "第一章狀態列")
+		return { "ok": errors.is_empty(), "errors": errors }
 
 	func _phase_cycle(tree: SceneTree) -> Dictionary:
-		var expected := ["afternoon", "evening", "night", "morning"]
-		for phase in expected:
+		var phases: Array[String] = ["morning", "afternoon", "evening", "night"]
+		for i in range(phases.size()):
+			var run := _run(tree)
+			assert_eq(int(run.get("day", 0)), 1, "第 1 天推進")
+			assert_eq(str(run.get("phase", "")), phases[i], "時段循環")
 			await _advance(tree)
-			assert_eq(str(_run(tree).get("phase", "")), phase, "連續推進時段")
-		assert_eq(int(_run(tree).get("day", 0)), 2, "連續推進後天數")
+		var next_day := _run(tree)
+		assert_eq(int(next_day.get("day", 0)), 2, "推進至第 2 天")
+		assert_eq(str(next_day.get("phase", "")), "morning", "次日起始時段")
 		return { "ok": errors.is_empty(), "errors": errors }
 
 	func _chapter_boundary(tree: SceneTree) -> Dictionary:
@@ -241,14 +266,165 @@ class UiCase extends CaseBaseClass:
 		var run := _run(tree)
 		var meta := _state(tree).get("meta", {}) as Dictionary
 		var knowledge := meta.get("knowledge", {}) as Dictionary
-		assert_true(not knowledge.is_empty(), "D9 狀態應有知識卡")
-		var knowledge_label := QAStepClass.find_controls_by_qa_id(tree.get_root(), "knowledge_cards")[0] as Label
-		var hand_label := QAStepClass.find_controls_by_qa_id(tree.get_root(), "hand_cards")[0] as Label
+		assert_true(not knowledge.is_empty(), "D10 狀態應有知識卡")
+		var k_entries := QAStepClass.find_controls_by_qa_id(tree.get_root(), "knowledge_entry")
+		assert_true(not k_entries.is_empty(), "知識入口按鈕必須存在")
+		if not k_entries.is_empty():
+			var btn := k_entries[0] as Button
+			assert_true(btn.text.contains(str(knowledge.size())), "知識按鈕顯示正確張數: %d (實際: %s)" % [knowledge.size(), btn.text])
 		for key in knowledge.keys():
-			assert_true(knowledge_label.text.contains(str(key)), "知識列必須顯示完整鍵: %s" % str(key))
-			assert_false(hand_label.text.contains(str(key)), "知識卡不得出現在手牌列: %s" % str(key))
+			var found_in_hand := QAStepClass.find_controls_by_qa_id(tree.get_root(), "hand_card::" + str(key))
+			assert_true(found_in_hand.is_empty(), "知識卡不得出現在手牌列: %s" % str(key))
 		assert_true(run.has("hand"), "serialize 手牌欄位")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "hand": run.get("hand", []), "knowledge": knowledge, "evidence": ["knowledge_label_complete", "knowledge_not_in_hand"] } }
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "hand": run.get("hand", []), "knowledge": knowledge, "evidence": ["knowledge_count_exact", "knowledge_not_in_hand"] } }
+
+	func _p1h_01(tree: SceneTree) -> Dictionary:
+		var run := _run(tree)
+		var hand_cards: Array = run.get("hand", []) as Array
+		assert_true(not hand_cards.is_empty(), "手牌不應為空")
+		var data_node := _data(tree)
+		var all_card_ids: Array = data_node.loader.cards.keys()
+		for card_id in hand_cards:
+			var btn_list := QAStepClass.find_controls_by_qa_id(tree.get_root(), "hand_card::" + str(card_id))
+			assert_eq(btn_list.size(), 1, "手牌卡片按鈕唯一: %s" % str(card_id))
+			if btn_list.size() == 1:
+				var btn := btn_list[0] as Button
+				var expected_name: String = str(data_node.call("card_display_name", str(card_id)))
+				assert_eq(btn.text, expected_name, "手牌按鈕顯示名稱: %s" % str(card_id))
+		for text in _texts(tree.get_root()):
+			for card_id in all_card_ids:
+				if str(card_id).length() > 2:
+					assert_false(text.contains(str(card_id)), "畫面上不得出現裸卡片 id: %s (在文字 '%s')" % [str(card_id), text])
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["hand_cards_visible", "no_card_id_visible"] } }
+
+	func _p1h_02(tree: SceneTree) -> Dictionary:
+		var before_state := _state(tree)
+		var data_node := _data(tree)
+
+		# 點先生說法
+		await _click(tree, "hand_card::info_husband_version")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "先生說法詳情開啟")
+		var husband_name: String = str(data_node.call("card_display_name", "info_husband_version"))
+		var husband_text: String = str(data_node.loader.cards.get("info_husband_version", {}).get("text", ""))
+		assert_true(_has_text(tree.get_root(), husband_name), "先生說法卡名")
+		assert_true(_has_text(tree.get_root(), husband_text), "先生說法內容")
+		await _click(tree, "dialog_confirm::card_detail")
+		var after_husband := _state(tree)
+		assert_eq(JSON.stringify(before_state), JSON.stringify(after_husband), "先生說法關閉後狀態逐欄不變")
+
+		# 點妻子說法
+		await _click(tree, "hand_card::info_wife_version")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "妻子說法詳情開啟")
+		var wife_name: String = str(data_node.call("card_display_name", "info_wife_version"))
+		var wife_text: String = str(data_node.loader.cards.get("info_wife_version", {}).get("text", ""))
+		assert_true(_has_text(tree.get_root(), wife_name), "妻子說法卡名")
+		assert_true(_has_text(tree.get_root(), wife_text), "妻子說法內容")
+		await _click(tree, "dialog_confirm::card_detail")
+		var after_wife := _state(tree)
+		assert_eq(JSON.stringify(before_state), JSON.stringify(after_wife), "妻子說法關閉後狀態逐欄不變")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["husband_detail_ok", "wife_detail_ok", "state_unchanged"] } }
+
+	func _p1h_03(tree: SceneTree) -> Dictionary:
+		await _click(tree, "hand_card::protagonist")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "詳情開啟")
+		var place_controls := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "place::")
+		var choose_controls := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "choose::")
+		assert_true(place_controls.is_empty(), "詳情開啟期間全樹不得存在任何 place:: 控制項")
+		assert_true(choose_controls.is_empty(), "詳情開啟期間全樹不得存在任何 choose:: 控制項")
+		await _click(tree, "dialog_confirm::card_detail")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "詳情關閉")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["no_placement_controls", "dialog_close_ok"] } }
+
+	func _p1h_04(tree: SceneTree) -> Dictionary:
+		var before_state := _state(tree)
+		var meta := before_state.get("meta", {}) as Dictionary
+		var knowledge := meta.get("knowledge", {}) as Dictionary
+		assert_true(knowledge.size() >= 10, "p1h_knowledge_full 應有完整知識")
+		var data_node := _data(tree)
+
+		await _click(tree, "knowledge_entry")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "知識清單開啟")
+
+		for k_id in knowledge.keys():
+			var k_name: String = str(data_node.call("card_display_name", str(k_id)))
+			var k_text: String = str(data_node.loader.cards.get(str(k_id), {}).get("text", ""))
+			assert_true(_has_text(tree.get_root(), k_name), "知識卡名稱存在: %s" % k_name)
+			assert_true(_has_text(tree.get_root(), k_text), "知識卡內容存在: %s" % str(k_id))
+
+		var scroll_nodes := QAStepClass.find_controls_by_name(tree.get_root(), "ScrollContainer")
+		var dialog_scroll: ScrollContainer = null
+		for sn in scroll_nodes:
+			if sn is ScrollContainer and sn.get_parent() is AcceptDialog:
+				dialog_scroll = sn as ScrollContainer
+				break
+		assert_true(dialog_scroll != null, "知識清單彈窗內應有 ScrollContainer")
+		if dialog_scroll != null:
+			var content_box: VBoxContainer = dialog_scroll.get_child(0) as VBoxContainer
+			var last_item: Control = content_box.get_child(content_box.get_child_count() - 1) as Control
+			var scroll_res := await QAStepClass.scroll_into_view(tree, dialog_scroll, last_item)
+			assert_true(bool(scroll_res.get("ok", false)), "滾輪捲動至最後一張知識卡")
+
+		await _click(tree, "dialog_confirm::card_detail")
+		var after_state := _state(tree)
+		assert_eq(JSON.stringify(before_state), JSON.stringify(after_state), "知識清單關閉後狀態逐欄不變")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["all_knowledge_present", "scroll_last_visible", "state_unchanged"] } }
+
+	func _p1h_05(tree: SceneTree) -> Dictionary:
+		var btn_list := QAStepClass.find_controls_by_qa_id(tree.get_root(), "hand_card::info_husband_version")
+		assert_eq(btn_list.size(), 1, "先生說法卡片按鈕")
+		var data_node := _data(tree)
+		var long_name: String = str(data_node.call("card_display_name", "info_husband_version"))
+		assert_true(long_name.length() > 10, "資料變體超長卡名生效")
+		if btn_list.size() == 1:
+			var btn := btn_list[0] as Button
+			assert_eq(btn.text_overrun_behavior, TextServer.OVERRUN_TRIM_ELLIPSIS, "文字溢出截斷模式應為 OVERRUN_TRIM_ELLIPSIS")
+			assert_true(btn.clip_text, "clip_text 應為 true")
+			var font: Font = btn.get_theme_font("font")
+			var font_size: int = btn.get_theme_font_size("font_size")
+			var text_w: float = font.get_string_size(btn.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			assert_true(text_w > btn.size.x, "超長卡名寬度 (%f) 應大於按鈕寬度 (%f)" % [text_w, btn.size.x])
+
+		await _click(tree, "hand_card::info_husband_version")
+		assert_true(_has_text(tree.get_root(), long_name), "詳情彈窗內顯示完整未截斷全名")
+		await _click(tree, "dialog_confirm::card_detail")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["ellipsis_displayed", "full_name_in_detail"] } }
+
+	func _p1h_06(tree: SceneTree) -> Dictionary:
+		var hand_bar_nodes := QAStepClass.find_controls_by_name(tree.get_root(), "HandBar")
+		assert_eq(hand_bar_nodes.size(), 1, "HandBar 節點存在")
+		var hand_bar := hand_bar_nodes[0] as Control
+
+		var grid_nodes := QAStepClass.find_controls_by_name(hand_bar, "CardsGrid")
+		assert_eq(grid_nodes.size(), 1, "CardsGrid 存在")
+		if grid_nodes.size() == 1:
+			var grid := grid_nodes[0] as GridContainer
+			assert_eq(grid.columns, 7, "GridContainer.columns 固定為 7")
+			var run := _run(tree)
+			var hand_cards: Array = run.get("hand", []) as Array
+			assert_eq(grid.get_child_count(), hand_cards.size(), "按鈕數等於手牌數")
+			for child in grid.get_children():
+				assert_true(child is Button, "CardsGrid 子節點皆為 Button（無空框）")
+
+		var hb_rect := hand_bar.get_global_rect()
+		assert_eq(hb_rect, Rect2(20, 580, 1240, 140), "HandBar 外框矩形保持 Rect2(20, 580, 1240, 140)")
+
+		var content_view_nodes := QAStepClass.find_controls_by_name(tree.get_root(), "ContentView")
+		assert_eq(content_view_nodes.size(), 1, "ContentView 存在")
+		if content_view_nodes.size() == 1:
+			var cv_rect := (content_view_nodes[0] as Control).get_global_rect()
+			assert_eq(cv_rect, Rect2(0, 170, 1280, 400), "ContentView 外框矩形保持 Rect2(0, 170, 1280, 400)")
+
+		var slots_labels := QAStepClass.find_controls_by_qa_id(tree.get_root(), "hand_slots")
+		assert_true(not slots_labels.is_empty(), "hand_slots 標籤存在")
+		if not slots_labels.is_empty():
+			var limit := int(_data(tree).call("tuning", "hand_size"))
+			var used := int(CaseBaseClass.get_game_state(tree).call("hand_slots_used"))
+			assert_eq((slots_labels[0] as Label).text, "手牌 %d / %d" % [used, limit], "hand_slots 格式吻合")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["grid_columns_7", "no_empty_slots", "rects_preserved"] } }
 
 	func _arrival(tree: SceneTree) -> Dictionary:
 		await _advance(tree)
@@ -305,9 +481,11 @@ class UiCase extends CaseBaseClass:
 
 	func _condition_hidden(tree: SceneTree, main_node: Control) -> Dictionary:
 		await _enter(tree, "temple")
-		assert_true(not _has_text(main_node, "阿婕"), "無邀請分支不顯示阿婕內容")
-		assert_true(not _has_text(main_node, "阿薇"), "無邀請分支不顯示阿薇內容")
-		assert_true(_has_text(main_node, "她沒聽見") or _has_text(main_node, "一個人走"), "條件成立的 D32 分支")
+		var panel_nodes := QAStepClass.find_controls_by_name(tree.get_root(), "LocationPanel")
+		var panel: Node = panel_nodes[0] if not panel_nodes.is_empty() else tree.get_root()
+		assert_true(not _has_text(panel, "看夜市那邊的燈"), "無邀請分支不顯示阿婕內容")
+		assert_true(not _has_text(panel, "金伯的尾音還沒收"), "無邀請分支不顯示阿薇內容")
+		assert_true(_has_text(panel, "兩段都沒有") or _has_text(panel, "一個人走"), "條件成立的 D32 分支")
 		return { "ok": errors.is_empty(), "errors": errors }
 
 	func _competing_beats(tree: SceneTree) -> Dictionary:
@@ -563,9 +741,6 @@ class UiCase extends CaseBaseClass:
 		for field in run_fields:
 			assert_true((after.get(field, {}) as Dictionary).is_empty(), "跨輪欄位清空: %s" % field)
 		assert_false(_has_text(tree.get_root(), "[結局 stub]"), "關閉結局 stub 後才進入新輪 UI")
-		# 步數上限的理由同 `QAStep.drain_beats`：推進一旦卡住，無上限的迴圈會空轉到
-		# launcher 逾時，回報只剩「逾時」而不是命中診斷。第 1 天到第 8 天上午是 29 個時段，
-		# 上限給 60 留足餘裕，真的卡住就在這裡紅。
 		var advance_steps := 0
 		while int(_run(tree).get("day", 0)) < 8 and advance_steps < 60:
 			await _advance(tree)

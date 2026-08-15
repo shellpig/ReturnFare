@@ -289,11 +289,12 @@ static func click(
 static func scroll_into_view(tree: SceneTree, scroll_container: ScrollContainer, target: Control, max_ticks: int = 60) -> Dictionary:
 	var result := { "ok": false, "ticks": 0, "error": "" }
 
-	var sc_rect := scroll_container.get_global_rect()
-	if sc_rect.size.x <= 0 or sc_rect.size.y <= 0:
+	var sc_size := scroll_container.size
+	if sc_size.x <= 0 or sc_size.y <= 0:
 		result["error"] = "ScrollContainer 尺寸為 0，無法定位滾輪事件座標"
 		return result
-	var wheel_pos: Vector2 = sc_rect.position + sc_rect.size * 0.5
+	var wheel_pos: Vector2 = scroll_container.get_screen_position() + sc_size * 0.5
+	DisplayServer.warp_mouse(Vector2i(wheel_pos))
 
 	var motion := InputEventMouseMotion.new()
 	motion.position = wheel_pos

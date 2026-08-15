@@ -89,6 +89,28 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _run_walk_with_checkpoints(tree, data_node, d9_knowledge_decisions, d9_knowledge_cp, output_dir):
 		return false
 
+	# 產生 P1-H 完整知識清單狀態（從 D10 知識狀態出發，以合法 gain_card() 加入全部 slotless 卡）
+	var gs_full: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+	_reset_state(gs_full)
+	var d10_bytes := FileAccess.get_file_as_bytes(output_dir + "d10_night__knowledge.json")
+	var d10_dict: Dictionary = JSON.parse_string(d10_bytes.get_string_from_utf8())
+	gs_full.deserialize(d10_dict)
+	for card_id_key: String in data_node.loader.cards.keys():
+		var c_def: Dictionary = data_node.loader.cards[card_id_key] as Dictionary
+		if bool(c_def.get("slotless", false)):
+			gs_full.gain_card(card_id_key)
+	var full_snapshot: Dictionary = gs_full.serialize()
+	var full_path := output_dir + "p1h_knowledge_full.json"
+	var f_full := FileAccess.open(full_path, FileAccess.WRITE)
+	if f_full == null:
+		printerr("無法寫入狀態檔: %s" % full_path)
+		return false
+	f_full.store_string(JSON.stringify(full_snapshot, "\t"))
+	f_full.close()
+	if not _verify_checkpoint_postcondition("p1h_knowledge_full", full_snapshot):
+		printerr("p1h_knowledge_full 後置條件失敗")
+		return false
+
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
 	var d45_coda_decisions: Array[Dictionary] = [
@@ -311,6 +333,8 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			return day == 10 and phase == "night"
 		"d10_night__knowledge":
 			return day == 10 and phase == "night" and (_state_knowledge(snapshot).has("k_forty_something"))
+		"p1h_knowledge_full":
+			return day == 10 and phase == "night" and (_state_knowledge(snapshot).size() >= 10)
 		"d15_night":
 			return day == 15 and phase == "night"
 		"d24_night":

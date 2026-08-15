@@ -1,7 +1,7 @@
 class_name QAContractMatrix
 extends RefCounted
 
-## 47 條 UI 契約的機器可讀目錄。變體由 runner 展開，但完成判定回到這份矩陣。
+## 53 條 UI 契約的機器可讀目錄。變體由 runner 展開，但完成判定回到這份矩陣。
 
 const CONTRACT_IDS := [
 	"p1g_case_01", "p1g_case_02", "p1g_case_03", "p1g_case_04",
@@ -19,11 +19,13 @@ const CONTRACT_IDS := [
 	"p1af_25_choice_card", "p1af_26_echo_d5", "p1af_27_ch1_echoes",
 	"p1af_28_d27_order", "p1af_29_night_resolution", "p1af_30_sleep_d24",
 	"p1af_31_night_place", "p1af_32_d45_coda_full", "p1af_33_full_walk",
+	"p1h_01_hand_cards", "p1h_02_card_detail", "p1h_03_detail_readonly",
+	"p1h_04_knowledge_detail", "p1h_05_name_truncation", "p1h_06_handbar_geometry",
 ]
 
 const SPECIAL_EVIDENCE := {
 	"p1af_03_chapter_boundary": ["chapter_changed_once"],
-	"p1af_06_hand_knowledge_split": ["knowledge_label_complete", "knowledge_not_in_hand"],
+	"p1af_06_hand_knowledge_split": ["knowledge_count_exact", "knowledge_not_in_hand"],
 	"p1af_09_occupant_empty": ["occupant_no_place", "empty_slot_interactive"],
 	"p1af_10_requires_locked": ["locked_visual", "locked_click_blocked", "locked_reason"],
 	"p1af_11_unlock_same_panel": ["locked_before", "unlocked_same_panel"],
@@ -40,6 +42,12 @@ const SPECIAL_EVIDENCE := {
 	"p1af_30_sleep_d24": ["sleep_input", "sleep_resolution"],
 	"p1af_32_d45_coda_full": ["run_fields_cleared", "reset_ui_state", "reset_flag_slots_locked"],
 	"p1af_33_full_walk": ["full_walk_d45", "first_round_reset", "second_round_arrival", "second_round_protagonist_exactly_one"],
+	"p1h_01_hand_cards": ["hand_cards_visible", "no_card_id_visible"],
+	"p1h_02_card_detail": ["husband_detail_ok", "wife_detail_ok", "state_unchanged"],
+	"p1h_03_detail_readonly": ["no_placement_controls", "dialog_close_ok"],
+	"p1h_04_knowledge_detail": ["all_knowledge_present", "scroll_last_visible", "state_unchanged"],
+	"p1h_05_name_truncation": ["ellipsis_displayed", "full_name_in_detail"],
+	"p1h_06_handbar_geometry": ["grid_columns_7", "no_empty_slots", "rects_preserved"],
 }
 
 ## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。

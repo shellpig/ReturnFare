@@ -46,6 +46,14 @@ static func get_game_state(tree: SceneTree) -> Node:
 	return tree.get_root().get_node("GameState")
 
 
+## 取得 Data 節點
+static func get_data(tree: SceneTree) -> Node:
+	if tree != null and tree.get_root() != null:
+		return tree.get_root().get_node_or_null("Data")
+	return null
+
+
+
 ## 從畫面上真的顯示出的預覽文字取卡片名稱；案例不讀 Data、cards.json 或任何規則層查詢。
 static func preview_bullet_names(dialog: AcceptDialog) -> Array[String]:
 	var names: Array[String] = []

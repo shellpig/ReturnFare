@@ -1,0 +1,22 @@
+[gd_scene load_steps=2 format=3 uid="uid://returnfare0carddetail"]
+
+[ext_resource type="Script" path="res://scenes/ui/card_detail.gd" id="1_card_detail"]
+
+[node name="CardDetailDialog" type="AcceptDialog"]
+title = "卡片詳情"
+size = Vector2i(600, 380)
+script = ExtResource("1_card_detail")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+custom_minimum_size = Vector2(560, 300)
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 592.0
+offset_bottom = 331.0
+horizontal_scroll_mode = 0
+
+[node name="ContentContainer" type="VBoxContainer" parent="ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8

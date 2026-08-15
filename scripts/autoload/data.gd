@@ -116,3 +116,17 @@ func card_type_name(type_id: String) -> String:
 		return type_id
 	var card_type: Dictionary = loader.card_types.get(type_id, {}) as Dictionary
 	return str(card_type.get("name", type_id))
+
+
+## 卡片顯示名查詢。自動切除實例後綴（madness#1 -> madness）後查表；
+## 缺少定義或查不到時退回原本的 id，讓 UI 仍可顯示且保留除錯線索。
+func card_display_name(card_id: String) -> String:
+	if loader == null:
+		return card_id
+	var base_id: String = card_id.split("#")[0]
+	var card: Dictionary = loader.cards.get(base_id, {}) as Dictionary
+	var name_val: Variant = card.get("name")
+	if name_val != null and str(name_val) != "":
+		return str(name_val)
+	return card_id
+
