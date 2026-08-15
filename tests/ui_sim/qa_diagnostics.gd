@@ -85,6 +85,33 @@ static func _get_global_z_index(ctrl: CanvasItem) -> int:
 	return z
 
 
+## 保護區容差：上界（StatusLabel/AdvanceButton 底邊）多留 8px，下界（HandBar 頂邊）多留 2px。
+## 容差維持現行版面下與舊寫死常數 168 / 582 等價，不得取消。
+const GUARD_TOP_TOLERANCE := 8.0
+const GUARD_BOTTOM_TOLERANCE := 2.0
+
+
+## 從實際節點矩形推導保護區上下界（K-28 / K-40 防線）。
+## 找不到 StatusLabel/AdvanceButton/HandBar 任一節點視為配置錯誤，回傳 ok = false，
+## 呼叫端必須讓幾何診斷判紅，不得靜默退回舊常數或跳過保護區檢查。
+static func _compute_guard_bounds(root: Node) -> Dictionary:
+	var status_label := root.get_node_or_null("StatusLabel")
+	var advance_button := root.get_node_or_null("AdvanceButton")
+	var hand_bar := root.get_node_or_null("HandBar")
+	if not (status_label is Control) or not (advance_button is Control) or not (hand_bar is Control):
+		return { "ok": false, "top": 0.0, "bottom": 0.0 }
+
+	var status_bottom: float = (status_label as Control).get_global_rect().end.y
+	var advance_bottom: float = (advance_button as Control).get_global_rect().end.y
+	var hand_top: float = (hand_bar as Control).get_global_rect().position.y
+
+	return {
+		"ok": true,
+		"top": max(status_bottom, advance_bottom) + GUARD_TOP_TOLERANCE,
+		"bottom": hand_top + GUARD_BOTTOM_TOLERANCE,
+	}
+
+
 ## 執行幾何診斷（遮蔽診斷與溢出診斷）
 static func run_geometry_diagnostics(root: Node) -> Dictionary:
 	var visible_controls: Array[Control] = []
@@ -160,6 +187,15 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 					})
 
 	# 2. 溢出診斷與保護區檢查
+	var guard_bounds := _compute_guard_bounds(root)
+	if not bool(guard_bounds.get("ok", false)):
+		overflow_issues.append({
+			"path": str(root.get_path()),
+			"reason": "保護區推導失敗：找不到 StatusLabel/AdvanceButton/HandBar 其中一個節點，無法確定 K-28/K-40 防線邊界",
+		})
+	var guard_top: float = guard_bounds.get("top", 0.0)
+	var guard_bottom: float = guard_bounds.get("bottom", 0.0)
+
 	for ctrl in visible_controls:
 		if ctrl is ScrollContainer:
 			var sc := ctrl as ScrollContainer
@@ -259,28 +295,29 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 							"reason": "元件底部 (%f) 溢出未裁切父容器 (%f)" % [raw_rect.position.y + raw_rect.size.y, p_raw.position.y + p_raw.size.y],
 						})
 
-			# 保護區檢查 (K-28 / K-40 防線): ContentView 內部內容不得侵入 StatusLabel/AdvanceButton (0..170) 或 HandBar (580..720)
+			# 保護區檢查 (K-28 / K-40 防線): ContentView 內部內容不得侵入 StatusLabel/AdvanceButton
+			# 或 HandBar，邊界從實際節點矩形推導 (見 _compute_guard_bounds)。
 			var path_str := str(ctrl.get_path())
-			var in_clipped_scroll := _is_inside_clipped_scroll(ctrl)
+			var in_clipped_scroll := _is_inside_clipped_scroll(ctrl, guard_bottom)
 			if path_str.contains("/ContentView/") and not _is_inside_window(ctrl, root):
-				if raw_rect.position.y < 168.0 and not in_clipped_scroll:
+				if raw_rect.position.y < guard_top and not in_clipped_scroll:
 					overflow_issues.append({
 						"path": path_str,
-						"reason": "內容侵入上方狀態列/推進按鈕保護區 (y=%f < 168)" % raw_rect.position.y,
+						"reason": "內容侵入上方狀態列/推進按鈕保護區 (y=%f < %f)" % [raw_rect.position.y, guard_top],
 					})
 				if ctrl is ScrollContainer:
 					# ScrollContainer 自身外框絕對不得侵入 HandBar
-					if raw_rect.position.y + raw_rect.size.y > 582.0:
+					if raw_rect.position.y + raw_rect.size.y > guard_bottom:
 						overflow_issues.append({
 							"path": path_str,
-							"reason": "ScrollContainer 容器本體侵入下方 HandBar 手牌保護區 (y2=%f > 582)" % (raw_rect.position.y + raw_rect.size.y),
+							"reason": "ScrollContainer 容器本體侵入下方 HandBar 手牌保護區 (y2=%f > %f)" % [raw_rect.position.y + raw_rect.size.y, guard_bottom],
 						})
 				else:
-					# 若在 ScrollContainer 內部，只要父層 ScrollContainer 有 clip_contents 且其外框在 582 內即可
-					if not in_clipped_scroll and raw_rect.position.y + raw_rect.size.y > 582.0:
+					# 若在 ScrollContainer 內部，只要父層 ScrollContainer 有 clip_contents 且其外框在保護區內即可
+					if not in_clipped_scroll and raw_rect.position.y + raw_rect.size.y > guard_bottom:
 						overflow_issues.append({
 							"path": path_str,
-							"reason": "未裁切內容侵入下方 HandBar 手牌保護區 (y2=%f > 582)" % (raw_rect.position.y + raw_rect.size.y),
+							"reason": "未裁切內容侵入下方 HandBar 手牌保護區 (y2=%f > %f)" % [raw_rect.position.y + raw_rect.size.y, guard_bottom],
 						})
 
 	return {
@@ -290,12 +327,12 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 	}
 
 
-static func _is_inside_clipped_scroll(ctrl: Control) -> bool:
+static func _is_inside_clipped_scroll(ctrl: Control, guard_bottom: float) -> bool:
 	var curr: Node = ctrl.get_parent()
 	while curr != null and curr is Control:
 		if curr is ScrollContainer:
 			var sc := curr as ScrollContainer
-			return sc.clip_contents and (sc.get_global_rect().position.y + sc.get_global_rect().size.y <= 582.0)
+			return sc.clip_contents and (sc.get_global_rect().position.y + sc.get_global_rect().size.y <= guard_bottom)
 		curr = curr.get_parent()
 	return false
 
