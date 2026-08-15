@@ -78,10 +78,10 @@ func _test_two_stage_location_panel(gs: Node) -> int:
 		failed += _fail("slots were rendered during beat演出")
 	else:
 		failed += _ok("slots are absent during beat演出")
-	if not (gs.get("beats_entered") as Dictionary).is_empty():
-		failed += _fail("entering location settled on_enter before player advance")
+	if (gs.get("beats_entered") as Dictionary).size() != 1:
+		failed += _fail("entering location should immediately play the first beat")
 	else:
-		failed += _ok("entering location is side-effect free before player advance")
+		failed += _ok("entering location plays the first beat immediately")
 
 	var advance_btn: Button = panel.get_node("AdvanceBeatButton")
 	if not advance_btn.visible:

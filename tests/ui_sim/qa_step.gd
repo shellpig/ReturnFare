@@ -32,6 +32,36 @@ static func _matches_pattern(str_val: String, pattern: String) -> bool:
 	return false
 
 
+static func find_controls_by_qa_id_prefix(root: Node, prefix: String) -> Array[Control]:
+	var results: Array[Control] = []
+	_search_qa_id_prefix_recursive(root, prefix, results)
+	return results
+
+
+static func _search_qa_id_prefix_recursive(node: Node, prefix: String, results: Array[Control]) -> void:
+	if node is Control:
+		var ctrl := node as Control
+		if ctrl.has_meta("qa_id"):
+			var qid := str(ctrl.get_meta("qa_id"))
+			if qid.begins_with(prefix):
+				results.append(ctrl)
+	for child in node.get_children(true):
+		_search_qa_id_prefix_recursive(child, prefix, results)
+
+
+static func find_controls_by_name(root: Node, node_name: String) -> Array[Control]:
+	var results: Array[Control] = []
+	_search_name_recursive(root, node_name, results)
+	return results
+
+
+static func _search_name_recursive(node: Node, node_name: String, results: Array[Control]) -> void:
+	if node is Control and node.name == node_name:
+		results.append(node as Control)
+	for child in node.get_children(true):
+		_search_name_recursive(child, node_name, results)
+
+
 ## 檢查特定 qa_id 是否存在於畫面上且可見
 static func has_visible_qa_id(root: Node, qa_id: String) -> bool:
 	var list := find_controls_by_qa_id(root, qa_id)
@@ -89,14 +119,6 @@ static func click(
 			result["error"] = "按鈕 disabled 狀態與預期不符 (實際: %s, 預期: %s)" % [str(btn.disabled), str(expected_disabled)]
 			return result
 
-	# 若目標位於 ScrollContainer 內，自動捲動確保元件落於可視區
-	var p_scroll := target.get_parent()
-	while p_scroll != null and not (p_scroll is Window) and not (p_scroll is SubViewport):
-		if p_scroll is ScrollContainer:
-			(p_scroll as ScrollContainer).ensure_control_visible(target)
-			await wait_draw_frames(tree, 2)
-			break
-		p_scroll = p_scroll.get_parent()
 
 	# 3. 計算螢幕/視口真實中心點與子視窗轉換
 	var target_vp := target.get_viewport()

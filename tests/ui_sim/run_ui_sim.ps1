@@ -15,9 +15,26 @@ function Invoke-GodotProcess {
         [string[]]$ArgumentList,
         [int]$TimeoutSec
     )
+    if (-not (Test-Path $Binary)) {
+        Write-Host "ERROR: Godot binary not found at '$Binary'" -ForegroundColor Red
+        return @{
+            Finished = $false
+            ExitCode = 1
+            Timeout = $false
+            Error = "Godot binary not found: $Binary"
+        }
+    }
+    $formattedArgs = @()
+    foreach ($arg in $ArgumentList) {
+        if ($arg -match '[\s"]') {
+            $formattedArgs += '"{0}"' -f ($arg -replace '"', '\"')
+        } else {
+            $formattedArgs += $arg
+        }
+    }
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $Binary
-    $psi.Arguments = ($ArgumentList -join " ")
+    $psi.Arguments = ($formattedArgs -join " ")
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     $p = [System.Diagnostics.Process]::Start($psi)
@@ -28,6 +45,7 @@ function Invoke-GodotProcess {
             Finished = $false
             ExitCode = -1
             Timeout = $true
+            Error = "Timeout ($TimeoutSec s)"
         }
     }
     $p.WaitForExit()
@@ -35,6 +53,7 @@ function Invoke-GodotProcess {
         Finished = $true
         ExitCode = $p.ExitCode
         Timeout = $false
+        Error = ""
     }
 }
 

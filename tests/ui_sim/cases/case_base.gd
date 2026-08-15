@@ -46,6 +46,13 @@ func assert_true(cond: bool, msg: String) -> bool:
 	return true
 
 
+func assert_false(cond: bool, msg: String) -> bool:
+	if cond:
+		errors.append("FAIL: " + msg)
+		return false
+	return true
+
+
 func assert_eq(actual: Variant, expected: Variant, msg: String) -> bool:
 	if actual != expected:
 		errors.append("FAIL: %s (實際: %s, 預期: %s)" % [msg, str(actual), str(expected)])

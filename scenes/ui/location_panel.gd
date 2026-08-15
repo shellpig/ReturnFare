@@ -98,19 +98,14 @@ func _start_next_beat() -> void:
 
 	_current_beat_id = _pending_beat_ids.pop_front()
 	_visit_seen[_current_beat_id] = true
-	_current_lines = PackedStringArray()
-	_current_played = false
+	_current_lines = GameState.play_beat(_current_beat_id)
+	_current_played = true
 	_is_playing = true
+	state_changed.emit()
 
 
 func _on_advance_beat_pressed() -> void:
 	if not _is_playing:
-		return
-	if not _current_played:
-		_current_lines = GameState.play_beat(_current_beat_id)
-		_current_played = true
-		state_changed.emit()
-		_rebuild()
 		return
 	_start_next_beat()
 	_rebuild()
@@ -257,10 +252,11 @@ func _show_preview(beat_id: String, slot_id: String, label_text: String) -> void
 	var cards: Array = result.get("cards", []) as Array
 	var message := _MSG_PREVIEW_EMPTY
 	if not cards.is_empty():
-		var names: Array[String] = []
-		for card_id: String in cards:
-			names.append(_card_display_name(card_id))
-		message = _FMT_PREVIEW_CARDS % "、".join(names)
+		var lines: Array[String] = ["可放置卡片："]
+		for card_id_val in cards:
+			var card_id := str(card_id_val)
+			lines.append("  • %s (%s)" % [_card_display_name(card_id), card_id])
+		message = "\n".join(lines)
 	else:
 		var reason := str(result.get("reason", ""))
 		if not reason.is_empty():

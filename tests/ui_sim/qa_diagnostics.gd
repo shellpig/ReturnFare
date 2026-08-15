@@ -63,10 +63,36 @@ static func _is_inside_window(node: Node) -> bool:
 	return false
 
 
+## 計算 Control 的全域 Z-Index
+static func _get_global_z_index(ctrl: CanvasItem) -> int:
+	var z := 0
+	var curr: Node = ctrl
+	while curr != null and curr is CanvasItem:
+		var ci := curr as CanvasItem
+		z += ci.z_index
+		if not ci.z_as_relative:
+			break
+		curr = curr.get_parent()
+	return z
+
+
 ## 執行幾何診斷（遮蔽診斷與溢出診斷）
 static func run_geometry_diagnostics(root: Node) -> Dictionary:
 	var visible_controls: Array[Control] = []
 	_collect_visible_controls(root, visible_controls)
+
+	# 依 (Global Z-Index, Tree Order) 排序以確定繪製順序 (小的在下，大的在上)
+	var z_map: Dictionary = {}
+	for ctrl in visible_controls:
+		z_map[ctrl] = _get_global_z_index(ctrl)
+
+	visible_controls.sort_custom(func(a: Control, b: Control) -> bool:
+		var za: int = z_map.get(a, 0)
+		var zb: int = z_map.get(b, 0)
+		if za != zb:
+			return za < zb
+		return false # 保持 scene tree 原序
+	)
 
 	var occlusion_issues: Array[Dictionary] = []
 	var overflow_issues: Array[Dictionary] = []
@@ -74,7 +100,7 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 	var root_vp := root.get_viewport() if root is Control else null
 	var vp_size: Vector2 = root_vp.get_visible_rect().size if root_vp != null else Vector2(1280, 720)
 
-	# 1. 遮蔽診斷 (五條防呆)
+	# 1. 遮蔽診斷 (排除祖先子孫，嚴格檢查同層與跨層覆蓋)
 	for i in range(visible_controls.size()):
 		var ctrl_a := visible_controls[i]
 		if not _has_renderable_content(ctrl_a):
@@ -88,28 +114,23 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 			if not _has_renderable_content(ctrl_b):
 				continue
 
-			# 防呆 2: 排除祖先與子孫
+			# 排除祖先與子孫
 			if ctrl_a.is_ancestor_of(ctrl_b) or ctrl_b.is_ancestor_of(ctrl_a):
 				continue
 
-			# 防呆 3: 同一個 Viewport / CanvasLayer 限制（Window/Popup 為獨立 Viewport）
+			# 同一個 Viewport / CanvasLayer 限制（Window/Popup 為獨立 Viewport）
 			if ctrl_a.get_viewport() != ctrl_b.get_viewport():
 				continue
 			if ctrl_a.get_canvas_layer_node() != ctrl_b.get_canvas_layer_node():
-				continue
-
-			# 防呆 4: 背景容器（Panel）不視為遮蔽前景元件
-			if ctrl_a is Panel or ctrl_b is Panel:
 				continue
 
 			var rect_b := get_effective_visible_rect(ctrl_b)
 			if rect_b.size.x <= 0 or rect_b.size.y <= 0:
 				continue
 
-			# 檢查重疊相交
+			# 檢查重疊相交 (面積 > 9px 才計入)
 			if rect_a.intersects(rect_b):
 				var intersection := rect_a.intersection(rect_b)
-				# 面積大於 9px 才計入，避免 1px 邊框鄰接誤報
 				if intersection.size.x > 3.0 and intersection.size.y > 3.0:
 					occlusion_issues.append({
 						"under": str(ctrl_a.get_path()),
@@ -124,7 +145,7 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 						}
 					})
 
-	# 2. 溢出診斷
+	# 2. 溢出診斷與保護區檢查
 	for ctrl in visible_controls:
 		if ctrl is ScrollContainer:
 			var sc := ctrl as ScrollContainer
@@ -140,8 +161,13 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 					"path": str(sc.get_path()),
 					"reason": "內容垂直高度 (%d) 大於容器 (%d) 且垂直捲動被停用" % [int(min_s.y), int(act_s.y)],
 				})
+			if min_s.x > act_s.x and sc.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
+				overflow_issues.append({
+					"path": str(sc.get_path()),
+					"reason": "內容水平寬度 (%d) 大於容器 (%d) 且水平捲動被停用" % [int(min_s.x), int(act_s.x)],
+				})
 
-		# 檢查常規 Control 右側/底部是否溢出視口邊界（未在 ScrollContainer 內）
+		# 檢查常規 Control 視口邊界溢出
 		if _has_renderable_content(ctrl) and not _is_inside_window(ctrl):
 			var eff := get_effective_visible_rect(ctrl)
 			if eff.size.x > 0 and eff.size.y > 0:
@@ -156,21 +182,45 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 						"reason": "元件底部超出主視口邊界 (y2=%f > %f)" % [eff.position.y + eff.size.y, vp_size.y],
 					})
 
-			# 檢查元件 combined_minimum_size 與未裁切固定父容器之尺寸
-			if ctrl.get_parent() is Control and not (ctrl.get_parent() is ScrollContainer):
-				var p_ctrl := ctrl.get_parent() as Control
-				if not p_ctrl.clip_contents and not (p_ctrl is Container):
-					var min_sz := ctrl.get_combined_minimum_size()
-					var p_sz := p_ctrl.size
-					if min_sz.x > p_sz.x + 2.0 and p_sz.x > 0:
+			# 檢查元件 combined_minimum_size 與未裁切父容器之邊界
+			var raw_rect := ctrl.get_global_rect()
+			var p_node := ctrl.get_parent()
+			if p_node is Control and not (p_node is ScrollContainer):
+				var p_ctrl := p_node as Control
+				if not p_ctrl.clip_contents:
+					var p_raw := p_ctrl.get_global_rect()
+					if raw_rect.position.x + raw_rect.size.x > p_raw.position.x + p_raw.size.x + 2.0 and p_raw.size.x > 0:
 						overflow_issues.append({
 							"path": str(ctrl.get_path()),
-							"reason": "元件最小寬度 (%f) 超出未裁切父容器寬度 (%f)" % [min_sz.x, p_sz.x],
+							"reason": "元件右側 (%f) 溢出未裁切父容器 (%f)" % [raw_rect.position.x + raw_rect.size.x, p_raw.position.x + p_raw.size.x],
 						})
-					if min_sz.y > p_sz.y + 2.0 and p_sz.y > 0:
+					if raw_rect.position.y + raw_rect.size.y > p_raw.position.y + p_raw.size.y + 2.0 and p_raw.size.y > 0:
 						overflow_issues.append({
 							"path": str(ctrl.get_path()),
-							"reason": "元件最小高度 (%f) 超出未裁切父容器高度 (%f)" % [min_sz.y, p_sz.y],
+							"reason": "元件底部 (%f) 溢出未裁切父容器 (%f)" % [raw_rect.position.y + raw_rect.size.y, p_raw.position.y + p_raw.size.y],
+						})
+
+			# 保護區檢查 (K-28 / K-40 防線): ContentView 內部內容不得侵入 StatusLabel/AdvanceButton 或 HandBar
+			var path_str := str(ctrl.get_path())
+			if path_str.contains("/ContentView/") and not path_str.contains("/AcceptDialog"):
+				if raw_rect.position.y < 168.0:
+					overflow_issues.append({
+						"path": path_str,
+						"reason": "內容侵入上方狀態列/推進按鈕保護區 (y=%f < 168)" % raw_rect.position.y,
+					})
+				if raw_rect.position.y + raw_rect.size.y > 582.0 and not (ctrl is ScrollContainer):
+					# 若在 ScrollContainer 內部，只要父層 ScrollContainer 有 clip_contents 且在 580 內即可
+					var in_clipped_scroll := false
+					var p_check: Node = ctrl.get_parent()
+					while p_check != null and p_check is Control:
+						if p_check is ScrollContainer and (p_check as ScrollContainer).clip_contents:
+							in_clipped_scroll = true
+							break
+						p_check = p_check.get_parent()
+					if not in_clipped_scroll:
+						overflow_issues.append({
+							"path": path_str,
+							"reason": "未裁切內容侵入下方 HandBar 手牌保護區 (y2=%f > 582)" % (raw_rect.position.y + raw_rect.size.y),
 						})
 
 	return {
