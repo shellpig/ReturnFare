@@ -19,6 +19,8 @@ func _initialize() -> void:
 		if args[i] == "--output-dir" and i + 1 < args.size():
 			output_dir = args[i + 1]
 			i += 1
+		elif not args[i].begins_with("--") and output_dir.is_empty():
+			output_dir = args[i]
 		i += 1
 
 	if output_dir.is_empty():
@@ -51,7 +53,6 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		"d17_morning": { "day": 17, "phase": "morning" },
 		"d22_afternoon": { "day": 22, "phase": "afternoon" },
 		"d35_afternoon": { "day": 35, "phase": "afternoon" },
-		"d40_morning": { "day": 40, "phase": "morning" },
 		"d43_morning": { "day": 43, "phase": "morning" },
 		"d43_afternoon": { "day": 43, "phase": "afternoon" },
 		"d45_evening": { "day": 45, "phase": "evening" },
@@ -121,6 +122,16 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	]
 	var d27_partial_cp: Dictionary = { "d27_evening__partial": { "day": 27, "phase": "evening" } }
 	if not _run_walk_with_checkpoints(tree, data_node, d27_partial_decisions, d27_partial_cp, output_dir):
+		return false
+
+	# 6. 產生 D40 morning 具有 info_something_off 分支（D3 拍立得 + D29 邀阿婕 + D39 比對照片）
+	var d40_decisions: Array[Dictionary] = [
+		{ "day": 3, "phase": "afternoon", "beat_id": "d3_pm_sanquan", "slot_id": "handle_couple", "card_id": "protagonist" },
+		{ "day": 29, "phase": "afternoon", "beat_id": "d29_pm_invitation", "slot_id": "invite_ajie", "group_id": "invitation" },
+		{ "day": 39, "phase": "afternoon", "beat_id": "d39_pm_readings", "slot_id": "objective", "card_id": "equip_polaroid" }
+	]
+	var d40_cp: Dictionary = { "d40_morning": { "day": 40, "phase": "morning" } }
+	if not _run_walk_with_checkpoints(tree, data_node, d40_decisions, d40_cp, output_dir):
 		return false
 
 	return true
@@ -255,9 +266,9 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 		"d32_morning__none":
 			return day == 32 and phase == "morning" and choices.get("d29_pm_invitation::invitation", "") == "invite_none"
 		"d35_afternoon":
-			return day == 35 and phase == "afternoon"
+			return day == 35 and phase == "afternoon" and flags.get("inheritance_offered", false) == true
 		"d40_morning":
-			return day == 40 and phase == "morning"
+			return day == 40 and phase == "morning" and hand.has("info_something_off")
 		"d43_morning":
 			return day == 43 and phase == "morning"
 		"d43_afternoon":

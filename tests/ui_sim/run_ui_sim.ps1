@@ -9,8 +9,37 @@ $ErrorActionPreference = "Continue"
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $projectRoot
 
-# 1. Setup run directories
-$runId = (Get-Date).ToString("yyyyMMdd-HHmmss")
+function Invoke-GodotProcess {
+    param(
+        [string]$Binary,
+        [string[]]$ArgumentList,
+        [int]$TimeoutSec
+    )
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $Binary
+    $psi.Arguments = ($ArgumentList -join " ")
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $finished = $p.WaitForExit($TimeoutSec * 1000)
+    if (-not $finished) {
+        try { $p.Kill() } catch {}
+        return @{
+            Finished = $false
+            ExitCode = -1
+            Timeout = $true
+        }
+    }
+    $p.WaitForExit()
+    return @{
+        Finished = $true
+        ExitCode = $p.ExitCode
+        Timeout = $false
+    }
+}
+
+# 1. Setup run directories (with millisecond precision)
+$runId = (Get-Date).ToString("yyyyMMdd-HHmmss-fff")
 $qaDir = Join-Path $projectRoot "_qa"
 $runDir = Join-Path $qaDir "runs\$runId"
 $statesDir = Join-Path $runDir "states"
@@ -41,25 +70,13 @@ $stateArgs = @(
     "--output-dir", $statesDir
 )
 
-$proc = Start-Process -FilePath $GodotBin -ArgumentList $stateArgs -NoNewWindow -PassThru
-$stateFinished = $proc.WaitForExit($TimeoutSeconds * 1000)
-if (-not $stateFinished) {
-    try { $proc.Kill() } catch {}
+$stateRes = Invoke-GodotProcess -Binary $GodotBin -ArgumentList $stateArgs -TimeoutSec $TimeoutSeconds
+if ($stateRes.Timeout) {
     Write-Host "ERROR: State generator timed out! ($TimeoutSeconds s)" -ForegroundColor Red
     exit 1
 }
-
-$stateExitCode = 0
-try {
-    if ($proc.HasExited) {
-        $stateExitCode = $proc.ExitCode
-    }
-} catch {
-    $stateExitCode = 0
-}
-
-if ($null -ne $stateExitCode -and $stateExitCode -ne 0) {
-    Write-Host "ERROR: Failed to generate scenario states! Exit code: $stateExitCode" -ForegroundColor Red
+if ($stateRes.ExitCode -ne 0) {
+    Write-Host "ERROR: Failed to generate scenario states! Exit code: $($stateRes.ExitCode)" -ForegroundColor Red
     exit 1
 }
 Write-Host "  Scenario states generated successfully." -ForegroundColor Green
@@ -71,8 +88,8 @@ $caseDefs = @(
     @{ Id = "p1g_case_02_lock_interaction_during_play"; State = "d32_morning__ajie.json"; Desc = "Lock interaction during play" },
     @{ Id = "p1g_case_03_reenter_no_duplicate_on_enter"; State = "d17_morning.json"; Desc = "Reenter no duplicate on_enter" },
     @{ Id = "p1g_case_04_slot_types"; State = "d22_afternoon.json"; Desc = "Slot type indicator (all 4 slots)" },
-    @{ Id = "p1g_case_05_protagonist_slot_type"; State = "d3_afternoon.json"; Desc = "Protagonist slot type indicator" },
-    @{ Id = "p1g_case_06_no_spoiler"; State = "d3_afternoon.json"; Desc = "No spoiler for specific card accepts" },
+    @{ Id = "p1g_case_05_protagonist_slot_type"; State = "d22_afternoon.json"; Desc = "Protagonist slot type indicator" },
+    @{ Id = "p1g_case_06_no_spoiler"; State = "d22_afternoon.json"; Desc = "No spoiler for specific card accepts" },
     @{ Id = "p1g_case_07_right_click_preview"; State = "d22_afternoon.json"; Desc = "Right click preview state unchanged" },
     @{ Id = "p1g_case_08_right_click_locked_preview"; State = "d22_afternoon.json"; Desc = "Right click locked slot preview with reason" },
     @{ Id = "p1g_case_09_preview_button_match_right_click"; State = "d22_afternoon.json"; Desc = "Preview button matches right click verbatim" },
@@ -116,29 +133,16 @@ foreach ($c in $caseDefs) {
         "--run-dir", $runDir
     )
 
-    $proc = Start-Process -FilePath $GodotBin -ArgumentList $caseArgs -NoNewWindow -PassThru
-    $finished = $proc.WaitForExit($TimeoutSeconds * 1000)
+    $runRes = Invoke-GodotProcess -Binary $GodotBin -ArgumentList $caseArgs -TimeoutSec $TimeoutSeconds
 
-    if (-not $finished) {
-        try { $proc.Kill() } catch {}
+    if ($runRes.Timeout) {
         Write-Host "TIMEOUT" -ForegroundColor Red
         $failedCount++
-        $results += @{ Id = $cId; Ok = $false; Error = "Timeout ($TimeoutSeconds s)" }
+        $results += @{ Id = $cId; Ok = $false; Errors = @("Timeout ($TimeoutSeconds s)"); ExitCode = -1 }
         continue
     }
 
-    $exitCode = 0
-    if ($proc.HasExited) {
-        try {
-            $rawCode = $proc.ExitCode
-            if ($null -ne $rawCode) {
-                $exitCode = [int]$rawCode
-            }
-        } catch {
-            $exitCode = 0
-        }
-    }
-
+    $exitCode = $runRes.ExitCode
     $repJsonPath = Join-Path $runDir "reports\$cId.json"
     $caseOk = $false
     $caseErrors = @()
@@ -148,20 +152,20 @@ foreach ($c in $caseDefs) {
             $repObj = Get-Content -Path $repJsonPath -Raw -Encoding utf8 | ConvertFrom-Json
             $caseOk = [bool]$repObj.ok
             if ($repObj.errors) {
-                $caseErrors = $repObj.errors
+                $caseErrors = @($repObj.errors)
             }
         } catch {
-            $caseOk = false
+            $caseOk = $false
             $caseErrors = @("Failed to parse report JSON: $_")
         }
     } else {
-        $caseOk = false
+        $caseOk = $false
         $caseErrors = @("Report file not found: $repJsonPath")
     }
 
     if ($caseOk -and $exitCode -eq 0) {
         Write-Host "OK" -ForegroundColor Green
-        $results += @{ Id = $cId; Ok = $true; Error = "" }
+        $results += @{ Id = $cId; Ok = $true; Errors = @(); ExitCode = 0 }
     } else {
         Write-Host "FAIL (Exit code: $exitCode)" -ForegroundColor Red
         if ($caseErrors.Count -gt 0) {
@@ -170,7 +174,7 @@ foreach ($c in $caseDefs) {
             }
         }
         $failedCount++
-        $results += @{ Id = $cId; Ok = $false; Error = "Exit code $exitCode" }
+        $results += @{ Id = $cId; Ok = $false; Errors = $caseErrors; ExitCode = $exitCode }
     }
 }
 

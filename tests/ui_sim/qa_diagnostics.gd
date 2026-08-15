@@ -156,6 +156,23 @@ static func run_geometry_diagnostics(root: Node) -> Dictionary:
 						"reason": "元件底部超出主視口邊界 (y2=%f > %f)" % [eff.position.y + eff.size.y, vp_size.y],
 					})
 
+			# 檢查元件 combined_minimum_size 與未裁切固定父容器之尺寸
+			if ctrl.get_parent() is Control and not (ctrl.get_parent() is ScrollContainer):
+				var p_ctrl := ctrl.get_parent() as Control
+				if not p_ctrl.clip_contents and not (p_ctrl is Container):
+					var min_sz := ctrl.get_combined_minimum_size()
+					var p_sz := p_ctrl.size
+					if min_sz.x > p_sz.x + 2.0 and p_sz.x > 0:
+						overflow_issues.append({
+							"path": str(ctrl.get_path()),
+							"reason": "元件最小寬度 (%f) 超出未裁切父容器寬度 (%f)" % [min_sz.x, p_sz.x],
+						})
+					if min_sz.y > p_sz.y + 2.0 and p_sz.y > 0:
+						overflow_issues.append({
+							"path": str(ctrl.get_path()),
+							"reason": "元件最小高度 (%f) 超出未裁切父容器高度 (%f)" % [min_sz.y, p_sz.y],
+						})
+
 	return {
 		"ok": occlusion_issues.is_empty() and overflow_issues.is_empty(),
 		"occlusion_issues": occlusion_issues,
@@ -189,13 +206,19 @@ static func capture_screenshot(tree: SceneTree, file_path: String) -> bool:
 
 
 ## 中途狀態擷取（截圖 + UI dump）
-static func capture_interim_state(tree: SceneTree, root_node: Node, run_dir: String, case_id: String, stage_name: String) -> void:
+static func capture_interim_state(tree: SceneTree, root_node: Node, run_dir: String, case_id: String, stage_name: String) -> bool:
 	var dump_path := run_dir + "dumps/" + case_id + "_" + stage_name + ".json"
 	var dump_data := dump_ui_tree(root_node)
 	var f := FileAccess.open(dump_path, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(dump_data, "\t"))
-		f.close()
+	if f == null:
+		printerr("capture_interim_state: dump 寫入失敗: %s" % dump_path)
+		return false
+	f.store_string(JSON.stringify(dump_data, "\t"))
+	f.close()
 
 	var shot_path := run_dir + "shots/" + case_id + "_" + stage_name + ".png"
-	capture_screenshot(tree, shot_path)
+	var shot_ok := capture_screenshot(tree, shot_path)
+	if not shot_ok:
+		printerr("capture_interim_state: 截圖寫入失敗: %s" % shot_path)
+		return false
+	return true

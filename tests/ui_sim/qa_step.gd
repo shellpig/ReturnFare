@@ -66,6 +66,10 @@ static func click(
 		result["error"] = "找不到 qa_id: %s (命中數 0)" % qa_id
 		return result
 
+	if candidates.size() > 1:
+		result["error"] = "qa_id: %s 違反唯一性契約 (全樹命中數 %d，包含隱藏)" % [qa_id, candidates.size()]
+		return result
+
 	var visible_candidates: Array[Control] = []
 	for c in candidates:
 		if c.is_visible_in_tree():
@@ -73,10 +77,6 @@ static func click(
 
 	if visible_candidates.is_empty():
 		result["error"] = "qa_id: %s 存在但不可見 (is_visible_in_tree 為 false)" % qa_id
-		return result
-
-	if visible_candidates.size() > 1:
-		result["error"] = "qa_id: %s 違反唯一性契約 (可見命中數 %d)" % [qa_id, visible_candidates.size()]
 		return result
 
 	var target := visible_candidates[0]
@@ -132,7 +132,7 @@ static func click(
 	var hit_ok := false
 	if hovered == target:
 		hit_ok = true
-	elif hovered != null and (target.is_ancestor_of(hovered) or hovered.is_ancestor_of(target)):
+	elif hovered != null and target.is_ancestor_of(hovered):
 		hit_ok = true
 
 	if not hit_ok:

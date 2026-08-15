@@ -48,6 +48,9 @@ func _ready() -> void:
 
 
 func _process_cli_args() -> void:
+	if not OS.is_debug_build() and not OS.has_feature("editor"):
+		return
+
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var data_root := ""
 	var state_path := ""
