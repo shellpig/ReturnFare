@@ -45,7 +45,10 @@ func _refresh() -> void:
 	for card_id: String in GameState.hand:
 		var btn := Button.new()
 		btn.name = "Card_%s" % card_id.replace("#", "_")
-		btn.text = Data.card_display_name(card_id)
+		var display_text := Data.card_display_name(card_id)
+		if GameState.madness_clock.has(card_id):
+			display_text = "%s (%d天)" % [display_text, int(GameState.madness_clock[card_id])]
+		btn.text = display_text
 		btn.set_meta("qa_id", "hand_card::%s" % card_id)
 		btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		btn.clip_text = true

@@ -35,6 +35,9 @@ var relations: Dictionary = {}        # npc -> int（單軸整數暫行案，規
 # --- 其他群 ---
 var action_spent: bool = false                 # 當前行動格是否已放過主角卡（run 層）
 var npc_action_counts: Dictionary = {}         # npc_id -> 本輪投入的主角行動數（run 層，規格書第十二節）
+var night_markers_opened: Dictionary = {}      # location_id -> true（本輪已開標記集合，run 層）
+var indulgence_count: int = 0                  # 本輪縱慾次數（主動＋強制合計，run 層）
+var forced_pending: Array[String] = []         # 已歸零、還沒吃到行動格的發狂卡實例 id（run 層）
 
 signal phase_changed(day: int, phase: String)
 signal day_changed(day: int)
@@ -76,6 +79,7 @@ func advance_phase() -> void:
 		day += 1
 		phase = PHASES[0]
 		day_changed.emit(day)
+		tick_madness()
 
 	action_spent = false
 	phase_changed.emit(day, phase)
@@ -105,6 +109,9 @@ func end_run(ending_id: String = "ending_default") -> void:
 	npc_action_counts.clear()
 	madness_clock.clear()
 	_madness_counter = 0
+	night_markers_opened.clear()
+	indulgence_count = 0
+	forced_pending.clear()
 
 	day_changed.emit(day)
 	phase_changed.emit(day, phase)
@@ -182,6 +189,40 @@ func sleep_night() -> PackedStringArray:
 		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
 			return play_beat(str(b.get("id", "")))
 	return PackedStringArray()
+
+
+## 開啟夜間收費標記（規格書第八、九節，P2-A）。
+## 首次進入該夜間地點時發 madness_cost 張發狂卡，回傳文字行。
+func open_night_marker(location_id: String) -> PackedStringArray:
+	var lines := PackedStringArray()
+	if night_markers_opened.has(location_id):
+		return lines
+
+	night_markers_opened[location_id] = true
+
+	if Data == null or Data.loader == null:
+		return lines
+
+	var loc: Dictionary = Data.loader.locations.get(location_id, {}) as Dictionary
+	var cost: int = int(loc.get("madness_cost", 0))
+	for i in range(cost):
+		gain_card("madness")
+
+	return lines
+
+
+## 每天 morning 開始時，桌上每張發狂卡的剩餘天數 −1（規格書第八節，P2-A）。
+## 回傳這次歸零的實例 id 陣列（Array[String]）。
+func tick_madness() -> Array[String]:
+	var zeroed: Array[String] = []
+	for inst: String in madness_clock.keys():
+		var remaining := int(madness_clock[inst]) - 1
+		madness_clock[inst] = remaining
+		if remaining <= 0:
+			zeroed.append(inst)
+	if not madness_clock.is_empty():
+		hand_changed.emit()
+	return zeroed
 
 
 ## 檢查 beat 在當前天與時段是否屬於合法範圍（K-18）。
@@ -633,6 +674,9 @@ func serialize() -> Dictionary:
 			"switch_progress": switch_progress.duplicate(),
 			"relations": relations.duplicate(),
 			"npc_action_counts": npc_action_counts.duplicate(),
+			"night_markers_opened": night_markers_opened.duplicate(),
+			"indulgence_count": indulgence_count,
+			"forced_pending": forced_pending.duplicate(),
 		},
 		"meta": {
 			"knowledge": knowledge.duplicate(),
@@ -648,8 +692,11 @@ func deserialize(d: Dictionary) -> void:
 	hand.clear()
 	for item in run.get("hand", []):
 		hand.append(str(item))
-	madness_clock = run.get("madness_clock", {}).duplicate()
-	_madness_counter = run.get("_madness_counter", 0)
+	madness_clock.clear()
+	var mc: Dictionary = run.get("madness_clock", {})
+	for k in mc.keys():
+		madness_clock[str(k)] = int(mc[k])
+	_madness_counter = int(run.get("_madness_counter", 0))
 	beats_entered = run.get("beats_entered", {}).duplicate()
 	slots_placed = run.get("slots_placed", {}).duplicate()
 	choices = run.get("choices", {}).duplicate()
@@ -658,6 +705,11 @@ func deserialize(d: Dictionary) -> void:
 	switch_progress = run.get("switch_progress", {}).duplicate()
 	relations = run.get("relations", {}).duplicate()
 	npc_action_counts = run.get("npc_action_counts", {}).duplicate()
+	night_markers_opened = run.get("night_markers_opened", {}).duplicate()
+	indulgence_count = int(run.get("indulgence_count", 0))
+	forced_pending.clear()
+	for item in run.get("forced_pending", []):
+		forced_pending.append(str(item))
 
 	var meta: Dictionary = d.get("meta", {})
 	knowledge = meta.get("knowledge", {}).duplicate()

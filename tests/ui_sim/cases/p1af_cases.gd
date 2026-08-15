@@ -681,14 +681,23 @@ class UiCase extends CaseBaseClass:
 		assert_true(add_idx >= 0, "D10 附加 beat 並列演出")
 		assert_true(add_idx > base_idx, "主內容與附加 beat 播放順序正確")
 		await _close(tree)
+		# 免費標記不產生發狂卡
+		var hand_free := _run(tree).get("hand", []) as Array
+		for card_id in hand_free:
+			assert_false(str(card_id).begins_with("madness"), "免費夜間地點不應產生 madness 卡")
+
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "D10 已到付費標記開放日")
 		await _enter(tree, "n_ahong_1")
 		assert_true(_has_text(tree.get_root(), "夜間標記尚未開放"), "付費夜間標記必須顯示鎖定 stub")
 		await _close(tree)
-		assert_true(not _has_text(main_node, "發狂卡"), "D10 night 不產生發狂卡")
-		var hand := _run(tree).get("hand", []) as Array
-		for card_id in hand:
-			assert_false(str(card_id).begins_with("madness"), "夜間不應產生 madness 卡")
+
+		# P2-A: 進入收費標記發放發狂卡
+		var hand_paid := _run(tree).get("hand", []) as Array
+		var has_madness := false
+		for card_id in hand_paid:
+			if str(card_id).begins_with("madness"):
+				has_madness = true
+		assert_true(has_madness, "進入收費夜間地點後手牌應獲得發狂卡")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "locations": _visible_ids(tree, "location::"), "evidence": ["night_free_interaction", "night_chapter_and_additional_order", "night_paid_locked", "night_no_madness"] } }
 
 	func _night_resolution_d1(tree: SceneTree) -> Dictionary:
