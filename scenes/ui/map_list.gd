@@ -28,6 +28,7 @@ func refresh() -> void:
 		btn.text = str(loc.get("name", loc_id)) + (_SUFFIX_EMPTY if is_empty else "")
 		btn.disabled = is_empty
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.set_meta("qa_id", "location::" + loc_id)
 		btn.pressed.connect(_on_location_pressed.bind(loc_id))
 		_container.add_child(btn)
 

@@ -73,7 +73,7 @@ func _test_two_stage_location_panel(gs: Node) -> int:
 	await process_frame
 
 	var failed := 0
-	var beat_container: Node = panel.get_node("BeatContainer")
+	var beat_container: Node = panel.find_child("BeatContainer", true, false)
 	if _has_slot_marker(beat_container):
 		failed += _fail("slots were rendered during beat演出")
 	else:

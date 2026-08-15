@@ -38,7 +38,7 @@ const _REASON_CODE_TEXTS := {
 @onready var _location_title: Label = $LocationTitle
 @onready var _description_label: Label = $DescriptionLabel
 @onready var _status_label: Label = Label.new()
-@onready var _beat_container: VBoxContainer = $BeatContainer
+@onready var _beat_container: VBoxContainer = $ScrollContainer/BeatContainer
 
 var _current_location: String = ""
 var _pending_beat_ids: Array[String] = []
@@ -51,12 +51,15 @@ var _preview_dialog: AcceptDialog
 
 
 func _ready() -> void:
+	_back_btn.set_meta("qa_id", "panel_back")
+	_advance_beat_btn.set_meta("qa_id", "beat_advance")
 	_back_btn.pressed.connect(func(): closed.emit())
 	_advance_beat_btn.pressed.connect(_on_advance_beat_pressed)
 	add_child(_status_label)
 	move_child(_status_label, _back_btn.get_index() + 1)
 	_preview_dialog = AcceptDialog.new()
 	add_child(_preview_dialog)
+	_preview_dialog.get_ok_button().set_meta("qa_id", "dialog_confirm::preview")
 
 
 func show_location(location_id: String) -> void:
@@ -198,6 +201,7 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 
 	var slot_lbl := Label.new()
 	slot_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
+	slot_lbl.set_meta("qa_id", "slot::%s::%s" % [beat_id, slot_id])
 	slot_lbl.gui_input.connect(_on_slot_gui_input.bind(beat_id, slot_id))
 	match tri:
 		PanelBuilder.TriState.OPEN:
@@ -217,6 +221,7 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 	if not accepts.is_empty():
 		var preview_btn := Button.new()
 		preview_btn.text = "預覽"
+		preview_btn.set_meta("qa_id", "preview::%s::%s" % [beat_id, slot_id])
 		preview_btn.pressed.connect(_show_preview.bind(beat_id, slot_id, label_text))
 		_beat_container.add_child(preview_btn)
 
@@ -228,12 +233,14 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 		var choice_group := str(slot.get("choice_group", ""))
 		var choose_btn := Button.new()
 		choose_btn.text = _FMT_CHOOSE_BUTTON % label_text
+		choose_btn.set_meta("qa_id", "choose::%s::%s::%s" % [beat_id, choice_group, slot_id])
 		choose_btn.pressed.connect(_on_choose_pressed.bind(beat_id, choice_group, slot_id, ""))
 		_beat_container.add_child(choose_btn)
 
 	for card_id: String in GameState.placeable_cards(beat_id, slot_id):
 		var place_btn := Button.new()
 		place_btn.text = _FMT_PLACE_BUTTON % _card_display_name(card_id)
+		place_btn.set_meta("qa_id", "place::%s::%s::%s" % [beat_id, slot_id, card_id])
 		place_btn.pressed.connect(_on_place_pressed.bind(beat_id, slot_id, card_id))
 		_beat_container.add_child(place_btn)
 

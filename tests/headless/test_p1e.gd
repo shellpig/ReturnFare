@@ -506,7 +506,7 @@ func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
 		panel_a.call("_on_advance_beat_pressed")
 		await process_frame
 
-	var beat_container_a: Node = panel_a.get_node("BeatContainer")
+	var beat_container_a: Node = panel_a.find_child("BeatContainer", true, false)
 	var direct_btn: Button = null
 	for child in beat_container_a.get_children():
 		if child is Button and (child as Button).text.contains("選擇：① 他走路的方式"):
@@ -546,7 +546,7 @@ func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
 		panel_b.call("_on_advance_beat_pressed")
 		await process_frame
 
-	var beat_container_b: Node = panel_b.get_node("BeatContainer")
+	var beat_container_b: Node = panel_b.find_child("BeatContainer", true, false)
 	var found_obs_walk_label := false
 	var card_btn: Button = null
 	for child in beat_container_b.get_children():

@@ -20,7 +20,13 @@ const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 var _is_showing_ending := false
 
 
+func _enter_tree() -> void:
+	_process_cli_args()
+
+
 func _ready() -> void:
+	_advance_btn.set_meta("qa_id", "phase_advance")
+
 	if not Data.ok:
 		_error_label.text = _MSG_DATA_ERROR
 		_status_label.visible = false
@@ -39,6 +45,113 @@ func _ready() -> void:
 
 	_refresh_status()
 	_route_view()
+
+
+func _process_cli_args() -> void:
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var data_root := ""
+	var state_path := ""
+
+	var i := 0
+	while i < args.size():
+		match args[i]:
+			"--data-root":
+				if i + 1 < args.size():
+					data_root = args[i + 1]
+					i += 1
+			"--state":
+				if i + 1 < args.size():
+					state_path = args[i + 1]
+					i += 1
+		i += 1
+
+	if not data_root.is_empty():
+		var normalized := data_root.replace("\\", "/")
+		if normalized.ends_with("/"):
+			normalized = normalized.substr(0, normalized.length() - 1)
+		normalized += "/"
+		var ok: bool = Data.load_data(normalized)
+		if not ok:
+			printerr("ERROR: --data-root 載入失敗: %s" % normalized)
+			get_tree().quit(1)
+			return
+
+	if not state_path.is_empty():
+		if not FileAccess.file_exists(state_path):
+			printerr("ERROR: --state 檔案不存在: %s" % state_path)
+			get_tree().quit(1)
+			return
+		var text := FileAccess.get_file_as_string(state_path)
+		var json_val: Variant = JSON.parse_string(text)
+		if json_val == null or not (json_val is Dictionary):
+			printerr("ERROR: --state JSON 解析失敗: %s" % state_path)
+			get_tree().quit(1)
+			return
+		var err_msg := _validate_state_json(json_val as Dictionary)
+		if not err_msg.is_empty():
+			printerr("ERROR: --state 狀態檔不合法: %s (%s)" % [err_msg, state_path])
+			get_tree().quit(1)
+			return
+		GameState.deserialize(json_val as Dictionary)
+
+
+static func _validate_state_json(data: Dictionary) -> String:
+	var template: Dictionary = GameState.serialize()
+	var dict_err := _validate_dict_shape(data, template, "")
+	if not dict_err.is_empty():
+		return dict_err
+
+	var run: Dictionary = data.get("run", {}) as Dictionary
+	var day_val: Variant = run.get("day")
+	if day_val == null:
+		return "run.day 遺失"
+	var day_int := int(day_val)
+	if day_int < 1 or day_int > 45:
+		return "run.day 超出範圍 (1..45): %d" % day_int
+
+	var phase_val: Variant = run.get("phase")
+	if phase_val == null or not (str(phase_val) in GameState.PHASES):
+		return "run.phase 不合法: %s" % str(phase_val)
+
+	return ""
+
+
+static func _validate_dict_shape(data: Dictionary, template: Dictionary, prefix: String) -> String:
+	for key: Variant in template.keys():
+		var k := str(key)
+		var full_key := (prefix + "." + k) if not prefix.is_empty() else k
+		if not data.has(k):
+			return "必要欄位遺失: %s" % full_key
+
+		var val: Variant = data[k]
+		var tpl_val: Variant = template[k]
+
+		if typeof(tpl_val) == TYPE_INT or typeof(tpl_val) == TYPE_FLOAT:
+			if typeof(val) != TYPE_INT and typeof(val) != TYPE_FLOAT:
+				return "欄位型別錯誤: %s 應為數字，實際為 %s" % [full_key, typeof(val)]
+			if typeof(tpl_val) == TYPE_INT:
+				var f_val := float(val)
+				if is_nan(f_val) or is_inf(f_val) or floor(f_val) != f_val:
+					return "欄位型別錯誤: %s 應為整數，實際為 %s" % [full_key, str(val)]
+		elif typeof(tpl_val) == TYPE_DICTIONARY:
+			if typeof(val) != TYPE_DICTIONARY:
+				return "欄位型別錯誤: %s 應為 Dictionary，實際為 %s" % [full_key, typeof(val)]
+			var tpl_sub := tpl_val as Dictionary
+			if not tpl_sub.is_empty():
+				var sub_err := _validate_dict_shape(val as Dictionary, tpl_sub, full_key)
+				if not sub_err.is_empty():
+					return sub_err
+		elif typeof(tpl_val) == TYPE_ARRAY:
+			if typeof(val) != TYPE_ARRAY:
+				return "欄位型別錯誤: %s 應為 Array，實際為 %s" % [full_key, typeof(val)]
+		elif typeof(tpl_val) == TYPE_STRING:
+			if typeof(val) != TYPE_STRING:
+				return "欄位型別錯誤: %s 應為 String，實際為 %s" % [full_key, typeof(val)]
+		elif typeof(tpl_val) == TYPE_BOOL:
+			if typeof(val) != TYPE_BOOL:
+				return "欄位型別錯誤: %s 應為 bool，實際為 %s" % [full_key, typeof(val)]
+
+	return ""
 
 
 func _on_advance_pressed() -> void:

@@ -210,7 +210,8 @@ func _test_main_scene_enters_normal_branch() -> int:
 		loc_panel.call("_on_advance_beat_pressed")
 		await process_frame
 	var occupant_lines := PackedStringArray()
-	for child in loc_panel.get_node("BeatContainer").get_children():
+	var beat_container: Node = loc_panel.find_child("BeatContainer", true, false)
+	for child in beat_container.get_children():
 		var lbl := child as Label
 		if lbl != null and lbl.text.contains("[出席]"):
 			occupant_lines.append(lbl.text)

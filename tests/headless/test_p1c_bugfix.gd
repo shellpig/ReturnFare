@@ -389,7 +389,7 @@ func _test_a7_on_enter_text_rendered_in_panel() -> int:
 	panel.call("_on_advance_beat_pressed")
 	await process_frame
 
-	var beat_container: VBoxContainer = panel.get_node("BeatContainer")
+	var beat_container: VBoxContainer = panel.find_child("BeatContainer", true, false) as VBoxContainer
 	var all_labels_text: Array[String] = []
 	for child in beat_container.get_children():
 		if child is Label:
