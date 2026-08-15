@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Case = "",
     [string]$GodotBin = "C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe",
     [int]$TimeoutSeconds = 180,
