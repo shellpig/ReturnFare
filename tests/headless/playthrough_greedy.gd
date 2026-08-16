@@ -18,11 +18,53 @@ func _initialize() -> void:
 	var gs := setup_game_state(self, data_node)
 
 	var res := run_greedy_walk(gs, data_node, true)
+	var failed := 0
+
+	# ── 驗收夜間收費標記與發狂卡統計 ──
+	var expected_paid_markers := 0
+	var expected_total_madness_cost := 0
+	var expected_paid_ids: Array[String] = []
+	for loc_id_key: String in data_node.loader.locations.keys():
+		var loc: Dictionary = data_node.loader.locations[loc_id_key] as Dictionary
+		if str(loc.get("layer", "")) == "night":
+			var cost_val: Variant = loc.get("madness_cost")
+			if cost_val != null and int(cost_val) > 0:
+				expected_paid_markers += 1
+				expected_total_madness_cost += int(cost_val)
+				expected_paid_ids.append(loc_id_key)
+
+	var opened_markers: Dictionary = res.get("final_night_markers", {}) as Dictionary
+	var opened_count: int = opened_markers.size()
+	var madness_gained: int = int(res.get("final_madness_count", 0))
+	var madness_in_hand: int = (res.get("final_madness_cards", []) as Array).size()
+
+	print("=== 夜間收費標記與發狂卡統計 ===")
+	print("  全作收費標記總數（locations.json）: %d" % expected_paid_markers)
+	print("  一輪實際開啟收費標記數:             %d" % opened_count)
+	print("  全作收費標記 madness_cost 總和:      %d" % expected_total_madness_cost)
+	print("  一輪累計發放發狂卡張數:             %d" % madness_gained)
+	print("  重置前手牌持有發狂卡張數:           %d" % madness_in_hand)
+
+	if opened_count != expected_paid_markers:
+		push_error("FAIL: 開啟的夜間收費標記數 (%d) 與全作收費標記總數 (%d) 不符" % [opened_count, expected_paid_markers])
+		failed += 1
+	else:
+		print("  ok  一輪結束時開到的收費標記數與全作收費標記總數完全相符 (%d/%d)" % [opened_count, expected_paid_markers])
+
+	if madness_gained != expected_total_madness_cost:
+		push_error("FAIL: 累計發放發狂卡張數 (%d) 與收費標記 madness_cost 總和 (%d) 不符" % [madness_gained, expected_total_madness_cost])
+		failed += 1
+	else:
+		print("  ok  累計發放發狂卡張數與收費標記 madness_cost 總和完全相符 (%d 張)" % madness_gained)
+
+	if madness_in_hand != expected_total_madness_cost:
+		push_error("FAIL: 重置前手牌持有發狂卡張數 (%d) 與預期總張數 (%d) 不符" % [madness_in_hand, expected_total_madness_cost])
+		failed += 1
+	else:
+		print("  ok  重置前手牌持有發狂卡張數與預期總張數完全相符 (%d 張)" % madness_in_hand)
 
 	# ── 驗收迴圈重置狀態 ──
-	print("=== 45 天走查完畢，驗收重置狀態 ===")
-
-	var failed := 0
+	print("\n=== 45 天走查完畢，驗收重置狀態 ===")
 
 	if int(res.get("illegal_phases", 0)) > 0:
 		push_error("FAIL: 存在 %d 個未放置且未列入合法原因之行動格 (K-25)" % int(res.get("illegal_phases", 0)))
@@ -81,9 +123,19 @@ func _initialize() -> void:
 static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) -> Dictionary:
 	var run_ended_box := [0]
 	var last_ending_box := [""]
+	var final_night_markers_box := [{}]
+	var final_madness_count_box := [0]
+	var final_madness_cards_box := [[]]
 	var cb := func(eid: String):
 		run_ended_box[0] += 1
 		last_ending_box[0] = eid
+		final_night_markers_box[0] = (gs.get("night_markers_opened") as Dictionary).duplicate()
+		final_madness_count_box[0] = int(gs.get("_madness_counter"))
+		var mcards: Array = []
+		for card in (gs.get("hand") as Array):
+			if str(card).begins_with("madness"):
+				mcards.append(card)
+		final_madness_cards_box[0] = mcards
 
 	gs.run_ended.connect(cb)
 
@@ -186,6 +238,9 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		"stats": stats,
 		"run_ended_count": run_ended_box[0],
 		"last_ending_id": last_ending_box[0],
+		"final_night_markers": final_night_markers_box[0],
+		"final_madness_count": final_madness_count_box[0],
+		"final_madness_cards": final_madness_cards_box[0],
 	}
 
 

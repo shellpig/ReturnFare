@@ -37,6 +37,7 @@ func _initialize() -> void:
 	failed += _test_fixed_night_beat_no_marker_no_madness(gs, data_node)
 	failed += _test_serialize_roundtrip_p2a(gs)
 	failed += _test_end_run_resets_p2a(gs)
+	failed += _test_failure_text_precedence()
 
 	Engine.unregister_singleton("Data")
 	Engine.unregister_singleton("GameState")
@@ -444,5 +445,56 @@ func _test_end_run_resets_p2a(gs: Node) -> int:
 		failed += _fail("end_run 未清空 P2 欄位 (clock=%s, counter=%d, opened=%s, chosen=%s, ind_cnt=%d, pending=%s)" % [
 			str(clock), counter, str(opened), chosen, ind_cnt, str(pending)
 		])
+
+	return failed
+
+
+# ── 10. location_panel failure_text 理由三層優先序 (K-52) ─────────────────────
+
+func _test_failure_text_precedence() -> int:
+	print("--- 10. location_panel failure_text precedence (K-52) ---")
+	var failed := 0
+	var LocationPanelScript: GDScript = load("res://scenes/ui/location_panel.gd") as GDScript
+	if LocationPanelScript == null:
+		return _fail("無法載入 location_panel.gd")
+
+	# Tier 1: reason_text 非空時優先勝出，不被 _REASON_CODE_TEXTS 覆蓋
+	var res1: Dictionary = { "ok": false, "reason_code": "locked", "reason_text": "需要阿宏的工作筆記" }
+	var text1: String = LocationPanelScript.failure_text(res1)
+	if text1 == "需要阿宏的工作筆記":
+		failed += _ok("Tier 1: reason_text 非空時優先採用資料 reject_reason ('需要阿宏的工作筆記')")
+	else:
+		failed += _fail("Tier 1 失敗: 預期 '需要阿宏的工作筆記'，實際 '%s'" % text1)
+
+	# Tier 2: reason_text 為空時，查表 _REASON_CODE_TEXTS
+	var res2: Dictionary = { "ok": false, "reason_code": "not_held", "reason_text": "" }
+	var text2: String = LocationPanelScript.failure_text(res2)
+	if text2 == "未持有此卡":
+		failed += _ok("Tier 2: reason_text 為空時查表成功 ('未持有此卡')")
+	else:
+		failed += _fail("Tier 2 失敗: 預期 '未持有此卡'，實際 '%s'" % text2)
+
+	var res2_locked: Dictionary = { "ok": false, "reason_code": "locked", "reason_text": "" }
+	var text2_locked: String = LocationPanelScript.failure_text(res2_locked)
+	if text2_locked == "條件不足":
+		failed += _ok("Tier 2: locked 查表成功 ('條件不足')")
+	else:
+		failed += _fail("Tier 2 失敗: 預期 '條件不足'，實際 '%s'" % text2_locked)
+
+	# Tier 3: reason_text 為空且 reason_code 未在表中，回傳原始 reason_code
+	var res3: Dictionary = { "ok": false, "reason_code": "custom_eval_error", "reason_text": "" }
+	var text3: String = LocationPanelScript.failure_text(res3)
+	if text3 == "custom_eval_error":
+		failed += _ok("Tier 3: 未知 reason_code 保留原始碼 ('custom_eval_error')，不為空字串")
+	else:
+		failed += _fail("Tier 3 失敗: 預期 'custom_eval_error'，實際 '%s'" % text3)
+
+	# Edge: reason_code 與 reason_text 皆為空
+	var res4: Dictionary = { "ok": false, "reason_code": "", "reason_text": "" }
+	var text4: String = LocationPanelScript.failure_text(res4)
+	if text4 == "":
+		failed += _ok("Edge: 兩者皆為空時回傳空字串")
+	else:
+		failed += _fail("Edge 失敗: 預期 ''，實際 '%s'" % text4)
 
 	return failed

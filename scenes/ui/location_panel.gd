@@ -286,8 +286,17 @@ func _on_choose_pressed(beat_id: String, group_id: String, slot_id: String, card
 	_rebuild()
 
 
+static func failure_text(result: Dictionary) -> String:
+	var reason_text := str(result.get("reason_text", "")).strip_edges()
+	if not reason_text.is_empty():
+		return reason_text
+	var reason_code := str(result.get("reason_code", "")).strip_edges()
+	if _REASON_CODE_TEXTS.has(reason_code):
+		return _REASON_CODE_TEXTS[reason_code]
+	return reason_code
+
+
 func _set_failure_status(result: Dictionary) -> void:
-	var reason_code := str(result.get("reason_code", ""))
-	var text: String = str(_REASON_CODE_TEXTS.get(reason_code, str(result.get("reason_text", ""))))
+	var text := failure_text(result)
 	_status_label.text = _FMT_PLACE_FAILED % text
 	_status_label.visible = true
