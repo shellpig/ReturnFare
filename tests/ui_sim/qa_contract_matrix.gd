@@ -1,7 +1,7 @@
 class_name QAContractMatrix
 extends RefCounted
 
-## 54 條 UI 契約的機器可讀目錄。變體由 runner 展開，但完成判定回到這份矩陣。
+## 58 條 UI 契約的機器可讀目錄。變體由 runner 展開，但完成判定回到這份矩陣。
 
 const CONTRACT_IDS := [
 	"p1g_case_01", "p1g_case_02", "p1g_case_03", "p1g_case_04",
@@ -22,6 +22,8 @@ const CONTRACT_IDS := [
 	"p1h_01_hand_cards", "p1h_02_card_detail", "p1h_03_detail_readonly",
 	"p1h_04_knowledge_detail", "p1h_05_name_truncation", "p1h_06_handbar_geometry",
 	"p2a_01_madness_hand_display",
+	"p2b_01_exit_visibility", "p2b_02_exit_place", "p2b_03_soak",
+	"p2b_04_exit_thresholds",
 ]
 
 const SPECIAL_EVIDENCE := {
@@ -50,6 +52,10 @@ const SPECIAL_EVIDENCE := {
 	"p1h_05_name_truncation": ["ellipsis_displayed", "full_name_in_detail"],
 	"p1h_06_handbar_geometry": ["grid_columns_7", "no_empty_slots", "rects_preserved"],
 	"p2a_01_madness_hand_display": ["madness_multi_distinct_buttons", "madness_countdown_labels", "madness_detail_dialog_ok"],
+	"p2b_01_exit_visibility": ["exit_slots_absent", "exit_slots_visible", "exit_slot_type_label"],
+	"p2b_02_exit_place": ["indulge_place_effect", "indulge_action_spent", "exit_rejects_non_madness"],
+	"p2b_03_soak": ["soak_eats_day", "soak_afternoon_locked", "soak_not_enough_actions"],
+	"p2b_04_exit_thresholds": ["violence_day_gate_before", "violence_day_gate_after", "lust_relation_gate", "splurge_locked_reason"],
 }
 
 ## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。
@@ -64,6 +70,14 @@ const VARIANT_EVIDENCE := {
 	"p1af_29_night_paid": [
 		"night_paid_locked", "night_one_location_limit",
 	],
+	"p2b_01_exit_zero": ["exit_slots_absent"],
+	"p2b_01_exit_one": ["exit_slots_visible", "exit_slot_type_label"],
+	"p2b_03_soak_morning": ["soak_eats_day"],
+	"p2b_03_soak_afternoon": ["soak_afternoon_locked"],
+	"p2b_03_soak_spent": ["soak_not_enough_actions"],
+	"p2b_04_violence_before": ["violence_day_gate_before"],
+	"p2b_04_violence_after": ["violence_day_gate_after", "splurge_locked_reason"],
+	"p2b_04_lust_relation": ["lust_relation_gate"],
 }
 
 

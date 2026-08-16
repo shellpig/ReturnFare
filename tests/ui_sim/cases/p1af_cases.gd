@@ -62,6 +62,15 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p1h_05_name_truncation", "超長卡名省略號截斷且詳情顯示完整名稱", "d10_night__knowledge.json", "long_card_name", "p1h_05_name_truncation", "", "p1h_05"),
 		UiCase.new("p1h_06_handbar_geometry", "手牌列固定7欄外框矩形不變且幾何診斷全綠", "d10_night__knowledge.json", "", "p1h_06_handbar_geometry", "", "p1h_06"),
 		UiCase.new("p2a_01_madness_hand_display", "多實例發狂卡在手牌各自呈現獨立按鈕且顯示各自倒數與詳情", "p2a_multi_madness.json", "", "p2a_01_madness_hand_display", "", "p2a_01"),
+		UiCase.new("p2b_01_exit_zero", "手上 0 張發狂卡時山泉閣完全沒有出口槽節點", "d3_morning.json", "", "p2b_01_exit_visibility", "", "p2b_01_zero"),
+		UiCase.new("p2b_01_exit_one", "手上有發狂卡時砸東西、暴食、泡湯三槽出現且標示「發狂卡」", "p2b_morning_madness.json", "", "p2b_01_exit_visibility", "", "p2b_01_one"),
+		UiCase.new("p2b_02_exit_place", "放發狂卡進砸東西：文字播出、卡消失、行動格用掉、出口槽不收主角卡", "p2b_morning_madness.json", "", "p2b_02_exit_place", "", "p2b_02"),
+		UiCase.new("p2b_03_soak_morning", "上午泡湯吃掉整天但不跳時段，手上只少一張", "p2b_morning_madness.json", "", "p2b_03_soak", "", "p2b_03_morning"),
+		UiCase.new("p2b_03_soak_afternoon", "下午泡湯槽呈灰並顯示只能上午發動", "p2b_afternoon_madness.json", "", "p2b_03_soak", "", "p2b_03_afternoon"),
+		UiCase.new("p2b_03_soak_spent", "上午行動格已用時泡湯槽呈灰並顯示格數不足", "p2b_morning_spent.json", "", "p2b_03_soak", "", "p2b_03_spent"),
+		UiCase.new("p2b_04_violence_before", "第 16 天前山泉閣看不到暴力對人", "p2b_morning_madness.json", "", "p2b_04_exit_thresholds", "", "p2b_04_before"),
+		UiCase.new("p2b_04_violence_after", "第 17 天暴力對人出現、性慾仍隱藏、老街奢侈呈灰附理由", "p2b_d17_madness.json", "", "p2b_04_exit_thresholds", "", "p2b_04_after"),
+		UiCase.new("p2b_04_lust_relation", "與阿婕達疑似後性慾槽出現", "p2b_d17_ajie.json", "", "p2b_04_exit_thresholds", "", "p2b_04_lust"),
 	]
 
 
@@ -154,6 +163,22 @@ class UiCase extends CaseBaseClass:
 				return _p1h_06(tree)
 			"p2a_01":
 				return await _p2a_01(tree)
+			"p2b_01_zero":
+				return await _p2b_01_zero(tree)
+			"p2b_01_one":
+				return await _p2b_01_one(tree)
+			"p2b_02":
+				return await _p2b_02(tree)
+			"p2b_03_morning":
+				return await _p2b_03_morning(tree)
+			"p2b_03_afternoon", "p2b_03_spent":
+				return await _p2b_03_locked(tree)
+			"p2b_04_before":
+				return await _p2b_04_before(tree)
+			"p2b_04_after":
+				return await _p2b_04_after(tree)
+			"p2b_04_lust":
+				return await _p2b_04_lust(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -484,6 +509,131 @@ class UiCase extends CaseBaseClass:
 				]
 			}
 		}
+
+	# ── P2-B 縱慾出口 ──────────────────────────────────────────────────────
+	# 出口槽的 id 全部是 exit_<地點>::x_<出口>，qa_id 沿用 P1-G 的 slot:: / place:: 契約。
+
+	const _EXIT_SLOT_IDS := [
+		"slot::exit_sanquan::x_smash",
+		"slot::exit_sanquan::x_binge",
+		"slot::exit_sanquan::x_soak",
+	]
+
+	func _p2b_01_zero(tree: SceneTree) -> Dictionary:
+		var before_hand: Array = (_run(tree).get("hand", []) as Array).duplicate()
+		assert_true(before_hand.filter(
+			func(c: Variant) -> bool: return str(c).begins_with("madness")
+		).is_empty(), "前提：手上沒有發狂卡")
+		await _enter(tree, "sanquan")
+		# 「不是灰掉，是不存在」——assert_no_qa_id 連隱藏節點都會抓到。
+		for slot_qa_id in _EXIT_SLOT_IDS:
+			assert_no_qa_id(tree, slot_qa_id, "0 張發狂卡時出口槽不得存在於節點樹")
+		assert_false(_has_text(tree.get_root(), "壓抑不住的衝動"), "出口 beat 的文字也不得播出")
+		# 不比對整份 state：開面板本來就會結算該面板的 on_enter（P1-C 契約），
+		# beats_entered 會合法變動。這裡只釘住「逛過沒有出口槽的面板不會動到縱慾帳」。
+		var after := _run(tree)
+		assert_eq(int(after.get("indulgence_count", -1)), 0, "沒有出口槽可放，縱慾次數維持 0")
+		assert_eq(JSON.stringify(after.get("hand", [])), JSON.stringify(before_hand), "手牌不變")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["exit_slots_absent"] } }
+
+	func _p2b_01_one(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		for slot_qa_id in _EXIT_SLOT_IDS:
+			assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), slot_qa_id),
+				"手上有發狂卡時出口槽應顯示：%s" % slot_qa_id)
+		assert_no_qa_id(tree, "slot::exit_sanquan::x_violence", "第 3 天不得出現暴力對人（D16 門檻）")
+		# 型別標示沿用 P1-G 規則：顯示 card_types.json 的型別名，不洩漏卡 id。
+		assert_true(_has_text(tree.get_root(), "（收：發狂卡）"), "出口槽標示收「發狂卡」")
+		assert_false(_has_text(tree.get_root(), "madness#"), "槽標籤不得出現卡片實例 id")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["exit_slots_visible", "exit_slot_type_label"] } }
+
+	func _p2b_02(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		var before := _state(tree)
+		# 出口槽只收發狂卡：畫面上不得出現主角卡的放入按鈕，且對槽真實輸入不改變狀態。
+		assert_no_qa_id(tree, "place::exit_sanquan::x_smash::protagonist", "出口槽不得提供主角卡放入入口")
+		await _click(tree, "slot::exit_sanquan::x_smash")
+		assert_eq(JSON.stringify(before), JSON.stringify(_state(tree)), "對出口槽的無效輸入不得改變狀態")
+
+		await _click(tree, "place::exit_sanquan::x_smash::madness#1")
+		var after := _run(tree)
+		assert_true(_has_text(tree.get_root(), "碎片散了一地"), "on_place 效果文字必須在 UI 顯示")
+		assert_false((after.get("hand", []) as Array).has("madness#1"), "縱慾掉的那張卡從手牌消失")
+		assert_true((after.get("hand", []) as Array).has("madness#2"), "只消掉玩家挑的那一張")
+		assert_true(bool(after.get("action_spent", false)), "縱慾吃掉該時段行動格")
+		assert_eq(int(after.get("indulgence_count", 0)), 1, "本輪縱慾次數 +1")
+
+		# 同時段任何地點都不能再放主角卡
+		await _close(tree)
+		await _enter(tree, "oldstreet")
+		assert_true(_visible_ids(tree, "place::").filter(
+			func(qa: String) -> bool: return qa.ends_with("::protagonist")
+		).is_empty(), "縱慾用掉行動格後，第二地點不得再出現主角卡放入入口")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["indulge_place_effect", "indulge_action_spent", "exit_rejects_non_madness"] } }
+
+	func _p2b_03_morning(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		await _click(tree, "place::exit_sanquan::x_soak::madness#1")
+		var after := _run(tree)
+		# K-55：泡湯不得在放置管線中途改時段。時段留在 morning，面板留在畫面上，
+		# 效果文字看得到，推進鈕沒有被鎖死。
+		assert_eq(str(after.get("phase", "")), "morning", "泡湯不跳時段")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"), "泡湯後地點面板仍在畫面上")
+		assert_true(_has_text(tree.get_root(), "溫泉池裡浸泡"), "泡湯效果文字必須在 UI 顯示")
+		assert_false((after.get("hand", []) as Array).has("madness#1"), "泡湯清掉指定的那張")
+		assert_true((after.get("hand", []) as Array).has("madness#2"), "只清 soak_cards_cleared 張，不是全清")
+
+		await _close(tree)
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "phase_advance"), "推進鈕可按（K-55 卡死回歸）")
+		await _advance(tree)
+		var pm := _run(tree)
+		assert_eq(str(pm.get("phase", "")), "afternoon", "推進一次進到下午")
+		assert_true(bool(pm.get("action_spent", false)), "下午的行動格已被泡湯預先吃掉")
+		await _enter(tree, "sanquan")
+		assert_true(_visible_ids(tree, "place::").filter(
+			func(qa: String) -> bool: return qa.ends_with("::protagonist")
+		).is_empty(), "被吃掉的下午不得再出現主角卡放入入口")
+		await _close(tree)
+		await _advance(tree)
+		assert_eq(str(_run(tree).get("phase", "")), "evening", "再推進一次進 evening")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["soak_eats_day"] } }
+
+	func _p2b_03_locked(tree: SceneTree) -> Dictionary:
+		var expected_reason := "只能在上午發動" if mode == "p2b_03_afternoon" else "格數不足"
+		await _enter(tree, "sanquan")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::exit_sanquan::x_soak"), "泡湯槽仍顯示（灰掉不是消失）")
+		assert_true(_has_text(tree.get_root(), expected_reason), "泡湯槽必須附理由：%s" % expected_reason)
+		var before := _state(tree)
+		assert_true(_visible_ids(tree, "place::exit_sanquan::x_soak::").is_empty(), "呈灰的泡湯槽不得提供放入入口")
+		await _click(tree, "slot::exit_sanquan::x_soak")
+		assert_eq(JSON.stringify(before), JSON.stringify(_state(tree)), "對呈灰泡湯槽的真實輸入不得改變狀態")
+		var token := "soak_afternoon_locked" if mode == "p2b_03_afternoon" else "soak_not_enough_actions"
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [token] } }
+
+	func _p2b_04_before(tree: SceneTree) -> Dictionary:
+		assert_eq(int(_run(tree).get("day", 0)), 3, "前提：第 16 天之前")
+		await _enter(tree, "sanquan")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::exit_sanquan::x_smash"), "無條件出口仍在（對照組）")
+		assert_no_qa_id(tree, "slot::exit_sanquan::x_violence", "第 16 天前暴力對人不得存在於節點樹")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["violence_day_gate_before"] } }
+
+	func _p2b_04_after(tree: SceneTree) -> Dictionary:
+		assert_eq(int(_run(tree).get("day", 0)), 17, "前提：第 16 天之後")
+		await _enter(tree, "sanquan")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::exit_sanquan::x_violence"), "第 17 天暴力對人應出現")
+		assert_no_qa_id(tree, "slot::exit_sanquan::x_lust_ajie", "未達疑似時性慾槽不得存在於節點樹")
+		await _close(tree)
+		# 奢侈出口：錢卡尚未建檔（待決 22），恆呈灰附理由——這是正確行為，不是 bug。
+		await _enter(tree, "oldstreet")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::exit_oldstreet::x_splurge"), "奢侈槽應顯示")
+		assert_true(_has_text(tree.get_root(), "身上沒有足夠的錢"), "奢侈槽必須附資料寫的理由")
+		assert_true(_visible_ids(tree, "place::exit_oldstreet::x_splurge::").is_empty(), "呈灰的奢侈槽不得提供放入入口")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["violence_day_gate_after", "splurge_locked_reason"] } }
+
+	func _p2b_04_lust(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::exit_sanquan::x_lust_ajie"), "達疑似後性慾槽應出現")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["lust_relation_gate"] } }
 
 	func _arrival(tree: SceneTree) -> Dictionary:
 		await _advance(tree)

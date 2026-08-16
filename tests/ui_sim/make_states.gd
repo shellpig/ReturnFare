@@ -134,6 +134,59 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		printerr("p2a_multi_madness 後置條件失敗")
 		return false
 
+	# 產生 P2-B 縱慾出口的五個情境。全部從既有 checkpoint 出發，只用規則層入口
+	# （gain_card / consume_action / add_relation）加工——不直接改 JSON（K-45）。
+	# 手上兩張的用意：泡湯只清 soak_cards_cleared 張，一張的話「沒有全清」驗不出來。
+	var d3am_dict: Dictionary = _load_state(output_dir, "d3_morning.json")
+	var d3pm_dict: Dictionary = _load_state(output_dir, "d3_afternoon.json")
+	var d17am_dict: Dictionary = _load_state(output_dir, "d17_morning.json")
+	if d3am_dict.is_empty() or d3pm_dict.is_empty() or d17am_dict.is_empty():
+		printerr("P2-B 情境的來源 checkpoint 讀取失敗")
+		return false
+
+	var gs_p2b: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+
+	# ① 第 3 天上午、手上兩張發狂卡：出口槽可見性、放卡、泡湯成功路徑
+	_reset_state(gs_p2b)
+	gs_p2b.deserialize(d3am_dict)
+	gs_p2b.gain_card("madness")
+	gs_p2b.gain_card("madness")
+	if not _write_p2b_state(output_dir, "p2b_morning_madness", gs_p2b.serialize()):
+		return false
+
+	# ② 第 3 天下午、手上兩張：泡湯呈灰（只能上午發動）
+	_reset_state(gs_p2b)
+	gs_p2b.deserialize(d3pm_dict)
+	gs_p2b.gain_card("madness")
+	gs_p2b.gain_card("madness")
+	if not _write_p2b_state(output_dir, "p2b_afternoon_madness", gs_p2b.serialize()):
+		return false
+
+	# ③ 第 3 天上午、行動格已用掉：泡湯呈灰（格數不足）。
+	# consume_action() 是規則層入口，不是直接把 action_spent 塞進 JSON。
+	_reset_state(gs_p2b)
+	gs_p2b.deserialize(d3am_dict)
+	gs_p2b.gain_card("madness")
+	gs_p2b.gain_card("madness")
+	gs_p2b.consume_action(1)
+	if not _write_p2b_state(output_dir, "p2b_morning_spent", gs_p2b.serialize()):
+		return false
+
+	# ④ 第 17 天上午、手上一張：暴力對人過了第 16 天門檻，性慾仍未達關係門檻
+	_reset_state(gs_p2b)
+	gs_p2b.deserialize(d17am_dict)
+	gs_p2b.gain_card("madness")
+	if not _write_p2b_state(output_dir, "p2b_d17_madness", gs_p2b.serialize()):
+		return false
+
+	# ⑤ 同上但與阿婕已達「疑似」（relation_scale.json 的序數是 1）：性慾槽出現
+	_reset_state(gs_p2b)
+	gs_p2b.deserialize(d17am_dict)
+	gs_p2b.gain_card("madness")
+	gs_p2b.add_relation("ajie", 1)
+	if not _write_p2b_state(output_dir, "p2b_d17_ajie", gs_p2b.serialize()):
+		return false
+
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
 	var d45_coda_decisions: Array[Dictionary] = [
@@ -329,6 +382,30 @@ static func _run_walk_with_checkpoints(
 	return true
 
 
+## 讀既有 checkpoint JSON 當作加工起點；讀不到回空字典（呼叫端當失敗處理）。
+static func _load_state(output_dir: String, file_name: String) -> Dictionary:
+	var bytes := FileAccess.get_file_as_bytes(output_dir + file_name)
+	if bytes.is_empty():
+		return {}
+	var parsed: Variant = JSON.parse_string(bytes.get_string_from_utf8())
+	return parsed as Dictionary if parsed is Dictionary else {}
+
+
+## 寫出 P2-B 情境並跑後置條件。與既有情境同一套規約：寫檔失敗或後置條件不過就整支失敗。
+static func _write_p2b_state(output_dir: String, cp_name: String, snapshot: Dictionary) -> bool:
+	var path := output_dir + cp_name + ".json"
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		printerr("無法寫入狀態檔: %s" % path)
+		return false
+	f.store_string(JSON.stringify(snapshot, "\t"))
+	f.close()
+	if not _verify_checkpoint_postcondition(cp_name, snapshot):
+		printerr("%s 後置條件失敗" % cp_name)
+		return false
+	return true
+
+
 static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictionary) -> bool:
 	var run: Dictionary = snapshot.get("run", {}) as Dictionary
 	var flags: Dictionary = run.get("flags", {}) as Dictionary
@@ -360,6 +437,20 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			return day == 10 and phase == "night" and (_state_knowledge(snapshot).size() >= 10)
 		"p2a_multi_madness":
 			return day == 10 and phase == "night" and hand.has("madness#1") and hand.has("madness#2") and hand.has("madness#3")
+		"p2b_morning_madness":
+			return day == 3 and phase == "morning" and hand.has("madness#1") and hand.has("madness#2") \
+				and not bool(run.get("action_spent", true))
+		"p2b_afternoon_madness":
+			return day == 3 and phase == "afternoon" and hand.has("madness#1") and hand.has("madness#2")
+		"p2b_morning_spent":
+			return day == 3 and phase == "morning" and hand.has("madness#1") and hand.has("madness#2") \
+				and bool(run.get("action_spent", false))
+		"p2b_d17_madness":
+			return day == 17 and phase == "morning" and hand.has("madness#1") \
+				and int((run.get("relations", {}) as Dictionary).get("ajie", 0)) < 1
+		"p2b_d17_ajie":
+			return day == 17 and phase == "morning" and hand.has("madness#1") \
+				and int((run.get("relations", {}) as Dictionary).get("ajie", 0)) >= 1
 		"d15_night":
 			return day == 15 and phase == "night"
 		"d24_night":
