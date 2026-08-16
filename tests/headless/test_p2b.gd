@@ -189,14 +189,39 @@ func _test_active_indulgence_smash(gs: Node, data: Node) -> int:
 	else:
 		failed += _ok("縱慾消耗行動格後，同一時段無法再放主角卡")
 
-	# 重複放同一槽應被拒絕
+	# 同一時段再縱慾一次應被行動格擋下（不是被「槽已放過」擋下）
 	gs.call("gain_card", "madness") # madness#2
-	gs.set("action_spent", false) # 模擬下一時段但槽已放置
-	var dup_res: Dictionary = gs.call("indulge", "exit_sanquan", "x_smash", "madness#2")
-	if dup_res.get("ok", true) or str(dup_res.get("reason_code", "")) != "resolved":
-		failed += _fail("重複放入已結算出口槽應被拒絕 (resolved)；實際：%s" % str(dup_res))
+	var same_phase_res: Dictionary = gs.call("indulge", "exit_sanquan", "x_smash", "madness#2")
+	if same_phase_res.get("ok", true) or str(same_phase_res.get("reason_code", "")) != "action_spent":
+		failed += _fail("同一時段重複縱慾應被 action_spent 擋下；實際：%s" % str(same_phase_res))
 	else:
-		failed += _ok("已結算出口槽無法重複放入")
+		failed += _ok("同一時段無法再縱慾一次（行動格已用）")
+
+	# 換到下一個行動時段：同一個出口槽必須可以再用（K-54）。
+	# 出口 beat 的 when 是 day_from 1 → day_to 45，若寫進 slots_placed 就會變成一輪只能用一次。
+	gs.set("action_spent", false)
+	var reuse_res: Dictionary = gs.call("indulge", "exit_sanquan", "x_smash", "madness#2")
+	if not reuse_res.get("ok", false):
+		failed += _fail("換一個行動時段後同一出口槽應可再用；實際：%s" % str(reuse_res))
+	elif int(gs.get("indulgence_count")) != init_count + 2:
+		failed += _fail("重複使用同一出口後 indulgence_count 應為 %d；實際：%d" % [
+			init_count + 2, int(gs.get("indulgence_count"))
+		])
+	elif (gs.get("slots_placed") as Dictionary).has("exit_sanquan::x_smash"):
+		failed += _fail("縱慾不得寫入 slots_placed（會讓常駐出口 beat 一輪只能用一次）")
+	else:
+		failed += _ok("同一出口槽跨時段可重複使用，且未寫入 slots_placed (K-54)")
+
+	# 跨日同樣成立：第 3 天再用一次同一個出口
+	gs.set("day", 3)
+	gs.set("phase", "morning")
+	gs.set("action_spent", false)
+	gs.call("gain_card", "madness") # madness#3
+	var next_day_res: Dictionary = gs.call("indulge", "exit_sanquan", "x_smash", "madness#3")
+	if not next_day_res.get("ok", false):
+		failed += _fail("跨日後同一出口槽應可再用；實際：%s" % str(next_day_res))
+	else:
+		failed += _ok("同一出口槽跨日可重複使用")
 
 	return failed
 

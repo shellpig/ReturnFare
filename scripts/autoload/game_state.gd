@@ -644,15 +644,19 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 
 
 ## 主動縱慾的唯一入口（UI 與 headless 共用，規格書 P2-B、開發設計方針 P2-B）。
-## 8 步固定順序，任一步失敗則 GameState 零變化：
+## 7 步固定順序，任一步失敗則 GameState 零變化：
 ## 1. 卡在手上、且 base id 是 madness
-## 2. 槽存在、indulgence 欄位存在、三態為 OPEN、未放置過
+## 2. 槽存在、indulgence 欄位存在、三態為 OPEN
 ## 3. 泡湯特例：soak == true 時檢查 phase == "morning" 且當天剩餘行動格 >= soak_phase_cost；非泡湯檢查 action_spent
-## 4. 消耗行動格（泡湯消 soak_phase_cost 格進 evening，其餘消 1 格）
-## 5. 消掉卡（lose_card(card_inst_id)）
+## 4. 消耗行動格（泡湯消 soak_phase_cost 格，其餘消 1 格）
+## 5. 消掉卡（泡湯消 soak_cards_cleared 張，其餘消傳入那張）
 ## 6. indulgence_count += 1
 ## 7. 套 on_place，再套 on_place_by_level 當次強度級那一組
-## 8. 記入 slots_placed
+##
+## **刻意不寫 slots_placed**（K-54）。出口 beat 的 when 是 day_from 1 → day_to 45，
+## 同一個 beat_id::slot_id 撐滿整輪；一旦寫進去就再也不會被清，等於「砸東西一輪只能砸一次」。
+## 縱慾是可重複的行為，節流閥是行動格（一天最多 2 次），不是槽的一次性。
+## 企劃書第七節「任何時刻都必須至少有一個出口點得下去」靠的就是這一點。
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
 func indulge(beat_id: String, slot_id: String, card_inst_id: String) -> Dictionary:
 	# 1. 卡持有檢查與 base_id 檢查
@@ -734,10 +738,7 @@ func indulge(beat_id: String, slot_id: String, card_inst_id: String) -> Dictiona
 			var lvl_lines := EffectApply.apply(lvl_effect, self)
 			lines.append_array(lvl_lines)
 
-	# 8. 記入 slots_placed
-	var slot_key := beat_id + "::" + slot_id
-	slots_placed[slot_key] = true
-
+	# 出口槽不記入 slots_placed，理由見函式開頭註解（K-54）。
 	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 
 
