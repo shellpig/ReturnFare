@@ -61,6 +61,7 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p1h_04_knowledge_detail", "知識詳情完整呈現全部知識卡且可捲動", "p1h_knowledge_full.json", "", "p1h_04_knowledge_detail", "", "p1h_04"),
 		UiCase.new("p1h_05_name_truncation", "超長卡名省略號截斷且詳情顯示完整名稱", "d10_night__knowledge.json", "long_card_name", "p1h_05_name_truncation", "", "p1h_05"),
 		UiCase.new("p1h_06_handbar_geometry", "手牌列固定7欄外框矩形不變且幾何診斷全綠", "d10_night__knowledge.json", "", "p1h_06_handbar_geometry", "", "p1h_06"),
+		UiCase.new("p2a_01_madness_hand_display", "多實例發狂卡在手牌各自呈現獨立按鈕且顯示各自倒數與詳情", "p2a_multi_madness.json", "", "p2a_01_madness_hand_display", "", "p2a_01"),
 	]
 
 
@@ -151,6 +152,8 @@ class UiCase extends CaseBaseClass:
 				return await _p1h_05(tree)
 			"p1h_06":
 				return _p1h_06(tree)
+			"p2a_01":
+				return await _p2a_01(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -431,6 +434,56 @@ class UiCase extends CaseBaseClass:
 			assert_eq((slots_labels[0] as Label).text, "手牌 %d / %d" % [used, limit], "hand_slots 格式吻合")
 
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["grid_columns_7", "no_empty_slots", "rects_preserved"] } }
+
+	func _p2a_01(tree: SceneTree) -> Dictionary:
+		var before_state := _state(tree)
+		var run := before_state.get("run", {}) as Dictionary
+		var hand_cards: Array = run.get("hand", []) as Array
+		var madness_clock: Dictionary = run.get("madness_clock", {}) as Dictionary
+
+		# 1. 斷言手牌含有多張獨立的發狂卡實例
+		var madness_instances: Array[String] = []
+		for c in hand_cards:
+			if str(c).begins_with("madness#"):
+				madness_instances.append(str(c))
+		assert_true(madness_instances.size() >= 3, "手牌應至少有 3 張獨立發狂卡實例: %s" % str(madness_instances))
+
+		# 2. 斷言畫面上各自存在獨立按鈕與對應倒數天數文字
+		var data_node := _data(tree)
+		for m_inst in madness_instances:
+			var btn_list := QAStepClass.find_controls_by_qa_id(tree.get_root(), "hand_card::" + m_inst)
+			assert_eq(btn_list.size(), 1, "發狂卡按鈕唯一且各自獨立: %s" % m_inst)
+			if btn_list.size() == 1:
+				var btn := btn_list[0] as Button
+				var days := int(madness_clock.get(m_inst, 0))
+				var card_name: String = str(data_node.call("card_display_name", m_inst))
+				var expected_text := "%s (%d天)" % [card_name, days]
+				assert_eq(btn.text, expected_text, "發狂卡按鈕文字正確顯示剩餘天數: %s" % m_inst)
+
+		# 3. 點擊其中一張發狂卡，驗證詳情彈窗正常開啟與關閉
+		var target_card := madness_instances[0]
+		await _click(tree, "hand_card::" + target_card)
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "發狂卡詳情開啟")
+		var target_days := int(madness_clock.get(target_card, 0))
+		var target_name: String = str(data_node.call("card_display_name", target_card))
+		assert_true(_has_text(tree.get_root(), "%s (%d天)" % [target_name, target_days]), "詳情內含發狂卡天數標題")
+		await _click(tree, "dialog_confirm::card_detail")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "詳情關閉")
+
+		var after_state := _state(tree)
+		assert_eq(JSON.stringify(before_state), JSON.stringify(after_state), "關閉詳情後狀態不變")
+
+		return {
+			"ok": errors.is_empty(),
+			"errors": errors,
+			"observations": {
+				"evidence": [
+					"madness_multi_distinct_buttons",
+					"madness_countdown_labels",
+					"madness_detail_dialog_ok"
+				]
+			}
+		}
 
 	func _arrival(tree: SceneTree) -> Dictionary:
 		await _advance(tree)

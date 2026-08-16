@@ -181,6 +181,7 @@ func _refresh_advance_hint() -> void:
 
 
 func _route_view() -> void:
+	_advance_btn.disabled = false
 	if _is_showing_ending:
 		_flow_text.visible = true
 		_flow_text.offset_top = 0.0

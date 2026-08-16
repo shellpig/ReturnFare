@@ -56,9 +56,8 @@ headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點�
 | P1-E choice_group | ✅ | 互斥選擇題、選定即定案、雙入口、選後唯讀 RESOLVED 展示（`test_p1e.gd` 全綠） |
 | P1-F 45 天全程走通 | 🟦 | 殘響播出、夜間 stub、結局 coda、迴圈重置、貪心走查（`playthrough_greedy.gd` / `test_p1f.gd` 全綠）；收尾 K 條目已清。**待手動操作驗收** |
 | P1-G 面板互動模型 | 🟦 | 規則層已拆成 `build_panel()`／`play_beat()`／`preview_slot()`，刪除 `open_panel()`；UI 改為演出後才建立槽、顯示型別與預覽；走查改走 `play_beat()`；缺 `locations.json.desc` 時退回只顯示地點名。**待手動操作驗收** |
-| P1-H 手牌可讀性 | 🟦 | 手牌改 7 欄格線、顯示卡名不顯示 id、卡片與知識各自可點開唯讀詳情。**只解決「看不出手上有什麼」，不碰 UI 型態（待決 23）**。8 條機器契約全綠，待手動操作驗收 |
-| P2-A 發狂卡的產生與倒數 | ✅ | `madness_clock` 走真錶（morning 全體 −1、產生當天不倒數、歸零 clamp 於 0）、開收費夜間標記發卡並播提示文字、一夜一個地點、`night_markers_opened` 只收錄收費標記（`test_p2a.gd` 9 組全綠，UI 加 `p1af_29_night_paid` 變體）。**只剩一條驗收尾巴**：多實例發狂卡的手牌顯示未驗（K-51，隨 P2-B 驗收清單一起關）。K-52／K-53 已於 `259a9f0` 結案 |
-| P2-B 縱慾出口與主動縱慾 | ✅ | 六個出口進 `data/beats/indulgence_exits.json`、`indulge()` 原子入口、泡湯特例、`when.day_from` 常駐 beat、Lint 4 & 10 檢查（`test_p2b.gd` 10 組全綠、12 套 headless 全綠） |
+| P2-A 發狂卡的產生與倒數 | ✅ | `madness_clock` 走真錶（morning 全體 −1、產生當天不倒數、歸零 clamp 於 0）、開收費夜間標記發卡並播提示文字、一夜一個地點、`night_markers_opened` 只收錄收費標記（`test_p2a.gd` 9 組全綠，UI 加 `p1af_29_night_paid` 變體與 `p2a_01_madness_hand_display` 契約）。K-51／K-52／K-53 全數結案 |
+| P2-B 縱慾出口與主動縱慾 | ✅ | 六個出口進 `data/beats/indulgence_exits.json`、`indulge()` 原子入口、泡湯特例（標記已用不跳時段、讀取 `soak_cards_cleared`）、`when.day_from` 常駐 beat、Lint 4 & 10 檢查（`test_p2b.gd` 10 組全綠、13 套 headless 全綠、UI 模擬 54 契約 67 變體全綠） |
 | P2-C 強制縱慾 | 📐 | 倒數歸零自動執行、`Indulgence.pick_exit()` 挑最重出口、強度級查表、當日不夠順延次日 |
 | P2-D 視野門檻與發瘋 BE | 📐 | `madness_at_least` 在真資料生效、達 `madness_cap` 立即 BE、共用既有 `end_run()` 收尾 |
 | P2-E headless 重演三種玩家 | 📐 | `test_p2_sim.gd` 逐項對上 `subdocs/驗證/發狂卡機制模擬.md > 三` 的八個指標與視野窗口。**P2 全部規則的整合測試** |

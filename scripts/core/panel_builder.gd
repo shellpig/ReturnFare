@@ -190,12 +190,16 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 					if ind_val is Dictionary:
 						is_soak = bool((ind_val as Dictionary).get("soak", false))
 
-					if is_soak and current_phase != "morning":
-						slot_tri = TriState.LOCKED
-						slot_reason = "（只能在上午發動）"
-					elif is_soak and bool(gs.get("action_spent")):
-						slot_tri = TriState.LOCKED
-						slot_reason = "（格數不足）"
+					if is_soak:
+						var soak_cost := 2
+						if data != null and data.has_method("tuning"):
+							soak_cost = int(data.tuning("indulgence.soak_phase_cost", 2))
+						var rem_actions: int = int(gs.call("remaining_actions_today")) if gs.has_method("remaining_actions_today") else (2 if (current_phase == "morning" and not bool(gs.get("action_spent"))) else (1 if (current_phase == "afternoon" and not bool(gs.get("action_spent"))) else 0))
+						if rem_actions < soak_cost:
+							slot_tri = TriState.LOCKED
+							slot_reason = "（只能在上午發動）" if current_phase != "morning" else "（格數不足）"
+						else:
+							slot_tri = TriState.OPEN
 					else:
 						slot_tri = TriState.OPEN
 

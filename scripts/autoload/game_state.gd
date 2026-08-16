@@ -37,6 +37,7 @@ var relations: Dictionary = {}        # npc -> int（單軸整數暫行案，規
 
 # --- 其他群 ---
 var action_spent: bool = false                 # 當前行動格是否已放過主角卡（run 層）
+var _actions_spent_ahead: int = 0              # 預先消耗之當日後續行動格數（泡湯特例／順延，run 層）
 var npc_action_counts: Dictionary = {}         # npc_id -> 本輪投入的主角行動數（run 層，規格書第十二節）
 var night_markers_opened: Dictionary = {}      # location_id -> true（本輪已開收費標記集合，run 層）
 var night_location_chosen: String = ""         # 當夜已選定的夜間地點 id（run 層，每夜重置，規格書第九節）
@@ -85,7 +86,15 @@ func advance_phase() -> void:
 		day_changed.emit(day)
 		tick_madness()
 
-	action_spent = false
+	if _actions_spent_ahead > 0 and ACTION_PHASES.has(phase):
+		_actions_spent_ahead -= 1
+		action_spent = true
+	else:
+		action_spent = false
+
+	if not ACTION_PHASES.has(phase):
+		_actions_spent_ahead = 0
+
 	night_location_chosen = ""
 	phase_changed.emit(day, phase)
 
@@ -102,6 +111,7 @@ func end_run(ending_id: String = "ending_default") -> void:
 	day = 1
 	phase = PHASES[0]
 	action_spent = false
+	_actions_spent_ahead = 0
 	hand.clear()
 	hand.append("protagonist")
 	flags.clear()
@@ -433,15 +443,24 @@ func relation_at_least(npc: String, state: String) -> bool:
 	return int(relations.get(npc, 0)) >= int(scale[state])
 
 
+## 取得當天剩餘可用之行動格數（規格書第六節、P2-B）。
+func remaining_actions_today() -> int:
+	if phase == "morning":
+		var m_avail := 0 if action_spent else 1
+		var a_avail := 0 if _actions_spent_ahead > 0 else 1
+		return m_avail + a_avail
+	elif phase == "afternoon":
+		return 0 if action_spent else 1
+	return 0
+
+
 ## 標記當前行動格已用（規格書第六節、P2-B）。
-## n > 1 適用於泡湯特例：吃掉當天剩餘行動格直接進 evening。
+## n > 1 適用於泡湯特例或順延：標記當前行動格已用，並在當天後續時段自動扣除行動格。
+## 絕不在此修改 phase 或發射 phase_changed，保持放置管線的原子性。
 func consume_action(n: int = 1) -> void:
-	if n <= 1:
-		action_spent = true
-	else:
-		action_spent = false
-		phase = "evening"
-		phase_changed.emit(day, phase)
+	action_spent = true
+	if n > 1:
+		_actions_spent_ahead += (n - 1)
 
 
 func _find_slot(beat: Dictionary, slot_id: String) -> Dictionary:
@@ -518,10 +537,11 @@ func _check_place(card_id: String, beat: Dictionary, slot: Dictionary) -> Dictio
 			var ind := ind_val as Dictionary
 			var is_soak := bool(ind.get("soak", false))
 			if is_soak:
-				if phase != "morning":
-					return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": "（只能在上午發動）" }
-				if action_spent:
-					return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": "（格數不足）" }
+				var soak_cost := int(Data.tuning("indulgence.soak_phase_cost", 2))
+				var rem_actions := remaining_actions_today()
+				if rem_actions < soak_cost:
+					var lock_reason := "（只能在上午發動）" if phase != "morning" else "（格數不足）"
+					return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": lock_reason }
 			else:
 				if ACTION_PHASES.has(phase) and action_spent:
 					return { "ok": false, "reason_code": _REASON_ACTION_SPENT, "reason_text": "" }
@@ -670,10 +690,10 @@ func indulge(beat_id: String, slot_id: String, card_inst_id: String) -> Dictiona
 	var soak_cost := int(Data.tuning("indulgence.soak_phase_cost", 2))
 
 	if is_soak:
-		if phase != "morning":
-			return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": "（只能在上午發動）", "lines": PackedStringArray() }
-		if action_spent:
-			return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": "（格數不足）", "lines": PackedStringArray() }
+		var rem_actions := remaining_actions_today()
+		if rem_actions < soak_cost:
+			var lock_reason := "（只能在上午發動）" if phase != "morning" else "（格數不足）"
+			return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": lock_reason, "lines": PackedStringArray() }
 	else:
 		if ACTION_PHASES.has(phase) and action_spent:
 			return { "ok": false, "reason_code": _REASON_ACTION_SPENT, "reason_text": "", "lines": PackedStringArray() }
@@ -684,8 +704,22 @@ func indulge(beat_id: String, slot_id: String, card_inst_id: String) -> Dictiona
 	else:
 		consume_action(1)
 
-	# 5. 消掉卡片
-	lose_card(card_inst_id)
+	# 5. 消掉卡片（泡湯消 soak_cards_cleared 張，以傳入的 card_inst_id 為主；其餘消傳入那張）
+	if is_soak:
+		var cards_cleared := int(Data.tuning("indulgence.soak_cards_cleared", 1))
+		lose_card(card_inst_id)
+		var remaining_to_clear := cards_cleared - 1
+		if remaining_to_clear > 0:
+			var to_remove: Array[String] = []
+			for c in hand:
+				if _card_base_id(c) == "madness" and c != card_inst_id:
+					to_remove.append(c)
+					if to_remove.size() == remaining_to_clear:
+						break
+			for c in to_remove:
+				lose_card(c)
+	else:
+		lose_card(card_inst_id)
 
 	# 6. indulgence_count += 1
 	indulgence_count += 1
@@ -773,6 +807,7 @@ func serialize() -> Dictionary:
 			"day": day,
 			"phase": phase,
 			"action_spent": action_spent,
+			"actions_spent_ahead": _actions_spent_ahead,
 			"hand": hand.duplicate(),
 			"madness_clock": madness_clock.duplicate(),
 			"_madness_counter": _madness_counter,
@@ -800,6 +835,7 @@ func deserialize(d: Dictionary) -> void:
 	day = int(run.get("day", 1))
 	phase = str(run.get("phase", "morning"))
 	action_spent = bool(run.get("action_spent", false))
+	_actions_spent_ahead = int(run.get("actions_spent_ahead", 0))
 	hand.clear()
 	for item in run.get("hand", []):
 		hand.append(str(item))

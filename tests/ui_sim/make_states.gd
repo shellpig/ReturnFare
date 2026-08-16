@@ -111,6 +111,29 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		printerr("p1h_knowledge_full 後置條件失敗")
 		return false
 
+	# 產生 P2-A 多實例發狂卡狀態（3 張發狂卡，分別為 7, 5, 3 天倒數）
+	var gs_mad: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+	_reset_state(gs_mad)
+	gs_mad.deserialize(d10_dict)
+	gs_mad.gain_card("madness") # madness#1
+	gs_mad.gain_card("madness") # madness#2
+	gs_mad.gain_card("madness") # madness#3
+	var mc: Dictionary = gs_mad.get("madness_clock") as Dictionary
+	mc["madness#1"] = 7
+	mc["madness#2"] = 5
+	mc["madness#3"] = 3
+	var mad_snapshot: Dictionary = gs_mad.serialize()
+	var mad_path := output_dir + "p2a_multi_madness.json"
+	var f_mad := FileAccess.open(mad_path, FileAccess.WRITE)
+	if f_mad == null:
+		printerr("無法寫入狀態檔: %s" % mad_path)
+		return false
+	f_mad.store_string(JSON.stringify(mad_snapshot, "\t"))
+	f_mad.close()
+	if not _verify_checkpoint_postcondition("p2a_multi_madness", mad_snapshot):
+		printerr("p2a_multi_madness 後置條件失敗")
+		return false
+
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
 	var d45_coda_decisions: Array[Dictionary] = [
@@ -335,6 +358,8 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			return day == 10 and phase == "night" and (_state_knowledge(snapshot).has("k_forty_something"))
 		"p1h_knowledge_full":
 			return day == 10 and phase == "night" and (_state_knowledge(snapshot).size() >= 10)
+		"p2a_multi_madness":
+			return day == 10 and phase == "night" and hand.has("madness#1") and hand.has("madness#2") and hand.has("madness#3")
 		"d15_night":
 			return day == 15 and phase == "night"
 		"d24_night":

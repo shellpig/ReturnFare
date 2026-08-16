@@ -211,22 +211,43 @@ func _test_soak_morning_vs_afternoon(gs: Node, data: Node) -> int:
 	gs.call("gain_card", "madness") # madness#1
 	gs.call("gain_card", "madness") # madness#2
 
-	# 上午發動泡湯：消耗 2 格直接進 evening，清掉指定的一張
+	# 上午發動泡湯：消耗當日 2 格行動格，時段維持 morning，清掉指定的一張
 	var soak_res: Dictionary = gs.call("indulge", "exit_sanquan", "x_soak", "madness#1")
 	if not soak_res.get("ok", false):
 		failed += _fail("上午發動泡湯失敗：%s" % str(soak_res))
 	else:
-		if str(gs.get("phase")) != "evening":
-			failed += _fail("泡湯吃兩格後時段應直接進 evening；實際：%s" % str(gs.get("phase")))
+		if str(gs.get("phase")) != "morning":
+			failed += _fail("泡湯不應跳時段，當前時段應維持 morning；實際：%s" % str(gs.get("phase")))
 		else:
-			failed += _ok("上午泡湯吃 2 格直接切換至 evening")
+			failed += _ok("上午泡湯時段維持 morning（不跳時段）")
+
+		if not bool(gs.get("action_spent")):
+			failed += _fail("上午泡湯後 morning 的 action_spent 應為 true")
+		else:
+			failed += _ok("上午泡湯後 morning action_spent = true")
 
 		if gs.call("has_card", "madness#1"):
 			failed += _fail("madness#1 應被清除")
 		elif not gs.call("has_card", "madness#2"):
 			failed += _fail("madness#2 應保留在手上（只清 1 張）")
 		else:
-			failed += _ok("泡湯只清除玩家指定之 1 張發狂卡，其餘保留")
+			failed += _ok("泡湯依 tuning.soak_cards_cleared 只清除玩家指定之 1 張發狂卡，其餘保留")
+
+		# 推進至 afternoon：下午行動格應自動呈現已消耗 (action_spent = true)
+		gs.call("advance_phase")
+		if str(gs.get("phase")) != "afternoon":
+			failed += _fail("推進後時段應為 afternoon；實際：%s" % str(gs.get("phase")))
+		elif not bool(gs.get("action_spent")):
+			failed += _fail("泡湯吃 2 格後，下午時段 action_spent 應自動為 true")
+		else:
+			failed += _ok("推進至 afternoon 後，下午行動格已預先扣除 (action_spent = true)")
+
+		# 推進至 evening
+		gs.call("advance_phase")
+		if str(gs.get("phase")) != "evening":
+			failed += _fail("推進後時段應為 evening；實際：%s" % str(gs.get("phase")))
+		else:
+			failed += _ok("再次推進正常進入 evening")
 
 	# 下午點泡湯：三態呈 LOCKED 且理由為只能在上午發動
 	gs.call("end_run")
