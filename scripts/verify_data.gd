@@ -125,6 +125,26 @@ func _initialize() -> void:
 		return
 	print("殘響可播出性 (Lint 8)　0 錯誤")
 
+	# Lint 4: 縱慾完整性
+	var integrity_errs := DataLoader.lint_indulgence_integrity(loader)
+	if integrity_errs.size() > 0:
+		print("\n縱慾完整性錯誤 %d 筆：" % integrity_errs.size())
+		for e in integrity_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("縱慾完整性 (Lint 4)　0 錯誤（第 1-45 天均有保底縱慾出口）")
+
+	# Lint 10: 縱慾出口資料完整性
+	var exit_errs := DataLoader.lint_indulgence_exits(loader.beats)
+	if exit_errs.size() > 0:
+		print("\n縱慾出口資料完整性錯誤 %d 筆：" % exit_errs.size())
+		for e in exit_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("縱慾出口資料完整性 (Lint 10)　0 錯誤")
+
 	print("\ntuning：手牌 %d／發狂上限 %d／倒數 %d 天／視野門檻 %d" % [
 		loader.tuning.get("hand_size", -1),
 		loader.tuning.get("madness_cap", -1),

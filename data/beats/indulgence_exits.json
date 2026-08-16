@@ -1,0 +1,194 @@
+{
+  "_comment": "六個縱慾出口與泡湯特例。欄位說明見 data/SCHEMA.md > 縱慾出口。文字為佔位。",
+
+  "beats": [
+    {
+      "id": "exit_sanquan",
+      "location": "sanquan",
+      "when": {
+        "day_from": 1,
+        "day_to": 45,
+        "phase": ["morning", "afternoon"]
+      },
+      "condition": { "madness_at_least": 1 },
+      "fixed": false,
+      "title": "山泉閣縱慾出口",
+      "text": "壓抑不住的衝動在體內翻湧。你可以選擇在此宣洩，或付出代價洗滌心智。",
+      "slots": [
+        {
+          "id": "x_smash",
+          "label": "砸東西",
+          "accepts": ["madness"],
+          "condition": { "madness_at_least": 1 },
+          "indulgence": { "weight": 1 },
+          "on_place": {
+            "text": "你把房間裡能摔的東西都摔了。碎片散了一地，胸口那股窒息感稍微退了一點。",
+            "flag": { "inn_damaged": true }
+          },
+          "on_place_by_level": {
+            "light": {
+              "text": "第一次的失控還算輕微。但你知道這只是開始。"
+            },
+            "normal": {
+              "relation": { "npc": "uncle", "delta": -1 }
+            },
+            "heavy": {
+              "relation": { "npc": "uncle", "delta": -2 }
+            }
+          }
+        },
+        {
+          "id": "x_binge",
+          "label": "暴食",
+          "accepts": ["madness"],
+          "condition": { "madness_at_least": 1 },
+          "indulgence": { "weight": 2 },
+          "on_place": {
+            "text": "你把廚房裡能找到的食物一股腦塞進胃裡。直到胃部隱隱作痛，腦中的雜音才安靜下來。",
+            "flag": { "binge_eaten": true }
+          },
+          "on_place_by_level": {
+            "light": {
+              "text": "胃裡的飽脹感暫時壓住了躁動。下一次恐怕沒這麼容易。"
+            },
+            "normal": {
+              "relation": { "npc": "uncle", "delta": -1 }
+            },
+            "heavy": {
+              "relation": { "npc": "uncle", "delta": -2 }
+            }
+          }
+        },
+        {
+          "id": "x_violence",
+          "label": "暴力對人",
+          "accepts": ["madness"],
+          "condition": {
+            "all": [
+              { "madness_at_least": 1 },
+              { "day_at_least": 16 }
+            ]
+          },
+          "indulgence": { "weight": 4 },
+          "on_place": {
+            "text": "你無法克制心中的暴虐，對身邊的人動了手。",
+            "relation": { "npc": "uncle", "delta": -2 }
+          },
+          "on_place_by_level": {
+            "light": {
+              "text": "突如其來的暴力讓人震驚。"
+            },
+            "normal": {
+              "relation": { "npc": "uncle", "delta": -1 }
+            },
+            "heavy": {
+              "relation": { "npc": "uncle", "delta": -2 }
+            }
+          }
+        },
+        {
+          "id": "x_lust_ajie",
+          "label": "宣洩慾望（阿婕）",
+          "accepts": ["madness"],
+          "condition": {
+            "all": [
+              { "madness_at_least": 1 },
+              { "relation_at_least": { "npc": "ajie", "state": "疑似" } }
+            ]
+          },
+          "indulgence": { "weight": 5 },
+          "on_place": {
+            "text": "在混亂與衝動中，你將慾望宣洩在阿婕身上。",
+            "relation": { "npc": "ajie", "delta": 1 }
+          },
+          "on_place_by_level": {
+            "light": {
+              "text": "關係在失控中產生了微妙的變化。"
+            }
+          }
+        },
+        {
+          "id": "x_soak",
+          "label": "長時間泡湯",
+          "accepts": ["madness"],
+          "condition": { "madness_at_least": 1 },
+          "indulgence": {
+            "auto": false,
+            "soak": true
+          },
+          "on_place": {
+            "text": "你在溫泉池裡浸泡了整整一天。熱氣蒸騰，思緒漸漸沉澱，發狂的念頭被洗去了一部分。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "exit_oldstreet",
+      "location": "oldstreet",
+      "when": {
+        "day_from": 1,
+        "day_to": 45,
+        "phase": ["morning", "afternoon"]
+      },
+      "condition": { "madness_at_least": 1 },
+      "fixed": false,
+      "title": "老街縱慾出口",
+      "text": "老街熱鬧的市聲刺激著感官。",
+      "slots": [
+        {
+          "id": "x_splurge",
+          "label": "奢侈",
+          "accepts": ["madness"],
+          "condition": { "madness_at_least": 1 },
+          "requires": { "has_card": "card_money" },
+          "reject_reason": "（身上沒有足夠的錢）",
+          "indulgence": { "weight": 3 },
+          "on_place": {
+            "text": "你走進老街最貴的店鋪，揮霍了一筆不該花的錢。"
+          },
+          "on_place_by_level": {
+            "light": {
+              "text": "揮霍帶來了短暫的平靜。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "exit_jinghe",
+      "location": "jinghe",
+      "when": {
+        "day_from": 1,
+        "day_to": 45,
+        "phase": ["morning", "afternoon"]
+      },
+      "condition": { "madness_at_least": 1 },
+      "fixed": false,
+      "title": "靜和園縱慾出口",
+      "text": "靜和園幽靜的角落掩蓋著隱密的騷動。",
+      "slots": [
+        {
+          "id": "x_lust_awei",
+          "label": "宣洩慾望（阿薇）",
+          "accepts": ["madness"],
+          "condition": {
+            "all": [
+              { "madness_at_least": 1 },
+              { "relation_at_least": { "npc": "awei", "state": "疑似" } }
+            ]
+          },
+          "indulgence": { "weight": 5 },
+          "on_place": {
+            "text": "在混亂與衝動中，你將慾望宣洩在阿薇身上。",
+            "relation": { "npc": "awei", "delta": 1 }
+          },
+          "on_place_by_level": {
+            "light": {
+              "text": "關係在失控中產生了微妙的變化。"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

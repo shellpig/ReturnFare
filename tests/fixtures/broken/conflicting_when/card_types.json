@@ -1,0 +1,5 @@
+{
+  "card_types": [
+    { "id": "protagonist", "name": "主角卡" }
+  ]
+}

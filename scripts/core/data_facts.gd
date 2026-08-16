@@ -27,6 +27,11 @@ const BY_DESIGN_CHOICE_ONLY_BEATS: PackedStringArray = [
 	"d43_morning_ask_paper",
 ]
 
+## 待決 22 卡片清單尚未建立、但已知在 requires 佔位使出口恆為 LOCKED 的卡片 id 名單（奢侈出口錢卡）
+const BY_DESIGN_PENDING_CARD_REFS: PackedStringArray = [
+	"card_money",
+]
+
 
 ## 檢查給定的 (day, phase) 是否為刻意留空的行動時段
 static func is_empty_phase_by_design(day: int, phase: String) -> bool:
@@ -42,3 +47,52 @@ static func is_choice_only_phase_by_design(day: int, phase: String) -> bool:
 		if int(p.get("day", -1)) == day and str(p.get("phase", "")) == phase:
 			return true
 	return false
+
+
+## 檢查給定的 card_id 是否為已知待決尚未建檔的引用卡片
+static func is_pending_card_ref_by_design(card_id: String) -> bool:
+	return BY_DESIGN_PENDING_CARD_REFS.has(card_id)
+
+
+
+## 檢查 beat 在給定的天數、時段（及章節）是否成立（P2-B，收攏 DataLoader 與 GameState 比對邏輯）
+static func beat_matches_time(beat: Dictionary, day: int, phase: String, chapter: int = 1) -> bool:
+	var w: Variant = beat.get("when")
+	if w is Dictionary:
+		var wd := w as Dictionary
+		if wd.has("day") and wd.has("day_from"):
+			return false
+
+		# 日期比對
+		if wd.has("day"):
+			if int(wd.get("day", -1)) != day:
+				return false
+		elif wd.has("day_from") or wd.has("day_to"):
+			var from_d := int(wd.get("day_from", 1))
+			var to_d := int(wd.get("day_to", 45))
+			if day < from_d or day > to_d:
+				return false
+		else:
+			return false
+
+		# 時段比對
+		var p_val: Variant = wd.get("phase")
+		if p_val is Array:
+			if not (p_val as Array).has(phase):
+				return false
+		elif p_val is String:
+			if str(p_val) != phase:
+				return false
+		else:
+			return false
+
+		return true
+	else:
+		if phase == "night":
+			var ch: Variant = beat.get("chapter")
+			if ch != null:
+				return int(ch) <= chapter
+			# 附加夜間 beat（無 when、無 chapter）
+			return true
+		return false
+

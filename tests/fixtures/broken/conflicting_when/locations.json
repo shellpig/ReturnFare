@@ -1,0 +1,6 @@
+{
+  "day": [
+    { "id": "sanquan", "name": "山泉閣", "phases": ["morning", "afternoon"], "layer": "day", "chapter": 1 }
+  ],
+  "night": []
+}

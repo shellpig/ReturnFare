@@ -67,9 +67,15 @@ func load_all() -> bool:
 	for path in _beat_files():
 		var d := _read_json(path)
 		for b in d.get("beats", []):
-			if beats_by_id.has(b["id"]):
-				errors.append("beat id 重複：%s" % b["id"])
-			beats_by_id[b["id"]] = b
+			var bid: String = str(b.get("id", "?"))
+			if beats_by_id.has(bid):
+				errors.append("beat id 重複：%s" % bid)
+			var w: Variant = b.get("when")
+			if w is Dictionary:
+				var wd := w as Dictionary
+				if wd.has("day") and wd.has("day_from"):
+					errors.append("%s：when 同時包含 day 與 day_from" % bid)
+			beats_by_id[bid] = b
 			beats.append(b)
 
 	return errors.is_empty()
@@ -122,6 +128,9 @@ func verify_references() -> PackedStringArray:
 			var where := "slot:" + str(s.get("id", "?"))
 			_check_card_refs(s.get("requires"), bid, where, problems)
 			_check_card_refs(s.get("on_place"), bid, where, problems)
+			if s.has("on_place_by_level") and s["on_place_by_level"] is Dictionary:
+				for lvl in (s["on_place_by_level"] as Dictionary).values():
+					_check_card_refs(lvl, bid, where + ".on_place_by_level", problems)
 			for a in s.get("accepts", []):
 				if not cards.has(a) and not CARD_TYPES.has(a):
 					problems.append("%s [%s]：accepts 既不是卡也不是 type → %s" % [bid, where, a])
@@ -163,7 +172,7 @@ func _check_card_refs(node: Variant, bid: String, where: String, problems: Packe
 						elif not cards.has(c):
 							problems.append("%s [%s]：%s 引用不存在的卡 → %s" % [bid, where, k, c])
 				"has_card", "has_knowledge":
-					if not cards.has(v):
+					if not cards.has(v) and not DataFacts.is_pending_card_ref_by_design(str(v)):
 						problems.append("%s [%s]：%s 不存在 → %s" % [bid, where, k, v])
 				_:
 					_check_card_refs(v, bid, where, problems)
@@ -359,15 +368,136 @@ static func lint_action_phases(loader: DataLoader) -> PackedStringArray:
 		var w: Variant = b.get("when")
 		if not w is Dictionary:
 			continue
-		var phase_str: String = str((w as Dictionary).get("phase", ""))
-		if phase_str in ["morning", "afternoon"]:
-			var loc_id: String = str(b.get("location", ""))
-			var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
-			var loc_phases: Array = loc.get("phases", []) as Array
-			if not loc_phases.has(phase_str):
-				errs.append("%s：beat 時段為 %s，但所屬地點 %s 的 phases 僅有 %s" % [
-					str(b.get("id", "")), phase_str, loc_id, str(loc_phases)
-				])
+		var p_val: Variant = (w as Dictionary).get("phase")
+		var phases_to_check: Array[String] = []
+		if p_val is Array:
+			for p_item in p_val as Array:
+				phases_to_check.append(str(p_item))
+		elif p_val is String:
+			phases_to_check.append(str(p_val))
+
+		var loc_id: String = str(b.get("location", ""))
+		var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
+		var loc_phases: Array = loc.get("phases", []) as Array
+		for phase_str in phases_to_check:
+			if phase_str in ["morning", "afternoon"]:
+				if not loc_phases.has(phase_str):
+					errs.append("%s：beat 時段為 %s，但所屬地點 %s 的 phases 僅有 %s" % [
+						str(b.get("id", "")), phase_str, loc_id, str(loc_phases)
+					])
+
+	return errs
+
+
+## lint 4：縱慾完整性（規格書第十七節 lint 4）。
+## 驗證 1～45 天的每一天（morning 與 afternoon），至少存在一個無條件自動縱慾出口。
+## 判準是「進得了強制縱慾挑選池」，只看 condition / requires，不驗地點開放時段。
+static func lint_indulgence_integrity(loader: DataLoader) -> PackedStringArray:
+	var errs: PackedStringArray = []
+	for d in range(1, 46):
+		for p in ["morning", "afternoon"]:
+			var has_unconditional_exit := false
+			for b in loader.beats_at(d, p):
+				var b_cond: Variant = b.get("condition")
+				var b_req: Variant = b.get("requires")
+				if b_req != null and not (b_req is Dictionary and (b_req as Dictionary).is_empty()):
+					continue
+				if not _is_unconditional_or_madness_only(b_cond):
+					continue
+
+				for s: Dictionary in b.get("slots", []) as Array:
+					var accepts: Array = s.get("accepts", []) as Array
+					if not accepts.has("madness"):
+						continue
+					var ind: Dictionary = s.get("indulgence", {}) as Dictionary
+					if ind.get("auto", true) == false:
+						continue
+					var s_req: Variant = s.get("requires")
+					if s_req != null and not (s_req is Dictionary and (s_req as Dictionary).is_empty()):
+						continue
+					var s_cond: Variant = s.get("condition")
+					if not _is_unconditional_or_madness_only(s_cond):
+						continue
+
+					has_unconditional_exit = true
+					break
+				if has_unconditional_exit:
+					break
+
+			if not has_unconditional_exit:
+				errs.append("第 %d 天 %s：無任何無條件自動縱慾出口" % [d, p])
+
+	return errs
+
+
+static func _is_unconditional_or_madness_only(cond: Variant) -> bool:
+	if cond == null:
+		return true
+	if not cond is Dictionary:
+		return false
+	var d := cond as Dictionary
+	if d.is_empty():
+		return true
+	if d.keys().size() == 1 and d.has("madness_at_least"):
+		return true
+	return false
+
+
+## lint 10：縱慾出口資料完整性（規格書第十七節 lint 10）。
+## 1. accepts 含 madness 的槽必須有 indulgence 物件且 weight 是整數。
+## 2. on_place_by_level 的鍵只能是 light / normal / heavy，值的內部鍵照第十四節效果鍵表。
+## 3. indulgence.auto 為 false 的槽全作至多一個（泡湯）。
+static func lint_indulgence_exits(beats_list: Array[Dictionary]) -> PackedStringArray:
+	var errs: PackedStringArray = []
+	var non_auto_count := 0
+
+	for b in beats_list:
+		var bid: String = str(b.get("id", "?"))
+		for s: Dictionary in b.get("slots", []) as Array:
+			var sid: String = str(s.get("id", "?"))
+			var where := "%s [slot:%s]" % [bid, sid]
+			var accepts: Array = s.get("accepts", []) as Array
+			if not accepts.has("madness"):
+				continue
+
+			var ind_val: Variant = s.get("indulgence")
+			if ind_val == null or not ind_val is Dictionary:
+				errs.append("%s：accepts 含 madness 但缺少有效的 indulgence 物件" % where)
+				continue
+
+			var ind := ind_val as Dictionary
+			var auto_val: Variant = ind.get("auto")
+			var is_auto: bool = true
+			if auto_val != null:
+				if not auto_val is bool:
+					errs.append("%s：indulgence.auto 必須是布林值" % where)
+				else:
+					is_auto = bool(auto_val)
+
+			if not is_auto:
+				non_auto_count += 1
+
+			# 非 auto 槽（泡湯）不強制 weight；auto 槽必須有整數 weight
+			if is_auto:
+				var weight_val: Variant = ind.get("weight")
+				if weight_val == null or not (weight_val is int or weight_val is float) or float(int(weight_val)) != float(weight_val):
+					errs.append("%s：indulgence.weight 必須是整數" % where)
+
+			# on_place_by_level 檢查
+			if s.has("on_place_by_level"):
+				var by_lvl_val: Variant = s.get("on_place_by_level")
+				if not by_lvl_val is Dictionary:
+					errs.append("%s：on_place_by_level 必須是 Dictionary" % where)
+				else:
+					var by_lvl := by_lvl_val as Dictionary
+					for lvl_key: String in by_lvl.keys():
+						if not lvl_key in ["light", "normal", "heavy"]:
+							errs.append("%s：on_place_by_level 未知強度鍵 → %s" % [where, lvl_key])
+						else:
+							_lint_effect(by_lvl[lvl_key], bid, where + ".on_place_by_level." + lvl_key, errs)
+
+	if non_auto_count > 1:
+		errs.append("全作 indulgence.auto 為 false 的槽至多 1 個，實際有 %d 個" % non_auto_count)
 
 	return errs
 
@@ -441,10 +571,10 @@ static func lint_echoes(beats_list: Array[Dictionary]) -> PackedStringArray:
 func beats_at(day: int, phase: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for b in beats:
-		var w: Dictionary = b.get("when", {})
-		if w.get("day", -1) == day and w.get("phase", "") == phase:
+		if DataFacts.beat_matches_time(b, day, phase):
 			out.append(b)
 	return out
+
 
 
 func _beat_files() -> PackedStringArray:

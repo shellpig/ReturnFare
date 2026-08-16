@@ -1,0 +1,15 @@
+{
+  "beats": [
+    {
+      "id": "b_broken_when",
+      "location": "sanquan",
+      "when": {
+        "day": 1,
+        "day_from": 1,
+        "day_to": 10,
+        "phase": "morning"
+      },
+      "slots": []
+    }
+  ]
+}

@@ -6,6 +6,9 @@ extends Node
 ## P1-C：beat 事件群（beats_entered / slots_placed / enter_beat）。
 ## P1-D：旗標／開關／關係群、放置與效果結算（try_place）、行動格消耗。
 
+const DataFacts := preload("res://scripts/core/data_facts.gd")
+const Indulgence := preload("res://scripts/core/indulgence.gd")
+
 const CHAPTER_START_DAYS := [1, 16, 33]
 const LAST_DAY := 45
 const PHASES := ["morning", "afternoon", "evening", "night"]
@@ -241,28 +244,9 @@ func tick_madness() -> Array[String]:
 	return zeroed
 
 
-## 檢查 beat 在當前天與時段是否屬於合法範圍（K-18）。
+## 檢查 beat 在當前天與時段是否屬於合法範圍（K-18, P2-B）。
 func _is_beat_time_valid(beat: Dictionary) -> bool:
-	var cur_day: int = day
-	var cur_phase: String = phase
-	var cur_ch: int = chapter()
-	if cur_phase != "night":
-		var w: Variant = beat.get("when")
-		if not w is Dictionary:
-			return false
-		var wd := w as Dictionary
-		return int(wd.get("day", -1)) == cur_day and str(wd.get("phase", "")) == cur_phase
-	else:
-		# Night phase
-		var w: Variant = beat.get("when")
-		if w is Dictionary:
-			var wd := w as Dictionary
-			return int(wd.get("day", -1)) == cur_day and str(wd.get("phase", "")) == "night"
-		var ch: Variant = beat.get("chapter")
-		if ch != null:
-			return int(ch) <= cur_ch
-		# Additional night beat (no when, no chapter)
-		return true
+	return DataFacts.beat_matches_time(beat, day, phase, chapter())
 
 
 # ── 手牌操作 ────────────────────────────────────────────────────────────────
@@ -449,9 +433,15 @@ func relation_at_least(npc: String, state: String) -> bool:
 	return int(relations.get(npc, 0)) >= int(scale[state])
 
 
-## 標記當前行動格已用（規格書第六節）。
-func consume_action() -> void:
-	action_spent = true
+## 標記當前行動格已用（規格書第六節、P2-B）。
+## n > 1 適用於泡湯特例：吃掉當天剩餘行動格直接進 evening。
+func consume_action(n: int = 1) -> void:
+	if n <= 1:
+		action_spent = true
+	else:
+		action_spent = false
+		phase = "evening"
+		phase_changed.emit(day, phase)
 
 
 func _find_slot(beat: Dictionary, slot_id: String) -> Dictionary:
@@ -520,6 +510,22 @@ func _check_place(card_id: String, beat: Dictionary, slot: Dictionary) -> Dictio
 	var is_protagonist := card_type == "protagonist"
 	if is_protagonist and ACTION_PHASES.has(phase) and action_spent:
 		return { "ok": false, "reason_code": _REASON_ACTION_SPENT, "reason_text": "" }
+
+	var is_madness := card_type == "madness"
+	if is_madness:
+		var ind_val: Variant = slot.get("indulgence")
+		if ind_val is Dictionary:
+			var ind := ind_val as Dictionary
+			var is_soak := bool(ind.get("soak", false))
+			if is_soak:
+				if phase != "morning":
+					return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": "（只能在上午發動）" }
+				if action_spent:
+					return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": "（格數不足）" }
+			else:
+				if ACTION_PHASES.has(phase) and action_spent:
+					return { "ok": false, "reason_code": _REASON_ACTION_SPENT, "reason_text": "" }
+
 	return { "ok": true, "reason_code": "", "reason_text": "" }
 
 
@@ -617,17 +623,106 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 
 
+## 主動縱慾的唯一入口（UI 與 headless 共用，規格書 P2-B、開發設計方針 P2-B）。
+## 8 步固定順序，任一步失敗則 GameState 零變化：
+## 1. 卡在手上、且 base id 是 madness
+## 2. 槽存在、indulgence 欄位存在、三態為 OPEN、未放置過
+## 3. 泡湯特例：soak == true 時檢查 phase == "morning" 且當天剩餘行動格 >= soak_phase_cost；非泡湯檢查 action_spent
+## 4. 消耗行動格（泡湯消 soak_phase_cost 格進 evening，其餘消 1 格）
+## 5. 消掉卡（lose_card(card_inst_id)）
+## 6. indulgence_count += 1
+## 7. 套 on_place，再套 on_place_by_level 當次強度級那一組
+## 8. 記入 slots_placed
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
+func indulge(beat_id: String, slot_id: String, card_inst_id: String) -> Dictionary:
+	# 1. 卡持有檢查與 base_id 檢查
+	if card_inst_id.is_empty() or not has_card(card_inst_id):
+		return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "", "lines": PackedStringArray() }
+	var base_id := _card_base_id(card_inst_id)
+	if base_id != "madness":
+		return { "ok": false, "reason_code": _REASON_NOT_ACCEPTED, "reason_text": "", "lines": PackedStringArray() }
+
+	# 2. beat 與 slot 存在性、indulgence 欄位存在、三態 OPEN、未放置過
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
+	if beat.is_empty():
+		return { "ok": false, "reason_code": _REASON_UNKNOWN_BEAT, "reason_text": "", "lines": PackedStringArray() }
+
+	var slot: Dictionary = _find_slot(beat, slot_id)
+	if slot.is_empty():
+		return { "ok": false, "reason_code": _REASON_UNKNOWN_SLOT, "reason_text": "", "lines": PackedStringArray() }
+
+	var ind_val: Variant = slot.get("indulgence")
+	if ind_val == null or not ind_val is Dictionary:
+		return { "ok": false, "reason_code": _REASON_NOT_ACCEPTED, "reason_text": "", "lines": PackedStringArray() }
+
+	var state_result := _check_slot_state(beat, slot)
+	if not state_result.get("ok", false):
+		return {
+			"ok": false,
+			"reason_code": str(state_result.get("reason_code", "")),
+			"reason_text": str(state_result.get("reason_text", "")),
+			"lines": PackedStringArray(),
+		}
+
+	# 3. 泡湯特例或行動格已耗盡檢查
+	var ind := ind_val as Dictionary
+	var is_soak := bool(ind.get("soak", false))
+	var soak_cost := int(Data.tuning("indulgence.soak_phase_cost", 2))
+
+	if is_soak:
+		if phase != "morning":
+			return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": "（只能在上午發動）", "lines": PackedStringArray() }
+		if action_spent:
+			return { "ok": false, "reason_code": _REASON_LOCKED, "reason_text": "（格數不足）", "lines": PackedStringArray() }
+	else:
+		if ACTION_PHASES.has(phase) and action_spent:
+			return { "ok": false, "reason_code": _REASON_ACTION_SPENT, "reason_text": "", "lines": PackedStringArray() }
+
+	# 4. 消耗行動格
+	if is_soak:
+		consume_action(soak_cost)
+	else:
+		consume_action(1)
+
+	# 5. 消掉卡片
+	lose_card(card_inst_id)
+
+	# 6. indulgence_count += 1
+	indulgence_count += 1
+
+	# 7. 套 on_place，再套 on_place_by_level
+	var lines: PackedStringArray = EffectApply.apply(slot.get("on_place", {}), self)
+	var by_level: Variant = slot.get("on_place_by_level")
+	if by_level is Dictionary:
+		var lvl := Indulgence.level_for(indulgence_count, Data.loader.tuning)
+		var lvl_effect: Variant = (by_level as Dictionary).get(lvl)
+		if lvl_effect is Dictionary:
+			var lvl_lines := EffectApply.apply(lvl_effect, self)
+			lines.append_array(lvl_lines)
+
+	# 8. 記入 slots_placed
+	var slot_key := beat_id + "::" + slot_id
+	slots_placed[slot_key] = true
+
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+
 ## 放卡的唯一入口（UI 與 headless 走查共用；UI 內不做任何判斷）。
 ## 放置合法性四步檢查，順序固定（規格書第六節）：
 ## ①持有 → ②三態 OPEN（beat 與槽兩級 condition/requires 都要過，含一次性未放過）→
 ## ③accepts → ④action_spent（僅行動格內的主角卡）。
 ## 若該槽帶 choice_group，直接轉導 choose() 保證規則層單一入口（P1-E）。
+## 若卡片為發狂卡，直接轉導 indulge() 保證規則層單一入口（P2-B）。
 ## 任一步不過 → { ok=false, reason_code, reason_text, lines=[] }，GameState 零變化。
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
 func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
 	# K-17: 空卡 id 走 try_place 直接擋下，不轉導 choose
 	if card_id.is_empty():
 		return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "", "lines": PackedStringArray() }
+
+	var base_id := _card_base_id(card_id)
+	if base_id == "madness":
+		return indulge(beat_id, slot_id, card_id)
 
 	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
 	if beat.is_empty():
@@ -650,7 +745,6 @@ func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
 			"lines": PackedStringArray(),
 		}
 
-	var base_id := _card_base_id(card_id)
 	var card: Dictionary = Data.loader.cards.get(base_id, {})
 	var slot_key := beat_id + "::" + slot_id
 	var card_type := str(card.get("type", ""))

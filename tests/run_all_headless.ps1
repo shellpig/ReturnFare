@@ -10,6 +10,7 @@ $tests = @(
     "tests/headless/test_p1f.gd",
     "tests/headless/test_p1g.gd",
     "tests/headless/test_p2a.gd",
+    "tests/headless/test_p2b.gd",
     "tests/headless/playthrough_greedy.gd"
 )
 

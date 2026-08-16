@@ -185,7 +185,19 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 					slot_tri = TriState.LOCKED
 					slot_reason = str(s.get("reject_reason", _REASON_FALLBACK))
 				else:
-					slot_tri = TriState.OPEN
+					var ind_val: Variant = s.get("indulgence")
+					var is_soak := false
+					if ind_val is Dictionary:
+						is_soak = bool((ind_val as Dictionary).get("soak", false))
+
+					if is_soak and current_phase != "morning":
+						slot_tri = TriState.LOCKED
+						slot_reason = "（只能在上午發動）"
+					elif is_soak and bool(gs.get("action_spent")):
+						slot_tri = TriState.LOCKED
+						slot_reason = "（格數不足）"
+					else:
+						slot_tri = TriState.OPEN
 
 			if slot_tri != TriState.HIDDEN:
 				slots_result.append({
