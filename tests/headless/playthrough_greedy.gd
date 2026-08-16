@@ -342,11 +342,37 @@ static func execute_evening_phase(gs: Node, _data_node: Node, day: int) -> void:
 			gs.try_place("info_registry", "d45_then", "compare_registry")
 
 
-static func execute_night_phase(gs: Node, _data_node: Node, _day: int) -> void:
-	# 統一走 GameState.play_night_fixed() 結算入夜 fixed beat（K-26）
+static func execute_night_phase(gs: Node, data_node: Node, _day: int, open_markers: bool = true) -> void:
+	# 1. 統一走 GameState.play_night_fixed() 結算入夜 fixed beat（K-26）
 	gs.play_night_fixed()
 
-	# 直接睡
+	if not open_markers:
+		gs.sleep_night()
+		return
+
+	# 2. 貪心開夜間標記：若當夜有可用的夜間地點，優先開未開啟的收費標記
+	var locs: Array[String] = PanelBuilder.available_locations(gs, data_node)
+	var chosen_loc := ""
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	if loader != null:
+		for loc_id in locs:
+			var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
+			if int(loc.get("madness_cost", 0)) > 0 and not (gs.get("night_markers_opened") as Dictionary).has(loc_id):
+				chosen_loc = loc_id
+				break
+	if chosen_loc.is_empty() and not locs.is_empty():
+		chosen_loc = locs[0]
+
+	if not chosen_loc.is_empty():
+		gs.open_night_marker(chosen_loc)
+		var view: Dictionary = gs.build_panel(chosen_loc)
+		for bv: Dictionary in view.get("beats", []) as Array:
+			if int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
+				var bid := str((bv["beat"] as Dictionary).get("id", ""))
+				if not bid.is_empty():
+					gs.play_beat(bid)
+
+	# 3. 夜間收尾：直接睡
 	gs.sleep_night()
 
 

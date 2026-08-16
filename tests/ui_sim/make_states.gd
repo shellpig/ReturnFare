@@ -300,7 +300,7 @@ static func _run_walk_with_checkpoints(
 					PlaythroughGreedy.execute_evening_phase(gs, data_node, d)
 					gs.advance_phase()
 				"night":
-					PlaythroughGreedy.execute_night_phase(gs, data_node, d)
+					PlaythroughGreedy.execute_night_phase(gs, data_node, d, false)
 					gs.advance_phase()
 
 	return true

@@ -55,6 +55,7 @@ func _ready() -> void:
 	_advance_beat_btn.set_meta("qa_id", "beat_advance")
 	_back_btn.pressed.connect(func(): closed.emit())
 	_advance_beat_btn.pressed.connect(_on_advance_beat_pressed)
+	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_status_label)
 	move_child(_status_label, _back_btn.get_index() + 1)
 	_preview_dialog = AcceptDialog.new()
@@ -62,9 +63,10 @@ func _ready() -> void:
 	_preview_dialog.get_ok_button().set_meta("qa_id", "dialog_confirm::preview")
 
 
-func show_location(location_id: String) -> void:
+func show_location(location_id: String, extra_lines: PackedStringArray = PackedStringArray()) -> void:
 	_current_location = location_id
-	_status_label.text = ""
+	_status_label.text = "\n".join(extra_lines) if not extra_lines.is_empty() else ""
+	_status_label.visible = not extra_lines.is_empty()
 	_pending_beat_ids.clear()
 	_visit_seen.clear()
 	_current_beat_id = ""
@@ -266,6 +268,7 @@ func _on_place_pressed(beat_id: String, slot_id: String, card_id: String) -> voi
 	var result: Dictionary = GameState.try_place(card_id, beat_id, slot_id)
 	if result.get("ok", false):
 		_status_label.text = "\n".join(result.get("lines", PackedStringArray()))
+		_status_label.visible = not _status_label.text.is_empty()
 		state_changed.emit()
 	else:
 		_set_failure_status(result)
@@ -276,6 +279,7 @@ func _on_choose_pressed(beat_id: String, group_id: String, slot_id: String, card
 	var result: Dictionary = GameState.choose(beat_id, group_id, slot_id, card_id)
 	if result.get("ok", false):
 		_status_label.text = "\n".join(result.get("lines", PackedStringArray()))
+		_status_label.visible = not _status_label.text.is_empty()
 		state_changed.emit()
 	else:
 		_set_failure_status(result)
@@ -283,8 +287,7 @@ func _on_choose_pressed(beat_id: String, group_id: String, slot_id: String, card
 
 
 func _set_failure_status(result: Dictionary) -> void:
-	var text := str(result.get("reason_text", ""))
-	if text.is_empty():
-		var code := str(result.get("reason_code", ""))
-		text = _REASON_CODE_TEXTS.get(code, code)
+	var reason_code := str(result.get("reason_code", ""))
+	var text: String = str(_REASON_CODE_TEXTS.get(reason_code, str(result.get("reason_text", ""))))
 	_status_label.text = _FMT_PLACE_FAILED % text
+	_status_label.visible = true

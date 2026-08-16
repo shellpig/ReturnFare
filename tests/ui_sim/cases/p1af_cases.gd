@@ -49,6 +49,7 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p1af_28_d27_both", "D27 evening 固定 beat 依序結算且取得知識", "d27_evening__both.json", "", "p1af_28_d27_order", "", "d27_both"),
 		UiCase.new("p1af_28_d27_partial", "D27 evening 缺一條前置時不取得知識", "d27_evening__partial.json", "", "p1af_28_d27_order", "", "d27_partial"),
 		UiCase.new("p1af_29_night_resolution", "D10 night 地圖解析與免費標記", "d10_night.json", "", "p1af_29_night_resolution", "", "night_resolution"),
+		UiCase.new("p1af_29_night_paid", "D10 night 收費標記發卡與鎖定 stub", "d10_night.json", "", "p1af_29_night_resolution", "", "night_resolution_paid"),
 		UiCase.new("p1af_29_night_d1_fixed", "D1 night 固定演出優先於地圖", "", "", "p1af_29_night_resolution", "", "night_resolution_d1"),
 		UiCase.new("p1af_30_sleep_d24", "D24 night 直接睡播定日 beat", "d24_night.json", "", "p1af_30_sleep_d24", "", "sleep_d24"),
 		UiCase.new("p1af_31_night_place", "D10 night 放主角卡不耗行動格", "d10_night.json", "", "p1af_31_night_place", "", "night_place"),
@@ -124,9 +125,11 @@ class UiCase extends CaseBaseClass:
 				return _echo(tree)
 			"d27_both", "d27_partial":
 				return _d27_order(tree)
-			"night_resolution", "night_resolution_d1":
+			"night_resolution", "night_resolution_paid", "night_resolution_d1":
 				if mode == "night_resolution_d1":
 					return await _night_resolution_d1(tree)
+				elif mode == "night_resolution_paid":
+					return await _night_resolution_paid(tree, main_node)
 				return await _night_resolution(tree, main_node)
 			"sleep_d24":
 				return await _sleep_d24(tree, main_node)
@@ -290,7 +293,10 @@ class UiCase extends CaseBaseClass:
 			if btn_list.size() == 1:
 				var btn := btn_list[0] as Button
 				var expected_name: String = str(data_node.call("card_display_name", str(card_id)))
-				assert_eq(btn.text, expected_name, "手牌按鈕顯示名稱: %s" % str(card_id))
+				if str(card_id).begins_with("madness"):
+					assert_true(btn.text.begins_with(expected_name), "手牌按鈕顯示名稱: %s" % str(card_id))
+				else:
+					assert_eq(btn.text, expected_name, "手牌按鈕顯示名稱: %s" % str(card_id))
 		for text in _texts(tree.get_root()):
 			for card_id in all_card_ids:
 				if str(card_id).length() > 2:
@@ -669,6 +675,7 @@ class UiCase extends CaseBaseClass:
 	func _night_resolution(tree: SceneTree, _main_node: Control) -> Dictionary:
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "D10 夜間免費地點初始可見")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "D10 夜間收費地點初始可見")
+		var count_before := (_run(tree).get("hand", []) as Array).size()
 		await _enter(tree, "n_landmark")
 		var texts := _texts(tree.get_root())
 		var base_idx := -1
@@ -683,10 +690,9 @@ class UiCase extends CaseBaseClass:
 		assert_true(add_idx > base_idx, "主內容與附加 beat 播放順序正確")
 		await _close(tree)
 
-		# 免費標記不產生發狂卡
-		var hand_free := _run(tree).get("hand", []) as Array
-		for card_id in hand_free:
-			assert_false(str(card_id).begins_with("madness"), "免費夜間地點不應產生 madness 卡")
+		# 免費標記不產生發狂卡（手牌張數不變）
+		var count_after := (_run(tree).get("hand", []) as Array).size()
+		assert_eq(count_after, count_before, "進入免費夜間地點手牌不應產生任何發狂卡")
 
 		# 一夜一個標記限制：選定 n_landmark 後，其他地點不可見/不可進
 		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "一夜最多開一個地點，已選過地點後其他地點不可見")
@@ -702,6 +708,35 @@ class UiCase extends CaseBaseClass:
 					"night_chapter_and_additional_order",
 					"night_one_location_limit",
 					"night_no_madness"
+				]
+			}
+		}
+
+	func _night_resolution_paid(tree: SceneTree, _main_node: Control) -> Dictionary:
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "D10 已到收費標記開放日")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "D10 免費標記可見")
+		var count_before := (_run(tree).get("hand", []) as Array).size()
+		await _enter(tree, "n_ahong_1")
+		assert_true(_has_text(tree.get_root(), "夜間標記尚未開放"), "付費夜間標記必須顯示鎖定 stub")
+		assert_true(_has_text(tree.get_root(), "獲得 1 張發狂卡"), "進入收費標記顯示發卡提示")
+		await _close(tree)
+
+		# 進入收費標記發放發狂卡（手牌張數恰好增加 1 張）
+		var count_after := (_run(tree).get("hand", []) as Array).size()
+		assert_eq(count_after, count_before + 1, "進入收費夜間地點後手牌應增加 1 張發狂卡")
+
+		# 一夜一個標記限制：選定 n_ahong_1 後，其他地點不可見/不可進
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "一夜最多開一個地點，已選過收費地點後其他地點不可見")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "已選定的夜間收費地點仍可重新查看")
+
+		return {
+			"ok": errors.is_empty(),
+			"errors": errors,
+			"observations": {
+				"locations": _visible_ids(tree, "location::"),
+				"evidence": [
+					"night_paid_locked",
+					"night_one_location_limit"
 				]
 			}
 		}

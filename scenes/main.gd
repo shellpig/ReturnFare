@@ -147,9 +147,10 @@ func _on_location_selected(loc_id: String) -> void:
 	_map_list.visible = false
 	_location_panel.visible = true
 	_advance_btn.disabled = true
+	var extra_lines := PackedStringArray()
 	if GameState.phase == "night":
-		GameState.open_night_marker(loc_id)
-	_location_panel.call("show_location", loc_id)
+		extra_lines = GameState.open_night_marker(loc_id)
+	_location_panel.call("show_location", loc_id, extra_lines)
 
 
 func _on_panel_closed() -> void:
