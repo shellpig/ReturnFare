@@ -196,6 +196,78 @@ func _test_effect_apply(gs: Node) -> int:
 	else:
 		failed += _ok("effect_apply: lose removed knowledge card")
 
+	failed += _test_effect_apply_card_guard(gs)
+	return failed
+
+
+# ── gain / lose 的帶條件卡片項目 { card, if }（SCHEMA「帶條件的卡片項目」）──
+
+func _test_effect_apply_card_guard(gs: Node) -> int:
+	print("--- effect_apply: { card, if } 守衛 ---")
+	_reset(gs)
+	var failed := 0
+
+	# gain：條件成立 → 發卡
+	EffectApply.apply({ "gain": [
+		{ "card": "k_forty_something", "if": { "not": { "has_knowledge": "k_already_on_list" } } }
+	] }, gs)
+	if (gs.get("knowledge") as Dictionary).has("k_forty_something"):
+		failed += _ok("card guard: if 成立時 gain 照常執行")
+	else:
+		failed += _fail("card guard: if 成立時 gain 未執行")
+
+	# gain：條件不成立 → 跳過，且同一塊的其他鍵仍生效
+	gs.call("gain_card", "k_already_on_list")
+	var lines_guard: PackedStringArray = EffectApply.apply({
+		"text": "守衛測試",
+		"gain": [
+			{ "card": "k_town_covers", "if": { "not": { "has_knowledge": "k_already_on_list" } } },
+			"k_twenty_years_ago",
+		],
+		"flag": { "fx_guard_flag": true },
+	}, gs)
+	var kn: Dictionary = gs.get("knowledge") as Dictionary
+	if not kn.has("k_town_covers"):
+		failed += _ok("card guard: if 不成立時該張被跳過")
+	else:
+		failed += _fail("card guard: if 不成立時仍發了卡")
+	if kn.has("k_twenty_years_ago"):
+		failed += _ok("card guard: 同一陣列裡的無條件字串項目不受影響")
+	else:
+		failed += _fail("card guard: 無條件字串項目被誤擋")
+	if (gs.get("flags") as Dictionary).get("fx_guard_flag", false):
+		failed += _ok("card guard: 守衛只作用於卡片項目，flag 照常寫入")
+	else:
+		failed += _fail("card guard: 守衛誤擋了整個效果塊")
+	if lines_guard.has("守衛測試"):
+		failed += _ok("card guard: text 照常回傳")
+	else:
+		failed += _fail("card guard: text 被誤擋")
+
+	# 缺 if 的物件形態 = 恆成立（同 ConditionEval 契約）
+	EffectApply.apply({ "gain": [{ "card": "k_not_today" }] }, gs)
+	if (gs.get("knowledge") as Dictionary).has("k_not_today"):
+		failed += _ok("card guard: 缺 if 的物件項目視為恆成立")
+	else:
+		failed += _fail("card guard: 缺 if 的物件項目未執行")
+
+	# lose 同樣支援守衛
+	EffectApply.apply({ "lose": [
+		{ "card": "k_not_today", "if": { "has_knowledge": "k_already_on_list" } }
+	] }, gs)
+	if not (gs.get("knowledge") as Dictionary).has("k_not_today"):
+		failed += _ok("card guard: lose 的守衛成立時執行")
+	else:
+		failed += _fail("card guard: lose 的守衛成立時未執行")
+
+	EffectApply.apply({ "lose": [
+		{ "card": "k_twenty_years_ago", "if": { "has_knowledge": "k_town_covers" } }
+	] }, gs)
+	if (gs.get("knowledge") as Dictionary).has("k_twenty_years_ago"):
+		failed += _ok("card guard: lose 的守衛不成立時跳過")
+	else:
+		failed += _fail("card guard: lose 的守衛不成立時仍執行")
+
 	return failed
 
 
@@ -552,9 +624,41 @@ func _test_lint_vocabulary() -> int:
 	else:
 		failed += _ok("lint_vocabulary: unknown effect key caught (%s)" % problems2[0])
 
+	# 帶條件的卡片項目：三種壞形狀都要被抓到
+	var bad_entry_key: Array[Dictionary] = [{
+		"id": "p1d_lint_bad_entry_key",
+		"on_enter": { "gain": [{ "card": "protagonist", "bogus": 1 }] },
+		"slots": [],
+	}]
+	if DataLoader.lint_vocabulary(bad_entry_key).is_empty():
+		failed += _fail("lint_vocabulary: 卡片項目的未知鍵應被抓到")
+	else:
+		failed += _ok("lint_vocabulary: 卡片項目的未知鍵被抓到")
+
+	var missing_card: Array[Dictionary] = [{
+		"id": "p1d_lint_entry_missing_card",
+		"on_enter": { "gain": [{ "if": { "flag": "x" } }] },
+		"slots": [],
+	}]
+	if DataLoader.lint_vocabulary(missing_card).is_empty():
+		failed += _fail("lint_vocabulary: 缺 card 的卡片項目應被抓到")
+	else:
+		failed += _ok("lint_vocabulary: 缺 card 的卡片項目被抓到")
+
+	var bad_entry_cond: Array[Dictionary] = [{
+		"id": "p1d_lint_entry_bad_cond",
+		"on_enter": { "gain": [{ "card": "protagonist", "if": { "bogus_operator": true } }] },
+		"slots": [],
+	}]
+	if DataLoader.lint_vocabulary(bad_entry_cond).is_empty():
+		failed += _fail("lint_vocabulary: 卡片項目 if 裡的未知運算子應被抓到")
+	else:
+		failed += _ok("lint_vocabulary: 卡片項目 if 裡的未知運算子被抓到")
+
 	var good: Array[Dictionary] = [{
 		"id": "p1d_lint_good",
 		"condition": { "all": [{ "day_at_least": 1 }, { "not": { "flag": "x" } }] },
+		"on_enter": { "gain": [{ "card": "protagonist", "if": { "not": { "has_knowledge": "k_not_today" } } }] },
 		"slots": [
 			{ "id": "s1", "requires": { "count_at_least": { "n": 1, "of": [{ "has_card": "protagonist" }] } },
 			  "reject_reason": "（測試）",

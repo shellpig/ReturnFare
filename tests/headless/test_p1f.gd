@@ -415,6 +415,29 @@ func _test_day45_ending_coda_and_loop_reset(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("重置後 flags 未清空")
 
+	# 4. 第二輪重播 d45_then：升級是單向的，不得把舊版發回來。
+	#    beats_entered 每輪清空，所以 on_enter 會再結算一次；而 knowledge 跨輪保留，
+	#    k_already_on_list 還在手上 → 守衛必須擋掉 k_not_today 的重發。
+	gs.set("day", 45)
+	gs.set("phase", "evening")
+	gs.play_beat("d45_then")
+
+	if not gs.has_knowledge("k_not_today"):
+		failed += _ok("第二輪重播 d45_then 不重發已升級的 k_not_today")
+	else:
+		failed += _fail("第二輪重播 d45_then 把 k_not_today 發回來了（升級應為單向）")
+
+	if gs.has_knowledge("k_already_on_list"):
+		failed += _ok("第二輪重播後升級版 k_already_on_list 仍在")
+	else:
+		failed += _fail("第二輪重播後升級版 k_already_on_list 遺失")
+
+	var flags_loop2: Dictionary = gs.get("flags") as Dictionary
+	if flags_loop2.get("loop1_end", false):
+		failed += _ok("守衛只擋卡片項目，同一個 on_enter 的 flag 照常寫入")
+	else:
+		failed += _fail("守衛誤擋了整個 on_enter：loop1_end 未寫入")
+
 	return failed
 
 

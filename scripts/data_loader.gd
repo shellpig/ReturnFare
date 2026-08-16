@@ -153,7 +153,14 @@ func _check_card_refs(node: Variant, bid: String, where: String, problems: Packe
 			match k:
 				"gain", "lose":
 					for c in v:
-						if not cards.has(c):
+						# 兩種形態：卡 id 字串，或 { card, if } 帶條件項目（EffectApply.CARD_ENTRY_KEYS）
+						if c is Dictionary:
+							var entry := c as Dictionary
+							var entry_card: String = str(entry.get("card", ""))
+							if not cards.has(entry_card):
+								problems.append("%s [%s]：%s 引用不存在的卡 → %s" % [bid, where, k, entry_card])
+							_check_card_refs(entry.get("if"), bid, where, problems)
+						elif not cards.has(c):
 							problems.append("%s [%s]：%s 引用不存在的卡 → %s" % [bid, where, k, c])
 				"has_card", "has_knowledge":
 					if not cards.has(v):
@@ -222,6 +229,32 @@ static func _lint_effect(node: Variant, bid: String, where: String, problems: Pa
 	for k: String in (node as Dictionary).keys():
 		if not EffectApply.KNOWN_KEYS.has(k):
 			problems.append("%s [%s]：未知效果鍵 → %s" % [bid, where, k])
+			continue
+		if k == "gain" or k == "lose":
+			_lint_card_entries((node as Dictionary)[k], bid, where + "." + k, problems)
+
+
+## 語彙封閉性 lint 1 的一部分：gain / lose 的元素形態。
+## 允許卡 id 字串，或 { card, if }；`if` 走一般 condition 語彙檢查。
+static func _lint_card_entries(node: Variant, bid: String, where: String, problems: PackedStringArray) -> void:
+	if not node is Array:
+		problems.append("%s [%s]：應為陣列" % [bid, where])
+		return
+	for entry: Variant in node as Array:
+		if entry is String:
+			continue
+		if not entry is Dictionary:
+			problems.append("%s [%s]：卡片項目必須是字串或 { card, if } 物件" % [bid, where])
+			continue
+		var d := entry as Dictionary
+		for k: String in d.keys():
+			if not EffectApply.CARD_ENTRY_KEYS.has(k):
+				problems.append("%s [%s]：卡片項目未知鍵 → %s" % [bid, where, k])
+		var card_val: Variant = d.get("card")
+		if not (card_val is String) or (card_val as String).is_empty():
+			problems.append("%s [%s]：卡片項目缺少 card" % [bid, where])
+		if d.has("if"):
+			_lint_condition(d["if"], bid, where + ".if", problems)
 
 
 ## 語彙封閉性 lint 2：有 requires 但沒填 reject_reason（架構要求灰掉一定要附理由）。回傳警告，不擋 Data.ok。

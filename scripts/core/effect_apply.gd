@@ -10,6 +10,12 @@ const KNOWN_KEYS := [
 	"text", "gain", "lose", "switch", "switch_progress", "relation", "madness", "flag",
 ]
 
+## gain / lose 的陣列元素有兩種形態：
+##   "card_id"                                → 無條件執行（既有形態，仍是預設寫法）
+##   { "card": "card_id", "if": <condition> } → `if` 成立才執行；語彙沿用 ConditionEval，不另立
+## 用途見 `data/SCHEMA.md > on_place 效果 > 帶條件的卡片項目`。
+const CARD_ENTRY_KEYS := ["card", "if"]
+
 static func apply(effect: Variant, gs: Node) -> PackedStringArray:
 	var lines := PackedStringArray()
 	if not effect is Dictionary:
@@ -20,11 +26,13 @@ static func apply(effect: Variant, gs: Node) -> PackedStringArray:
 	if text is String and not (text as String).is_empty():
 		lines.append(text as String)
 
-	for card_id: Variant in e.get("lose", []) as Array:
-		gs.call("lose_card", str(card_id))
+	for entry: Variant in e.get("lose", []) as Array:
+		if _entry_passes(entry, gs):
+			gs.call("lose_card", _entry_card_id(entry))
 
-	for card_id: Variant in e.get("gain", []) as Array:
-		gs.call("gain_card", str(card_id))
+	for entry: Variant in e.get("gain", []) as Array:
+		if _entry_passes(entry, gs):
+			gs.call("gain_card", _entry_card_id(entry))
 
 	if e.has("switch"):
 		gs.call("open_switch", str(e["switch"]))
@@ -48,3 +56,18 @@ static func apply(effect: Variant, gs: Node) -> PackedStringArray:
 			gs.call("set_flag", flag_name, true if f[flag_name] else false)
 
 	return lines
+
+
+## 卡片項目的 id：字串形態直接回傳，物件形態取 `card`。
+static func _entry_card_id(entry: Variant) -> String:
+	if entry is Dictionary:
+		return str((entry as Dictionary).get("card", ""))
+	return str(entry)
+
+
+## 卡片項目的守衛：字串形態恆成立；物件形態求值 `if`（缺 `if` 亦恆成立，同 ConditionEval 契約）。
+## 逐項求值而非整塊求值——同一個效果塊裡其他鍵（例如 flag）不受影響。
+static func _entry_passes(entry: Variant, gs: Node) -> bool:
+	if not entry is Dictionary:
+		return true
+	return ConditionEval.eval((entry as Dictionary).get("if"), gs)
