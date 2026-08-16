@@ -38,7 +38,7 @@ const SPECIAL_EVIDENCE := {
 	"p1af_21_choice_resolved": ["resolved_render", "resolved_click_noop"],
 	"p1af_22_choice_equivalence": ["choice_equivalence_complete"],
 	"p1af_28_d27_order": ["evening_ui_order", "evening_outcome"],
-	"p1af_29_night_resolution": ["night_fixed_priority", "night_free_interaction", "night_chapter_and_additional_order", "night_paid_locked", "night_no_madness"],
+	"p1af_29_night_resolution": ["night_fixed_priority", "night_free_interaction", "night_chapter_and_additional_order", "night_one_location_limit", "night_no_madness"],
 	"p1af_30_sleep_d24": ["sleep_input", "sleep_resolution"],
 	"p1af_32_d45_coda_full": ["run_fields_cleared", "reset_ui_state", "reset_flag_slots_locked"],
 	"p1af_33_full_walk": ["full_walk_d45", "first_round_reset", "second_round_arrival", "second_round_protagonist_exactly_one"],
@@ -57,7 +57,7 @@ const VARIANT_EVIDENCE := {
 	"p1af_29_night_d1_fixed": ["night_fixed_priority"],
 	"p1af_29_night_resolution": [
 		"night_free_interaction", "night_chapter_and_additional_order",
-		"night_paid_locked", "night_no_madness",
+		"night_one_location_limit", "night_no_madness",
 	],
 }
 

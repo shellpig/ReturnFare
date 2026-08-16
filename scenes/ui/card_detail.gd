@@ -21,7 +21,7 @@ func show_card(card_id: String) -> void:
 
 	var display_name := Data.card_display_name(card_id)
 	if GameState.madness_clock.has(card_id):
-		display_name = "%s (%d天)" % [display_name, int(GameState.madness_clock[card_id])]
+		display_name = "%s (%d天)" % [display_name, maxi(0, int(GameState.madness_clock[card_id]))]
 	var base_id: String = card_id.split("#")[0]
 	var card_data: Dictionary = Data.loader.cards.get(base_id, {}) as Dictionary
 	var text_content: String = str(card_data.get("text", ""))

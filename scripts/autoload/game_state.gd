@@ -35,7 +35,8 @@ var relations: Dictionary = {}        # npc -> int（單軸整數暫行案，規
 # --- 其他群 ---
 var action_spent: bool = false                 # 當前行動格是否已放過主角卡（run 層）
 var npc_action_counts: Dictionary = {}         # npc_id -> 本輪投入的主角行動數（run 層，規格書第十二節）
-var night_markers_opened: Dictionary = {}      # location_id -> true（本輪已開標記集合，run 層）
+var night_markers_opened: Dictionary = {}      # location_id -> true（本輪已開收費標記集合，run 層）
+var night_location_chosen: String = ""         # 當夜已選定的夜間地點 id（run 層，每夜重置，規格書第九節）
 var indulgence_count: int = 0                  # 本輪縱慾次數（主動＋強制合計，run 層）
 var forced_pending: Array[String] = []         # 已歸零、還沒吃到行動格的發狂卡實例 id（run 層）
 
@@ -82,6 +83,7 @@ func advance_phase() -> void:
 		tick_madness()
 
 	action_spent = false
+	night_location_chosen = ""
 	phase_changed.emit(day, phase)
 
 	var new_ch := chapter()
@@ -110,6 +112,7 @@ func end_run(ending_id: String = "ending_default") -> void:
 	madness_clock.clear()
 	_madness_counter = 0
 	night_markers_opened.clear()
+	night_location_chosen = ""
 	indulgence_count = 0
 	forced_pending.clear()
 
@@ -195,19 +198,28 @@ func sleep_night() -> PackedStringArray:
 ## 首次進入該夜間地點時發 madness_cost 張發狂卡，回傳文字行。
 func open_night_marker(location_id: String) -> PackedStringArray:
 	var lines := PackedStringArray()
-	if night_markers_opened.has(location_id):
-		return lines
-
-	night_markers_opened[location_id] = true
+	if phase == "night":
+		night_location_chosen = location_id
 
 	if Data == null or Data.loader == null:
 		return lines
 
 	var loc: Dictionary = Data.loader.locations.get(location_id, {}) as Dictionary
 	var cost: int = int(loc.get("madness_cost", 0))
+
+	if cost <= 0:
+		# 免費地點不收費、不發卡、不計入夜間標記集合（night_markers_opened 僅收錄收費標記）
+		return lines
+
+	if night_markers_opened.has(location_id):
+		return lines
+
+	night_markers_opened[location_id] = true
+
 	for i in range(cost):
 		gain_card("madness")
 
+	lines.append("推開了夜色深處的門。獲得 %d 張發狂卡。" % cost)
 	return lines
 
 
@@ -216,10 +228,14 @@ func open_night_marker(location_id: String) -> PackedStringArray:
 func tick_madness() -> Array[String]:
 	var zeroed: Array[String] = []
 	for inst: String in madness_clock.keys():
-		var remaining := int(madness_clock[inst]) - 1
-		madness_clock[inst] = remaining
-		if remaining <= 0:
-			zeroed.append(inst)
+		var cur := int(madness_clock[inst])
+		if cur > 0:
+			var remaining := cur - 1
+			madness_clock[inst] = remaining
+			if remaining == 0:
+				zeroed.append(inst)
+		else:
+			madness_clock[inst] = 0
 	if not madness_clock.is_empty():
 		hand_changed.emit()
 	return zeroed
@@ -675,6 +691,7 @@ func serialize() -> Dictionary:
 			"relations": relations.duplicate(),
 			"npc_action_counts": npc_action_counts.duplicate(),
 			"night_markers_opened": night_markers_opened.duplicate(),
+			"night_location_chosen": night_location_chosen,
 			"indulgence_count": indulgence_count,
 			"forced_pending": forced_pending.duplicate(),
 		},
@@ -706,6 +723,7 @@ func deserialize(d: Dictionary) -> void:
 	relations = run.get("relations", {}).duplicate()
 	npc_action_counts = run.get("npc_action_counts", {}).duplicate()
 	night_markers_opened = run.get("night_markers_opened", {}).duplicate()
+	night_location_chosen = str(run.get("night_location_chosen", ""))
 	indulgence_count = int(run.get("indulgence_count", 0))
 	forced_pending.clear()
 	for item in run.get("forced_pending", []):

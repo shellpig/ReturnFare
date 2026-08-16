@@ -27,6 +27,12 @@ static func available_locations(gs: Node, data: Node) -> Array[String]:
 	var current_day: int = int(gs.get("day"))
 
 	if current_phase == "night":
+		var chosen_loc: String = str(gs.get("night_location_chosen"))
+		if not chosen_loc.is_empty():
+			if loader.locations.has(chosen_loc):
+				result.append(chosen_loc)
+			return result
+
 		for loc_id: String in loader.locations:
 			var loc: Dictionary = loader.locations[loc_id] as Dictionary
 			if str(loc.get("layer", "")) != "night":
