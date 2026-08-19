@@ -37,14 +37,14 @@ func _initialize() -> void:
 	var opened_count: int = opened_markers.size()
 	var madness_gained: int = int(res.get("final_madness_count", 0))
 	var madness_in_hand: int = (res.get("final_madness_cards", []) as Array).size()
-	var madness_cleared: int = int(res.get("final_indulgence_count", 0))
+	var madness_cleared: int = int(res.get("final_madness_cards_cleared", 0))
 
 	print("=== 夜間收費標記與發狂卡統計 ===")
 	print("  全作收費標記總數（locations.json）: %d" % expected_paid_markers)
 	print("  一輪實際開啟收費標記數:             %d" % opened_count)
 	print("  全作收費標記 madness_cost 總和:      %d" % expected_total_madness_cost)
 	print("  一輪累計發放發狂卡張數:             %d" % madness_gained)
-	print("  一輪累計強制縱慾消除張數:           %d" % madness_cleared)
+	print("  一輪累計消除發狂卡張數:             %d" % madness_cleared)
 	print("  重置前手牌持有發狂卡張數:           %d" % madness_in_hand)
 
 	if opened_count != expected_paid_markers:
@@ -129,6 +129,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 	var final_madness_count_box := [0]
 	var final_madness_cards_box := [[]]
 	var final_indulgence_count_box := [0]
+	var final_madness_cards_cleared_box := [0]
 	var cb := func(eid: String):
 		run_ended_box[0] += 1
 		last_ending_box[0] = eid
@@ -140,6 +141,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 				mcards.append(card)
 		final_madness_cards_box[0] = mcards
 		final_indulgence_count_box[0] = int(gs.get("indulgence_count"))
+		final_madness_cards_cleared_box[0] = int(gs.get("madness_cards_cleared"))
 
 	gs.run_ended.connect(cb)
 
@@ -248,6 +250,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		"final_madness_count": final_madness_count_box[0],
 		"final_madness_cards": final_madness_cards_box[0],
 		"final_indulgence_count": final_indulgence_count_box[0],
+		"final_madness_cards_cleared": final_madness_cards_cleared_box[0],
 	}
 
 
@@ -330,8 +333,9 @@ static func diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 	var beats: Array[Dictionary] = loader.beats_at(day, phase)
 
-	# 0. 強制縱慾已消耗該時段行動格（P2-C）
-	if bool(gs.get("action_spent")):
+	# 0. 強制縱慾已消耗該時段行動格（P2-C：嚴格比對 action_spent 且 last_forced_lines 非空）
+	var forced_lines: PackedStringArray = gs.get("last_forced_lines")
+	if bool(gs.get("action_spent")) and not forced_lines.is_empty():
 		return { "ok": true, "category": "forced_indulgence", "detail": "行動格已由強制縱慾消耗" }
 
 	# 1. 刻意留空

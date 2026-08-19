@@ -42,6 +42,7 @@ var npc_action_counts: Dictionary = {}         # npc_id -> 本輪投入的主角
 var night_markers_opened: Dictionary = {}      # location_id -> true（本輪已開收費標記集合，run 層）
 var night_location_chosen: String = ""         # 當夜已選定的夜間地點 id（run 層，每夜重置，規格書第九節）
 var indulgence_count: int = 0                  # 本輪縱慾次數（主動＋強制合計，run 層）
+var madness_cards_cleared: int = 0             # 本輪消除的發狂卡張數累計（run 層，避免依賴縱慾次數換算卡數）
 var forced_pending: Array[String] = []         # 已歸零、還沒吃到行動格的發狂卡實例 id（run 層）
 var last_forced_lines: PackedStringArray = []  # 當前時段強制縱慾產生的演出文字行（transient UI）
 
@@ -138,6 +139,7 @@ func end_run(ending_id: String = "ending_default") -> void:
 	night_markers_opened.clear()
 	night_location_chosen = ""
 	indulgence_count = 0
+	madness_cards_cleared = 0
 	forced_pending.clear()
 	last_forced_lines.clear()
 
@@ -325,6 +327,7 @@ func lose_card(id: String) -> void:
 		hand.remove_at(idx)
 		if card.get("type", "") == "madness":
 			madness_clock.erase(id)
+			madness_cards_cleared += 1
 		hand_changed.emit()
 		return
 
@@ -767,16 +770,14 @@ func _settle_forced_indulgence() -> PackedStringArray:
 	if forced_pending.is_empty() or action_spent:
 		return PackedStringArray()
 
-	var card_inst_id := ""
-	while not forced_pending.is_empty():
-		var candidate := str(forced_pending.pop_front())
-		if has_card(candidate):
-			card_inst_id = candidate
-			break
+	# 清理前面已不在手上的無效實例
+	while not forced_pending.is_empty() and not has_card(str(forced_pending[0])):
+		forced_pending.pop_front()
 
-	if card_inst_id.is_empty():
+	if forced_pending.is_empty():
 		return PackedStringArray()
 
+	# 先驗證出口，若出口異常或找不到槽則不 pop 隊首，債留在 forced_pending（帳不豁免）
 	var exit_result := Indulgence.pick_exit(self, Data)
 	if exit_result.is_empty():
 		push_error("_settle_forced_indulgence: Indulgence.pick_exit returned empty exit (data bug)")
@@ -789,6 +790,9 @@ func _settle_forced_indulgence() -> PackedStringArray:
 	if slot.is_empty():
 		push_error("_settle_forced_indulgence: slot not found '%s::%s'" % [beat_id, slot_id])
 		return PackedStringArray()
+
+	# 確定執行後才 pop 隊首
+	var card_inst_id := str(forced_pending.pop_front())
 
 	# 1. 消耗該時段行動格
 	consume_action(1)
@@ -893,6 +897,7 @@ func serialize() -> Dictionary:
 			"night_markers_opened": night_markers_opened.duplicate(),
 			"night_location_chosen": night_location_chosen,
 			"indulgence_count": indulgence_count,
+			"madness_cards_cleared": madness_cards_cleared,
 			"forced_pending": forced_pending.duplicate(),
 		},
 		"meta": {
@@ -926,6 +931,7 @@ func deserialize(d: Dictionary) -> void:
 	night_markers_opened = run.get("night_markers_opened", {}).duplicate()
 	night_location_chosen = str(run.get("night_location_chosen", ""))
 	indulgence_count = int(run.get("indulgence_count", 0))
+	madness_cards_cleared = int(run.get("madness_cards_cleared", 0))
 	forced_pending.clear()
 	for item in run.get("forced_pending", []):
 		forced_pending.append(str(item))

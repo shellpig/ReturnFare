@@ -313,42 +313,96 @@ func _test_pick_exit_algorithms(gs: Node, data: Node) -> int:
 	return failed
 
 
-# ── 6. 泡湯永不入自動挑選池 ──────────────────────────────────────────────────
+# ── 6. auto == false 槽（泡湯等）永不入自動挑選池 ────────────────────────────
 
 func _test_soak_never_picked(gs: Node, data: Node) -> int:
-	print("--- 6. soak is never picked by pick_exit ---")
+	print("--- 6. auto == false slots (e.g. soak) are never picked by pick_exit ---")
 	var failed := 0
 	gs.call("end_run")
 
 	gs.set("day", 1)
 	gs.call("gain_card", "madness")
-	var exit: Dictionary = Indulgence.pick_exit(gs, data)
 
-	if str(exit.get("slot_id", "")) != "x_soak":
-		failed += _ok("pick_exit 挑選結果不是泡湯 (%s)" % str(exit.get("slot_id", "")))
+	# 1. 注入一個 weight = 999 的 auto == false 槽
+	# 若 pick_exit 沒有 auto == false 過濾，它會因為 999 > 2 而錯誤挑中該槽
+	var loader: DataLoader = data.get("loader") as DataLoader
+	var test_synthetic_beat := {
+		"id": "test_synthetic_soak_beat",
+		"location": "sanquan",
+		"when": { "day_from": 1, "day_to": 45, "phase": ["morning", "afternoon"] },
+		"title": "測試非自動槽",
+		"text": "測試",
+		"slots": [
+			{
+				"id": "test_heavy_non_auto_slot",
+				"accepts": ["madness"],
+				"label": "測試非自動高權重槽",
+				"indulgence": {
+					"auto": false,
+					"weight": 999
+				},
+				"on_place": {}
+			}
+		]
+	}
+	(loader.beats as Array).append(test_synthetic_beat)
+	loader.beats_by_id["test_synthetic_soak_beat"] = test_synthetic_beat
+
+	var exit_with_high_weight_non_auto: Dictionary = Indulgence.pick_exit(gs, data)
+
+	# 復原 loader
+	(loader.beats as Array).erase(test_synthetic_beat)
+	loader.beats_by_id.erase("test_synthetic_soak_beat")
+
+	if str(exit_with_high_weight_non_auto.get("slot_id", "")) == "x_binge":
+		failed += _ok("即使存在 weight=999 的 auto==false 槽，pick_exit 仍堅定過濾並挑中 x_binge")
+	else:
+		failed += _fail("auto==false 過濾器失效，挑中了: %s" % str(exit_with_high_weight_non_auto))
+
+	# 2. 真實資料中 x_soak 永遠不被挑中
+	var exit_real: Dictionary = Indulgence.pick_exit(gs, data)
+	if str(exit_real.get("slot_id", "")) != "x_soak":
+		failed += _ok("真實資料庫中 pick_exit 挑選結果不是泡湯 (%s)" % str(exit_real.get("slot_id", "")))
 	else:
 		failed += _fail("pick_exit 錯誤挑中了泡湯槽 x_soak")
 
 	return failed
 
 
-# ── 7. 強制縱慾與玩家位置及時段無關 ──────────────────────────────────────────
+# ── 7. 強制縱慾照樣執行（時段與環境無關性）────────────────────────────────────
 
 func _test_location_agnostic(gs: Node, data: Node) -> int:
-	print("--- 7. forced indulgence is location- and time-agnostic ---")
+	print("--- 7. forced indulgence executes end-to-end regardless of context ---")
 	var failed := 0
 	gs.call("end_run")
 
-	# 即使玩家在一個完全沒有縱慾出口的地點（如 clinic）且為 afternoon，pick_exit 依舊正常求值
+	# 1. pick_exit 跨時段（下午）挑選
 	gs.set("day", 8)
 	gs.set("phase", "afternoon")
 	gs.call("gain_card", "madness")
 
 	var exit: Dictionary = Indulgence.pick_exit(gs, data)
 	if not exit.is_empty() and str(exit.get("beat_id", "")).begins_with("exit_"):
-		failed += _ok("pick_exit 成功跨地點挑選出口，不依賴玩家當前位置與 when 時段")
+		failed += _ok("pick_exit 成功跨時段挑選出口，不依賴特定地點與 when 時段")
 	else:
-		failed += _fail("pick_exit 跨地點挑選失敗: %s" % str(exit))
+		failed += _fail("pick_exit 跨時段挑選失敗: %s" % str(exit))
+
+	# 2. 完整執行 _settle_forced_indulgence()（驗證「照樣執行」真路徑）
+	(gs.get("forced_pending") as Array).append("madness#1")
+	gs.set("action_spent", false)
+
+	var forced_lines: PackedStringArray = gs.call("_settle_forced_indulgence")
+	var action_spent: bool = gs.get("action_spent")
+	var has_m1: bool = gs.call("has_card", "madness#1")
+	var ind_count: int = gs.get("indulgence_count")
+	var m_cleared: int = gs.get("madness_cards_cleared")
+
+	if forced_lines.size() > 0 and action_spent and not has_m1 and ind_count == 1 and m_cleared == 1:
+		failed += _ok("_settle_forced_indulgence 成功完整執行（扣格、消卡、累計次數、累計消卡數均正確）")
+	else:
+		failed += _fail("_settle_forced_indulgence 執行不符 (spent=%s, has=%s, ind=%d, cleared=%d, lines=%d)" % [
+			action_spent, has_m1, ind_count, m_cleared, forced_lines.size()
+		])
 
 	return failed
 
@@ -372,10 +426,11 @@ func _test_shared_indulgence_count(gs: Node, data: Node) -> int:
 			return failed + _fail("主動縱慾第 %d 次失敗: %s" % [i + 1, str(ind_res)])
 
 	var ind_count: int = gs.get("indulgence_count")
-	if ind_count == 3:
-		failed += _ok("主動縱慾 3 次後 indulgence_count 為 3")
+	var m_cleared_3: int = gs.get("madness_cards_cleared")
+	if ind_count == 3 and m_cleared_3 == 3:
+		failed += _ok("主動縱慾 3 次後 indulgence_count 為 3 且 madness_cards_cleared 為 3")
 	else:
-		failed += _fail("主動縱慾 3 次後計數不符: %d" % ind_count)
+		failed += _fail("主動縱慾 3 次後計數不符: ind=%d, cleared=%d" % [ind_count, m_cleared_3])
 
 	# 第 4 次為強制縱慾：強度級應為 normal（level_for(4)）
 	gs.call("gain_card", "madness")
@@ -387,13 +442,14 @@ func _test_shared_indulgence_count(gs: Node, data: Node) -> int:
 	gs.call("advance_phase")
 
 	var ind_count_after: int = gs.get("indulgence_count")
+	var m_cleared_4: int = gs.get("madness_cards_cleared")
 	var lvl4: String = Indulgence.level_for(4, data.get("loader").tuning)
 	var uncle_rel: int = int((gs.get("relations") as Dictionary).get("uncle", 0))
 
-	if ind_count_after == 4 and lvl4 == "normal":
-		failed += _ok("第 4 次（強制縱慾）正確接續為第 4 次縱慾，強度級為 normal")
+	if ind_count_after == 4 and m_cleared_4 == 4 and lvl4 == "normal":
+		failed += _ok("第 4 次（強制縱慾）正確接續為第 4 次縱慾，強度級為 normal，累計消卡數為 4")
 	else:
-		failed += _fail("強度級或計數接續錯誤 (count=%d, lvl=%s)" % [ind_count_after, lvl4])
+		failed += _fail("強度級或計數接續錯誤 (count=%d, cleared=%d, lvl=%s)" % [ind_count_after, m_cleared_4, lvl4])
 
 	# normal 等級對 uncle 關係產生 -1 代價
 	if uncle_rel < 0:
@@ -438,14 +494,15 @@ func _test_serialize_and_end_run_p2c(gs: Node) -> int:
 	gs.set("day", 15)
 	gs.set("phase", "morning")
 	gs.set("indulgence_count", 5)
+	gs.set("madness_cards_cleared", 5)
 	(gs.get("forced_pending") as Array).append("madness#2")
 	(gs.get("forced_pending") as Array).append("madness#3")
 
 	var s: Dictionary = gs.call("serialize")
 	var run: Dictionary = s.get("run", {})
 
-	if int(run.get("indulgence_count", 0)) == 5 and (run.get("forced_pending", []) as Array) == ["madness#2", "madness#3"]:
-		failed += _ok("serialize 正確收錄 indulgence_count 與 forced_pending")
+	if int(run.get("indulgence_count", 0)) == 5 and int(run.get("madness_cards_cleared", 0)) == 5 and (run.get("forced_pending", []) as Array) == ["madness#2", "madness#3"]:
+		failed += _ok("serialize 正確收錄 indulgence_count, madness_cards_cleared 與 forced_pending")
 	else:
 		failed += _fail("serialize 遺失 P2-C 欄位: %s" % str(run))
 
@@ -454,24 +511,28 @@ func _test_serialize_and_end_run_p2c(gs: Node) -> int:
 	gs.call("deserialize", s)
 
 	var restored_ind: int = gs.get("indulgence_count")
+	var restored_cleared: int = gs.get("madness_cards_cleared")
 	var restored_pending: Array = gs.get("forced_pending")
 
-	if restored_ind == 5 and restored_pending == ["madness#2", "madness#3"]:
-		failed += _ok("deserialize 完整還原 indulgence_count 與 forced_pending")
+	if restored_ind == 5 and restored_cleared == 5 and restored_pending == ["madness#2", "madness#3"]:
+		failed += _ok("deserialize 完整還原 indulgence_count, madness_cards_cleared 與 forced_pending")
 	else:
-		failed += _fail("deserialize 還原 P2-C 欄位失敗 (ind=%d, pending=%s)" % [restored_ind, str(restored_pending)])
+		failed += _fail("deserialize 還原 P2-C 欄位失敗 (ind=%d, cleared=%d, pending=%s)" % [
+			restored_ind, restored_cleared, str(restored_pending)
+		])
 
 	# end_run 重置
 	gs.call("end_run")
 	var reset_ind: int = gs.get("indulgence_count")
+	var reset_cleared: int = gs.get("madness_cards_cleared")
 	var reset_pending: Array = gs.get("forced_pending")
 	var reset_lines: PackedStringArray = gs.get("last_forced_lines")
 
-	if reset_ind == 0 and reset_pending.is_empty() and reset_lines.is_empty():
-		failed += _ok("end_run 成功重置 indulgence_count, forced_pending 與 last_forced_lines")
+	if reset_ind == 0 and reset_cleared == 0 and reset_pending.is_empty() and reset_lines.is_empty():
+		failed += _ok("end_run 成功重置 indulgence_count, madness_cards_cleared, forced_pending 與 last_forced_lines")
 	else:
-		failed += _fail("end_run 重置 P2-C 欄位失敗 (ind=%d, pending=%s, lines=%s)" % [
-			reset_ind, str(reset_pending), str(reset_lines)
+		failed += _fail("end_run 重置 P2-C 欄位失敗 (ind=%d, cleared=%d, pending=%s, lines=%s)" % [
+			reset_ind, reset_cleared, str(reset_pending), str(reset_lines)
 		])
 
 	return failed

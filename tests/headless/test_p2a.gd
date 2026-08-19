@@ -168,6 +168,9 @@ func _test_daily_countdown_zeroing_and_clamp(gs: Node, _data_node: Node) -> int:
 	else:
 		failed += _fail("第 12 天 morning 倒數未變 1 (val=%d)" % d12_val)
 
+	# 說明：在 P2-A 單元驗證層，驗證 tick_madness() 自身的歸零回傳與 clamp 於 0 行為。
+	# 在 P2-C 之後，若推進至第 13 天 morning，advance_phase 會自動觸發 _settle_forced_indulgence()
+	# 將歸零的 madness#1 消除；完整的跨時段生命週期（歸零 -> 強制執行 -> 消卡吃格）由 test_p2c.gd 測試 1 驗收。
 	# 驗證 tick_madness() 歸零行為
 	var zeroed_list: Array[String] = gs.call("tick_madness")
 	var zero_val: int = int((gs.get("madness_clock") as Dictionary).get("madness#1", -1))
