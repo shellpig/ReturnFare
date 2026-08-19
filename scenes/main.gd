@@ -194,11 +194,17 @@ func _route_view() -> void:
 	var phase: String = GameState.phase
 	match phase:
 		"morning", "afternoon":
-			_map_list.visible = true
-			_map_list.offset_top = 0.0
-			_map_list.offset_bottom = 400.0
 			_location_panel.visible = false
-			_flow_text.visible = false
+			_play_forced_lines()
+			_map_list.visible = true
+			if _flow_text.visible:
+				_flow_text.offset_top = 0.0
+				_flow_text.offset_bottom = 120.0
+				_map_list.offset_top = 130.0
+				_map_list.offset_bottom = 400.0
+			else:
+				_map_list.offset_top = 0.0
+				_map_list.offset_bottom = 400.0
 			_map_list.call("refresh")
 			_advance_btn.visible = true
 		"evening":
@@ -226,6 +232,16 @@ func _route_view() -> void:
 				_map_list.offset_bottom = 400.0
 			_map_list.call("refresh")
 			_advance_btn.visible = true
+
+
+func _play_forced_lines() -> void:
+	_flow_text.clear()
+	var lines: PackedStringArray = GameState.last_forced_lines
+	if lines.size() > 0:
+		_flow_text.append_lines(lines)
+		_flow_text.visible = true
+	else:
+		_flow_text.visible = false
 
 
 func _play_evening() -> void:

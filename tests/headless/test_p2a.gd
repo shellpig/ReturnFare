@@ -149,8 +149,8 @@ func _test_daily_countdown_zeroing_and_clamp(gs: Node, _data_node: Node) -> int:
 	else:
 		failed += _fail("第 7 天 morning 倒數未變 6 (day=%d, phase=%s, clock=%s)" % [d7_day, d7_phase, str(clock)])
 
-	# 逐日推進至第 12 天 night
-	for d in range(7, 13):
+	# 逐日推進至第 12 天 morning (倒數變 1)
+	for d in range(7, 12):
 		gs.call("advance_phase") # -> afternoon
 		gs.call("advance_phase") # -> evening
 		gs.call("advance_phase") # -> night
@@ -162,35 +162,27 @@ func _test_daily_countdown_zeroing_and_clamp(gs: Node, _data_node: Node) -> int:
 		# 推進到次日 morning (d+1 morning)
 		gs.call("advance_phase")
 
-	var d13_day: int = gs.get("day")
-	var d13_phase: String = gs.get("phase")
-	var d13_val: int = int((gs.get("madness_clock") as Dictionary).get("madness#1", -1))
-
-	if d13_day == 13 and d13_phase == "morning" and d13_val == 0:
-		failed += _ok("第 13 天 morning: madness#1 正確歸零 (clock = 0)")
+	var d12_val: int = int((gs.get("madness_clock") as Dictionary).get("madness#1", -1))
+	if d12_val == 1:
+		failed += _ok("第 12 天 morning: madness#1 倒數變 1")
 	else:
-		failed += _fail("第 13 天 morning 未正確歸零 (day=%d, phase=%s, val=%d)" % [d13_day, d13_phase, d13_val])
+		failed += _fail("第 12 天 morning 倒數未變 1 (val=%d)" % d12_val)
 
-	# 推進至第 14 天 morning：驗證不變負數且不再回傳歸零
-	gs.call("advance_phase") # D13 afternoon
-	gs.call("advance_phase") # D13 evening
-	gs.call("advance_phase") # D13 night
-	# 推進到 D14 morning (此時觸發 tick_madness)
-	gs.call("advance_phase")
-
-	var d14_day: int = gs.get("day")
-	var d14_val: int = int((gs.get("madness_clock") as Dictionary).get("madness#1", -1))
-	if d14_day == 14 and d14_val == 0:
-		failed += _ok("第 14 天 morning: 倒數值 clamp 於 0，不變為負數 (val = 0)")
+	# 驗證 tick_madness() 歸零行為
+	var zeroed_list: Array[String] = gs.call("tick_madness")
+	var zero_val: int = int((gs.get("madness_clock") as Dictionary).get("madness#1", -1))
+	if zeroed_list == ["madness#1"] and zero_val == 0:
+		failed += _ok("tick_madness 成功回傳歸零清單 ['madness#1'] 且 clock 值變為 0")
 	else:
-		failed += _fail("第 14 天 morning 倒數值非 0 (val=%d)" % d14_val)
+		failed += _fail("tick_madness 歸零行為不符 (zeroed=%s, val=%d)" % [str(zeroed_list), zero_val])
 
-	# 手動再呼叫一次 tick_madness 驗證回傳值為空
+	# 再次呼叫 tick_madness：驗證 clamp 於 0 且不重複回傳歸零
 	var zeroed_next: Array[String] = gs.call("tick_madness")
-	if zeroed_next.is_empty():
-		failed += _ok("已歸零的卡片次日不重複加入 zeroed 回傳隊列")
+	var clamp_val: int = int((gs.get("madness_clock") as Dictionary).get("madness#1", -1))
+	if zeroed_next.is_empty() and clamp_val == 0:
+		failed += _ok("已歸零卡片倒數值 clamp 於 0 且次日不重複加入 zeroed 回傳隊列")
 	else:
-		failed += _fail("已歸零卡片重複加入 zeroed: %s" % str(zeroed_next))
+		failed += _fail("clamp 或重複加入 zeroed 異常 (zeroed=%s, val=%d)" % [str(zeroed_next), clamp_val])
 
 	return failed
 

@@ -43,6 +43,7 @@ var night_markers_opened: Dictionary = {}      # location_id -> true（本輪已
 var night_location_chosen: String = ""         # 當夜已選定的夜間地點 id（run 層，每夜重置，規格書第九節）
 var indulgence_count: int = 0                  # 本輪縱慾次數（主動＋強制合計，run 層）
 var forced_pending: Array[String] = []         # 已歸零、還沒吃到行動格的發狂卡實例 id（run 層）
+var last_forced_lines: PackedStringArray = []  # 當前時段強制縱慾產生的演出文字行（transient UI）
 
 signal phase_changed(day: int, phase: String)
 signal day_changed(day: int)
@@ -68,12 +69,15 @@ func advance_phase() -> void:
 	if day == LAST_DAY and phase == "afternoon":
 		phase = "evening"
 		action_spent = false
+		last_forced_lines.clear()
 		phase_changed.emit(day, phase)
 		return
 
 	if day == LAST_DAY and phase == "evening":
 		end_run("ending_default")
 		return
+
+	last_forced_lines.clear()
 
 	# 一般推進
 	var idx := PHASES.find(phase)
@@ -84,7 +88,9 @@ func advance_phase() -> void:
 		day += 1
 		phase = PHASES[0]
 		day_changed.emit(day)
-		tick_madness()
+		var zeroed := tick_madness()
+		for inst_id: String in zeroed:
+			forced_pending.append(inst_id)
 
 	if _actions_spent_ahead > 0 and ACTION_PHASES.has(phase):
 		_actions_spent_ahead -= 1
@@ -96,6 +102,11 @@ func advance_phase() -> void:
 		_actions_spent_ahead = 0
 
 	night_location_chosen = ""
+
+	# P2-C: 行動時段開始時執行強制縱慾（每個行動時段最多一次）
+	if ACTION_PHASES.has(phase) and not action_spent and not forced_pending.is_empty():
+		last_forced_lines = _settle_forced_indulgence()
+
 	phase_changed.emit(day, phase)
 
 	var new_ch := chapter()
@@ -128,6 +139,7 @@ func end_run(ending_id: String = "ending_default") -> void:
 	night_location_chosen = ""
 	indulgence_count = 0
 	forced_pending.clear()
+	last_forced_lines.clear()
 
 	day_changed.emit(day)
 	phase_changed.emit(day, phase)
@@ -740,6 +752,64 @@ func indulge(beat_id: String, slot_id: String, card_inst_id: String) -> Dictiona
 
 	# 出口槽不記入 slots_placed，理由見函式開頭註解（K-54）。
 	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+
+## 強制縱慾結算（規格書第八節、P2-C、開發設計方針 P2-C）。
+## 規則層入口（由 advance_phase 於行動時段開始時自動呼叫）：
+## 1. 取 forced_pending 隊首有效的發狂卡（若已被消則取下一張）
+## 2. Indulgence.pick_exit 挑選當前條件成立之最高權重出口
+## 3. consume_action(1) 消耗當前時段行動格
+## 4. lose_card(card_inst_id) 消除該發狂卡
+## 5. indulgence_count += 1
+## 6. 套用 base on_place，再套用 on_place_by_level[lvl]
+## 回傳要播出的文字行（PackedStringArray）。
+func _settle_forced_indulgence() -> PackedStringArray:
+	if forced_pending.is_empty() or action_spent:
+		return PackedStringArray()
+
+	var card_inst_id := ""
+	while not forced_pending.is_empty():
+		var candidate := str(forced_pending.pop_front())
+		if has_card(candidate):
+			card_inst_id = candidate
+			break
+
+	if card_inst_id.is_empty():
+		return PackedStringArray()
+
+	var exit_result := Indulgence.pick_exit(self, Data)
+	if exit_result.is_empty():
+		push_error("_settle_forced_indulgence: Indulgence.pick_exit returned empty exit (data bug)")
+		return PackedStringArray()
+
+	var beat_id := str(exit_result.get("beat_id", ""))
+	var slot_id := str(exit_result.get("slot_id", ""))
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
+	var slot: Dictionary = _find_slot(beat, slot_id)
+	if slot.is_empty():
+		push_error("_settle_forced_indulgence: slot not found '%s::%s'" % [beat_id, slot_id])
+		return PackedStringArray()
+
+	# 1. 消耗該時段行動格
+	consume_action(1)
+
+	# 2. 消掉發狂卡
+	lose_card(card_inst_id)
+
+	# 3. 累計縱慾次數
+	indulgence_count += 1
+
+	# 4. 套用效果：基底 on_place + 當次強度級追加效果
+	var lines: PackedStringArray = EffectApply.apply(slot.get("on_place", {}), self)
+	var by_level: Variant = slot.get("on_place_by_level")
+	if by_level is Dictionary:
+		var lvl := Indulgence.level_for(indulgence_count, Data.loader.tuning)
+		var lvl_effect: Variant = (by_level as Dictionary).get(lvl)
+		if lvl_effect is Dictionary:
+			var lvl_lines := EffectApply.apply(lvl_effect, self)
+			lines.append_array(lvl_lines)
+
+	return lines
 
 
 ## 放卡的唯一入口（UI 與 headless 走查共用；UI 內不做任何判斷）。
