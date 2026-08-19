@@ -39,6 +39,7 @@ func _initialize() -> void:
 	failed += _test_shared_indulgence_count(gs, data_node)
 	failed += _test_determinism(gs, data_node)
 	failed += _test_serialize_and_end_run_p2c(gs)
+	failed += _test_forced_indulgence_debt_preservation_on_failure(gs, data_node)
 
 	Engine.unregister_singleton("Data")
 	Engine.unregister_singleton("GameState")
@@ -536,3 +537,137 @@ func _test_serialize_and_end_run_p2c(gs: Node) -> int:
 		])
 
 	return failed
+
+
+# ── 11. 強制縱慾防吃債守衛（出口無效或找不到槽時，債留在 forced_pending）(K-59) ─
+
+func _test_forced_indulgence_debt_preservation_on_failure(gs: Node, _data: Node) -> int:
+	print("--- 11. debt preservation on forced indulgence failure (K-59) ---")
+	var failed := 0
+	gs.call("end_run")
+
+	# GameState 內部一律讀裸全域 `Data`（/root/Data 那一份 loader）
+	var real_data: Node = get_root().get_node("Data")
+	var loader: DataLoader = real_data.get("loader") as DataLoader
+
+	# 1. 情境 A：出口池全數條件不成立（pick_exit 回傳空字典）
+	gs.set("day", 5)
+	gs.set("phase", "morning")
+	gs.set("action_spent", false)
+	gs.call("gain_card", "madness") # madness#1
+	(gs.get("forced_pending") as Array).append("madness#1")
+
+	# 將所有出口槽的 condition 替換為不可能成立的條件
+	var original_conditions: Dictionary = {}
+	for b: Dictionary in loader.beats:
+		if str(b.get("id", "")).begins_with("exit_"):
+			for s: Dictionary in b.get("slots", []) as Array:
+				if s.has("indulgence"):
+					var key := "%s::%s" % [str(b.get("id")), str(s.get("id"))]
+					original_conditions[key] = s.get("condition")
+					s["condition"] = { "flag": "__impossible_condition_flag_k59__" }
+
+	# 執行 _settle_forced_indulgence()
+	var lines_no_exit: PackedStringArray = gs.call("_settle_forced_indulgence")
+
+	# 立即復原 condition
+	for b: Dictionary in loader.beats:
+		if str(b.get("id", "")).begins_with("exit_"):
+			for s: Dictionary in b.get("slots", []) as Array:
+				if s.has("indulgence"):
+					var key := "%s::%s" % [str(b.get("id")), str(s.get("id"))]
+					if original_conditions.has(key):
+						if original_conditions[key] == null:
+							s.erase("condition")
+						else:
+							s["condition"] = original_conditions[key]
+
+	var pending_a: Array = gs.get("forced_pending")
+	var spent_a: bool = gs.get("action_spent")
+	var ind_count_a: int = gs.get("indulgence_count")
+	var cleared_a: int = gs.get("madness_cards_cleared")
+	var has_card_a: bool = gs.call("has_card", "madness#1")
+
+	if lines_no_exit.is_empty():
+		failed += _ok("出口池無效時 _settle_forced_indulgence 回傳空行")
+	else:
+		failed += _fail("出口池無效時仍回傳文字: %s" % str(lines_no_exit))
+
+	if pending_a == ["madness#1"]:
+		failed += _ok("出口池無效時 forced_pending 隊首仍完整保留（未吃債）")
+	else:
+		failed += _fail("出口池無效時 forced_pending 遺失: %s" % str(pending_a))
+
+	if not spent_a and ind_count_a == 0 and cleared_a == 0 and has_card_a:
+		failed += _ok("出口池無效時 action_spent, indulgence_count, madness_cards_cleared 未被污染且手牌維持持有")
+	else:
+		failed += _fail("出口池無效時狀態被污染: spent=%s, ind=%d, cleared=%d, has=%s" % [
+			spent_a, ind_count_a, cleared_a, has_card_a
+		])
+
+	# 2. 情境 B：pick_exit 命中但 beat 內找不到對應 slot
+	gs.call("end_run")
+	gs.set("day", 5)
+	gs.set("phase", "morning")
+	gs.set("action_spent", false)
+	gs.call("gain_card", "madness") # madness#1
+	(gs.get("forced_pending") as Array).append("madness#1")
+
+	var corrupt_beat := {
+		"id": "exit_corrupt_test",
+		"location": "sanquan",
+		"when": { "day_from": 1, "day_to": 45, "phase": ["morning", "afternoon"] },
+		"title": "損壞出口測試",
+		"text": "測試",
+		"slots": [
+			{
+				"id": "x_corrupt_slot",
+				"accepts": ["madness"],
+				"label": "損壞槽",
+				"indulgence": {
+					"auto": true,
+					"weight": 99999
+				},
+				"on_place": {}
+			}
+		]
+	}
+	(loader.beats as Array).append(corrupt_beat)
+	# 故意讓 loader.beats_by_id 裡的 beat 遺失 slots，模擬 slot 找不到的異常情境
+	loader.beats_by_id["exit_corrupt_test"] = {
+		"id": "exit_corrupt_test",
+		"location": "sanquan",
+		"slots": []
+	}
+
+	var lines_no_slot: PackedStringArray = gs.call("_settle_forced_indulgence")
+
+	# 復原 loader
+	(loader.beats as Array).erase(corrupt_beat)
+	loader.beats_by_id.erase("exit_corrupt_test")
+
+	var pending_b: Array = gs.get("forced_pending")
+	var spent_b: bool = gs.get("action_spent")
+	var ind_count_b: int = gs.get("indulgence_count")
+	var cleared_b: int = gs.get("madness_cards_cleared")
+	var has_card_b: bool = gs.call("has_card", "madness#1")
+
+	if lines_no_slot.is_empty():
+		failed += _ok("槽遺失時 _settle_forced_indulgence 回傳空行")
+	else:
+		failed += _fail("槽遺失時仍回傳文字: %s" % str(lines_no_slot))
+
+	if pending_b == ["madness#1"]:
+		failed += _ok("槽遺失時 forced_pending 隊首仍完整保留（未吃債）")
+	else:
+		failed += _fail("槽遺失時 forced_pending 遺失: %s" % str(pending_b))
+
+	if not spent_b and ind_count_b == 0 and cleared_b == 0 and has_card_b:
+		failed += _ok("槽遺失時 action_spent, indulgence_count, madness_cards_cleared 未被污染且手牌維持持有")
+	else:
+		failed += _fail("槽遺失時狀態被污染: spent=%s, ind=%d, cleared=%d, has=%s" % [
+			spent_b, ind_count_b, cleared_b, has_card_b
+		])
+
+	return failed
+

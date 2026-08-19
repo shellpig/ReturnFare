@@ -165,12 +165,16 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		"illegal": 0,
 	}
 
+	var last_ind_count := int(gs.get("indulgence_count"))
+
 	for d in range(1, 46):
 		day_counter = d
 
 		# 1. Morning
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "morning", "時間同步錯誤 (morning)")
-		var res_m := execute_action_phase(gs, data_node, d, "morning")
+		var forced_m := (int(gs.get("indulgence_count")) > last_ind_count)
+		last_ind_count = int(gs.get("indulgence_count"))
+		var res_m := execute_action_phase(gs, data_node, d, "morning", forced_m)
 		var cat_m: String = str(res_m.get("category", "illegal"))
 		if stats.has(cat_m):
 			stats[cat_m] += 1
@@ -180,11 +184,14 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			illegal_phases += 1
 		if res_m.get("placed", false):
 			actions_taken += 1
+		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
 
 		# 2. Afternoon
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "afternoon", "時間同步錯誤 (afternoon)")
-		var res_a := execute_action_phase(gs, data_node, d, "afternoon")
+		var forced_a := (int(gs.get("indulgence_count")) > last_ind_count)
+		last_ind_count = int(gs.get("indulgence_count"))
+		var res_a := execute_action_phase(gs, data_node, d, "afternoon", forced_a)
 		var cat_a: String = str(res_a.get("category", "illegal"))
 		if stats.has(cat_a):
 			stats[cat_a] += 1
@@ -194,6 +201,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			illegal_phases += 1
 		if res_a.get("placed", false):
 			actions_taken += 1
+		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
 
 		if verbose:
@@ -206,6 +214,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		# 3. Evening
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "evening", "時間同步錯誤 (evening)")
 		execute_evening_phase(gs, data_node, d)
+		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
 
 		# 第 45 天 evening 推進後已自動呼叫 end_run()，不進第 45 夜
@@ -215,6 +224,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		# 4. Night
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "night", "時間同步錯誤 (night)")
 		execute_night_phase(gs, data_node, d)
+		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
 
 	gs.run_ended.disconnect(cb)
@@ -254,7 +264,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 	}
 
 
-static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: String) -> Dictionary:
+static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: String, forced_indulged: bool = false) -> Dictionary:
 	var locs := PanelBuilder.available_locations(gs, data_node)
 	var placed := false
 	var placed_info := ""
@@ -310,8 +320,8 @@ static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: Str
 			"summary": "放置 [%s]" % placed_info
 		}
 
-	# 放不下主角卡時，進行合法性診斷與分類（K-25）
-	var diag := diagnose_unplaced_phase(data_node, day, phase, gs)
+	# 放不下主角卡時，進行合法性診斷與分類（K-25 / K-60）
+	var diag := diagnose_unplaced_phase(data_node, day, phase, gs, forced_indulged)
 	var ok: bool = bool(diag.get("ok", false))
 	var cat: String = str(diag.get("category", "illegal"))
 	var detail: String = str(diag.get("detail", ""))
@@ -328,14 +338,13 @@ static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: Str
 	}
 
 
-## 診斷未放卡時段的合法性（K-25：從資料推導全 fixed 時段、比對名單與條件/門檻限制）
-static func diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node) -> Dictionary:
+## 診斷未放卡時段的合法性（K-25 / K-60：從規則層事實推導縱慾吃格、全 fixed 時段、比對名單與條件/門檻限制）
+static func diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs: Node, forced_indulged: bool = false) -> Dictionary:
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 	var beats: Array[Dictionary] = loader.beats_at(day, phase)
 
-	# 0. 強制縱慾已消耗該時段行動格（P2-C：嚴格比對 action_spent 且 last_forced_lines 非空）
-	var forced_lines: PackedStringArray = gs.get("last_forced_lines")
-	if bool(gs.get("action_spent")) and not forced_lines.is_empty():
+	# 0. 強制縱慾已消耗該時段行動格（P2-C / K-60：規則層比對該時段進場時是否發生強制縱慾結算）
+	if bool(gs.get("action_spent")) and forced_indulged:
 		return { "ok": true, "category": "forced_indulgence", "detail": "行動格已由強制縱慾消耗" }
 
 	# 1. 刻意留空
