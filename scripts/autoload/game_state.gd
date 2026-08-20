@@ -319,7 +319,11 @@ func _check_madness_cap() -> void:
 	var cap: int = int(Data.tuning("madness_cap", 0))
 	if cap <= 0:
 		return
-	if madness_clock.size() >= cap:
+	var madness_count := 0
+	for c: String in hand:
+		if _card_base_id(c) == "madness":
+			madness_count += 1
+	if madness_count >= cap:
 		end_run("ending_madness_be")
 
 

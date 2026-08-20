@@ -298,37 +298,48 @@ func _test_madness_cap_triggers_be(gs: Node, data_node: Node) -> int:
 # ── 3. 發瘋 BE 演出文字展示 ──────────────────────────────────────────────────
 
 func _test_be_flow_text_display() -> int:
-	print("--- 3. madness BE display branches in main scene ---")
+	print("--- 3. madness BE display branches in main scene (K-67) ---")
 	var failed := 0
+
+	var gs: Node = get_root().get_node_or_null("GameState")
+	var data_node: Node = get_root().get_node_or_null("Data")
+	var loader: DataLoader = data_node.get("loader")
+	var orig_cap = loader.tuning["madness_cap"]
 
 	var main_scene: PackedScene = load("res://scenes/main.tscn")
 	var main: Control = main_scene.instantiate()
 	get_root().add_child(main)
 	await process_frame
 
-	# 模擬觸發一般結局
-	main.call("_on_run_ended", "ending_default")
+	# 觸發一般結局（透過 GameState 發射 run_ended）
+	gs.call("end_run", "ending_default")
+	await process_frame
 	var flow_text: FlowText = main.get_node("ContentView/FlowText")
 	var text_default := flow_text.get_text() if flow_text.has_method("get_text") else ""
 	if text_default.is_empty() and flow_text.has_node("ScrollContainer/TextLabel"):
 		text_default = (flow_text.get_node("ScrollContainer/TextLabel") as RichTextLabel).text
 
 	if "[結局 stub]" in text_default:
-		failed += _ok("一般結局顯示 [結局 stub]")
+		failed += _ok("一般結局訊號發射後顯示 [結局 stub]")
 	else:
 		failed += _fail("一般結局未顯示 [結局 stub] (text=%s)" % text_default)
 
-	# 模擬觸發發瘋 BE：不播後日談骨架，顯示 [發瘋 BE]
-	main.call("_on_run_ended", "ending_madness_be")
+	# 透過真實規則層入口發卡衝破 cap 觸發發瘋 BE（K-67：驗證 GameState.run_ended 訊號接線）
+	loader.tuning["madness_cap"] = 2
+	gs.call("gain_card", "madness")
+	gs.call("gain_card", "madness")
+	await process_frame
+
 	var text_be := flow_text.get_text() if flow_text.has_method("get_text") else ""
 	if text_be.is_empty() and flow_text.has_node("ScrollContainer/TextLabel"):
 		text_be = (flow_text.get_node("ScrollContainer/TextLabel") as RichTextLabel).text
 
 	if "[發瘋 BE]" in text_be and not ("[結局 stub]" in text_be):
-		failed += _ok("發瘋 BE 顯示 [發瘋 BE] 且不播一般結局骨架")
+		failed += _ok("真實發卡達 cap 觸發發瘋 BE，經由訊號接線顯示 [發瘋 BE] 且不播一般結局骨架 (K-67)")
 	else:
 		failed += _fail("發瘋 BE 文本展示錯誤 (text=%s)" % text_be)
 
+	loader.tuning["madness_cap"] = orig_cap
 	main.queue_free()
 	await process_frame
 	return failed

@@ -74,6 +74,9 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p2c_01_forced_text", "強制縱慾自動執行時效果文字播在地圖上，且整個時段留存", "p2c_night_one_forced.json", "", "p2c_01_forced_text", "", "p2c_01"),
 		UiCase.new("p2c_02_forced_action_spent", "被強制縱慾吃掉的行動格：任何地點都沒有主角卡放入入口", "p2c_night_one_forced.json", "", "p2c_02_forced_action_spent", "", "p2c_02"),
 		UiCase.new("p2c_03_forced_two_same_day", "同日兩張歸零：上午下午各吃一格，那一天完全沒有行動格", "p2c_night_two_forced.json", "", "p2c_03_forced_two_same_day", "", "p2c_03"),
+		UiCase.new("p2d_01_vision_zero", "手上 2 張發狂卡時二樓有人在走完全不出現", "p2d_d24_two_cards.json", "", "p2d_01_vision_visibility", "", "p2d_01_zero"),
+		UiCase.new("p2d_01_vision_three", "手上 3 張發狂卡時二樓有人在走正確出現", "p2d_d24_three_cards.json", "", "p2d_01_vision_visibility", "", "p2d_01_three"),
+		UiCase.new("p2d_02_be_screen", "發狂卡達到 cap 時立即觸發發瘋 BE 且畫面呈現 [發瘋 BE] 並收起地圖與面板", "p2d_near_cap.json", "", "p2d_02_be_screen", "", "p2d_02"),
 	]
 
 
@@ -188,6 +191,12 @@ class UiCase extends CaseBaseClass:
 				return await _p2c_02(tree)
 			"p2c_03":
 				return await _p2c_03(tree)
+			"p2d_01_zero":
+				return await _p2d_01_zero(tree)
+			"p2d_01_three":
+				return await _p2d_01_three(tree)
+			"p2d_02":
+				return await _p2d_02(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -729,6 +738,41 @@ class UiCase extends CaseBaseClass:
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
 			"forced_two_same_day", "forced_day_fully_eaten",
+		] } }
+
+	func _p2d_01_zero(tree: SceneTree) -> Dictionary:
+		# 手上 2 張發狂卡（未達門檻 3）：D24 night 睡眠時不觸發二樓有人在走（awei_heard_it 不落帳）
+		assert_eq(int(_run(tree).get("day", 0)), 24, "D24 night 起點")
+		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "睡眠前 awei_heard_it 為 false")
+		await _click(tree, "phase_advance")
+		assert_eq(int(_run(tree).get("day", 0)), 25, "睡眠推進至 D25")
+		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "2 張發狂卡時二樓有人在走未達門檻，不得落帳")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
+			"vision_hidden_at_2",
+		] } }
+
+	func _p2d_01_three(tree: SceneTree) -> Dictionary:
+		# 手上 3 張發狂卡（達門檻 3）：D24 night 睡眠時成功觸發二樓有人在走（awei_heard_it 成功落帳）
+		assert_eq(int(_run(tree).get("day", 0)), 24, "D24 night 起點")
+		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "睡眠前 awei_heard_it 為 false")
+		await _click(tree, "phase_advance")
+		assert_eq(int(_run(tree).get("day", 0)), 25, "睡眠推進至 D25")
+		assert_true((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "3 張發狂卡時二樓有人在走達視野門檻，成功落帳")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
+			"vision_visible_at_3",
+		] } }
+
+	func _p2d_02(tree: SceneTree) -> Dictionary:
+		# 手上 6 張發狂卡，進 n_ahong_1 開啟收費標記獲得第 7 張 -> 達到 cap 7 即刻觸發發瘋 BE
+		var run_before := _run(tree)
+		var mcards := (run_before.get("hand", []) as Array).filter(func(c: String) -> bool: return c.begins_with("madness"))
+		assert_eq(mcards.size(), 6, "啟動時手上 6 張發狂卡")
+		await _enter(tree, "n_ahong_1")
+		assert_true(_has_text(tree.get_root(), "[發瘋 BE]"), "達到 cap 7 必須呈現 [發瘋 BE]")
+		assert_false(_has_text(tree.get_root(), "[結局 stub]"), "發瘋 BE 不得播出一般結局骨架")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"), "發瘋 BE 觸發後地點面板必須收起")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
+			"be_text_visible", "be_no_coda_stub", "be_map_hidden",
 		] } }
 
 	func _arrival(tree: SceneTree) -> Dictionary:

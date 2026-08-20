@@ -218,6 +218,45 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _write_p2b_state(output_dir, "p2c_night_two_forced", gs_p2c.serialize()):
 		return false
 
+	# 產生 P2-D 視野門檻與發瘋 BE 的情境（K-68）。
+	var d24n_dict: Dictionary = _load_state(output_dir, "d24_night.json")
+	if d24n_dict.is_empty():
+		printerr("P2-D 情境的來源 checkpoint (d24_night) 讀取失敗")
+		return false
+
+	var gs_p2d: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+
+	# ① D24 night 2 張發狂卡（二樓有人在走 HIDDEN）
+	_reset_state(gs_p2d)
+	gs_p2d.deserialize(d24n_dict)
+	gs_p2d.set_flag("boundary_bleeding", true)
+	gs_p2d.set_flag("hold_d24am", false)
+	gs_p2d.set_flag("hold_d24pm", false)
+	gs_p2d.gain_card("madness")
+	gs_p2d.gain_card("madness")
+	if not _write_p2b_state(output_dir, "p2d_d24_two_cards", gs_p2d.serialize()):
+		return false
+
+	# ② D24 night 3 張發狂卡（二樓有人在走 OPEN）
+	_reset_state(gs_p2d)
+	gs_p2d.deserialize(d24n_dict)
+	gs_p2d.set_flag("boundary_bleeding", true)
+	gs_p2d.set_flag("hold_d24am", false)
+	gs_p2d.set_flag("hold_d24pm", false)
+	gs_p2d.gain_card("madness")
+	gs_p2d.gain_card("madness")
+	gs_p2d.gain_card("madness")
+	if not _write_p2b_state(output_dir, "p2d_d24_three_cards", gs_p2d.serialize()):
+		return false
+
+	# ③ 接近 cap 狀態：D10 night 6 張發狂卡，再開一次收費標記即達 cap 7
+	_reset_state(gs_p2d)
+	gs_p2d.deserialize(d10n_dict)
+	for i in range(6):
+		gs_p2d.gain_card("madness")
+	if not _write_p2b_state(output_dir, "p2d_near_cap", gs_p2d.serialize()):
+		return false
+
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
 	var d45_coda_decisions: Array[Dictionary] = [
@@ -490,6 +529,12 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 				and hand.has("madness#1") and hand.has("madness#2") \
 				and int((run.get("madness_clock", {}) as Dictionary).get("madness#1", 0)) == 1 \
 				and int((run.get("madness_clock", {}) as Dictionary).get("madness#2", 0)) == 1
+		"p2d_d24_two_cards":
+			return day == 24 and phase == "night" and hand.has("madness#1") and hand.has("madness#2") and not hand.has("madness#3")
+		"p2d_d24_three_cards":
+			return day == 24 and phase == "night" and hand.has("madness#1") and hand.has("madness#2") and hand.has("madness#3")
+		"p2d_near_cap":
+			return day == 10 and phase == "night" and hand.has("madness#6") and not hand.has("madness#7")
 		"d15_night":
 			return day == 15 and phase == "night"
 		"d24_night":
