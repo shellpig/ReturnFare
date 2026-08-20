@@ -355,7 +355,24 @@ Write-Host "  Run Dir:   $runDir"
 Write-Host "  Timeout:   $TimeoutSeconds s per process"
 
 Write-Host ""
-Write-Host "[1/4] Generating scenario states..." -ForegroundColor Yellow
+Write-Host "[1/5] Hover regression guard (K-48)..." -ForegroundColor Yellow
+$hoverGuardLog = Join-Path $runDir "hover_regression.log"
+$hoverGuardArgs = @(
+    "--path", ".",
+    "--script", "res://tests/ui_sim/qa_hover_regression.gd",
+    "--log-file", $hoverGuardLog
+)
+$hoverGuardRes = Invoke-GodotProcess -Binary $GodotBin -ArgumentList $hoverGuardArgs -TimeoutSec $TimeoutSeconds
+if ($hoverGuardRes.ExitCode -ne 0 -or $hoverGuardRes.Timeout) {
+    Write-Host "FATAL: hover regression guard failed. See $hoverGuardLog" -ForegroundColor Red
+    Write-Host "  The guard pins the K-48 rule: read gui_get_hovered_control() immediately after" -ForegroundColor Red
+    Write-Host "  sending the motion, and never yield between press and release." -ForegroundColor Red
+    exit 1
+}
+Write-Host "  -> OK" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[2/5] Generating scenario states..." -ForegroundColor Yellow
 $stateGenLog = Join-Path $runDir "make_states.log"
 $stateArgs = @(
     "--headless",
@@ -375,7 +392,7 @@ if ($stateRes.Timeout -or $stateRes.ExitCode -ne 0) {
     exit 1
 }
 
-Write-Host "[2/4] Creating isolated data variants and runner manifest..." -ForegroundColor Yellow
+Write-Host "[3/5] Creating isolated data variants and runner manifest..." -ForegroundColor Yellow
 $dataSource = Join-Path $projectRoot "data"
 $defaultData = Join-Path $dataVariantsDir "hand_size_default"
 $smallData = Join-Path $dataVariantsDir "hand_size_small"
@@ -465,7 +482,7 @@ if (-not [string]::IsNullOrEmpty($Case)) {
 }
 $executedContractCount = @($caseDefs | ForEach-Object { [string]$_.contract_id } | Sort-Object -Unique).Count
 
-Write-Host "[3/4] Executing $($caseDefs.Count) UI variants (catalog $catalogContractCount, executed $executedContractCount contracts)..." -ForegroundColor Yellow
+Write-Host "[4/5] Executing $($caseDefs.Count) UI variants (catalog $catalogContractCount, executed $executedContractCount contracts)..." -ForegroundColor Yellow
 $results = @()
 $failedCount = 0
 foreach ($caseDef in $caseDefs) {
@@ -652,7 +669,7 @@ foreach ($group in $groups) {
 
 $negativeResults = @()
 if ([string]::IsNullOrEmpty($Case) -and -not $SkipNegative) {
-    Write-Host "[4/4] Executing formal negative tests..." -ForegroundColor Yellow
+    Write-Host "[5/5] Executing formal negative tests..." -ForegroundColor Yellow
     $negativeResults = @(Invoke-NegativeTests -RunDir $runDir -StatesDir $statesDir -GodotBinary $GodotBin -TimeoutSec $TimeoutSeconds)
     foreach ($negative in $negativeResults) {
         if ($negative.Ok) {
@@ -662,7 +679,7 @@ if ([string]::IsNullOrEmpty($Case) -and -not $SkipNegative) {
         }
     }
 } else {
-    Write-Host "[4/4] Negative tests skipped." -ForegroundColor DarkGray
+    Write-Host "[5/5] Negative tests skipped." -ForegroundColor DarkGray
 }
 
 $negativeFailures = @($negativeResults | Where-Object { -not $_.Ok }).Count

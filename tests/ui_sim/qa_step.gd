@@ -183,8 +183,14 @@ static func click(
 	# 3～5. 算中心點、送滑鼠移動、核驗 hover 命中。
 	#
 	# 這三步綁在同一個迴圈裡重試（K-48）。Container 的排版是 `queue_sort()` 延後套用的，
-	# hover 也不保證跟事件同一幀更新，所以每一輪都要**重讀矩形**再重送事件——
-	# 只重送事件會拿到舊 hover，只重讀矩形則抓不到 hover 落後的那一拍。
+	# 所以每一輪都要**重讀矩形**再重送事件。
+	#
+	# ⚠️ **送出 motion 之後必須立刻讀 hover，中間不准等幀**（K-48 的真因，2026-08-20）。
+	# 案例是開真視窗跑的，桌面上還有一個實體滑鼠。`gui_get_hovered_control()` 是「最後
+	# 一個滑鼠移動事件打到誰」的狀態，不是每幀重算的東西——只要在送出與讀取之間讓出
+	# 執行權，使用者手動了一下滑鼠，作業系統就會補一個真的移動事件把 hover 蓋掉，
+	# 斷言就會回報「預期 AdvanceBeatButton、實際 Main」這種與座標矛盾的結果。
+	# 要等排版落定就等在**下一輪重試的開頭**，不要等在這兩步中間。
 	var target_vp := target.get_viewport()
 	var root_rect := Rect2(Vector2.ZERO, root.get_visible_rect().size)
 	var screen_center := Vector2.ZERO
@@ -194,13 +200,15 @@ static func click(
 
 	for attempt in range(HOVER_SYNC_ATTEMPTS):
 		geometry_error = ""
+		# 第 2 輪起先等排版落定再重讀矩形。等在這裡，不等在「送 motion」與「讀 hover」之間。
+		if attempt > 0:
+			await wait_draw_frames(tree, 2)
 		var rect_size: Vector2 = target.size
 		if rect_size.x <= 0 or rect_size.y <= 0:
 			rect_size = target.get_global_rect().size
 
 		if rect_size.x <= 0 or rect_size.y <= 0:
 			geometry_error = "目標元件尺寸為 0 (size: %s)" % str(rect_size)
-			await wait_draw_frames(tree, 2)
 			continue
 
 		screen_center = target.get_screen_position() + rect_size * 0.5
@@ -208,15 +216,14 @@ static func click(
 		# 邊界檢查：中心點必須落在主視口範圍內 (1280x720)
 		if not root_rect.has_point(screen_center):
 			geometry_error = "目標中心點越界 (點: %s, 視口: %s)" % [str(screen_center), str(root_rect.size)]
-			await wait_draw_frames(tree, 2)
 			continue
 
 		var motion := InputEventMouseMotion.new()
 		motion.position = screen_center
 		motion.global_position = screen_center
 		send_input(motion)
-		await wait_draw_frames(tree, 2)
 
+		# 立刻讀，不 await。理由見上方註解（K-48）。
 		hovered = target_vp.gui_get_hovered_control()
 		if hovered == target or (hovered != null and target.is_ancestor_of(hovered)):
 			hit_ok = true
@@ -239,13 +246,17 @@ static func click(
 		return result
 
 	# 6. 送 InputEventMouseButton (pressed = true)
+	#
+	# ⚠️ 按下與放開之間**不准等幀**（K-48 的第二個同源缺口）。中間讓出執行權的話，
+	# 使用者動一下實體滑鼠會讓按鈕收到 MOUSE_EXIT，`BaseButton` 的 `pressing_inside`
+	# 被清掉，放開時就不發 `pressed`——症狀是「click 回報成功但畫面什麼都沒發生」。
+	# 一次真實點擊本來就是連續動作，中間沒有理由停。
 	var press_event := InputEventMouseButton.new()
 	press_event.button_index = button_index
 	press_event.pressed = true
 	press_event.position = screen_center
 	press_event.global_position = screen_center
 	send_input(press_event)
-	await wait_draw_frames(tree, 2)
 
 	# 7. 送 InputEventMouseButton (pressed = false)
 	var release_event := InputEventMouseButton.new()
