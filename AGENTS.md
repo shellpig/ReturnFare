@@ -39,6 +39,26 @@
 
 Report to user: current progress, and any issues with their scope of impact.
 
+**Layer 0 — 每個任務開工前先過這張表（不是只有開場）：**
+
+任務屬於下列哪一類，就先讀對應的 skill，再動手。**判斷任務類型是開工的第一步，不是可選項。**
+
+| 任務類型 | 先讀 |
+|---|---|
+| 規劃遊戲規格、Phase 規劃、平衡調整、帶 code review 的驗證 | `gamestudio` |
+| 診斷 bug、分析錯誤、找根因、效能回歸 | `diagnose` |
+| 需求不清、規格討論、要問釐清問題 | `grill-me` |
+| 前端／本機 web app 驗證、UI 行為除錯、瀏覽器截圖或 console log | `webapp-testing` |
+
+四個 skill 已於 2026-08-20 用 junction 掛進 `~/.claude/skills/`，**會出現在 session 的技能清單裡，直接用 skill 名字叫**。原始檔仍在 `C:\_work\AI_Work\Skills\`（改那邊就等於改這邊）；環境沒掛 junction 時退回讀檔：
+
+- `gamestudio` → `Skills\gamestudio\SKILL.md`
+- `diagnose` → `Skills\engineering\diagnose\SKILL.md`
+- `grill-me` → `Skills\productivity\grill-me\SKILL.md`
+- `webapp-testing` → `Skills\engineering\webapp-testing\SKILL.md`
+
+> ⚠️ **這張表原本只住在下面「本機 Windows 環境專用」段，結果被當成參考資料而不是待辦。** 2026-08-20 的 P2-E 驗證整場沒發動 `gamestudio`（該發動：QA mode ＋ `CODEX_HANDOFF.md` 交接區塊）。搬到開場檢查裡就是為了這件事。
+
 ## 文件查閱規則
 
 除了 `AGENTS.md` 與 `PROJECT_BRIEF.md`（開場整份讀），**其他文件一律標題 grep 定位、只讀該段**（讀到下一個同級標題為止）。大檔（企劃書約 90 KB、三章故事線各 50–70 KB）整份讀會被工具截斷；小檔照做是為了讀對的段落，不是省流量。
@@ -122,13 +142,9 @@ grep -n "P1-A" 實作規格書.md 開發設計方針.md 測試指南.md
 
 ### Project Skills
 
-This project uses local skills from `C:\_work\AI_Work\Skills\`.
+原始檔住 `C:\_work\AI_Work\Skills\`；四個 skill 已用 junction 掛進 `~/.claude/skills/`（`gamestudio`、`diagnose`、`grill-me`、`webapp-testing`），改原始檔等於改掛進去的那份。
 
-Trigger rules:
-- Diagnosing bugs / analyzing errors / finding root cause → read `Skills\engineering\diagnose\SKILL.md` first
-- Requirements unclear / spec discussion / planning / need to ask clarifying questions → read `Skills\productivity\grill-me\SKILL.md` first
-- Planning game specs / verification with code review → read `Skills\gamestudio\SKILL.md` first
-- Frontend / local web app verification, UI behavior debugging, browser screenshots, or console logs → read `Skills\engineering\webapp-testing\SKILL.md` first
+**觸發表已搬到 `New Conversation Opening Check > Layer 0`，本節不重複。**
 
 ### 專案外部工具路徑
 
