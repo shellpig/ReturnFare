@@ -194,6 +194,12 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 > `madness` 不可丟棄、不可寄放，只能靠縱慾消掉。
 > **除 `madness` 外，所有卡都是 unique**：重複取得＝no-op（gain 冪等），不會出現第二張。`madness` 是唯一的多實例卡。堆疊卡等真需求出現再開欄位（規格書第三節）。
 
+### 夜間對位知識卡（P3）
+
+- 每個 distinct `locations.json > night[].day_counterpart` 恰好一張 knowledge 卡；多個夜間 row 指向同一白天地點時共用同一張。
+- 卡名只陳述「夜裡可以走回該白天地點」，`text` 可描述白天與夜裡是同一座鎮，但**不得列出同地點下尚未到訪的其他夜間分區**。
+- 對位卡只由 `night_reveal` 引用；實際 id、名稱與文字住 `cards.json`，其他文件不複製映射表。
+
 ## `card_types.json`
 
 卡片型別的顯示名。**卡槽用它告訴玩家「這一格收什麼」**（規格書第五節、P1-G）。
@@ -220,16 +226,17 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 | 欄位 | 說明 |
 |---|---|
-| `id` / `name` | — |
+| `id` / `name` | `name` 是地點外部可觀察的名稱。night row 在對位前把它當引子顯示，不可直接寫進場後才知道的結果 |
 | `phases` | 開放時段：`morning` / `afternoon`（白天地點用） |
 | `layer` | `day` / `night` / `both` |
-| `chapter` | 第幾章開放 |
+| `chapter` | 第幾章開放。night row 必須與 `earliest_night` 所屬章節一致；一般 row 仍以 `earliest_night` 控制出現，`teaser_only` 才以 `chapter` 控制可見起點 |
 | `earliest_night` | 夜間地點最早可開的夜。**是下限不是期限**——開過與否跨夜持續 |
-| `requires` | 夜間地點級門檻（如阿宏鏈逐級旗標）；不成立時灰掉 |
+| `requires` | 夜間地點級門檻；不成立時 row 仍顯示，詳情的「進入」灰掉。走過前一夜間地點用 `night_seen`，不用 `opened_n_*` flag |
 | `reject_reason` | 夜間地點灰掉時那一行字（選填；未填時引擎用通用文案） |
-| `night_reveal` | 對位所需的知識卡 id；拿到後夜間名改成白天名 |
+| `night_reveal` | 對位後取得的 knowledge 卡 id；有 `day_counterpart` 的 row 必填，夜間限定 row 必須為 null。同一 `day_counterpart` 的 row 必須共用 id |
 | `day_counterpart` | **夜間地點專用**：白天去同一個位置是哪個地點；`null` ＝ 白天那裡什麼都沒有。見下 |
-| `madness_cost` | **夜間標記的價碼**，開這個標記產生幾張發狂卡；0 ＝ 免費地形 |
+| `madness_cost` | 夜間 row 的終身首次主動到訪會產生幾張發狂卡；0 ＝不產生。玩家到訪前不看見數字，UI 不顯示「免費」 |
+| `teaser_only` | 選填 boolean。`true` ＝從 `chapter` 起可見但永遠不能進入；必須有 `reject_reason`，且 `madness_cost`／`day_counterpart`／`night_reveal` 必須為 null 或省略 |
 | `map` | 地圖座標，`{x, y}` |
 | `note` | 設計註記，引擎不讀 |
 
@@ -249,7 +256,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 **第三類最值錢**：白天去那個座標是空地、一堵牆、一間沒有門的房子。
 
-> `night_reveal` 只有第二類填得動——沒有白天版就沒有「改成白天名」這回事。第三類一律 `null`。
+> `night_reveal` 只有第二類填得動——沒有白天版就沒有「改成白天名」這回事。第三類一律 `null`。已對位不是儲存欄位；引擎由「該 row 已在 meta `night_locations_seen`」且「meta knowledge 含 `night_reveal`」即時計算。
 
 ## `npcs.json`
 
@@ -287,6 +294,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `fixed` | `true` ＝ 一定發生且**不吃行動格** |
 | `condition` | 出現條件，不成立則整個 beat 不存在 |
 | `requires` / `reject_reason` | beat 級門檻：不成立時整個 beat 灰掉＋理由（語意同槽級） |
+| `meta_once` | 選填 boolean；只供 `when.phase == "night"` 且 `fixed: true` 的 beat。`true` ＝整份存檔只自動播一次，id 記進 meta `night_once_beats_seen` |
 | `title` / `text` | 面板標題與敘述 |
 | `slots` | 槽陣列 |
 | `on_enter` | beat 首次呈現給玩家時結算一次的效果；鍵同 `on_place` |
@@ -364,6 +372,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 { "relation_at_least": { "npc": "awei", "state": "疑似" } }
 { "flag": "ahong_missing" }
 { "madness_at_least": 3 }
+{ "night_seen": "n_ahong_1" }
 { "count_at_least": { "n": 2, "of": [ ... ] } }
 { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
 { "not": { ... } }
@@ -396,6 +405,18 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 **這是拖延唯一的正報酬，沒有它那條路只剩壞處**——一張卡不管主動清還是倒數歸零都是一格，拖延省不到行動格。
 
 用在 `condition` 而不是 `requires`：看不見的東西就是不存在，不該灰給玩家看。**這是三態裡「不顯示」那一態的正當用法**——它不是缺鑰匙，是他還不夠不正常。
+
+#### `night_seen`＝「曾經走到過這裡」
+
+`night_seen` 的值是 night location id；求值只讀 meta `night_locations_seen`。它跨輪成立，用於路徑前置與「以前走過就不必重走」的承諾。
+
+它不等於本輪故事 flag，也不等於對位：
+
+- 需要「曾走過某夜間地點」→ `night_seen`
+- 需要「本輪發生過某件事」→ `flag`
+- 需要「已經把日夜位置對起來」→ `has_knowledge` 讀該 row 的 `night_reveal`
+
+正式資料不得以 `opened_n_*` flag 模擬 `night_seen`。
 
 ### `on_place` 效果
 
@@ -441,5 +462,5 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 - **第 1–3 天不發人物卡。** 人只作為槽上的 occupant 存在；人物卡等第 17 天委託登場再進手牌。這是為了不讓 prototype 早期就要處理「人在手上是什麼意思」。
 - **地圖座標先給示意值**，但保留相對位置——`待決事項.md` 第 29 項那條隱藏線索需要地理關係。
-- **標記價碼**：全輪 14 個收費，一律 1 張。規則是「往裡走收費，地形免費」。多張價碼留給第二輪之後（待決 38 已結案）。
-- **章節變體目前一個都還沒寫。** schema 支援了，但 24 個標記的第二、三章版本要等文本階段。
+- **標記價碼**：全輪 14 個 `madness_cost > 0` row，目前一律 1 張。規則是「往裡走收費，地形不產生卡」，且只收終身第一次主動到訪；多張價碼留給後續內容調整（待決 38 已結案）。
+- **章節變體已投入使用。** `n_litwindow` 與 `n_gathering` 現有跨章版本，多數一般 marker 有所屬章節版本；D1／D2 走定日 fixed，teaser 不需要內容。引擎仍必須支援「沒有當章版本時向下取最近版本」。
