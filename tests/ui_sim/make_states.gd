@@ -187,6 +187,37 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _write_p2b_state(output_dir, "p2b_d17_ajie", gs_p2b.serialize()):
 		return false
 
+	# 產生 P2-C 強制縱慾的兩個情境（K-61）。起點都是第 10 夜、發狂卡倒數壓到 1——
+	# UI 案例只要推進一次跨到第 11 天 morning，跨日 tick 就會歸零並自動執行強制縱慾。
+	# 倒數值直接寫 madness_clock，作法沿用 p2a_multi_madness：規則層沒有「設定倒數」
+	# 這個入口，改用走 6 天只是把同一件事拉長，還會讓情境綁上那 6 天的內容。
+	var d10n_dict: Dictionary = _load_state(output_dir, "d10_night.json")
+	if d10n_dict.is_empty():
+		printerr("P2-C 情境的來源 checkpoint 讀取失敗")
+		return false
+
+	var gs_p2c: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+
+	# ① 一張歸零：文字播出、時段內留存、行動格被吃掉
+	_reset_state(gs_p2c)
+	gs_p2c.deserialize(d10n_dict)
+	gs_p2c.gain_card("madness")
+	var mc_one: Dictionary = gs_p2c.get("madness_clock") as Dictionary
+	mc_one["madness#1"] = 1
+	if not _write_p2b_state(output_dir, "p2c_night_one_forced", gs_p2c.serialize()):
+		return false
+
+	# ② 同日兩張歸零：上午一格、下午一格，那一天完全沒有行動格
+	_reset_state(gs_p2c)
+	gs_p2c.deserialize(d10n_dict)
+	gs_p2c.gain_card("madness")
+	gs_p2c.gain_card("madness")
+	var mc_two: Dictionary = gs_p2c.get("madness_clock") as Dictionary
+	mc_two["madness#1"] = 1
+	mc_two["madness#2"] = 1
+	if not _write_p2b_state(output_dir, "p2c_night_two_forced", gs_p2c.serialize()):
+		return false
+
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
 	var d45_coda_decisions: Array[Dictionary] = [
@@ -451,6 +482,14 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 		"p2b_d17_ajie":
 			return day == 17 and phase == "morning" and hand.has("madness#1") \
 				and int((run.get("relations", {}) as Dictionary).get("ajie", 0)) >= 1
+		"p2c_night_one_forced":
+			return day == 10 and phase == "night" and hand.has("madness#1") \
+				and int((run.get("madness_clock", {}) as Dictionary).get("madness#1", 0)) == 1
+		"p2c_night_two_forced":
+			return day == 10 and phase == "night" \
+				and hand.has("madness#1") and hand.has("madness#2") \
+				and int((run.get("madness_clock", {}) as Dictionary).get("madness#1", 0)) == 1 \
+				and int((run.get("madness_clock", {}) as Dictionary).get("madness#2", 0)) == 1
 		"d15_night":
 			return day == 15 and phase == "night"
 		"d24_night":

@@ -71,6 +71,9 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p2b_04_violence_before", "第 16 天前山泉閣看不到暴力對人", "p2b_morning_madness.json", "", "p2b_04_exit_thresholds", "", "p2b_04_before"),
 		UiCase.new("p2b_04_violence_after", "第 17 天暴力對人出現、性慾仍隱藏、老街奢侈呈灰附理由", "p2b_d17_madness.json", "", "p2b_04_exit_thresholds", "", "p2b_04_after"),
 		UiCase.new("p2b_04_lust_relation", "與阿婕達疑似後性慾槽出現", "p2b_d17_ajie.json", "", "p2b_04_exit_thresholds", "", "p2b_04_lust"),
+		UiCase.new("p2c_01_forced_text", "強制縱慾自動執行時效果文字播在地圖上，且整個時段留存", "p2c_night_one_forced.json", "", "p2c_01_forced_text", "", "p2c_01"),
+		UiCase.new("p2c_02_forced_action_spent", "被強制縱慾吃掉的行動格：任何地點都沒有主角卡放入入口", "p2c_night_one_forced.json", "", "p2c_02_forced_action_spent", "", "p2c_02"),
+		UiCase.new("p2c_03_forced_two_same_day", "同日兩張歸零：上午下午各吃一格，那一天完全沒有行動格", "p2c_night_two_forced.json", "", "p2c_03_forced_two_same_day", "", "p2c_03"),
 	]
 
 
@@ -179,6 +182,12 @@ class UiCase extends CaseBaseClass:
 				return await _p2b_04_after(tree)
 			"p2b_04_lust":
 				return await _p2b_04_lust(tree)
+			"p2c_01":
+				return await _p2c_01(tree)
+			"p2c_02":
+				return await _p2c_02(tree)
+			"p2c_03":
+				return await _p2c_03(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -634,6 +643,93 @@ class UiCase extends CaseBaseClass:
 		await _enter(tree, "sanquan")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::exit_sanquan::x_lust_ajie"), "達疑似後性慾槽應出現")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["lust_relation_gate"] } }
+
+	# ── P2-C 強制縱慾（K-61）────────────────────────────────────────────────
+	# 三個案例都從「第 10 夜、發狂卡倒數剩 1」出發，推進一次跨到第 11 天 morning，
+	# 跨日 tick 歸零之後 advance_phase() 自動執行強制縱慾。
+	# 第 11 天 < 16 且無關係，所以挑選池只有砸東西(1) 與暴食(2)，必定挑中暴食。
+
+	## 取當下地圖上前幾個可進的地點 id（不寫死地點，避免資料一改就假紅）。
+	func _open_locations(tree: SceneTree, count: int) -> Array[String]:
+		var ids: Array[String] = []
+		for qa_id in _visible_ids(tree, "location::"):
+			ids.append(qa_id.trim_prefix("location::"))
+			if ids.size() >= count:
+				break
+		return ids
+
+	func _forced_to_d11_morning(tree: SceneTree) -> Dictionary:
+		await _advance(tree)
+		var run := _run(tree)
+		assert_eq(int(run.get("day", 0)), 11, "跨到第 11 天")
+		assert_eq(str(run.get("phase", "")), "morning", "跨到 morning")
+		return run
+
+	func _p2c_01(tree: SceneTree) -> Dictionary:
+		var run := await _forced_to_d11_morning(tree)
+		assert_eq(int(run.get("indulgence_count", 0)), 1, "強制縱慾自動執行一次")
+		# 效果文字必須真的畫在地圖上方，不是只存在 GameState 裡。
+		assert_true(_has_text(tree.get_root(), "你把廚房裡能找到的食物"),
+			"強制縱慾的 on_place 文字必須在畫面上")
+		# 第一次是輕的，而且文字明講下次更重（規格書 P2-C：一張帳單，也是一則預告）。
+		assert_true(_has_text(tree.get_root(), "下一次恐怕沒這麼容易"),
+			"第一次強制縱慾必須播出輕度預告文字")
+
+		# 開發設計方針 > P2-C 的契約：文字整個時段留存，關掉地點面板回到地圖仍看得到。
+		var locs := _open_locations(tree, 1)
+		assert_false(locs.is_empty(), "第 11 天上午地圖上必須有可進的地點")
+		await _enter(tree, locs[0])
+		await _close(tree)
+		assert_true(_has_text(tree.get_root(), "你把廚房裡能找到的食物"),
+			"關掉地點面板回到地圖，強制縱慾文字仍須留存")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
+			"forced_text_visible", "forced_text_persists_in_phase",
+		] } }
+
+	func _p2c_02(tree: SceneTree) -> Dictionary:
+		var run := await _forced_to_d11_morning(tree)
+		assert_true(bool(run.get("action_spent", false)), "強制縱慾吃掉該時段行動格")
+		assert_false((run.get("hand", []) as Array).has("madness#1"), "歸零那張發狂卡被消掉")
+		assert_eq(int(run.get("indulgence_count", 0)), 1, "縱慾計數 +1")
+
+		# 玩家在那一格不能再放主角卡——兩個地點都驗，證明擋的是行動格不是單一面板。
+		var locs := _open_locations(tree, 2)
+		assert_true(locs.size() >= 2, "第 11 天上午應有兩個以上可進地點可驗")
+		for loc_id in locs:
+			await _enter(tree, loc_id)
+			assert_true(_visible_ids(tree, "place::").filter(
+				func(qa: String) -> bool: return qa.ends_with("::protagonist")
+			).is_empty(), "行動格已被強制縱慾吃掉，%s 不得出現主角卡放入入口" % loc_id)
+			await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
+			"forced_action_spent", "forced_no_protagonist_place",
+		] } }
+
+	func _p2c_03(tree: SceneTree) -> Dictionary:
+		var morning := await _forced_to_d11_morning(tree)
+		assert_true(bool(morning.get("action_spent", false)), "上午行動格被第 1 張吃掉")
+		assert_eq(int(morning.get("indulgence_count", 0)), 1, "上午結算第 1 次")
+		assert_false((morning.get("hand", []) as Array).has("madness#1"), "第 1 張被消掉")
+		assert_true((morning.get("hand", []) as Array).has("madness#2"), "第 2 張還在，等下午")
+
+		await _advance(tree)
+		var afternoon := _run(tree)
+		assert_eq(str(afternoon.get("phase", "")), "afternoon", "推進到下午")
+		assert_true(bool(afternoon.get("action_spent", false)), "下午行動格被第 2 張吃掉")
+		assert_eq(int(afternoon.get("indulgence_count", 0)), 2, "下午結算第 2 次")
+		assert_false((afternoon.get("hand", []) as Array).has("madness#2"), "第 2 張也被消掉")
+
+		# 那一天玩家完全沒有行動格。
+		var locs := _open_locations(tree, 1)
+		assert_false(locs.is_empty(), "第 11 天下午地圖上必須有可進的地點")
+		await _enter(tree, locs[0])
+		assert_true(_visible_ids(tree, "place::").filter(
+			func(qa: String) -> bool: return qa.ends_with("::protagonist")
+		).is_empty(), "同日兩張歸零後，下午同樣不得出現主角卡放入入口")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
+			"forced_two_same_day", "forced_day_fully_eaten",
+		] } }
 
 	func _arrival(tree: SceneTree) -> Dictionary:
 		await _advance(tree)

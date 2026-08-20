@@ -1,7 +1,7 @@
 class_name QAContractMatrix
 extends RefCounted
 
-## 58 條 UI 契約的機器可讀目錄。變體由 runner 展開，但完成判定回到這份矩陣。
+## 61 條 UI 契約的機器可讀目錄。變體由 runner 展開，但完成判定回到這份矩陣。
 
 const CONTRACT_IDS := [
 	"p1g_case_01", "p1g_case_02", "p1g_case_03", "p1g_case_04",
@@ -24,6 +24,7 @@ const CONTRACT_IDS := [
 	"p2a_01_madness_hand_display",
 	"p2b_01_exit_visibility", "p2b_02_exit_place", "p2b_03_soak",
 	"p2b_04_exit_thresholds",
+	"p2c_01_forced_text", "p2c_02_forced_action_spent", "p2c_03_forced_two_same_day",
 ]
 
 const SPECIAL_EVIDENCE := {
@@ -56,6 +57,9 @@ const SPECIAL_EVIDENCE := {
 	"p2b_02_exit_place": ["indulge_place_effect", "indulge_action_spent", "exit_rejects_non_madness"],
 	"p2b_03_soak": ["soak_eats_day", "soak_afternoon_locked", "soak_not_enough_actions"],
 	"p2b_04_exit_thresholds": ["violence_day_gate_before", "violence_day_gate_after", "lust_relation_gate", "splurge_locked_reason"],
+	"p2c_01_forced_text": ["forced_text_visible", "forced_text_persists_in_phase"],
+	"p2c_02_forced_action_spent": ["forced_action_spent", "forced_no_protagonist_place"],
+	"p2c_03_forced_two_same_day": ["forced_two_same_day", "forced_day_fully_eaten"],
 }
 
 ## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。
