@@ -65,6 +65,11 @@ function Invoke-GodotProcess {
     $psi.Arguments = ($formattedArgs -join " ")
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
+    # K-62：所有 Godot 參數都用 `--path .`，而 `.` 吃的是**行程**的工作目錄。
+    # 腳本開頭的 Set-Location 只改 PowerShell 自己的位置，不改行程的工作目錄，
+    # 所以不設這一行的話，從別的目錄呼叫本腳本會安靜地去測那個目錄下的專案
+    # （--run-dir 是絕對路徑，產物照樣寫對地方，看起來一切正常）。
+    $psi.WorkingDirectory = $projectRoot
 
     $process = $null
     $rootPid = 0
