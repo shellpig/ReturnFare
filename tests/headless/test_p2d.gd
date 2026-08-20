@@ -7,6 +7,7 @@ extends SceneTree
 
 const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
+const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 
 
 func _initialize() -> void:
@@ -182,6 +183,79 @@ func _test_vision_threshold_visibility(gs: Node, data_node: Node) -> int:
 	# 清理合成資料
 	loader.beats.erase(test_beat)
 	loader.beats_by_id.erase(test_beat_id)
+
+	# (e) 真資料驗證（K-64）：ch2_nights.json 颱風夜 d23_night_bleed (madness_at_least: 3)
+	gs.call("end_run")
+	gs.set("day", 23)
+	gs.set("phase", "night")
+	var d23_beat: Dictionary = loader.beats_by_id.get("d23_night_bleed", {})
+	if d23_beat.is_empty():
+		failed += _fail("真資料未找到 d23_night_bleed")
+	else:
+		if ConditionEval.eval(d23_beat.get("condition"), gs):
+			failed += _fail("0 張發狂卡且未防颱時 d23_night_bleed 應為 false")
+		else:
+			failed += _ok("0 張發狂卡時真資料 d23_night_bleed 為 false")
+
+		gs.call("gain_card", "madness")
+		gs.call("gain_card", "madness")
+		if ConditionEval.eval(d23_beat.get("condition"), gs):
+			failed += _fail("2 張發狂卡時真資料 d23_night_bleed 應為 false")
+		else:
+			failed += _ok("2 張發狂卡時真資料 d23_night_bleed 仍為 false")
+
+		gs.call("gain_card", "madness")
+		if not ConditionEval.eval(d23_beat.get("condition"), gs):
+			failed += _fail("3 張發狂卡時真資料 d23_night_bleed 應為 true")
+		else:
+			failed += _ok("3 張發狂卡時真資料 d23_night_bleed 成功解鎖為 true (K-64)")
+
+		gs.call("lose_card", "madness#1")
+		if ConditionEval.eval(d23_beat.get("condition"), gs):
+			failed += _fail("降至 2 張後真資料 d23_night_bleed 應恢復為 false")
+		else:
+			failed += _ok("降至 2 張後真資料 d23_night_bleed 重新關閉為 false")
+
+	# (f) 真資料驗證（K-64）：ch2_nights.json d24_night_bleed (boundary_bleeding + madness_at_least: 3)
+	gs.call("end_run")
+	gs.set("day", 24)
+	gs.set("phase", "night")
+	gs.call("set_flag", "boundary_bleeding", true)
+	var d24_beat: Dictionary = loader.beats_by_id.get("d24_night_bleed", {})
+	if d24_beat.is_empty():
+		failed += _fail("真資料未找到 d24_night_bleed")
+	else:
+		gs.call("gain_card", "madness")
+		gs.call("gain_card", "madness")
+		if ConditionEval.eval(d24_beat.get("condition"), gs):
+			failed += _fail("2 張發狂卡時真資料 d24_night_bleed 應為 false")
+		else:
+			failed += _ok("2 張發狂卡時真資料 d24_night_bleed 仍為 false")
+
+		gs.call("gain_card", "madness")
+		if not ConditionEval.eval(d24_beat.get("condition"), gs):
+			failed += _fail("3 張發狂卡時真資料 d24_night_bleed 應為 true")
+		else:
+			failed += _ok("3 張發狂卡時真資料 d24_night_bleed 成功解鎖為 true (K-64)")
+
+	# (g) 真資料驗證（K-64）：indulgence_exits.json exit_sanquan (madness_at_least: 1)
+	gs.call("end_run")
+	gs.set("day", 1)
+	gs.set("phase", "morning")
+	var exit_beat: Dictionary = loader.beats_by_id.get("exit_sanquan", {})
+	if exit_beat.is_empty():
+		failed += _fail("真資料未找到 exit_sanquan")
+	else:
+		if ConditionEval.eval(exit_beat.get("condition"), gs):
+			failed += _fail("0 張發狂卡時 exit_sanquan 應為 false")
+		else:
+			failed += _ok("0 張發狂卡時 exit_sanquan condition 為 false")
+
+		gs.call("gain_card", "madness")
+		if not ConditionEval.eval(exit_beat.get("condition"), gs):
+			failed += _fail("1 張發狂卡時 exit_sanquan 應為 true")
+		else:
+			failed += _ok("1 張發狂卡時 exit_sanquan condition 成功解鎖為 true (K-64)")
 
 	return failed
 
@@ -367,23 +441,36 @@ func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) ->
 	return failed
 
 
-# ── 6. 正式資料上第一輪碰不到 BE ───────────────────────────────────────────
+# ── 6. 正式資料上第一輪碰不到 BE（K-63）────────────────────────────────────
 
 func _test_real_data_cap_unreached_in_run1(gs: Node, data_node: Node) -> int:
-	print("--- 6. real data tuning madness_cap is 7 and unreached in normal play ---")
+	print("--- 6. real data 45-day playthrough never reaches madness BE (K-63) ---")
 	var failed := 0
 	gs.call("end_run")
 
-	var cap = data_node.call("tuning", "madness_cap")
-	if int(cap) == 7:
-		failed += _ok("tuning.json 定義之 madness_cap 為 7")
+	var res: Dictionary = PlaythroughGreedy.run_greedy_walk(gs, data_node, false)
+	if not bool(res.get("ok", false)):
+		failed += _fail("45 天貪心走查執行失敗")
 	else:
-		failed += _fail("tuning.json madness_cap 預期為 7，實際為 %s" % str(cap))
+		failed += _ok("45 天貪心走查在正式資料上成功走完")
 
-	var threshold = data_node.call("tuning", "madness_vision_threshold")
-	if int(threshold) == 3:
-		failed += _ok("tuning.json 定義之 madness_vision_threshold 為 3")
+	var last_ending: String = str(res.get("last_ending_id", ""))
+	if last_ending == "ending_default" and last_ending != "ending_madness_be":
+		failed += _ok("45 天走查結局為 ending_default，未觸發 ending_madness_be (K-63)")
 	else:
-		failed += _fail("tuning.json madness_vision_threshold 預期為 3，實際為 %s" % str(threshold))
+		failed += _fail("走查結局異常 (last_ending_id=%s)" % last_ending)
+
+	var run_ended_cnt: int = int(res.get("run_ended_count", 0))
+	if run_ended_cnt == 1:
+		failed += _ok("走查全程 run_ended 恰好發射 1 次")
+	else:
+		failed += _fail("走查全程 run_ended 發射次數不符 (實際: %d)" % run_ended_cnt)
+
+	var final_madness: int = (res.get("final_madness_cards", []) as Array).size()
+	var cap: int = int(data_node.call("tuning", "madness_cap"))
+	if final_madness < cap:
+		failed += _ok("重置前持有發狂卡數 (%d) 低於 tuning.madness_cap (%d)" % [final_madness, cap])
+	else:
+		failed += _fail("重置前持有發狂卡數 (%d) 達到或超過 cap (%d)" % [final_madness, cap])
 
 	return failed
