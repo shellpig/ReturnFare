@@ -228,6 +228,13 @@ func _test_hand_overflow_warning(gs: Node) -> int:
 	print("--- hand_overflow_warning ---")
 	_reset(gs)
 	var failed := 0
+
+	var data_node: Node = get_root().get_node_or_null("Data")
+	var orig_cap = 7
+	if data_node != null and data_node.get("loader") != null:
+		orig_cap = data_node.get("loader").tuning.get("madness_cap", 7)
+		data_node.get("loader").tuning["madness_cap"] = 99
+
 	# 塞滿 15 張卡（tuning hand_size 為 14）
 	for i in range(15):
 		gs.call("gain_card", ID_MADNESS)
@@ -237,6 +244,10 @@ func _test_hand_overflow_warning(gs: Node) -> int:
 		failed += _fail("hand overflow: expected 15 cards, got %d" % hand_array.size())
 	else:
 		failed += _ok("hand overflow: 15 cards gained despite exceeding hand_size (warning emitted)")
+
+	if data_node != null and data_node.get("loader") != null:
+		data_node.get("loader").tuning["madness_cap"] = orig_cap
+
 	return failed
 
 

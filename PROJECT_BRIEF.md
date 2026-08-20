@@ -4,7 +4,7 @@
 
 最後更新：2026-08-20
 
-> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-H 已全部實作並驗證全綠**；**Phase 2-A 發狂卡的產生與倒數、P2-B 縱慾出口與主動縱慾、P2-C 強制縱慾與失控時段均已實作並驗收（全套 14 套 headless exit 0）**；**UI 模擬驗證工具鏈（`tests/ui_sim/`）61 條 UI 契約、79 個案例變體**（P2-C 的 3 條於 2026-08-20 補齊，K-61 結案）。✅ **UI 模擬的可重現性已結案（2026-08-20）**——K-48 定位到真因：`click()` 送出滑鼠移動後等了 2 幀才讀 hover，這段空檔會被**使用者的實體滑鼠**插隊蓋掉。改成立刻讀，並新增守衛 `qa_hover_regression.gd`（launcher 第 2 步強制跑）。修後連跑三輪全套：76 variants／58 contracts／0 failed checks。**下一步進 P2-D 視野門檻與發瘋 BE。**
+> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-H 已全部實作並驗證全綠**；**Phase 2-A 發狂卡的產生與倒數、P2-B 縱慾出口與主動縱慾、P2-C 強制縱慾與失控時段、P2-D 視野門檻與發瘋 BE 均已實作並驗收（全套 15 套 headless exit 0）**；**UI 模擬驗證工具鏈（`tests/ui_sim/`）61 條 UI 契約、79 個案例變體**。**下一步進 P2-E headless 重演三種玩家。**
 
 ---
 
@@ -60,7 +60,7 @@ headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點�
 | P2-A 發狂卡的產生與倒數 | ✅ | `madness_clock` 走真錶（morning 全體 −1、產生當天不倒數、歸零 clamp 於 0）、開收費夜間標記發卡並播提示文字、一夜一個地點、`night_markers_opened` 只收錄收費標記（`test_p2a.gd` 9 組全綠，UI 加 `p1af_29_night_paid` 變體與 `p2a_01_madness_hand_display` 契約）。K-51／K-52／K-53 全數結案 |
 | P2-B 縱慾出口與主動縱慾 | ✅ | 六個出口進 `data/beats/indulgence_exits.json`、`indulge()` 原子入口、泡湯特例（標記已用不跳時段、讀取 `soak_cards_cleared`）、`when.day_from` 常駐 beat、出口槽可重複使用（K-54）、Lint 4 & 10 檢查（`test_p2b.gd` 全綠、13 套 headless 全綠）。UI 那一半補了 4 條契約 9 個變體（可見性／放卡／泡湯三態／三個門檻），全套 58 契約 76 變體全綠 |
 | P2-C 強制縱慾 | ✅ | 倒數歸零自動執行、`Indulgence.pick_exit()` 挑最重出口、強度級查表、當日不夠順延次日、主動與強制共享曲線（`test_p2c.gd` 10 組全綠、14 套 headless 全綠） |
-| P2-D 視野門檻與發瘋 BE | 📐 | `madness_at_least` 在真資料生效、達 `madness_cap` 立即 BE、共用既有 `end_run()` 收尾 |
+| P2-D 視野門檻與發瘋 BE | ✅ | `madness_at_least` 在真資料生效、達 `madness_cap` 立即 BE、共用既有 `end_run()` 收尾（`test_p2d.gd` 全綠） |
 | P2-E headless 重演三種玩家 | 📐 | `test_p2_sim.gd` 逐項對上 `subdocs/驗證/發狂卡機制模擬.md > 三` 的八個指標與視野窗口。**P2 全部規則的整合測試** |
 | P3 夜間層真值化 | ⬜ | 標記收費、對位改名、meta 免費 |
 | P4 委託與遭遇 | ⬜ | 人物卡外出／回報、遭遇回合循環 |
@@ -124,8 +124,9 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 - **P2-C 收尾修正**：**K-59**（防吃債測試）於 `test_p2c.gd` 補第 11 組測試，完成出口池無效與 slot 遺失之債務保留斷言（含突變驗證）；**K-60**（走查解耦文字）於 `playthrough_greedy.gd` 改比對推進前後 `indulgence_count`。**兩條均已結案全綠**。**K-61**（`tests/ui_sim/` P2-C 契約）留待 K-48 收掉後處理。
 - 2026-08-20：**K-48 結案，UI 模擬終於可重現。** 真因不是 hover 落後、不是殘留行程、也不是排版未定案——**案例是開真視窗跑的，桌面上還有一支實體滑鼠**。`gui_get_hovered_control()` 記的是「最後一個滑鼠移動事件打到誰」，而 `click()` 送出移動之後等了 2 幀才讀；這段空檔裡使用者手動一下滑鼠，作業系統補進來的真實事件就把 hover 蓋掉。最小重現一字不差地複製了失敗訊息（`預期 AdvanceBeatButton、實際 Main`）。**同源的第二個缺口一併修掉**：按下與放開之間也等了 2 幀，中途的外來移動會讓按鈕收到 `MOUSE_EXIT`、放開時不發 `pressed`，症狀是「click 回報成功但畫面沒反應」。修法是兩段之間都不再等幀。**防再犯**：新增 `qa_hover_regression.gd`，用「每幀補送一發打到別處的移動事件」扮演實體滑鼠，不靠運氣也不用真的動游標；接進 launcher 第 2 步，不過就整套中止，且已驗證還原修法後守衛會紅。複驗：三輪全套各 76 variants／58 contracts／0 failed checks，14 套 headless exit 0。**教訓寫進 K-48**：干擾源在測試程序之外時，「連跑三輪全綠」沒有證明力——那只證明那三輪沒人碰滑鼠。
 - 2026-08-20：**K-61 結案，P2-C 的操作層補齊。** 新增 3 條 UI 契約（契約 58 → 61、變體 76 → 79）：`p2c_01_forced_text`（效果文字播在地圖上、第一次是輕的且明講下次更重、**關掉地點面板回地圖仍留存**）、`p2c_02_forced_action_spent`（行動格被吃掉，**兩個地點**都沒有主角卡放入入口——擋的是行動格不是單一面板）、`p2c_03_forced_two_same_day`（同日兩張歸零，上午下午各吃一格）。狀態由 `make_states.gd` 產生兩個：第 10 夜、發狂卡倒數壓到 1，UI 推進一次就跨日歸零並自動結算。**突變檢查確認不是同義反覆**：拿掉 `_play_forced_lines()` → `p2c_01` 紅三條；拿掉 `consume_action(1)` → `p2c_02`／`p2c_03` 各紅三條。K-58 的五處契約數已同步改完。
-- **K-48 結案的連帶影響**：**K-61（`tests/ui_sim/` 沒有 P2-C 契約）解除封鎖並已補完**。另新增 **K-62 並已修**——`run_ui_sim.ps1` 用 `Set-Location` 決定測哪個專案，但 Godot 是用 `ProcessStartInfo` 起的、`--path .` 吃行程的工作目錄，所以從別的目錄呼叫會**安靜地去測別的專案**。診斷 K-48 時真的踩到了。修法是補 `$psi.WorkingDirectory = $projectRoot`。**待修清單現在只剩 K-61。**
-- **下一步進 P2-D 視野門檻與發瘋 BE**。P2 順序：P2-A（✅）→ P2-B（✅）→ P2-C（✅）→ P2-D 視野縮減與 BE → P2-E 重演三種玩家。
+- **K-48 結案的連帶影響**：**K-61（`tests/ui_sim/` 沒有 P2-C 契約）解除封鎖並已補完**。另新增 **K-62 並已修**——`run_ui_sim.ps1` 用 `Set-Location` 決定測哪個專案，但 Godot 是用 `ProcessStartInfo` 起的、`--path .` 吃行程的工作目錄，所以從別的目錄呼叫會**安靜地去測別的專案**。診斷 K-48 時真的踩到了。修法是補 `$psi.WorkingDirectory = $projectRoot`。**待修清單現在只剩排到後面 Phase 的那幾條。**
+- 2026-08-20：**P2-D 視野門檻與發瘋 BE 實作與驗收完成**——`madness_at_least` 視野門檻動態顯隱（2 張隱藏、3 張出現、扣回 2 張再隱藏）、`GameState._check_madness_cap()` 於 `gain_card()` 與 `open_night_marker()` 批次發卡後檢查 `madness_cap` 並即刻轉導 `end_run("ending_madness_be")`、`main.gd` 收到 `ending_madness_be` 時分支呈現 `[發瘋 BE]` 且不播後日談骨架、跨輪重置保留知識卡且清空 run 層。新建專屬驗收測試 `test_p2d.gd` 6 組驗證全綠，全套 15 套 headless 與 61 條 UI 模擬契約（79 個變體）全數通過無迴歸。
+- **下一步進 P2-E headless 重演三種玩家**。P2 順序：P2-A（✅）→ P2-B（✅）→ P2-C（✅）→ P2-D（✅）→ P2-E 重演三種玩家。
 - **P1 之後不擋、可順手做的文件小事**：K-24（純措辭，下次動 `實作規格書.md` 時一起改）。**明確排到後面 Phase 的**：K-30／K-33／K-34／K-35 全部等 P3 夜間層真值化（現在改是改在 stub 上），K-08 等 i18n 管線。（K-32 已於 2026-08-15 `2ae62a9` 結案。）
 - 2026-08-14：**P1-F 收尾完成**——K-31（`verify_data` 重複檢查刪除）、K-27（lint 3 改以 `(day, phase, location)` 面板分組並更名 `lint_free_slot_rules()`，`d28_morning_xiaowu` 補主角卡槽）、K-29（補齊 K-17／K-18／K-19／K-22 回歸測試）、K-36（走查抽 `run_greedy_walk()` 供 `test_p1f` 共用）、K-28（`FlowText` 接線，殘響／入夜 fixed／結局 stub 三種文字共用容器）、K-37、K-40（`FlowText` 改 `ScrollContainer` ＋ `clip_contents`，夜間文字不再蓋到地點清單與地點面板）。十套 headless 全綠，`main.tscn` 開機無錯誤。
 - 2026-08-14：**P1-E 完成**——`GameState.choose()` 原子化唯一選擇入口（驗證未結算、三態 OPEN、帶卡持有與 accepts 檢查、`on_place` 結算、寫入 `choices` 與 `slots_placed`）、`PanelBuilder.build()` 互斥收起與唯讀（RESOLVED）展示、`try_place()` 轉導 `choose()`、`location_panel.gd` 雙入口按鈕支援（直接選擇與帶卡放置）、狀態序列化往返。`test_p1e.gd` 9 項驗證全綠（含真實資料 `d22_pm_sandbags`）。全部既有 headless 測試無迴歸。

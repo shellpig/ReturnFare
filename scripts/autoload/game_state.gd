@@ -244,7 +244,8 @@ func open_night_marker(location_id: String) -> PackedStringArray:
 	night_markers_opened[location_id] = true
 
 	for i in range(cost):
-		gain_card("madness")
+		gain_card("madness", false)
+	_check_madness_cap()
 
 	lines.append("推開了夜色深處的門。獲得 %d 張發狂卡。" % cost)
 	return lines
@@ -276,7 +277,7 @@ func _is_beat_time_valid(beat: Dictionary) -> bool:
 # ── 手牌操作 ────────────────────────────────────────────────────────────────
 
 ## 取得卡片（按型別分流：slotless → knowledge；madness → 新實例進 hand；其餘 unique）。
-func gain_card(id: String) -> void:
+func gain_card(id: String, check_cap: bool = true) -> void:
 	var card: Dictionary = Data.loader.cards.get(id, {})
 	if card.is_empty():
 		push_error("gain_card: unknown card id '%s'" % id)
@@ -298,6 +299,8 @@ func gain_card(id: String) -> void:
 		madness_clock[inst] = int(Data.tuning("madness_countdown_days"))
 		_check_hand_overflow(id)
 		hand_changed.emit()
+		if check_cap:
+			_check_madness_cap()
 		return
 
 	# 其餘卡：unique（已持有 = no-op，含知識集合）
@@ -306,6 +309,18 @@ func gain_card(id: String) -> void:
 	hand.append(id)
 	_check_hand_overflow(id)
 	hand_changed.emit()
+
+
+## 檢查手牌發狂卡是否達到上限（規格書第八節，P2-D）。
+## 若達到 madness_cap 立即觸發發瘋 BE 並結束本輪。
+func _check_madness_cap() -> void:
+	if Data == null or not Data.ok:
+		return
+	var cap: int = int(Data.tuning("madness_cap", 0))
+	if cap <= 0:
+		return
+	if madness_clock.size() >= cap:
+		end_run("ending_madness_be")
 
 
 func _check_hand_overflow(card_id: String) -> void:

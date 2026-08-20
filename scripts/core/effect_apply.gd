@@ -47,8 +47,10 @@ static func apply(effect: Variant, gs: Node) -> PackedStringArray:
 		gs.call("add_relation", str(r.get("npc", "")), int(r.get("delta", 0)))
 
 	if e.has("madness"):
-		for i in range(int(e["madness"])):
-			gs.call("gain_card", "madness")
+		var m_count := int(e["madness"])
+		for i in range(m_count):
+			gs.call("gain_card", "madness", false)
+		gs.call("_check_madness_cap")
 
 	if e.has("flag"):
 		var f: Dictionary = e["flag"] as Dictionary

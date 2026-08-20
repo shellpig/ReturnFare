@@ -7,6 +7,7 @@ const QAValidationClass := preload("res://tests/ui_sim/qa_validation.gd")
 
 const _MSG_DATA_ERROR := "資料載入失敗，詳情見 Output。"
 const _MSG_ENDING_STUB := "[結局 stub]"
+const _MSG_ENDING_MADNESS_BE := "[發瘋 BE]"
 const _MSG_ADVANCE := "推進時段"
 const _MSG_ADVANCE_HINT := "推進時段（目前無可做動作）"
 const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
@@ -132,10 +133,13 @@ func _on_chapter_changed(_chapter: int) -> void:
 	_refresh_status()
 
 
-func _on_run_ended(_ending_id: String) -> void:
+func _on_run_ended(ending_id: String) -> void:
 	_is_showing_ending = true
 	_flow_text.clear()
-	_flow_text.append_line(_MSG_ENDING_STUB)
+	if ending_id == "ending_madness_be":
+		_flow_text.append_line(_MSG_ENDING_MADNESS_BE)
+	else:
+		_flow_text.append_line(_MSG_ENDING_STUB)
 	_flow_text.visible = true
 	_map_list.visible = false
 	_location_panel.visible = false
@@ -150,6 +154,8 @@ func _on_location_selected(loc_id: String) -> void:
 	var extra_lines := PackedStringArray()
 	if GameState.phase == "night":
 		extra_lines = GameState.open_night_marker(loc_id)
+	if _is_showing_ending:
+		return
 	_location_panel.call("show_location", loc_id, extra_lines)
 
 
