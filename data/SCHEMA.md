@@ -229,7 +229,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `id` / `name` | `name` 是地點外部可觀察的名稱。night row 在對位前把它當引子顯示，不可直接寫進場後才知道的結果 |
 | `phases` | 開放時段：`morning` / `afternoon`（白天地點用） |
 | `layer` | `day` / `night` / `both` |
-| `chapter` | 第幾章開放。night row 必須與 `earliest_night` 所屬章節一致；一般 row 仍以 `earliest_night` 控制出現，`teaser_only` 才以 `chapter` 控制可見起點 |
+| `chapter` | 第幾章開放。night row（含 `teaser_only`）必須與 `earliest_night` 所屬章節一致；一般 row 仍以 `earliest_night` 控制出現，`teaser_only` 才以 `chapter` 控制可見起點。teaser 的 `earliest_night` 不參與解鎖，只作章節一致性守衛 |
 | `earliest_night` | 夜間地點最早可開的夜。**是下限不是期限**——開過與否跨夜持續 |
 | `requires` | 夜間地點級門檻；不成立時 row 仍顯示，詳情的「進入」灰掉。走過前一夜間地點用 `night_seen`，不用 `opened_n_*` flag |
 | `reject_reason` | 夜間地點灰掉時那一行字（選填；未填時引擎用通用文案） |
@@ -417,6 +417,8 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 - 需要「已經把日夜位置對起來」→ `has_knowledge` 讀該 row 的 `night_reveal`
 
 正式資料不得以 `opened_n_*` flag 模擬 `night_seen`。
+
+例外不是保留舊名字，而是把語意寫準：若條件要求「本輪較早已看過某段內容」，使用明確的 run flag。P3-B 落地後，聚會常態內容寫 `saw_n_gathering_intro`，D31 特殊內容讀它；不得改讀 `night_seen: n_gathering`，因為進場會先寫 meta seen，且 meta seen 跨輪。
 
 ### `on_place` 效果
 
