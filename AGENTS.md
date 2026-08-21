@@ -30,12 +30,11 @@
 - `驗證後已知問題.md` — 待修清單與已接受的邊界決定；修 bug 前先看（未建，第一波驗證收尾時建）
 
 **Layer 3 — 任務相關細節（不逐檔枚舉，開工時 `ls subdocs/<分類>/` 再挑）：**
-- `subdocs/故事線/` — 第一輪三章逐日事件層
-- `subdocs/地點/` — 地點的卡槽定義
-- `subdocs/人/` — NPC 設定
-- `subdocs/卡片/` — 卡片清單
-- `subdocs/驗證/` — 體驗模擬等驗證產出
-- `subdocs/歸檔/` — 歷史歸檔；除非考古不必讀
+- `subdocs/故事線/` — 第一輪三章逐日事件層（三檔）
+- `subdocs/卡牌/` — 卡片清單與衍生索引（目前只有 `知識卡.md`）
+- `subdocs/驗證/` — 體驗模擬等驗證產出（目前兩檔）
+
+> 目前就這三個目錄。地點的卡槽定義住 `data/beats/`、NPC 住 `data/npcs.json`，都不在 `subdocs/`；歸檔目錄尚未建立。
 
 Report to user: current progress, and any issues with their scope of impact.
 
@@ -76,7 +75,7 @@ Report to user: current progress, and any issues with their scope of impact.
 | `測試指南.md` | Phase 編號 | `#### P1-D` |
 | `data/SCHEMA.md` | 檔名小節 | `## beats/*.json`、`### slots[]` |
 | `待決事項.md` | 分組標題（一～五）＋條目編號 | `grep -n "36\|倒數" 待決事項.md` |
-| 其餘 `subdocs/`（驗證／人／卡片／地點） | 檔案小，可整份讀 | — |
+| 其餘 `subdocs/`（卡牌／驗證） | 檔案小，可整份讀 | — |
 
 ### 按 Phase 查閱規則
 

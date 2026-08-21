@@ -1,12 +1,42 @@
 # ReturnFare 交接狀態
 
-- 目前階段：Phase 1（P1-A～P1-G）全部實作完成，UI 模擬驗證工具鏈（`tests/ui_sim/`）完成全面重構與缺陷修復，P1-G 第一批 14 條需求（17 個案例變體）100% 通過；其餘 33 條與全流程無注入走查列入後續擴充計畫。P2 規格已齊備，隨時可動工。
-- 已完成：
-  - Phase 1 全部規則與面板互動模型（`build_panel()`／`play_beat()`／`preview_slot()`、兩階段地點面板、槽型別標示、右鍵／按鈕預覽、推進提示）。
-  - UI 模擬驗證工具鏈：`make_states.gd`（動態狀態模板、19 個 checkpoints 驗證）、`run_ui_sim.ps1`（.NET Process 原生啟動、參數轉義與 binary 預檢）、`qa_step.gd`（子視窗座標轉換、純真實輸入事件、事前 Hover 命中強校驗）、`qa_diagnostics.gd`（Z-Index 繪製順序、Panel 遮蔽、視口邊界與未裁切容器溢出檢測、保護區侵入檢查）、`p1g_cases.gd` 包含 17 個案例變體（單步推進、去作弊預覽集合比對、夜間實質放卡、防劇透等）。
-- 主要修改：`scenes/main.gd`、`scenes/ui/location_panel.gd`、`tests/ui_sim/`、`scripts/`。
-- 驗證：
-  - UI 模擬：17 案例變體全綠（`run_ui_sim.ps1`：Total 17, Passed 17, Failed 0）。
-  - 反證測試（Negative Tests）：錯誤 fixture 與反向狀態全數 Exit Code 1 轉紅。
-  - Headless 回歸：`verify_data.gd`、P1-A～P1-G、`test_boot.gd`、`playthrough_greedy.gd` 全部 exit 0 通過。
-- 下一個任務：依 `實作規格書.md > P2-A` 開始實作 P2-A 發狂卡的產生與倒數時鐘機制。
+最後更新：2026-08-21
+
+## 目前階段
+
+**Phase 2 全數完工，Phase 3 規格完成、程式未開工。下一步是 P3-A 夜間資料真值化。**
+
+- Phase 1（P1-A～P1-H）：實作全綠。P1-F／G／H 三個子階段仍標 🟦「待手動操作驗收」。
+- Phase 2（P2-A～P2-E）：全部實作並驗收。發狂卡的產生與倒數、縱慾出口與主動縱慾、強制縱慾與失控時段、視野門檻與發瘋 BE、headless 重演三種玩家。
+- Phase 3（P3-A～P3-F）：三份文件與 `data/SCHEMA.md` 契約已寫到可動工，並經兩輪規格審核（K-73～K-97）回寫完畢。
+
+## 最近完成的工作
+
+- `9e342de` P2-E headless 三種玩家重演與 Phase 2 全套驗收。
+- `a05e0cf` P2-E 驗證落檔，四條尾巴記為 K-69～K-72。
+- `92383e6` P3 夜間層六階段規格完成。
+- `9b7f1c8`／`00551c1` P3 文件兩輪規格審核，K-73～K-97 落檔。
+- 本次：K-82～K-97 全數回寫（文件層），P3 開工閘清空。
+
+## 驗證狀態
+
+- **16 套 headless 全部 exit 0**（`verify_data`、`test_boot`、P1-A～G、P2-A～E、`playthrough_greedy`、`test_p2_sim`）。
+- **UI 模擬 63 條契約／82 個變體／11 個負向反證全綠，0 failed checks**。
+- 走查基準（`6e5e51a` 起，90 個行動時段）：主角卡 47／強制縱慾 12／純比對 22／刻意留空 3／純選擇題 3／HIDDEN 2／LOCKED 1。發狂卡帳 14 張 ＝ 強制消除 12 ＋ 重置前留存 2。
+
+測試命令見 `PROJECT_BRIEF.md > 測試速查`。sandbox 內 headless 會因 `user://logs` 權限 crash，直接用 escalated 權限跑。
+
+## 已知風險與未驗區
+
+- **P3-F 會改動第一輪基準**：D15 fixed 讓 `n_plaza` 永久免費、night-layer fixed 消耗今晚，第一輪 marker cost 拆成「路徑效率 13／最大壓力 14」兩條具名策略，要以新流程重跑並更新 `subdocs/驗證/發狂卡機制模擬.md`。
+- **第二輪的發狂卡供給仍是待決**（`待決事項.md > 25／26`）。第一輪走滿既有收費 row 的玩家，第二輪從既有 marker cost 拿到 0 張；主要壓力應由第二輪新增／深化的內容提供，P3 不補內容。
+- **待修清單**見 `驗證後已知問題.md`。與 P3 有關的：K-30／K-33／K-34／K-35／K-69 等 P3 夜間層真值化；K-68 卡在 K-69；K-65 排內容期。
+- 本專案**沒有 Art Bible，也還沒談美術方向**；**沒有 `.venv`**。
+
+## 下一個任務
+
+依 `實作規格書.md > P3-A`＋`開發設計方針.md > P3-A`＋`測試指南.md > P3-A` 三段實作 **P3-A 夜間資料真值化**：10 張對位 knowledge 卡、12 筆 `night_reveal`、28 個夜間名稱審查、6 個阿宏門檻理由、`teaser_only` schema、lint 11～12 與各自獨立的壞資料 fixture。
+
+**不得跳過 P3-A／P3-B 的資料與狀態前置去先做 P3-C 的流程或 P3-D 的 UI。**
+
+> 每個 P3 子階段收尾時更新本檔（`開發設計方針.md > 全域結構決策（P3 期間建立）` 有同一條規約）。內容過期比沒有更糟——本檔曾停在 P1-G 五個子階段之久，落檔為 K-97。
