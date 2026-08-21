@@ -432,19 +432,28 @@ func _test_negative_fixtures() -> int:
 			failed += _ok("負向 fixture 10: madness_cost 為負值被 Lint 12 成功攔截 (K-110)")
 
 	# 11. 欄位型別錯誤 (K-110)
+	# 兩個 row 各自只踩一道防線，因此刪掉型別／整數性檢查就一定會紅：
+	#   n_string_chapter      chapter 寫成字串 "2"——範圍檢查攔不到（int("2") == 2 落在 1-3），只有型別檢查抓得到
+	#   n_fractional_earliest earliest_night 寫成 15.5——範圍檢查攔不到（15 落在 1-45），只有整數性檢查抓得到
+	# 用 "one" 那種寫不出數字的值不算數：int("one") == 0，會被範圍檢查順手攔下，型別檢查根本沒出手（K-113）。
 	var l11 := DataLoader.new("res://tests/fixtures/broken/p3a_invalid_type_field/")
 	if not l11.load_all():
 		failed += _fail("fixture 11 讀取失敗: %s" % str(l11.errors))
 	else:
 		var errs11 := DataLoader.lint_night_locations(l11)
-		var matched11 := false
+		var has_string_chapter_err := false
+		var has_fractional_earliest_err := false
 		for e in errs11:
-			if "缺少有效的 chapter" in e or "型別錯誤" in e:
-				matched11 = true
-		if not matched11:
-			failed += _fail("fixture 11 未觸發預期錯誤；實際報錯：%s" % str(errs11))
-		else:
-			failed += _ok("負向 fixture 11: 欄位型別錯誤被 Lint 12 成功攔截 (K-110)")
+			if "n_string_chapter" in e and "缺少有效的 chapter" in e:
+				has_string_chapter_err = true
+			if "n_fractional_earliest" in e and "缺少有效的 earliest_night" in e:
+				has_fractional_earliest_err = true
+		if not has_string_chapter_err:
+			failed += _fail("fixture 11: chapter 寫成字串未被攔下；實際報錯：%s" % str(errs11))
+		if not has_fractional_earliest_err:
+			failed += _fail("fixture 11: earliest_night 寫成小數未被攔下；實際報錯：%s" % str(errs11))
+		if has_string_chapter_err and has_fractional_earliest_err:
+			failed += _ok("負向 fixture 11: 字串型別與小數值均被 Lint 12 成功攔截 (K-110／K-113)")
 
 	return failed
 

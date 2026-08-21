@@ -256,10 +256,13 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _write_p2b_state(output_dir, "p2d_d24_three_cards", gs_p2d.serialize(), data_node):
 		return false
 
-	# ③ 接近 cap 狀態：D10 night 6 張發狂卡，再開一次收費標記即達 cap 7
+	# ③ 接近 cap 狀態：D10 night 手上 cap-1 張發狂卡，再開一次收費標記即達 cap。
+	# 張數從 tuning 現算，不寫死 6——`madness_cap` 是可調數值，釘死會讓調值後這份情境
+	# 變成「早就撞破」或「離 cap 還很遠」，而 UI 案例仍宣稱自己在驗 cap 邊界（K-114）。
 	_reset_state(gs_p2d)
 	gs_p2d.deserialize(d10n_dict)
-	for i in range(6):
+	var near_cap_count := int(data_node.tuning("madness_cap", 7)) - 1
+	for i in range(near_cap_count):
 		gs_p2d.gain_card("madness")
 	if not _write_p2b_state(output_dir, "p2d_near_cap", gs_p2d.serialize(), data_node):
 		return false
@@ -541,7 +544,12 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 		"p2d_d24_three_cards":
 			return day == 24 and phase == "night" and hand.has("madness#1") and hand.has("madness#2") and hand.has("madness#3")
 		"p2d_near_cap":
-			return day == 10 and phase == "night" and hand.has("madness#6") and not hand.has("madness#7")
+			# 「手上恰好 cap-1 張」——張數與 instance 名都從 tuning 現算，不寫死 6／7（K-114）。
+			var cap := 7
+			if data_node != null and data_node.has_method("tuning"):
+				cap = int(data_node.tuning("madness_cap", 7))
+			return day == 10 and phase == "night" \
+				and hand.has("madness#%d" % (cap - 1)) and not hand.has("madness#%d" % cap)
 		"d15_night":
 			return day == 15 and phase == "night"
 		"d24_night":

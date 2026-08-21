@@ -2,11 +2,21 @@
   "day": [],
   "night": [
     {
-      "id": "n_invalid_type",
-      "name": "型別錯誤",
+      "id": "n_string_chapter",
+      "name": "章節寫成字串",
       "layer": "night",
-      "chapter": "one",
-      "earliest_night": 1,
+      "chapter": "2",
+      "earliest_night": 15,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null
+    },
+    {
+      "id": "n_fractional_earliest",
+      "name": "最早夜寫成小數",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 15.5,
       "madness_cost": 0,
       "day_counterpart": null,
       "night_reveal": null
