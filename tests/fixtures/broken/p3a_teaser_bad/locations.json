@@ -1,0 +1,16 @@
+{
+  "day": [],
+  "night": [
+    {
+      "id": "n_teaser",
+      "name": "走廊盡頭",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 45,
+      "teaser_only": true,
+      "madness_cost": 1,
+      "day_counterpart": null,
+      "night_reveal": null
+    }
+  ]
+}

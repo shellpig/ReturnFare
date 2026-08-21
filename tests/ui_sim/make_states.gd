@@ -63,11 +63,18 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		"d43_morning": { "day": 43, "phase": "morning" },
 		"d8_evening": { "day": 8, "phase": "evening" },
 		"d13_evening": { "day": 13, "phase": "evening" },
+		"p3a_night_baseline": { "day": 14, "phase": "night" },
 	}
 
 	var res_std := _run_walk_with_checkpoints(tree, data_node, [], standard_checkpoints, output_dir)
 	if not res_std:
 		return false
+
+	var p3a_dict: Dictionary = _load_state(output_dir, "p3a_night_baseline.json")
+	if not p3a_dict.is_empty():
+		if not _generate_p3a_baseline(tree, data_node, p3a_dict):
+			printerr("p3a_baseline 產出失敗")
+			return false
 
 	# D3 的 requires 負向案例需要「尚未在 D2 下午拿到兩張情報」的合法起點；
 	# 仍由走查器建立，只在產生情境時刻意跳過那一個行動時段。
@@ -577,8 +584,114 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			return day == 8 and phase == "evening"
 		"d13_evening":
 			return day == 13 and phase == "evening"
+		"p3a_night_baseline":
+			if day != 14:
+				printerr("p3a_night_baseline 後置條件失敗：預期 day == 14，實際 %d" % day)
+				return false
+			if phase != "night":
+				printerr("p3a_night_baseline 後置條件失敗：預期 phase == 'night'，實際 %s" % phase)
+				return false
+			var opened: Dictionary = run.get("night_markers_opened", {}) as Dictionary
+			if not opened.is_empty():
+				printerr("p3a_night_baseline 後置條件失敗：預期 night_markers_opened 為空，實際 %s" % str(opened))
+				return false
+			var madness_count := 0
+			for c in hand:
+				if str(c).begins_with("madness"):
+					madness_count += 1
+			if madness_count >= 7:
+				printerr("p3a_night_baseline 後置條件失敗：預期 madness < 7，實際 %d" % madness_count)
+				return false
+			return true
 		_:
 			return true
+
+
+static func _generate_p3a_baseline(tree: SceneTree, data_node: Node, baseline_snapshot: Dictionary) -> bool:
+	var base_dir := "res://_qa/p3a_baseline/"
+	var global_dir := ProjectSettings.globalize_path(base_dir).replace("\\", "/")
+	if not global_dir.ends_with("/"):
+		global_dir += "/"
+	DirAccess.make_dir_recursive_absolute(global_dir)
+
+	# 1. 寫出狀態檔
+	var f_state := FileAccess.open(global_dir + "p3a_night_baseline.json", FileAccess.WRITE)
+	if f_state == null:
+		printerr("無法寫入 _qa/p3a_baseline/p3a_night_baseline.json")
+		return false
+	f_state.store_string(JSON.stringify(baseline_snapshot, "\t"))
+	f_state.close()
+
+	# 2. 計算 expected 基準值
+	# (a) available_locations()
+	var gs_avail: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+	_reset_state(gs_avail)
+	gs_avail.deserialize(baseline_snapshot)
+	var avail_locs: Array[String] = PanelBuilder.available_locations(gs_avail, data_node)
+
+	# (b) 首次發卡 (first_card_grant)
+	var gs_grant: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+	_reset_state(gs_grant)
+	gs_grant.deserialize(baseline_snapshot)
+	var paid_loc := ""
+	for lid in avail_locs:
+		var ldef: Dictionary = data_node.loader.locations.get(lid, {}) as Dictionary
+		if int(ldef.get("madness_cost", 0)) > 0:
+			paid_loc = lid
+			break
+	if paid_loc.is_empty():
+		printerr("p3a_baseline: 在 D14 night 找不到任何可用的收費標記")
+		return false
+	var grant_lines: PackedStringArray = gs_grant.open_night_marker(paid_loc)
+	var grant_opened: Dictionary = (gs_grant.get("night_markers_opened") as Dictionary).duplicate(true)
+	var grant_hand: Array = (gs_grant.get("hand") as Array).duplicate(true)
+	var grant_clock: Dictionary = (gs_grant.get("madness_clock") as Dictionary).duplicate(true)
+	var grant_res: Dictionary = {
+		"target_location": paid_loc,
+		"lines": Array(grant_lines),
+		"night_markers_opened": grant_opened,
+		"hand": grant_hand,
+		"madness_clock": grant_clock,
+	}
+
+	# (c) fixed 流程 (fixed_flow)
+	var gs_fixed: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+	_reset_state(gs_fixed)
+	gs_fixed.deserialize(baseline_snapshot)
+	gs_fixed.sleep_night()
+	gs_fixed.advance_phase()
+	PlaythroughGreedy.execute_action_phase(gs_fixed, data_node, 15, "morning")
+	gs_fixed.advance_phase()
+	PlaythroughGreedy.execute_action_phase(gs_fixed, data_node, 15, "afternoon")
+	gs_fixed.advance_phase()
+	PlaythroughGreedy.execute_evening_phase(gs_fixed, data_node, 15)
+	gs_fixed.advance_phase()
+	var avail_d15: Array[String] = PanelBuilder.available_locations(gs_fixed, data_node)
+	gs_fixed.play_night_fixed()
+	var beats_entered_d15: Array = (gs_fixed.get("beats_entered") as Dictionary).keys()
+	beats_entered_d15.sort()
+	var fixed_res: Dictionary = {
+		"day": int(gs_fixed.get("day")),
+		"phase": str(gs_fixed.get("phase")),
+		"available_locations": avail_d15,
+		"beats_entered": beats_entered_d15,
+	}
+
+	var expected_dict: Dictionary = {
+		"available_locations": avail_locs,
+		"first_card_grant": grant_res,
+		"fixed_flow": fixed_res,
+	}
+
+	var f_exp := FileAccess.open(global_dir + "p3a_night_baseline.expected.json", FileAccess.WRITE)
+	if f_exp == null:
+		printerr("無法寫入 _qa/p3a_baseline/p3a_night_baseline.expected.json")
+		return false
+	f_exp.store_string(JSON.stringify(expected_dict, "\t"))
+	f_exp.close()
+
+	print("p3a_baseline 成功產出至 %s" % global_dir)
+	return true
 
 
 static func _reset_state(gs: Node) -> void:

@@ -9,7 +9,7 @@ extends Node
 const DataFacts := preload("res://scripts/core/data_facts.gd")
 const Indulgence := preload("res://scripts/core/indulgence.gd")
 
-const CHAPTER_START_DAYS := [1, 16, 33]
+const CHAPTER_START_DAYS := DataFacts.CHAPTER_START_DAYS
 const LAST_DAY := 45
 const PHASES := ["morning", "afternoon", "evening", "night"]
 const ACTION_PHASES := ["morning", "afternoon"]
@@ -57,10 +57,7 @@ signal knowledge_changed
 # ── 時段狀態機 ──────────────────────────────────────────────────────────────
 
 func chapter() -> int:
-	for i in range(CHAPTER_START_DAYS.size() - 1, -1, -1):
-		if day >= CHAPTER_START_DAYS[i]:
-			return i + 1
-	return 1
+	return DataFacts.chapter_for_day(day)
 
 
 func advance_phase() -> void:

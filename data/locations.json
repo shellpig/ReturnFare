@@ -302,7 +302,7 @@
       "earliest_night": 1,
       "madness_cost": 0,
       "day_counterpart": "jinghe_back",
-      "night_reveal": null,
+      "night_reveal": "k_night_jinghe_back",
       "map": {
         "x": 62,
         "y": 48
@@ -317,7 +317,7 @@
       "earliest_night": 2,
       "madness_cost": 0,
       "day_counterpart": "sanquan",
-      "night_reveal": null,
+      "night_reveal": "k_night_sanquan",
       "map": {
         "x": 50,
         "y": 50
@@ -332,7 +332,7 @@
       "earliest_night": 3,
       "madness_cost": 0,
       "day_counterpart": "clinic",
-      "night_reveal": null,
+      "night_reveal": "k_night_clinic",
       "map": {
         "x": 55,
         "y": 66
@@ -362,7 +362,7 @@
       "earliest_night": 3,
       "madness_cost": 0,
       "day_counterpart": "riverside",
-      "night_reveal": null,
+      "night_reveal": "k_night_riverside",
       "map": {
         "x": 25,
         "y": 72
@@ -392,7 +392,7 @@
       "earliest_night": 6,
       "madness_cost": 0,
       "day_counterpart": "temple",
-      "night_reveal": null,
+      "night_reveal": "k_night_temple",
       "map": {
         "x": 33,
         "y": 40
@@ -407,7 +407,7 @@
       "earliest_night": 7,
       "madness_cost": 1,
       "day_counterpart": "upstream",
-      "night_reveal": null,
+      "night_reveal": "k_night_upstream",
       "map": {
         "x": 30,
         "y": 18
@@ -437,7 +437,7 @@
       "earliest_night": 9,
       "madness_cost": 0,
       "day_counterpart": "temple",
-      "night_reveal": null,
+      "night_reveal": "k_night_temple",
       "map": {
         "x": 33,
         "y": 40
@@ -452,7 +452,7 @@
       "earliest_night": 11,
       "madness_cost": 0,
       "day_counterpart": "oldhouse_room",
-      "night_reveal": null,
+      "night_reveal": "k_night_oldhouse_room",
       "map": {
         "x": 22,
         "y": 62
@@ -461,7 +461,7 @@
     },
     {
       "id": "n_ahong_2",
-      "name": "血還是新的",
+      "name": "有血跡的地方",
       "layer": "night",
       "chapter": 1,
       "earliest_night": 11,
@@ -469,6 +469,7 @@
       "requires": {
         "flag": "opened_n_ahong_1"
       },
+      "reject_reason": "你還沒跟完上一段痕跡。",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -485,7 +486,7 @@
       "earliest_night": 12,
       "madness_cost": 0,
       "day_counterpart": "jinghe",
-      "night_reveal": null,
+      "night_reveal": "k_night_jinghe",
       "map": {
         "x": 62,
         "y": 46
@@ -532,6 +533,7 @@
       "requires": {
         "flag": "opened_n_ahong_2"
       },
+      "reject_reason": "你還沒跟完上一段痕跡。",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -548,7 +550,7 @@
       "earliest_night": 17,
       "madness_cost": 1,
       "day_counterpart": "clinic_back",
-      "night_reveal": null,
+      "night_reveal": "k_night_clinic_back",
       "map": {
         "x": 56,
         "y": 68
@@ -578,6 +580,7 @@
       "earliest_night": 20,
       "madness_cost": 1,
       "requires": { "flag": "opened_n_ahong_3" },
+      "reject_reason": "你還沒跟完上一段痕跡。",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -624,6 +627,7 @@
       "earliest_night": 28,
       "madness_cost": 1,
       "requires": { "has_knowledge": "k_ahong_point_1" },
+      "reject_reason": "你手上的路線知識還少了一段。",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -640,7 +644,7 @@
       "earliest_night": 37,
       "madness_cost": 1,
       "day_counterpart": "jinghe_back",
-      "night_reveal": null,
+      "night_reveal": "k_night_jinghe_back",
       "map": {
         "x": 62,
         "y": 48
@@ -655,6 +659,7 @@
       "earliest_night": 38,
       "madness_cost": 1,
       "requires": { "has_knowledge": "k_ahong_point_2" },
+      "reject_reason": "你手上的路線知識還少了一段。",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -686,7 +691,7 @@
       "earliest_night": 42,
       "madness_cost": 1,
       "day_counterpart": "temple_back",
-      "night_reveal": null,
+      "night_reveal": "k_night_temple_back",
       "map": {
         "x": 31,
         "y": 37
@@ -707,6 +712,7 @@
           { "has_knowledge": "k_ahong_point_3" }
         ] }
       },
+      "reject_reason": "三個對位點尚未連齊。",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -721,6 +727,8 @@
       "layer": "night",
       "chapter": 3,
       "earliest_night": 45,
+      "teaser_only": true,
+      "reject_reason": "還沒有走到那裡。",
       "madness_cost": null,
       "day_counterpart": null,
       "night_reveal": null,
@@ -732,7 +740,6 @@
     }
   ],
   "_pending": {
-    "madness_cost": "待決 38 已結案：第一輪全部 1，多張價碼留給第二輪之後。資料結構支援 2-3，改這個欄位即可",
-    "night_reveal": "28 個夜間地點全是 null——對位所需的知識卡一張都還沒開（現有 11 張 knowledge 全是真相／理論卡，沒有一張是地點命名卡）。要補的是第二類那 10 個地方：jinghe_back（n_corridor／n_steam_below 共用）、sanquan（n_exit）、clinic（n_queue）、riverside（n_watersound）、temple（n_woodtags／n_music 共用）、upstream（n_source）、oldhouse_room（n_lockedhouse）、jinghe（n_nodoor）、clinic_back（n_litcorridor）、temple_back（n_behind_temple）。第三類的 16 個沒有白天版，永遠 null。卡開不出來就填不動——綁卡片清單（待決 22）"
+    "madness_cost": "待決 38 已結案：第一輪全部 1，多張價碼留給第二輪之後。資料結構支援 2-3，改這個欄位即可"
   }
 }

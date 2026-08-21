@@ -57,6 +57,8 @@ func _validate_loader(candidate: DataLoader) -> Dictionary:
 	errors.append_array(DataLoader.lint_vocabulary(candidate.beats))
 	errors.append_array(DataLoader.lint_card_types(candidate))
 	errors.append_array(DataLoader.lint_indulgence_exits(candidate.beats))
+	errors.append_array(DataLoader.lint_night_alignment(candidate))
+	errors.append_array(DataLoader.lint_night_locations(candidate))
 	warnings.append_array(DataLoader.lint_missing_reject_reason(candidate.beats))
 	for key: String in REQUIRED_TUNING_KEYS:
 		if _candidate_tuning(candidate, key) == null:

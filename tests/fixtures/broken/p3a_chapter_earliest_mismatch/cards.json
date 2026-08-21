@@ -1,0 +1,7 @@
+{
+  "cards": [
+    { "id": "protagonist", "type": "protagonist", "name": "我", "text": "主角", "slotless": false, "stashable": false, "discardable": false },
+    { "id": "k_card_1", "type": "knowledge", "name": "卡1", "text": "說明1", "slotless": true, "stashable": false, "discardable": false },
+    { "id": "k_card_2", "type": "knowledge", "name": "卡2", "text": "說明2", "slotless": true, "stashable": false, "discardable": false }
+  ]
+}

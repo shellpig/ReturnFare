@@ -32,6 +32,17 @@ const BY_DESIGN_PENDING_CARD_REFS: PackedStringArray = [
 	"card_money",
 ]
 
+## 章節起始天數（第 1、2、3 章）
+const CHAPTER_START_DAYS: Array[int] = [1, 16, 33]
+
+
+## 根據天數計算所屬章節（1-3）
+static func chapter_for_day(day: int) -> int:
+	for i in range(CHAPTER_START_DAYS.size() - 1, -1, -1):
+		if day >= CHAPTER_START_DAYS[i]:
+			return i + 1
+	return 1
+
 
 ## 檢查給定的 (day, phase) 是否為刻意留空的行動時段
 static func is_empty_phase_by_design(day: int, phase: String) -> bool:

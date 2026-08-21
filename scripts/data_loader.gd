@@ -567,6 +567,131 @@ static func lint_echoes(beats_list: Array[Dictionary]) -> PackedStringArray:
 	return errs
 
 
+## lint 11：夜間對位完整性（規格書第十七節 lint 11）。
+static func lint_night_alignment(loader: DataLoader) -> PackedStringArray:
+	var errs: PackedStringArray = []
+	var counterpart_to_card: Dictionary = {} # day_counterpart -> card_id
+	var card_to_counterparts: Dictionary = {} # card_id -> Array (day_counterparts)
+
+	for lid in loader.locations:
+		var loc: Dictionary = loader.locations[lid]
+		if loc.get("layer", "") != "night":
+			continue
+
+		var cp_val: Variant = loc.get("day_counterpart")
+		var reveal_val: Variant = loc.get("night_reveal")
+
+		if cp_val != null:
+			var cp := str(cp_val)
+			if reveal_val == null or not (reveal_val is String) or str(reveal_val).is_empty():
+				errs.append("%s：有 day_counterpart（%s）但缺少有效的 night_reveal" % [lid, cp])
+				continue
+
+			var card_id := str(reveal_val)
+			if not loader.cards.has(card_id):
+				errs.append("%s：night_reveal 卡片不存在：%s" % [lid, card_id])
+			else:
+				var cdef: Dictionary = loader.cards[card_id]
+				var ctype: String = str(cdef.get("type", ""))
+				var slotless: bool = bool(cdef.get("slotless", false))
+				if ctype != "knowledge":
+					errs.append("%s：night_reveal 卡片 %s 型別不是 knowledge（實際為 %s）" % [lid, card_id, ctype])
+				if not slotless:
+					errs.append("%s：night_reveal 卡片 %s slotless 必須為 true" % [lid, card_id])
+
+			# 驗證同一 day_counterpart 共用同一張卡
+			if counterpart_to_card.has(cp):
+				if counterpart_to_card[cp] != card_id:
+					errs.append("%s：day_counterpart %s 指向多個不同的 night_reveal（%s vs %s）" % [
+						lid, cp, counterpart_to_card[cp], card_id
+					])
+			else:
+				counterpart_to_card[cp] = card_id
+
+			# 雙向單射：不同 day_counterpart 不得共用同一張卡
+			if not card_to_counterparts.has(card_id):
+				card_to_counterparts[card_id] = []
+			var cp_list: Array = card_to_counterparts[card_id]
+			if not cp_list.has(cp):
+				cp_list.append(cp)
+				if cp_list.size() > 1:
+					errs.append("不同 day_counterpart（%s）共用了同一張對位卡 %s" % [
+						" 與 ".join(cp_list), card_id
+					])
+		else:
+			if reveal_val != null:
+				errs.append("%s：day_counterpart 為 null，但 night_reveal 不為 null（實際為 %s）" % [lid, str(reveal_val)])
+
+	return errs
+
+
+## lint 12：夜間地點狀態完整性（規格書第十七節 lint 12）。
+static func lint_night_locations(loader: DataLoader) -> PackedStringArray:
+	var errs: PackedStringArray = []
+
+	for lid in loader.locations:
+		var loc: Dictionary = loader.locations[lid]
+		if loc.get("layer", "") != "night":
+			continue
+
+		var is_teaser: bool = bool(loc.get("teaser_only", false))
+		if is_teaser:
+			# teaser_only 欄位檢查
+			var reason_val: Variant = loc.get("reject_reason")
+			if reason_val == null or not (reason_val is String) or str(reason_val).strip_edges().is_empty():
+				errs.append("%s：teaser_only 地點缺少有效的 reject_reason" % lid)
+
+			var cost_val: Variant = loc.get("madness_cost")
+			if cost_val != null:
+				errs.append("%s：teaser_only 地點的 madness_cost 必須為 null 或省略（實際為 %s）" % [lid, str(cost_val)])
+
+			var cp_val: Variant = loc.get("day_counterpart")
+			if cp_val != null:
+				errs.append("%s：teaser_only 地點的 day_counterpart 必須為 null 或省略（實際為 %s）" % [lid, str(cp_val)])
+
+			var rev_val: Variant = loc.get("night_reveal")
+			if rev_val != null:
+				errs.append("%s：teaser_only 地點的 night_reveal 必須為 null 或省略（實際為 %s）" % [lid, str(rev_val)])
+
+			var earliest_val: Variant = loc.get("earliest_night")
+			var ch_val: Variant = loc.get("chapter")
+			if earliest_val != null and ch_val != null:
+				var earliest := int(earliest_val)
+				var ch := int(ch_val)
+				var expected_ch := DataFacts.chapter_for_day(earliest)
+				if ch != expected_ch:
+					errs.append("%s：chapter（%d）與 earliest_night（%d 所屬章節 %d）不一致" % [
+						lid, ch, earliest, expected_ch
+					])
+		else:
+			# 一般 night row 必填欄位與型別檢查
+			var earliest_val: Variant = loc.get("earliest_night")
+			if earliest_val == null or not (earliest_val is int or earliest_val is float) or float(int(earliest_val)) != float(earliest_val) or int(earliest_val) < 1 or int(earliest_val) > 45:
+				errs.append("%s：缺少有效的 earliest_night（1-45 整數）" % lid)
+
+			var ch_val: Variant = loc.get("chapter")
+			if ch_val == null or not (ch_val is int or ch_val is float) or float(int(ch_val)) != float(ch_val) or int(ch_val) < 1 or int(ch_val) > 3:
+				errs.append("%s：缺少有效的 chapter（1-3 整數）" % lid)
+
+			if not loc.has("madness_cost"):
+				errs.append("%s：缺少 madness_cost 欄位" % lid)
+			else:
+				var cost_val: Variant = loc.get("madness_cost")
+				if cost_val == null or not (cost_val is int or cost_val is float) or float(int(cost_val)) != float(cost_val) or int(cost_val) < 0:
+					errs.append("%s：madness_cost 必須為 >= 0 之整數（實際為 %s）" % [lid, str(cost_val)])
+
+			if earliest_val != null and (earliest_val is int or earliest_val is float) and ch_val != null and (ch_val is int or ch_val is float):
+				var earliest := int(earliest_val)
+				var ch := int(ch_val)
+				var expected_ch := DataFacts.chapter_for_day(earliest)
+				if ch != expected_ch:
+					errs.append("%s：chapter（%d）與 earliest_night（%d 所屬章節 %d）不一致" % [
+						lid, ch, earliest, expected_ch
+					])
+
+	return errs
+
+
 ## 某一天某個時段有哪些 beat（不解 condition，只挑時間對的）。
 func beats_at(day: int, phase: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

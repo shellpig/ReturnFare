@@ -4,24 +4,28 @@
 
 ## 目前階段
 
-**Phase 2 全數完工，Phase 3 規格完成、程式未開工。下一步是 P3-A 夜間資料真值化。**
+**Phase 3-A（夜間資料真值化）實作與驗收完成。下一步是 P3-B 夜間狀態與進入規則。**
 
 - Phase 1（P1-A～P1-H）：實作全綠。P1-F／G／H 三個子階段仍標 🟦「待手動操作驗收」。
 - Phase 2（P2-A～P2-E）：全部實作並驗收。發狂卡的產生與倒數、縱慾出口與主動縱慾、強制縱慾與失控時段、視野門檻與發瘋 BE、headless 重演三種玩家。
-- Phase 3（P3-A～P3-F）：三份文件與 `data/SCHEMA.md` 契約已寫到可動工，並經三輪規格審核（K-73～K-102）回寫完畢。
+- Phase 3（P3-A～P3-F）：P3-A 已實作並全套驗收；P3-B～F 規格定案待實作。
 
 ## 最近完成的工作
 
-- `9e342de` P2-E headless 三種玩家重演與 Phase 2 全套驗收。
-- `a05e0cf` P2-E 驗證落檔，四條尾巴記為 K-69～K-72。
-- `92383e6` P3 夜間層六階段規格完成。
-- `9b7f1c8`／`00551c1` P3 文件兩輪規格審核，K-73～K-97 落檔。
-- `e9bf8bf` K-82～K-97 全數回寫（文件層），P3 開工閘清空。
-- 本次：P3 文件第三輪複審，K-98～K-102 落檔並同批回寫（文件層，未動程式與資料）。補的是「驗收證不出來」那一類——P3-B 八碼拒絕矩陣、P3-E 對位入口的六碼與負向矩陣、P3-A baseline checkpoint 的產生方式、P3-F 角色分工、K-37 殘留。
+- `870db64` P3 文件第三輪複審，K-98～K-102 落檔並同批回寫。
+- 本次：**P3-A 夜間資料真值化實作與驗收完成**：
+  - Baseline checkpoint（`_qa/p3a_baseline/`，commit `870db64` 產生）：D14 night 前置狀態四項後置條件通過，P3-A 變更後重演 `available_locations()`、首次發卡、fixed 流程三項輸出基準與 `expected.json` 逐字全等（K-100）。
+  - `data/cards.json` 新增 10 張 slotless knowledge 對位卡（`k_night_<day_counterpart>`），名稱忠實包含白天地點名稱、文字無未到訪夜間分區劇透。
+  - `data/locations.json` 12 個可對位 night row 填入 `night_reveal`，16 個夜間限定 row 維持 `null`；`n_ahong_2` 正式改名為進場前引子名「有血跡的地方」；阿宏鏈 6 個門檻地點補齊具體 `reject_reason`；`n_corridor_end` 配置為 `teaser_only: true` 且三欄為 `null`；刪除已兌現的 `_pending.night_reveal`。
+  - `DataFacts` 新增 `CHAPTER_START_DAYS` 與 `chapter_for_day(day)`；`GameState` 相容轉接。
+  - `DataLoader` 新增 Lint 11（夜間對位完整性，含雙向單射檢查）與 Lint 12（夜間地點狀態完整性，含 `madness_cost` 拼錯檢查），接通 `verify_data.gd` 與 `Data._validate_loader()`。
+  - 新建 6 組獨立負向壞資料 fixture（`tests/fixtures/broken/p3a_*`），各證明一種錯誤能被 Lint 11／12 攔截。
+  - 新建專屬驗收測試 `tests/headless/test_p3a.gd` 7 組驗收全綠。
+  - 同步更新 `subdocs/卡牌/知識卡.md` 索引至 21 張知識卡。
 
 ## 驗證狀態
 
-- **16 套 headless 全部 exit 0**（`verify_data`、`test_boot`、P1-A～G、P2-A～E、`playthrough_greedy`、`test_p2_sim`）。
+- **17 套 headless 全部 exit 0**（`verify_data`、`test_boot`、P1-A～G、P2-A～E、`playthrough_greedy`、`test_p2_sim`、`test_p3a`）。
 - **UI 模擬 63 條契約／82 個變體／11 個負向反證全綠，0 failed checks**。
 - 走查基準（`6e5e51a` 起，90 個行動時段）：主角卡 47／強制縱慾 12／純比對 22／刻意留空 3／純選擇題 3／HIDDEN 2／LOCKED 1。發狂卡帳 14 張 ＝ 強制消除 12 ＋ 重置前留存 2。
 
@@ -36,10 +40,9 @@
 
 ## 下一個任務
 
-依 `實作規格書.md > P3-A`＋`開發設計方針.md > P3-A`＋`測試指南.md > P3-A` 三段實作 **P3-A 夜間資料真值化**：10 張對位 knowledge 卡、12 筆 `night_reveal`、28 個夜間名稱審查、6 個阿宏門檻理由、`teaser_only` schema、lint 11～12 與各自獨立的壞資料 fixture。
+依 `實作規格書.md > P3-B`＋`開發設計方針.md > P3-B`＋`測試指南.md > P3-B` 三段實作 **P3-B 夜間狀態與進入規則**：
+- `night_locations_seen` 與 `night_once_beats_seen` 進 meta 序列化、跨輪保留。
+- 新增 `enter_night_location()` / `night_location_seen()` / `would_night_entry_end_run()`，刪除 `open_night_marker()`。
+- 八碼拒絕矩陣（`not_night`／`unknown_location`／`not_night_layer`／`teaser`／`too_early`／`locked`／`already_chosen`／`already_slept`）與雙欄 `{reason_code, reason_text}` 回傳。
+- 退役正式資料所有 `opened_n_*`（改用 `night_seen`，聚會改 `saw_n_gathering_intro`），新增 Lint 13。
 
-**⚠️ P3-A 的第一件事不是改資料，是產 baseline。** 在動 `cards.json`／`locations.json` 之前，先於乾淨工作區跑 `make_states.gd` 的 `p3a_night_baseline` 情境，產出 `_qa/p3a_baseline/p3a_night_baseline.json` 與 `.expected.json`，並把當時的 commit sha 記回本檔。事後補產一律不算——舊資料已經不在，拿到的「前」其實是「後」，那條驗收會恆真（K-100）。契約在 `開發設計方針.md > P3-A`。
-
-**不得跳過 P3-A／P3-B 的資料與狀態前置去先做 P3-C 的流程或 P3-D 的 UI。**
-
-> 每個 P3 子階段收尾時更新本檔（`開發設計方針.md > 全域結構決策（P3 期間建立）` 有同一條規約）。內容過期比沒有更糟——本檔曾停在 P1-G 五個子階段之久，落檔為 K-97。

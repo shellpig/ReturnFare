@@ -454,6 +454,76 @@
       "note": "升級版，需要第一章看過名冊上自己那一格。它不解釋機制，但直接生成第二輪的第一個目標：我要找出自己是什麼時候被寫進去的"
     },
     {
+      "id": "k_night_sanquan",
+      "type": "knowledge",
+      "name": "夜裡可以走回山泉閣",
+      "text": "夜裡走過的路可以通往白天的山泉閣。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_jinghe",
+      "type": "knowledge",
+      "name": "夜裡可以走回靜和園",
+      "text": "夜裡走過的路可以通往白天的靜和園。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_clinic",
+      "type": "knowledge",
+      "name": "夜裡可以走回診所",
+      "text": "夜裡走過的路可以通往白天的診所。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_riverside",
+      "type": "knowledge",
+      "name": "夜裡可以走回河邊",
+      "text": "夜裡走過的路可以通往白天的河邊。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_temple",
+      "type": "knowledge",
+      "name": "夜裡可以走回廟＋廟埕",
+      "text": "夜裡走過的路可以通往白天的廟＋廟埕。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_upstream",
+      "type": "knowledge",
+      "name": "夜裡可以走回上游源頭",
+      "text": "夜裡走過的路可以通往白天的上游源頭。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_oldhouse_room",
+      "type": "knowledge",
+      "name": "夜裡可以走回老家那間房",
+      "text": "夜裡走過的路可以通往白天的老家那間房。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_jinghe_back",
+      "type": "knowledge",
+      "name": "夜裡可以走回靜和園後棟",
+      "text": "夜裡走過的路可以通往白天的靜和園後棟。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_clinic_back",
+      "type": "knowledge",
+      "name": "夜裡可以走回診所後棟",
+      "text": "夜裡走過的路可以通往白天的診所後棟。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
+      "id": "k_night_temple_back",
+      "type": "knowledge",
+      "name": "夜裡可以走回廟的後殿／燒金爐",
+      "text": "夜裡走過的路可以通往白天的廟的後殿／燒金爐。兩邊是同一座鎮。",
+      "slotless": true, "stashable": false, "discardable": false
+    },
+    {
       "id": "mood_watched",
       "type": "mood",
       "name": "被盯上",

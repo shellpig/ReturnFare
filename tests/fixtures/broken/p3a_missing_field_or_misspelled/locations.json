@@ -1,0 +1,15 @@
+{
+  "day": [],
+  "night": [
+    {
+      "id": "n_misspelled",
+      "name": "拼錯字地點",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 5,
+      "madness_costs": 1,
+      "day_counterpart": null,
+      "night_reveal": null
+    }
+  ]
+}

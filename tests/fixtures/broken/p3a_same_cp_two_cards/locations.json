@@ -1,0 +1,27 @@
+{
+  "day": [
+    { "id": "temple", "name": "廟", "phases": ["morning", "afternoon"], "layer": "day", "chapter": 1 }
+  ],
+  "night": [
+    {
+      "id": "n_1",
+      "name": "夜1",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 1,
+      "madness_cost": 0,
+      "day_counterpart": "temple",
+      "night_reveal": "k_card_1"
+    },
+    {
+      "id": "n_2",
+      "name": "夜2",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 2,
+      "madness_cost": 0,
+      "day_counterpart": "temple",
+      "night_reveal": "k_card_2"
+    }
+  ]
+}

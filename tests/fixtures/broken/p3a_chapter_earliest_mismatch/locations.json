@@ -1,0 +1,15 @@
+{
+  "day": [],
+  "night": [
+    {
+      "id": "n_mismatch",
+      "name": "錯章地點",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 20,
+      "madness_cost": 1,
+      "day_counterpart": null,
+      "night_reveal": null
+    }
+  ]
+}

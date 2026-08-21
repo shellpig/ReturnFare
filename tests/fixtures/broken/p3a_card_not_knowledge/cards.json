@@ -1,0 +1,6 @@
+{
+  "cards": [
+    { "id": "protagonist", "type": "protagonist", "name": "我", "text": "主角", "slotless": false, "stashable": false, "discardable": false },
+    { "id": "k_bad", "type": "info", "name": "壞卡", "text": "不是知識卡", "slotless": false, "stashable": false, "discardable": false }
+  ]
+}
