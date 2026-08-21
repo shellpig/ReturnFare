@@ -1,0 +1,21 @@
+{
+  "day": [],
+  "night": [
+    {
+      "id": "n_teaser_no_earliest",
+      "name": "走廊盡頭無最早夜",
+      "layer": "night",
+      "chapter": 3,
+      "teaser_only": true,
+      "reject_reason": "還沒有走到那裡。"
+    },
+    {
+      "id": "n_teaser_no_chapter",
+      "name": "走廊盡頭無章節",
+      "layer": "night",
+      "earliest_night": 45,
+      "teaser_only": true,
+      "reject_reason": "還沒有走到那裡。"
+    }
+  ]
+}

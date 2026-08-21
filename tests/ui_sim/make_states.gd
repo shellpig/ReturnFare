@@ -114,7 +114,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		return false
 	f_full.store_string(JSON.stringify(full_snapshot, "\t"))
 	f_full.close()
-	if not _verify_checkpoint_postcondition("p1h_knowledge_full", full_snapshot):
+	if not _verify_checkpoint_postcondition("p1h_knowledge_full", full_snapshot, data_node):
 		printerr("p1h_knowledge_full 後置條件失敗")
 		return false
 
@@ -137,7 +137,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		return false
 	f_mad.store_string(JSON.stringify(mad_snapshot, "\t"))
 	f_mad.close()
-	if not _verify_checkpoint_postcondition("p2a_multi_madness", mad_snapshot):
+	if not _verify_checkpoint_postcondition("p2a_multi_madness", mad_snapshot, data_node):
 		printerr("p2a_multi_madness 後置條件失敗")
 		return false
 
@@ -158,7 +158,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	gs_p2b.deserialize(d3am_dict)
 	gs_p2b.gain_card("madness")
 	gs_p2b.gain_card("madness")
-	if not _write_p2b_state(output_dir, "p2b_morning_madness", gs_p2b.serialize()):
+	if not _write_p2b_state(output_dir, "p2b_morning_madness", gs_p2b.serialize(), data_node):
 		return false
 
 	# ② 第 3 天下午、手上兩張：泡湯呈灰（只能上午發動）
@@ -166,7 +166,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	gs_p2b.deserialize(d3pm_dict)
 	gs_p2b.gain_card("madness")
 	gs_p2b.gain_card("madness")
-	if not _write_p2b_state(output_dir, "p2b_afternoon_madness", gs_p2b.serialize()):
+	if not _write_p2b_state(output_dir, "p2b_afternoon_madness", gs_p2b.serialize(), data_node):
 		return false
 
 	# ③ 第 3 天上午、行動格已用掉：泡湯呈灰（格數不足）。
@@ -176,14 +176,14 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	gs_p2b.gain_card("madness")
 	gs_p2b.gain_card("madness")
 	gs_p2b.consume_action(1)
-	if not _write_p2b_state(output_dir, "p2b_morning_spent", gs_p2b.serialize()):
+	if not _write_p2b_state(output_dir, "p2b_morning_spent", gs_p2b.serialize(), data_node):
 		return false
 
 	# ④ 第 17 天上午、手上一張：暴力對人過了第 16 天門檻，性慾仍未達關係門檻
 	_reset_state(gs_p2b)
 	gs_p2b.deserialize(d17am_dict)
 	gs_p2b.gain_card("madness")
-	if not _write_p2b_state(output_dir, "p2b_d17_madness", gs_p2b.serialize()):
+	if not _write_p2b_state(output_dir, "p2b_d17_madness", gs_p2b.serialize(), data_node):
 		return false
 
 	# ⑤ 同上但與阿婕已達「疑似」（relation_scale.json 的序數是 1）：性慾槽出現
@@ -191,7 +191,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	gs_p2b.deserialize(d17am_dict)
 	gs_p2b.gain_card("madness")
 	gs_p2b.add_relation("ajie", 1)
-	if not _write_p2b_state(output_dir, "p2b_d17_ajie", gs_p2b.serialize()):
+	if not _write_p2b_state(output_dir, "p2b_d17_ajie", gs_p2b.serialize(), data_node):
 		return false
 
 	# 產生 P2-C 強制縱慾的兩個情境（K-61）。起點都是第 10 夜、發狂卡倒數壓到 1——
@@ -211,7 +211,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	gs_p2c.gain_card("madness")
 	var mc_one: Dictionary = gs_p2c.get("madness_clock") as Dictionary
 	mc_one["madness#1"] = 1
-	if not _write_p2b_state(output_dir, "p2c_night_one_forced", gs_p2c.serialize()):
+	if not _write_p2b_state(output_dir, "p2c_night_one_forced", gs_p2c.serialize(), data_node):
 		return false
 
 	# ② 同日兩張歸零：上午一格、下午一格，那一天完全沒有行動格
@@ -222,7 +222,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	var mc_two: Dictionary = gs_p2c.get("madness_clock") as Dictionary
 	mc_two["madness#1"] = 1
 	mc_two["madness#2"] = 1
-	if not _write_p2b_state(output_dir, "p2c_night_two_forced", gs_p2c.serialize()):
+	if not _write_p2b_state(output_dir, "p2c_night_two_forced", gs_p2c.serialize(), data_node):
 		return false
 
 	# 產生 P2-D 視野門檻與發瘋 BE 的情境（K-68）。
@@ -241,7 +241,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	gs_p2d.set_flag("hold_d24pm", false)
 	gs_p2d.gain_card("madness")
 	gs_p2d.gain_card("madness")
-	if not _write_p2b_state(output_dir, "p2d_d24_two_cards", gs_p2d.serialize()):
+	if not _write_p2b_state(output_dir, "p2d_d24_two_cards", gs_p2d.serialize(), data_node):
 		return false
 
 	# ② D24 night 3 張發狂卡（二樓有人在走 OPEN）
@@ -253,7 +253,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	gs_p2d.gain_card("madness")
 	gs_p2d.gain_card("madness")
 	gs_p2d.gain_card("madness")
-	if not _write_p2b_state(output_dir, "p2d_d24_three_cards", gs_p2d.serialize()):
+	if not _write_p2b_state(output_dir, "p2d_d24_three_cards", gs_p2d.serialize(), data_node):
 		return false
 
 	# ③ 接近 cap 狀態：D10 night 6 張發狂卡，再開一次收費標記即達 cap 7
@@ -261,7 +261,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	gs_p2d.deserialize(d10n_dict)
 	for i in range(6):
 		gs_p2d.gain_card("madness")
-	if not _write_p2b_state(output_dir, "p2d_near_cap", gs_p2d.serialize()):
+	if not _write_p2b_state(output_dir, "p2d_near_cap", gs_p2d.serialize(), data_node):
 		return false
 
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
@@ -393,7 +393,7 @@ static func _run_walk_with_checkpoints(
 					f.close()
 
 					# 驗證後置條件
-					var post_ok := _verify_checkpoint_postcondition(cp_name, snapshot)
+					var post_ok := _verify_checkpoint_postcondition(cp_name, snapshot, data_node)
 					if not post_ok:
 						printerr("checkpoint 後置條件失敗: %s" % cp_name)
 						return false
@@ -469,7 +469,7 @@ static func _load_state(output_dir: String, file_name: String) -> Dictionary:
 
 
 ## 寫出 P2-B 情境並跑後置條件。與既有情境同一套規約：寫檔失敗或後置條件不過就整支失敗。
-static func _write_p2b_state(output_dir: String, cp_name: String, snapshot: Dictionary) -> bool:
+static func _write_p2b_state(output_dir: String, cp_name: String, snapshot: Dictionary, data_node: Node = null) -> bool:
 	var path := output_dir + cp_name + ".json"
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
@@ -477,7 +477,7 @@ static func _write_p2b_state(output_dir: String, cp_name: String, snapshot: Dict
 		return false
 	f.store_string(JSON.stringify(snapshot, "\t"))
 	f.close()
-	if not _verify_checkpoint_postcondition(cp_name, snapshot):
+	if not _verify_checkpoint_postcondition(cp_name, snapshot, data_node):
 		printerr("%s 後置條件失敗" % cp_name)
 		return false
 	return true
@@ -599,11 +599,15 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			for c in hand:
 				if str(c).begins_with("madness"):
 					madness_count += 1
-			var madness_cap := 7
-			if data_node != null:
+			var madness_cap: int = 7
+			if data_node != null and data_node.has_method("tuning"):
 				madness_cap = int(data_node.tuning("madness_cap", 7))
-			elif Engine.has_singleton("Data"):
-				madness_cap = int(Engine.get_singleton("Data").tuning("madness_cap", 7))
+			elif FileAccess.file_exists("res://data/tuning.json"):
+				var tf := FileAccess.open("res://data/tuning.json", FileAccess.READ)
+				if tf != null:
+					var tj: Variant = JSON.parse_string(tf.get_as_text())
+					if tj is Dictionary and tj.has("madness_cap"):
+						madness_cap = int(tj.get("madness_cap", 7))
 			if madness_count >= madness_cap:
 				printerr("p3a_night_baseline 後置條件失敗：預期 madness < %d，實際 %d" % [madness_cap, madness_count])
 				return false

@@ -1,0 +1,15 @@
+{
+  "day": [],
+  "night": [
+    {
+      "id": "n_neg_cost",
+      "name": "負價碼",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 1,
+      "madness_cost": -1,
+      "day_counterpart": null,
+      "night_reveal": null
+    }
+  ]
+}

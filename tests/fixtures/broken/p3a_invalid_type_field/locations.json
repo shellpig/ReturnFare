@@ -1,0 +1,15 @@
+{
+  "day": [],
+  "night": [
+    {
+      "id": "n_invalid_type",
+      "name": "型別錯誤",
+      "layer": "night",
+      "chapter": "one",
+      "earliest_night": 1,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null
+    }
+  ]
+}

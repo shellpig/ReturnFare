@@ -1,0 +1,6 @@
+{
+  "card_types": [
+    { "id": "knowledge", "name": "知識卡" },
+    { "id": "protagonist", "name": "主角卡" }
+  ]
+}

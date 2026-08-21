@@ -4,7 +4,7 @@
 
 最後更新：2026-08-21
 
-> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-H 已全部實作並驗證全綠**；**Phase 2 全數完工——P2-A 發狂卡的產生與倒數、P2-B 縱慾出口與主動縱慾、P2-C 強制縱慾與失控時段、P2-D 視野門檻與發瘋 BE、P2-E headless 重演三種玩家均已實作並驗收（全套 16 套 headless exit 0）**；**Phase 3 已完成規格拆分——P3-A～P3-F 三份階段文件與 Schema 契約均寫到可實作**；**UI 模擬驗證工具鏈（`tests/ui_sim/`）63 條 UI 契約、82 個案例變體**。**下一步實作 P3-A 夜間資料真值化。**
+> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-H 已全部實作並驗證全綠**；**Phase 2 全數完工——P2-A 發狂卡的產生與倒數、P2-B 縱慾出口與主動縱慾、P2-C 強制縱慾與失控時段、P2-D 視野門檻與發瘋 BE、P2-E headless 重演三種玩家均已實作並驗收（全套 16 套 headless exit 0）**；**Phase 3 已完成規格拆分——P3-A～P3-F 三份階段文件與 Schema 契約均寫到可實作**；**P3-A 夜間資料真值化已實作並驗收（17 套 headless exit 0，三條測試覆蓋尾巴 K-105／K-108／K-110 留給實作者）**；**UI 模擬驗證工具鏈（`tests/ui_sim/`）63 條 UI 契約、82 個案例變體**。**下一步實作 P3-B 夜間狀態與進入規則。**
 
 ---
 
@@ -64,7 +64,7 @@ headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點�
 | P2-C 強制縱慾 | ✅ | 倒數歸零自動執行、`Indulgence.pick_exit()` 挑最重出口、強度級查表、當日不夠順延次日、主動與強制共享曲線（`test_p2c.gd` 10 組全綠、14 套 headless 全綠） |
 | P2-D 視野門檻與發瘋 BE | ✅ | 達 `madness_cap` 立即 BE、批次發卡只結束一次、共用既有 `end_run()` 收尾、BE 走獨立顯示分支（`test_p2d.gd` 全綠）。驗收六條尾巴（K-63～K-68）**已結案五條**：K-63／K-64（`673f62e` 當批）、K-66／K-67（`9e342de`）；**K-68 只做到一半**——BE 畫面那條補完了，視野門檻那條驗的是旗標不是畫面，卡在 K-69。K-65 排內容期 |
 | P2-E headless 重演三種玩家 | ✅ | `test_p2_sim.gd` 重演 A 深潛／B 典型／C 謹慎 45 天，八個指標、視野窗口與 A 的 26 項時間軸逐項對上 `subdocs/驗證/發狂卡機制模擬.md > 三`，並驗同存檔重跑兩次逐字相同。走真規則層入口（`open_night_marker()`／`indulge()`／`advance_phase()`）。**P2 全部規則的整合測試**，16 套 headless exit 0、UI 全套 82／63 無迴歸 |
-| P3-A 夜間資料真值化 | 📐 | 10 張對位 knowledge／12 筆 `night_reveal`、28 名稱審查、6 個門檻理由、teaser schema、lint 11～12 |
+| P3-A 夜間資料真值化 | ✅ | 10 張對位 knowledge／12 筆 `night_reveal`／16 夜間限定 row 全部從真資料衍生；28 名稱審查落檔對照表；6 個阿宏門檻理由分階段區分；`n_corridor_end` 改 teaser-only；lint 11～12 與 6 個獨立壞資料 fixture。17 套 headless exit 0、UI 82 變體／63 契約／0 failed。**baseline 由 verifier 以 `870db64` 資料獨立重跑對過（逐字相同），所以「沒改玩家流程」這個結論成立**。**三條尾巴給實作者**：K-108（teaser 雙欄 lint 沒有反證 fixture）、K-110（缺欄／型別／負值四種沒有反證）、K-105（`make_states.gd` 死參數與兩處 `7` 字面值）。K-107 是流程紀律，不是 code |
 | P3-B 夜間狀態與進入規則 | 📐 | meta 到訪與 once 集合、`night_seen`、終身首次收費、BE 前先記 seen、一夜一地點、退掉 `opened_n_*` |
 | P3-C 夜間內容流程 | 📐 | `night_beat_candidates()` 結構候選＋`resolved_night_content()` 狀態求值、fixed／D3／D24、睡覺停拍與三種推進按鈕，收 K-30／33／69 |
 | P3-D 夜間地點清單與詳情 UI | 📐 | 穩定文字清單、四種狀態文字＋teaser 鎖定案例、隱藏價碼、可讀 LOCKED 詳情、風險 warning；不做座標地圖 |
@@ -144,7 +144,8 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
   - 同批解決 **K-66**（`_check_madness_cap()` 嚴格依手牌發狂卡計算）、**K-67**（`test_p2d.gd` 走真規則層發卡觸發 BE）；**K-68 只做到一半**（`tests/ui_sim/` 補了 `p2d_01_vision_visibility`、`p2d_02_be_screen` 兩條契約，但視野門檻那條驗的是旗標不是畫面，見下一則）。
   - **全套 16 套 headless 測試全綠**（`test_p2_sim.gd` 是新增的第 16 套；commit message 與本檔原本都誤寫 15，已更正）、**全套 63 條 UI 模擬契約（82 個變體 + 11 個負向反證）全綠**、0 failed checks。
 - 2026-08-20：**P2-E 與 K-66／K-67／K-68 的驗證完成，四條新尾巴落檔為 K-69～K-72。** 16 套 headless 全部 exit 0、UI 全套 82 變體／63 契約／0 failed checks、`playthrough_greedy` 的 90 格新分類已重記（見上方資料層現況）。逐條判定：**K-66、K-67 真的修好了**（cap 改數手牌、BE 測試改讓 `GameState` 自己發 `run_ended`，接線斷掉會紅）；A 深潛 26 項時間軸與模擬文件逐行比對相符；模擬文件把強制縱慾 11 → 12 的補正經獨立驗算為正確（第 38 夜那張卡第 39–45 天各扣 1，第 45 天上午歸零；14 ＝ 12 ＋ 2）。**四條新尾巴**：**K-69**（睡覺解析的 beat 文字被 `main.gd` 丟掉，颱風三夜的外溢文字玩家一個字都看不到，排 P3 與 K-33 同批）、**K-68 未完的那一半**（視野門檻契約用 `serialize()` 的旗標判定，不是畫面節點；**卡在 K-69**——那三格在畫面上本來就沒有節點可查）、**K-70**（`be_map_hidden` 這個 token 只查地點面板沒查地圖，低）、**K-72**（`test_p2_sim.gd` 兩處自行重算，低）。另 **K-71 已修**：契約數與 headless 套數又只改到一部分（K-58 同族第二次），五處已補齊，名單擴充為含走查基準。
-- **下一步實作 P3-A 夜間資料真值化。K-73～K-102 全數回寫完成，文件閘清空，可直接動工。開工的第一件事是產 baseline checkpoint，不是改資料（K-100）。** P3-C 才處理 K-69（夜間睡覺文字沒上畫面）並解除 K-68 的封鎖；不得為了先關 K-69 跳過 P3-A／P3-B 的資料與狀態前置。
+- 2026-08-21：**P3-A 夜間資料真值化實作完成並通過 verifier 驗收**（`ce7c41a` 實作、`41d2d8e` 修 review 尾巴）。verifier 自跑證據：17 套 headless 全部 exit 0、`verify_data` 的 lint 11／12 各 0 錯誤、`test_p3a` 12 項全綠、UI 全套 82 變體／63 契約／0 failed。**K-100 的結論由 verifier 獨立證明**——把 worktree 開在 `870db64`（P3-A 之前的資料）＋現行 generator 重跑，產出的 baseline 與現檔逐字相同，`ce7c41a` 與 `41d2d8e` 各驗一次。第一輪 review 抓到 7 條（K-103～K-109）當日修掉 5 條；**剩下三條測試覆蓋尾巴給實作者**：K-108（teaser 雙欄 lint 補了程式沒補 fixture）、K-110（缺欄／型別錯／負值四種都沒有反證）、K-105（`data_node` 死參數與兩處 `7` 字面值）。K-107（baseline 產生順序）不是 code——兩次都是資料改完才產，結論成立靠的是 verifier 事後重跑，已改記為流程紀律。
+- **下一步實作 P3-B 夜間狀態與進入規則。K-73～K-102 全數回寫完成，文件閘清空。** P3-B 的重點是八碼拒絕矩陣（K-98）與 `opened_n_*` 退場；`enter_night_location()` 取代 `open_night_marker()` 時，`make_states.gd` 的 `p3a_night_baseline` 後置條件（現在讀 `night_markers_opened`）要同批改成讀 `night_location_chosen`，否則 baseline 產不出來。 P3-C 才處理 K-69（夜間睡覺文字沒上畫面）並解除 K-68 的封鎖；不得為了先關 K-69 跳過 P3-A／P3-B 的資料與狀態前置。
 - **P1 之後不擋、可順手做的文件小事**：K-24（純措辭，下次動 `實作規格書.md` 時一起改）。**明確排到後面 Phase 的**：K-30／K-33／K-34／K-35／K-69 全部等 P3 夜間層真值化（現在改是改在 stub 上），K-08 等 i18n 管線。（K-32 已於 2026-08-15 `2ae62a9` 結案。）
 - 2026-08-14：**P1-F 收尾完成**——K-31（`verify_data` 重複檢查刪除）、K-27（lint 3 改以 `(day, phase, location)` 面板分組並更名 `lint_free_slot_rules()`，`d28_morning_xiaowu` 補主角卡槽）、K-29（補齊 K-17／K-18／K-19／K-22 回歸測試）、K-36（走查抽 `run_greedy_walk()` 供 `test_p1f` 共用）、K-28（`FlowText` 接線，殘響／入夜 fixed／結局 stub 三種文字共用容器）、K-37、K-40（`FlowText` 改 `ScrollContainer` ＋ `clip_contents`，夜間文字不再蓋到地點清單與地點面板）。十套 headless 全綠，`main.tscn` 開機無錯誤。
 - 2026-08-14：**P1-E 完成**——`GameState.choose()` 原子化唯一選擇入口（驗證未結算、三態 OPEN、帶卡持有與 accepts 檢查、`on_place` 結算、寫入 `choices` 與 `slots_placed`）、`PanelBuilder.build()` 互斥收起與唯讀（RESOLVED）展示、`try_place()` 轉導 `choose()`、`location_panel.gd` 雙入口按鈕支援（直接選擇與帶卡放置）、狀態序列化往返。`test_p1e.gd` 9 項驗證全綠（含真實資料 `d22_pm_sandbags`）。全部既有 headless 測試無迴歸。

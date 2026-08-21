@@ -1,0 +1,14 @@
+{
+  "day": [],
+  "night": [
+    {
+      "id": "n_missing_earliest",
+      "name": "缺最早夜",
+      "layer": "night",
+      "chapter": 1,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null
+    }
+  ]
+}

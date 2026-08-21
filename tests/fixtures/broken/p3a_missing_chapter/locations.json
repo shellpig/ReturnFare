@@ -1,0 +1,14 @@
+{
+  "day": [],
+  "night": [
+    {
+      "id": "n_missing_ch",
+      "name": "缺章節",
+      "layer": "night",
+      "earliest_night": 1,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null
+    }
+  ]
+}

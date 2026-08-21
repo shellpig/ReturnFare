@@ -366,6 +366,86 @@ func _test_negative_fixtures() -> int:
 		else:
 			failed += _ok("負向 fixture 6: madness_cost 拼錯/缺少被 Lint 12 成功攔截")
 
+	# 7. teaser 地點單獨缺 earliest_night 或 chapter 被 Lint 12 攔截 (K-108)
+	var l7 := DataLoader.new("res://tests/fixtures/broken/p3a_teaser_missing_time_column/")
+	if not l7.load_all():
+		failed += _fail("fixture 7 讀取失敗: %s" % str(l7.errors))
+	else:
+		var errs7 := DataLoader.lint_night_locations(l7)
+		var has_no_earliest_err := false
+		var has_no_chapter_err := false
+		for e in errs7:
+			if "n_teaser_no_earliest" in e and "缺少有效的 earliest_night" in e:
+				has_no_earliest_err = true
+			if "n_teaser_no_chapter" in e and "缺少有效的 chapter" in e:
+				has_no_chapter_err = true
+		if not has_no_earliest_err:
+			failed += _fail("fixture 7: n_teaser_no_earliest 未報出缺少 earliest_night；實際報錯：%s" % str(errs7))
+		if not has_no_chapter_err:
+			failed += _fail("fixture 7: n_teaser_no_chapter 未報出缺少 chapter；實際報錯：%s" % str(errs7))
+		if has_no_earliest_err and has_no_chapter_err:
+			failed += _ok("負向 fixture 7: teaser 單獨缺 earliest_night 或 chapter 均被 Lint 12 成功攔截 (K-108)")
+
+	# 8. 一般 night row 缺 earliest_night (K-110)
+	var l8 := DataLoader.new("res://tests/fixtures/broken/p3a_missing_earliest_night/")
+	if not l8.load_all():
+		failed += _fail("fixture 8 讀取失敗: %s" % str(l8.errors))
+	else:
+		var errs8 := DataLoader.lint_night_locations(l8)
+		var matched8 := false
+		for e in errs8:
+			if "缺少有效的 earliest_night" in e:
+				matched8 = true
+		if not matched8:
+			failed += _fail("fixture 8 未觸發預期錯誤；實際報錯：%s" % str(errs8))
+		else:
+			failed += _ok("負向 fixture 8: 一般 night row 缺 earliest_night 被 Lint 12 成功攔截 (K-110)")
+
+	# 9. 一般 night row 缺 chapter (K-110)
+	var l9 := DataLoader.new("res://tests/fixtures/broken/p3a_missing_chapter/")
+	if not l9.load_all():
+		failed += _fail("fixture 9 讀取失敗: %s" % str(l9.errors))
+	else:
+		var errs9 := DataLoader.lint_night_locations(l9)
+		var matched9 := false
+		for e in errs9:
+			if "缺少有效的 chapter" in e:
+				matched9 = true
+		if not matched9:
+			failed += _fail("fixture 9 未觸發預期錯誤；實際報錯：%s" % str(errs9))
+		else:
+			failed += _ok("負向 fixture 9: 一般 night row 缺 chapter 被 Lint 12 成功攔截 (K-110)")
+
+	# 10. 一般 night row madness_cost 為負值 (K-110)
+	var l10 := DataLoader.new("res://tests/fixtures/broken/p3a_negative_madness_cost/")
+	if not l10.load_all():
+		failed += _fail("fixture 10 讀取失敗: %s" % str(l10.errors))
+	else:
+		var errs10 := DataLoader.lint_night_locations(l10)
+		var matched10 := false
+		for e in errs10:
+			if "madness_cost 必須為 >= 0 之整數" in e:
+				matched10 = true
+		if not matched10:
+			failed += _fail("fixture 10 未觸發預期錯誤；實際報錯：%s" % str(errs10))
+		else:
+			failed += _ok("負向 fixture 10: madness_cost 為負值被 Lint 12 成功攔截 (K-110)")
+
+	# 11. 欄位型別錯誤 (K-110)
+	var l11 := DataLoader.new("res://tests/fixtures/broken/p3a_invalid_type_field/")
+	if not l11.load_all():
+		failed += _fail("fixture 11 讀取失敗: %s" % str(l11.errors))
+	else:
+		var errs11 := DataLoader.lint_night_locations(l11)
+		var matched11 := false
+		for e in errs11:
+			if "缺少有效的 chapter" in e or "型別錯誤" in e:
+				matched11 = true
+		if not matched11:
+			failed += _fail("fixture 11 未觸發預期錯誤；實際報錯：%s" % str(errs11))
+		else:
+			failed += _ok("負向 fixture 11: 欄位型別錯誤被 Lint 12 成功攔截 (K-110)")
+
 	return failed
 
 

@@ -634,9 +634,27 @@ static func lint_night_locations(loader: DataLoader) -> PackedStringArray:
 		if loc.get("layer", "") != "night":
 			continue
 
+		# 1. 通用時間欄位與章節一致性檢查（含 teaser_only 與一般 night row）
+		var earliest_val: Variant = loc.get("earliest_night")
+		if earliest_val == null or not (earliest_val is int or earliest_val is float) or float(int(earliest_val)) != float(earliest_val) or int(earliest_val) < 1 or int(earliest_val) > 45:
+			errs.append("%s：缺少有效的 earliest_night（1-45 整數）" % lid)
+
+		var ch_val: Variant = loc.get("chapter")
+		if ch_val == null or not (ch_val is int or ch_val is float) or float(int(ch_val)) != float(ch_val) or int(ch_val) < 1 or int(ch_val) > 3:
+			errs.append("%s：缺少有效的 chapter（1-3 整數）" % lid)
+
+		if earliest_val != null and (earliest_val is int or earliest_val is float) and ch_val != null and (ch_val is int or ch_val is float):
+			var earliest := int(earliest_val)
+			var ch := int(ch_val)
+			var expected_ch := DataFacts.chapter_for_day(earliest)
+			if ch != expected_ch:
+				errs.append("%s：chapter（%d）與 earliest_night（%d 所屬章節 %d）不一致" % [
+					lid, ch, earliest, expected_ch
+				])
+
+		# 2. teaser vs 一般 row 分支檢查
 		var is_teaser: bool = bool(loc.get("teaser_only", false))
 		if is_teaser:
-			# teaser_only 欄位檢查
 			var reason_val: Variant = loc.get("reject_reason")
 			if reason_val == null or not (reason_val is String) or str(reason_val).strip_edges().is_empty():
 				errs.append("%s：teaser_only 地點缺少有效的 reject_reason" % lid)
@@ -652,46 +670,13 @@ static func lint_night_locations(loader: DataLoader) -> PackedStringArray:
 			var rev_val: Variant = loc.get("night_reveal")
 			if rev_val != null:
 				errs.append("%s：teaser_only 地點的 night_reveal 必須為 null 或省略（實際為 %s）" % [lid, str(rev_val)])
-
-			var earliest_val: Variant = loc.get("earliest_night")
-			var ch_val: Variant = loc.get("chapter")
-			if earliest_val == null or not (earliest_val is int or earliest_val is float) or float(int(earliest_val)) != float(earliest_val) or int(earliest_val) < 1 or int(earliest_val) > 45:
-				errs.append("%s：teaser_only 地點缺少有效的 earliest_night（1-45 整數）" % lid)
-			if ch_val == null or not (ch_val is int or ch_val is float) or float(int(ch_val)) != float(ch_val) or int(ch_val) < 1 or int(ch_val) > 3:
-				errs.append("%s：teaser_only 地點缺少有效的 chapter（1-3 整數）" % lid)
-			if earliest_val != null and (earliest_val is int or earliest_val is float) and ch_val != null and (ch_val is int or ch_val is float):
-				var earliest := int(earliest_val)
-				var ch := int(ch_val)
-				var expected_ch := DataFacts.chapter_for_day(earliest)
-				if ch != expected_ch:
-					errs.append("%s：chapter（%d）與 earliest_night（%d 所屬章節 %d）不一致" % [
-						lid, ch, earliest, expected_ch
-					])
 		else:
-			# 一般 night row 必填欄位與型別檢查
-			var earliest_val: Variant = loc.get("earliest_night")
-			if earliest_val == null or not (earliest_val is int or earliest_val is float) or float(int(earliest_val)) != float(earliest_val) or int(earliest_val) < 1 or int(earliest_val) > 45:
-				errs.append("%s：缺少有效的 earliest_night（1-45 整數）" % lid)
-
-			var ch_val: Variant = loc.get("chapter")
-			if ch_val == null or not (ch_val is int or ch_val is float) or float(int(ch_val)) != float(ch_val) or int(ch_val) < 1 or int(ch_val) > 3:
-				errs.append("%s：缺少有效的 chapter（1-3 整數）" % lid)
-
 			if not loc.has("madness_cost"):
 				errs.append("%s：缺少 madness_cost 欄位" % lid)
 			else:
 				var cost_val: Variant = loc.get("madness_cost")
 				if cost_val == null or not (cost_val is int or cost_val is float) or float(int(cost_val)) != float(cost_val) or int(cost_val) < 0:
 					errs.append("%s：madness_cost 必須為 >= 0 之整數（實際為 %s）" % [lid, str(cost_val)])
-
-			if earliest_val != null and (earliest_val is int or earliest_val is float) and ch_val != null and (ch_val is int or ch_val is float):
-				var earliest := int(earliest_val)
-				var ch := int(ch_val)
-				var expected_ch := DataFacts.chapter_for_day(earliest)
-				if ch != expected_ch:
-					errs.append("%s：chapter（%d）與 earliest_night（%d 所屬章節 %d）不一致" % [
-						lid, ch, earliest, expected_ch
-					])
 
 	return errs
 
