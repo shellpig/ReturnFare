@@ -126,12 +126,14 @@ func _test_knowledge_card_naming_and_text(data_node: Node) -> int:
 	var failed := 0
 	var loader: DataLoader = data_node.loader
 
-	# 收集所有夜間分區/引子名稱
+	# 收集所有夜間分區/引子名稱（K-103：動態防護）
 	var night_location_names: Array[String] = []
 	for lid in loader.locations:
 		var loc: Dictionary = loader.locations[lid]
 		if str(loc.get("layer", "")) == "night":
-			night_location_names.append(str(loc.get("name", "")))
+			var n_name := str(loc.get("name", "")).strip_edges()
+			if not n_name.is_empty():
+				night_location_names.append(n_name)
 
 	for lid in loader.locations:
 		var loc: Dictionary = loader.locations[lid]
@@ -152,13 +154,13 @@ func _test_knowledge_card_naming_and_text(data_node: Node) -> int:
 		if not day_name in card_name:
 			failed += _fail("對位卡 %s 名稱（%s）未包含白天地點名稱（%s）" % [reveal_id, card_name, day_name])
 
-		# 文字不應洩漏其他夜間分區引子名稱（如很長的走廊、有蒸氣的樓下等特定夜點名）
-		for n_name in ["很長的走廊", "有蒸氣的樓下", "數木牌的屋子", "有音樂的地方"]:
+		# 文字不應洩漏任何夜間分區引子名稱
+		for n_name in night_location_names:
 			if n_name in card_text:
-				failed += _fail("對位卡 %s 文字（%s）劇透了未到訪夜間分區名（%s）" % [reveal_id, card_text, n_name])
+				failed += _fail("對位卡 %s 文字（%s）洩漏了夜間分區名（%s）" % [reveal_id, card_text, n_name])
 
 	if failed == 0:
-		failed += _ok("10 張對位卡名稱均包含白天地點名稱且文字無特定夜間分區劇透")
+		failed += _ok("10 張對位卡名稱均包含白天地點名稱且文字無夜間分區劇透（動態掃描 28 個夜間名稱）")
 
 	return failed
 
@@ -188,7 +190,7 @@ func _test_night_names_review(data_node: Node) -> int:
 		failed += _fail("夜間地點總數應為 28，實際 %d" % night_count)
 
 	if failed == 0:
-		failed += _ok("28 個夜間名稱審查通過（n_ahong_2 正確改名為引子名）")
+		failed += _ok("夜間地點總數為 28、名稱非空且 n_ahong_2 正確改名為引子名（K-104：其餘 27 個名稱與 primary beat 人工審查已落檔）")
 
 	return failed
 
@@ -199,24 +201,46 @@ func _test_ahong_reject_reasons(data_node: Node) -> int:
 	var failed := 0
 	var loader: DataLoader = data_node.loader
 
-	var ahong_expected_reasons := {
-		"n_ahong_2": "你還沒跟完上一段痕跡。",
-		"n_ahong_3": "你還沒跟完上一段痕跡。",
-		"n_ahong_4": "你還沒跟完上一段痕跡。",
-		"n_ahong_5": "你手上的路線知識還少了一段。",
-		"n_ahong_6": "你手上的路線知識還少了一段。",
-		"n_ahong_7": "三個對位點尚未連齊。",
-	}
+	# 驗證 6 個帶 location requires 的阿宏 row 均有非空、非通用、語意對應的 reject_reason（K-109）
+	var ahong_ids := ["n_ahong_2", "n_ahong_3", "n_ahong_4", "n_ahong_5", "n_ahong_6", "n_ahong_7"]
+	var seen_reasons: Dictionary = {}
 
-	for lid in ahong_expected_reasons.keys():
+	for lid in ahong_ids:
 		var loc: Dictionary = loader.locations.get(lid, {}) as Dictionary
-		var reason := str(loc.get("reject_reason", ""))
-		var expected: String = ahong_expected_reasons[lid]
-		if reason != expected:
-			failed += _fail("%s reject_reason 不符：預期「%s」，實際「%s」" % [lid, expected, reason])
+		var reason := str(loc.get("reject_reason", "")).strip_edges()
+		if reason.is_empty():
+			failed += _fail("%s 缺少 reject_reason" % lid)
+			continue
+		if reason == "無法進入" or reason == "條件未達成" or reason == "未解鎖":
+			failed += _fail("%s reject_reason 不得使用通用 fallback（實際為「%s」）" % [lid, reason])
+		seen_reasons[lid] = reason
+
+	# 語意對應斷言（非字串逐字拷貝，避免文案微調時假紅）
+	# 2/3/4 指向上一段痕跡
+	for lid in ["n_ahong_2", "n_ahong_3", "n_ahong_4"]:
+		var r: String = str(seen_reasons.get(lid, ""))
+		if not ("痕跡" in r or "上一段" in r):
+			failed += _fail("%s reject_reason（%s）未指向上一段痕跡" % [lid, r])
+
+	# 5 指向第一段路線知識
+	var r5: String = str(seen_reasons.get("n_ahong_5", ""))
+	if not ("路線知識" in r5 or "第一段" in r5):
+		failed += _fail("n_ahong_5 reject_reason（%s）未指向第一段路線知識" % r5)
+
+	# 6 指向第二段路線知識，且與 5 不得完全相同
+	var r6: String = str(seen_reasons.get("n_ahong_6", ""))
+	if not ("路線知識" in r6 or "第二段" in r6):
+		failed += _fail("n_ahong_6 reject_reason（%s）未指向第二段路線知識" % r6)
+	if r5 == r6:
+		failed += _fail("n_ahong_5 與 n_ahong_6 要求不同知識卡，reject_reason 不應完全相同")
+
+	# 7 指向三個對位點
+	var r7: String = str(seen_reasons.get("n_ahong_7", ""))
+	if not ("對位點" in r7 or "三個" in r7):
+		failed += _fail("n_ahong_7 reject_reason（%s）未指向三個對位點" % r7)
 
 	if failed == 0:
-		failed += _ok("阿宏鏈 6 個門檻地點均有正確具體的 reject_reason")
+		failed += _ok("阿宏鏈 6 個門檻地點均有非空、彼此語意對應且指向各自要求之 reject_reason")
 
 	return failed
 

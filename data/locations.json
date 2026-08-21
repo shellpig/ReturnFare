@@ -627,7 +627,7 @@
       "earliest_night": 28,
       "madness_cost": 1,
       "requires": { "has_knowledge": "k_ahong_point_1" },
-      "reject_reason": "你手上的路線知識還少了一段。",
+      "reject_reason": "你手上的路線知識還少了第一段。",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -659,7 +659,7 @@
       "earliest_night": 38,
       "madness_cost": 1,
       "requires": { "has_knowledge": "k_ahong_point_2" },
-      "reject_reason": "你手上的路線知識還少了一段。",
+      "reject_reason": "你手上的路線知識還少了第二段。",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {

@@ -483,7 +483,7 @@ static func _write_p2b_state(output_dir: String, cp_name: String, snapshot: Dict
 	return true
 
 
-static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictionary) -> bool:
+static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictionary, data_node: Node = null) -> bool:
 	var run: Dictionary = snapshot.get("run", {}) as Dictionary
 	var flags: Dictionary = run.get("flags", {}) as Dictionary
 	var choices: Dictionary = run.get("choices", {}) as Dictionary
@@ -599,8 +599,13 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			for c in hand:
 				if str(c).begins_with("madness"):
 					madness_count += 1
-			if madness_count >= 7:
-				printerr("p3a_night_baseline 後置條件失敗：預期 madness < 7，實際 %d" % madness_count)
+			var madness_cap := 7
+			if data_node != null:
+				madness_cap = int(data_node.tuning("madness_cap", 7))
+			elif Engine.has_singleton("Data"):
+				madness_cap = int(Engine.get_singleton("Data").tuning("madness_cap", 7))
+			if madness_count >= madness_cap:
+				printerr("p3a_night_baseline 後置條件失敗：預期 madness < %d，實際 %d" % [madness_cap, madness_count])
 				return false
 			return true
 		_:
@@ -633,14 +638,13 @@ static func _generate_p3a_baseline(tree: SceneTree, data_node: Node, baseline_sn
 	var gs_grant: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
 	_reset_state(gs_grant)
 	gs_grant.deserialize(baseline_snapshot)
-	var paid_loc := ""
-	for lid in avail_locs:
-		var ldef: Dictionary = data_node.loader.locations.get(lid, {}) as Dictionary
-		if int(ldef.get("madness_cost", 0)) > 0:
-			paid_loc = lid
-			break
-	if paid_loc.is_empty():
-		printerr("p3a_baseline: 在 D14 night 找不到任何可用的收費標記")
+	var paid_loc := "n_ahong_1"
+	if not avail_locs.has(paid_loc):
+		printerr("p3a_baseline: 在 D14 night 可用地點中找不到指定的收費標記 %s" % paid_loc)
+		return false
+	var ldef: Dictionary = data_node.loader.locations.get(paid_loc, {}) as Dictionary
+	if int(ldef.get("madness_cost", 0)) <= 0:
+		printerr("p3a_baseline: 指定的地點 %s 不是收費標記（madness_cost <= 0）" % paid_loc)
 		return false
 	var grant_lines: PackedStringArray = gs_grant.open_night_marker(paid_loc)
 	var grant_opened: Dictionary = (gs_grant.get("night_markers_opened") as Dictionary).duplicate(true)

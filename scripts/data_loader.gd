@@ -655,7 +655,11 @@ static func lint_night_locations(loader: DataLoader) -> PackedStringArray:
 
 			var earliest_val: Variant = loc.get("earliest_night")
 			var ch_val: Variant = loc.get("chapter")
-			if earliest_val != null and ch_val != null:
+			if earliest_val == null or not (earliest_val is int or earliest_val is float) or float(int(earliest_val)) != float(earliest_val) or int(earliest_val) < 1 or int(earliest_val) > 45:
+				errs.append("%s：teaser_only 地點缺少有效的 earliest_night（1-45 整數）" % lid)
+			if ch_val == null or not (ch_val is int or ch_val is float) or float(int(ch_val)) != float(ch_val) or int(ch_val) < 1 or int(ch_val) > 3:
+				errs.append("%s：teaser_only 地點缺少有效的 chapter（1-3 整數）" % lid)
+			if earliest_val != null and (earliest_val is int or earliest_val is float) and ch_val != null and (ch_val is int or ch_val is float):
 				var earliest := int(earliest_val)
 				var ch := int(ch_val)
 				var expected_ch := DataFacts.chapter_for_day(earliest)

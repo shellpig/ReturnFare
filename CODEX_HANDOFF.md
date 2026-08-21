@@ -14,13 +14,13 @@
 
 - `870db64` P3 文件第三輪複審，K-98～K-102 落檔並同批回寫。
 - 本次：**P3-A 夜間資料真值化實作與驗收完成**：
-  - Baseline checkpoint（`_qa/p3a_baseline/`，commit `870db64` 產生）：D14 night 前置狀態四項後置條件通過，P3-A 變更後重演 `available_locations()`、首次發卡、fixed 流程三項輸出基準與 `expected.json` 逐字全等（K-100）。
-  - `data/cards.json` 新增 10 張 slotless knowledge 對位卡（`k_night_<day_counterpart>`），名稱忠實包含白天地點名稱、文字無未到訪夜間分區劇透。
-  - `data/locations.json` 12 個可對位 night row 填入 `night_reveal`，16 個夜間限定 row 維持 `null`；`n_ahong_2` 正式改名為進場前引子名「有血跡的地方」；阿宏鏈 6 個門檻地點補齊具體 `reject_reason`；`n_corridor_end` 配置為 `teaser_only: true` 且三欄為 `null`；刪除已兌現的 `_pending.night_reveal`。
+  - Baseline checkpoint（`_qa/p3a_baseline/`，commit `870db64` 產生）：D14 night 前置狀態四項後置條件通過，P3-A 變更後重演 `available_locations()`、首次發卡、fixed 流程三項輸出基準與 `expected.json` 逐字全等（K-100）。後續已按 review 意見更新 `make_states.gd`（動態 `madness_cap` 與明示 `n_ahong_1`，K-105／K-106）並重跑產出基準。
+  - `data/cards.json` 新增 10 張 slotless knowledge 對位卡（`k_night_<day_counterpart>`），名稱忠實包含白天地點名稱、文字動態防護 28 個夜間名稱劇透（K-103）。
+  - `data/locations.json` 12 個可對位 night row 填入 `night_reveal`，16 個夜間限定 row 維持 `null`；`n_ahong_2` 正式改名為進場前引子名「有血跡的地方」；阿宏鏈 6 個門檻地點補齊具體 `reject_reason`（區分 5 與 6 的路線知識階段，K-109）；`n_corridor_end` 配置為 `teaser_only: true` 且三欄為 `null`；刪除已兌現的 `_pending.night_reveal`。
   - `DataFacts` 新增 `CHAPTER_START_DAYS` 與 `chapter_for_day(day)`；`GameState` 相容轉接。
-  - `DataLoader` 新增 Lint 11（夜間對位完整性，含雙向單射檢查）與 Lint 12（夜間地點狀態完整性，含 `madness_cost` 拼錯檢查），接通 `verify_data.gd` 與 `Data._validate_loader()`。
+  - `DataLoader` 新增 Lint 11（夜間對位完整性，含雙向單射檢查）與 Lint 12（夜間地點狀態完整性，含 `madness_cost` 拼錯檢查、teaser 雙欄必填與一致性檢查 K-108），接通 `verify_data.gd` 與 `Data._validate_loader()`。
   - 新建 6 組獨立負向壞資料 fixture（`tests/fixtures/broken/p3a_*`），各證明一種錯誤能被 Lint 11／12 攔截。
-  - 新建專屬驗收測試 `tests/headless/test_p3a.gd` 7 組驗收全綠。
+  - 新建專屬驗收測試 `tests/headless/test_p3a.gd` 7 組驗收全綠，語意斷言覆蓋阿宏 6 門檻（K-109），28 個夜間名稱人工 code review 對照表記錄於 `驗證後已知問題.md`（K-104）。
   - 同步更新 `subdocs/卡牌/知識卡.md` 索引至 21 張知識卡。
 
 ## 驗證狀態
