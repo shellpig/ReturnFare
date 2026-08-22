@@ -324,10 +324,13 @@ static func _handle_night_phase(gs: Node, data_node: Node, day: int, strategy: S
 	var opened_markers: Dictionary = gs.get("night_locations_seen") as Dictionary
 
 	for loc_id in locs:
+		var summary: Dictionary = PanelBuilder.location_summary(loc_id, gs, data_node)
+		if not bool(summary.get("can_enter", false)):
+			continue
 		var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
-		if int(loc.get("madness_cost", 0)) > 0 and not opened_markers.has(loc_id):
-			if loc.has("requires") and not ConditionEval.eval(loc["requires"], gs):
-				continue
+		var cost_val: Variant = loc.get("madness_cost", 0)
+		var cost: int = int(cost_val) if (cost_val is int or cost_val is float) else 0
+		if cost > 0 and not opened_markers.has(loc_id):
 			chosen_loc = loc_id
 			break
 

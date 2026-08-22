@@ -47,6 +47,7 @@ func _ready() -> void:
 	_map_list.location_selected.connect(_on_location_selected)
 	_location_panel.closed.connect(_on_panel_closed)
 	_location_panel.state_changed.connect(_on_location_panel_state_changed)
+	_location_panel.night_entry_requested.connect(_on_night_entry_requested)
 
 	_refresh_status()
 	_route_view()
@@ -160,22 +161,31 @@ func _on_run_ended(ending_id: String) -> void:
 	_map_list.visible = false
 	_location_panel.visible = false
 	_advance_btn.visible = true
+	_advance_btn.disabled = false
 
 
 func _on_location_selected(loc_id: String) -> void:
-	var extra_lines := PackedStringArray()
-	if GameState.phase == "night":
-		var entry_res: Dictionary = GameState.enter_night_location(loc_id)
-		if not entry_res.get("ok", false):
-			return
-		extra_lines = entry_res.get("lines", PackedStringArray())
 	if _is_showing_ending:
 		return
 	_flow_text.visible = false
 	_map_list.visible = false
 	_location_panel.visible = true
 	_advance_btn.disabled = true
+	if GameState.phase == "night":
+		_location_panel.call("show_night_details", loc_id)
+	else:
+		_location_panel.call("show_location", loc_id)
+
+
+func _on_night_entry_requested(loc_id: String) -> void:
+	var entry_res: Dictionary = GameState.enter_night_location(loc_id)
+	if not bool(entry_res.get("ok", false)):
+		return
+	if _is_showing_ending:
+		return
+	var extra_lines: PackedStringArray = entry_res.get("lines", PackedStringArray())
 	_location_panel.call("show_location", loc_id, extra_lines)
+	_refresh_advance_hint()
 
 
 func _on_panel_closed() -> void:

@@ -251,12 +251,17 @@ func _test_one_location_per_night(gs: Node, data_node: Node) -> int:
 	# 選定 n_ahong_1
 	gs.call("enter_night_location", "n_ahong_1")
 
-	# 選定後：available_locations 僅回傳該選定地點
+	# 選定後：available_locations 仍保留全部開放地點（P3-D 規格：清單不收縮，由 location_summary 控制 can_enter）
 	var chosen_locs: Array[String] = PanelBuilder.available_locations(gs, data_node)
-	if chosen_locs == ["n_ahong_1"]:
-		failed += _ok("選定 n_ahong_1 後，available_locations 僅回傳 ['n_ahong_1']，其餘地點不可見/不可進")
+	if chosen_locs == initial_locs:
+		failed += _ok("選定 n_ahong_1 後，available_locations 仍保留全部當前開放地點")
 	else:
-		failed += _fail("選定地點後 available_locations 未正確過濾: %s" % str(chosen_locs))
+		failed += _fail("選定地點後 available_locations 順序或項目異常: %s" % str(chosen_locs))
+
+	for cl: String in chosen_locs:
+		var summary: Dictionary = PanelBuilder.location_summary(cl, gs, data_node)
+		if bool(summary.get("can_enter", false)) or str(summary.get("reason_code", "")) != "already_chosen":
+			failed += _fail("選定地點後地點 %s 未正確 disabled (can_enter=%s, reason=%s)" % [cl, str(summary.get("can_enter")), str(summary.get("reason_code"))])
 
 	# 推進至次日 morning：night_location_chosen 自動重置
 	gs.call("advance_phase")
@@ -329,11 +334,12 @@ func _test_free_location_no_madness(gs: Node, data_node: Node) -> int:
 			str(lines), str(hand), str(clock), str(seen), chosen
 		])
 
-	var chosen_locs: Array[String] = PanelBuilder.available_locations(gs, data_node)
-	if chosen_locs == ["n_landmark"]:
-		failed += _ok("免費地點選定後當夜同樣套用一夜一個地點過濾")
+	var summary_landmark: Dictionary = PanelBuilder.location_summary("n_landmark", gs, data_node)
+	var summary_other: Dictionary = PanelBuilder.location_summary("n_woodtags", gs, data_node)
+	if not bool(summary_landmark.get("can_enter", true)) and str(summary_landmark.get("reason_code", "")) == "already_chosen" and not bool(summary_other.get("can_enter", true)) and str(summary_other.get("reason_code", "")) == "already_chosen":
+		failed += _ok("免費地點選定後當夜所有地點 summary.can_enter 正確設為 false (already_chosen)")
 	else:
-		failed += _fail("免費地點選定後過濾異常: %s" % str(chosen_locs))
+		failed += _fail("免費地點選定後過濾異常: summary_landmark=%s, summary_other=%s" % [str(summary_landmark), str(summary_other)])
 
 	return failed
 

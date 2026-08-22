@@ -5,6 +5,7 @@ extends VBoxContainer
 
 signal closed
 signal state_changed
+signal night_entry_requested(id: String)
 
 const _LABEL_NO_TITLE := "（無標題）"
 const _FMT_BEAT_TITLE := "== %s =="
@@ -33,8 +34,20 @@ const _REASON_CODE_TEXTS := {
 	"locked": "條件不足",
 }
 
+const _NIGHT_REJECT_TEXTS := {
+	"not_night": "非夜間時段",
+	"unknown_location": "未知的地點",
+	"not_night_layer": "非夜間地點",
+	"teaser": "還沒有走到那裡。",
+	"too_early": "時機未到",
+	"locked": "條件不足",
+	"already_chosen": "今夜已探索過其他地點",
+	"already_slept": "今夜已準備就寢",
+}
+
 @onready var _back_btn: Button = $BackButton
 @onready var _advance_beat_btn: Button = $AdvanceBeatButton
+@onready var _night_enter_btn: Button = $NightEnterButton
 @onready var _location_title: Label = $LocationTitle
 @onready var _description_label: Label = $DescriptionLabel
 @onready var _status_label: Label = Label.new()
@@ -55,6 +68,7 @@ func _ready() -> void:
 	_advance_beat_btn.set_meta("qa_id", "beat_advance")
 	_back_btn.pressed.connect(func(): closed.emit())
 	_advance_beat_btn.pressed.connect(_on_advance_beat_pressed)
+	_night_enter_btn.pressed.connect(_on_night_enter_pressed)
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_status_label)
 	move_child(_status_label, _back_btn.get_index() + 1)
@@ -65,6 +79,7 @@ func _ready() -> void:
 
 func show_location(location_id: String, extra_lines: PackedStringArray = PackedStringArray()) -> void:
 	_current_location = location_id
+	_night_enter_btn.visible = false
 	_status_label.text = "\n".join(extra_lines) if not extra_lines.is_empty() else ""
 	_status_label.visible = not extra_lines.is_empty()
 	_pending_beat_ids.clear()
@@ -75,6 +90,69 @@ func show_location(location_id: String, extra_lines: PackedStringArray = PackedS
 	_queue_open_beats()
 	_is_playing = not _pending_beat_ids.is_empty()
 	_rebuild()
+
+
+func show_night_details(location_id: String) -> void:
+	_current_location = location_id
+	_pending_beat_ids.clear()
+	_visit_seen.clear()
+	_current_beat_id = ""
+	_current_lines = PackedStringArray()
+	_current_played = false
+	_is_playing = false
+	_advance_beat_btn.visible = false
+	_description_label.visible = false
+	_status_label.visible = false
+	_status_label.text = ""
+
+	for child in _beat_container.get_children():
+		child.queue_free()
+
+	var summary: Dictionary = PanelBuilder.location_summary(location_id, GameState, Data)
+	_location_title.text = str(summary.get("display_name", location_id))
+	_location_title.visible = true
+
+	var status_text := str(summary.get("status_text", ""))
+	if not status_text.is_empty():
+		var status_lbl := Label.new()
+		status_lbl.text = status_text
+		status_lbl.set_meta("qa_id", "night_status::" + location_id)
+		_beat_container.add_child(status_lbl)
+
+	var can_enter := bool(summary.get("can_enter", false))
+	if not can_enter:
+		var reason_text := str(summary.get("reason_text", "")).strip_edges()
+		var reason_code := str(summary.get("reason_code", "")).strip_edges()
+		var display_reason := reason_text
+		if display_reason.is_empty():
+			if _NIGHT_REJECT_TEXTS.has(reason_code):
+				display_reason = _NIGHT_REJECT_TEXTS[reason_code]
+			else:
+				display_reason = reason_code
+		if not display_reason.is_empty():
+			var reason_lbl := Label.new()
+			reason_lbl.text = display_reason
+			reason_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			reason_lbl.set_meta("qa_id", "night_reason::" + location_id)
+			_beat_container.add_child(reason_lbl)
+
+	var warning_text := str(summary.get("warning", "")).strip_edges()
+	if not warning_text.is_empty():
+		var warn_lbl := Label.new()
+		warn_lbl.text = warning_text
+		warn_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		warn_lbl.set_meta("qa_id", "night_warning::" + location_id)
+		_beat_container.add_child(warn_lbl)
+
+	_night_enter_btn.visible = true
+	_night_enter_btn.text = "進入"
+	_night_enter_btn.disabled = not can_enter
+	_night_enter_btn.set_meta("qa_id", "night_enter::" + location_id)
+
+
+func _on_night_enter_pressed() -> void:
+	if not _current_location.is_empty():
+		night_entry_requested.emit(_current_location)
 
 
 func _queue_open_beats() -> void:
@@ -107,6 +185,7 @@ func _on_advance_beat_pressed() -> void:
 
 
 func _rebuild() -> void:
+	_night_enter_btn.visible = false
 	for child in _beat_container.get_children():
 		child.queue_free()
 

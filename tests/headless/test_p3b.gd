@@ -406,8 +406,9 @@ func _test_main_scene_cap_be_screen(tree: SceneTree, gs: Node, _data_node: Node)
 	var loc_panel: Node = main.get_node("ContentView/LocationPanel")
 	var flow_text: Node = main.get_node("ContentView/FlowText")
 
-	# 點擊收費地點 n_ahong_1 觸發 cap BE
+	# P3-D 流程：點擊地點清單開啟詳情，再點擊進入按鈕觸發 cap BE
 	main.call("_on_location_selected", "n_ahong_1")
+	main.call("_on_night_entry_requested", "n_ahong_1")
 	await tree.process_frame
 
 	var flow_lines: PackedStringArray = flow_text.call("get_lines")

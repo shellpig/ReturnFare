@@ -862,9 +862,11 @@ class Case13NightSameModel extends CaseBaseClass:
 		assert_eq(int(run_state.get("day", 1)), 10, "天數必須為 10")
 		assert_eq(str(run_state.get("phase", "")), "night", "時段必須為 night")
 
-		# 點進夜間地標地點
+		# 點進夜間地標地點（P3-D：先詳情後進入）
 		var click_res := await QAStep.click(tree, "location::n_landmark")
-		assert_true(click_res.get("ok", false), "進入 n_landmark 失敗: " + str(click_res.get("error")))
+		assert_true(click_res.get("ok", false), "開啟 n_landmark 詳情失敗: " + str(click_res.get("error")))
+		var enter_res := await QAStep.click(tree, "night_enter::n_landmark")
+		assert_true(enter_res.get("ok", false), "進入 n_landmark 失敗: " + str(enter_res.get("error")))
 
 		# 演出固定 beat
 		var drain_res := await QAStep.drain_beats(tree)

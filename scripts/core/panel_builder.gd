@@ -26,19 +26,38 @@ static func available_locations(gs: Node, data: Node) -> Array[String]:
 	var current_day: int = int(gs.get("day"))
 
 	if current_phase == "night":
-		var chosen_loc: String = str(gs.get("night_location_chosen"))
-		if not chosen_loc.is_empty():
-			if loader.locations.has(chosen_loc):
-				result.append(chosen_loc)
-			return result
-
+		var candidates: Array[Dictionary] = []
+		var original_index: int = 0
 		for loc_id: String in loader.locations:
 			var loc: Dictionary = loader.locations[loc_id] as Dictionary
 			if str(loc.get("layer", "")) != "night":
+				original_index += 1
 				continue
+			var is_teaser: bool = bool(loc.get("teaser_only", false))
 			var earliest: int = int(loc.get("earliest_night", 999))
-			if earliest <= current_day:
-				result.append(loc_id)
+			var chapter: int = int(loc.get("chapter", 1))
+			var is_visible: bool = false
+			if is_teaser:
+				is_visible = (chapter <= current_chapter)
+			else:
+				is_visible = (earliest <= current_day)
+
+			if is_visible:
+				candidates.append({
+					"id": loc_id,
+					"earliest": earliest,
+					"index": original_index,
+				})
+			original_index += 1
+
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			if int(a["earliest"]) != int(b["earliest"]):
+				return int(a["earliest"]) < int(b["earliest"])
+			return int(a["index"]) < int(b["index"])
+		)
+
+		for c in candidates:
+			result.append(str(c["id"]))
 		return result
 
 	for loc_id: String in loader.locations:
@@ -54,6 +73,122 @@ static func available_locations(gs: Node, data: Node) -> Array[String]:
 		result.append(loc_id)
 
 	return result
+
+
+## 計算夜間地點的 summary view model（規格書第九節、開發設計方針 P3-D）。
+## 回傳：{
+##   "display_name": String,
+##   "status_text": String,
+##   "can_enter": bool,
+##   "reason_code": String,
+##   "reason_text": String,
+##   "warning": String,
+##   "teaser_only": bool
+## }
+static func location_summary(location_id: String, gs: Node, data: Node) -> Dictionary:
+	var loader: DataLoader = data.get("loader") as DataLoader if data != null else null
+	if loader == null or not loader.locations.has(location_id):
+		return {
+			"display_name": location_id,
+			"status_text": "",
+			"can_enter": false,
+			"reason_code": "unknown_location",
+			"reason_text": "",
+			"warning": "",
+			"teaser_only": false,
+		}
+
+	var loc: Dictionary = loader.locations[location_id] as Dictionary
+	var layer: String = str(loc.get("layer", ""))
+	var is_teaser: bool = bool(loc.get("teaser_only", false))
+	var day_counterpart: Variant = loc.get("day_counterpart")
+	var night_reveal: Variant = loc.get("night_reveal")
+
+	var seen_dict: Dictionary = gs.get("night_locations_seen") as Dictionary if gs != null and gs.get("night_locations_seen") is Dictionary else {}
+	var is_seen: bool = seen_dict.has(location_id)
+
+	var knowledge_dict: Dictionary = gs.get("knowledge") as Dictionary if gs != null and gs.get("knowledge") is Dictionary else {}
+	var has_reveal_knowledge: bool = (night_reveal != null and not str(night_reveal).is_empty() and knowledge_dict.has(str(night_reveal)))
+	var is_aligned: bool = (is_seen and has_reveal_knowledge)
+
+	# 1. display_name 計算
+	var display_name: String = str(loc.get("name", location_id))
+	if day_counterpart != null and not str(day_counterpart).is_empty() and is_aligned:
+		var day_loc_id := str(day_counterpart)
+		var day_loc_name := day_loc_id
+		if loader.locations.has(day_loc_id):
+			day_loc_name = str((loader.locations[day_loc_id] as Dictionary).get("name", day_loc_id))
+
+		# 檢查是一對一或多對一
+		var counterpart_count := 0
+		for other_id: String in loader.locations:
+			var other_loc: Dictionary = loader.locations[other_id] as Dictionary
+			if str(other_loc.get("layer", "")) == "night" and str(other_loc.get("day_counterpart", "")) == day_loc_id:
+				counterpart_count += 1
+
+		if counterpart_count > 1:
+			display_name = "%s・%s" % [day_loc_name, str(loc.get("name", location_id))]
+		else:
+			display_name = day_loc_name
+
+	# 2. status_text 計算
+	var status_text: String = "[尚未到訪]"
+	if is_teaser:
+		status_text = "[尚未到訪]"
+	elif not is_seen:
+		status_text = "[尚未到訪]"
+	else:
+		if day_counterpart != null and not str(day_counterpart).is_empty():
+			if is_aligned:
+				status_text = "[已對位]"
+			else:
+				status_text = "[已到訪，尚未對位]"
+		else:
+			status_text = "[已到訪]"
+
+	# 3. can_enter, reason_code, reason_text 計算 (依 GameState.enter_night_location 封閉八碼矩陣)
+	var can_enter: bool = false
+	var reason_code: String = ""
+	var reason_text: String = ""
+
+	var current_phase: String = str(gs.get("phase")) if gs != null else ""
+	var current_day: int = int(gs.get("day")) if gs != null else 1
+	var chosen_loc: String = str(gs.get("night_location_chosen")) if gs != null else ""
+	var sleep_pending: bool = bool(gs.get("night_sleep_pending")) if gs != null else false
+
+	if current_phase != "night":
+		reason_code = "not_night"
+	elif layer != "night":
+		reason_code = "not_night_layer"
+	elif is_teaser:
+		reason_code = "teaser"
+		reason_text = str(loc.get("reject_reason", ""))
+	elif current_day < int(loc.get("earliest_night", 1)):
+		reason_code = "too_early"
+	elif loc.has("requires") and not ConditionEval.eval(loc["requires"], gs):
+		reason_code = "locked"
+		reason_text = str(loc.get("reject_reason", _REASON_FALLBACK))
+	elif not chosen_loc.is_empty():
+		reason_code = "already_chosen"
+	elif sleep_pending:
+		reason_code = "already_slept"
+	else:
+		can_enter = true
+
+	# 4. warning 計算
+	var warning: String = ""
+	if gs != null and gs.has_method("would_night_entry_end_run") and bool(gs.call("would_night_entry_end_run", location_id)):
+		warning = "再往前，你可能回不來。"
+
+	return {
+		"display_name": display_name,
+		"status_text": status_text,
+		"can_enter": can_enter,
+		"reason_code": reason_code,
+		"reason_text": reason_text,
+		"warning": warning,
+		"teaser_only": is_teaser,
+	}
 
 
 ## 計算一個地點面板的 view model。

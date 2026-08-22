@@ -9,9 +9,6 @@ extends VBoxContainer
 
 signal location_selected(id: String)
 
-## debug 版的空面板標示。正式版拿掉（改不顯示）。
-const _SUFFIX_EMPTY := "（無內容）"
-
 @onready var _container: GridContainer = $LocationsContainer
 
 
@@ -20,13 +17,16 @@ func refresh() -> void:
 		child.queue_free()
 
 	var locs: Array[String] = PanelBuilder.available_locations(GameState, Data)
+	var is_night: bool = (GameState.phase == "night")
 	for loc_id in locs:
 		var loc: Dictionary = Data.loader.locations.get(loc_id, {}) as Dictionary
-		var view: Dictionary = GameState.build_panel(loc_id)
-		var is_empty: bool = (view.get("beats", []) as Array).is_empty()
 		var btn := Button.new()
-		btn.text = str(loc.get("name", loc_id)) + (_SUFFIX_EMPTY if is_empty else "")
-		btn.disabled = is_empty
+		if is_night:
+			var summary: Dictionary = PanelBuilder.location_summary(loc_id, GameState, Data)
+			btn.text = "%s %s" % [summary.get("display_name", loc_id), summary.get("status_text", "")]
+		else:
+			btn.text = str(loc.get("name", loc_id))
+		btn.disabled = false
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.set_meta("qa_id", "location::" + loc_id)
 		btn.pressed.connect(_on_location_pressed.bind(loc_id))

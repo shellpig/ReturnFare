@@ -439,12 +439,19 @@ static func execute_night_phase(gs: Node, data_node: Node, _day: int, open_marke
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 	if loader != null:
 		for loc_id in locs:
+			var summary: Dictionary = PanelBuilder.location_summary(loc_id, gs, data_node)
+			if not bool(summary.get("can_enter", false)):
+				continue
 			var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
 			if int(loc.get("madness_cost", 0)) > 0 and not (gs.get("night_locations_seen") as Dictionary).has(loc_id):
 				chosen_loc = loc_id
 				break
-	if chosen_loc.is_empty() and not locs.is_empty():
-		chosen_loc = locs[0]
+	if chosen_loc.is_empty():
+		for loc_id in locs:
+			var summary: Dictionary = PanelBuilder.location_summary(loc_id, gs, data_node)
+			if bool(summary.get("can_enter", false)):
+				chosen_loc = loc_id
+				break
 
 	if not chosen_loc.is_empty():
 		var entry_res: Dictionary = gs.enter_night_location(chosen_loc)

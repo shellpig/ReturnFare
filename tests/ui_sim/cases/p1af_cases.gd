@@ -242,6 +242,10 @@ class UiCase extends CaseBaseClass:
 
 	func _enter(tree: SceneTree, location_id: String, drain: bool = true) -> void:
 		await _click(tree, "location::" + location_id)
+		if QAStepClass.has_visible_qa_id(tree.get_root(), "night_enter::" + location_id):
+			var enter_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::" + location_id)
+			if not enter_btns.is_empty() and not (enter_btns[0] as Button).disabled:
+				await _click(tree, "night_enter::" + location_id)
 		if drain:
 			var drained := await QAStepClass.drain_beats(tree)
 			assert_true(bool(drained.get("ok", false)), "地點 %s 演出失敗: %s" % [location_id, str(drained.get("error", ""))])
@@ -756,12 +760,31 @@ class UiCase extends CaseBaseClass:
 		# 手上 3 張發狂卡（達門檻 3）：D24 night 睡眠時成功觸發二樓有人在走（awei_heard_it 成功落帳，停拍顯示文字）
 		assert_eq(int(_run(tree).get("day", 0)), 24, "D24 night 起點")
 		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "睡眠前 awei_heard_it 為 false")
+
+		# K-123 斷言：夜間推進按鈕初始為『直接睡』
+		var adv_btn_init := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")[0] as Button
+		assert_eq(adv_btn_init.text, "直接睡", "夜間初始推進按鈕文字為直接睡 (K-123)")
+
 		# 第 1 次點擊：停拍並顯示睡眠文字
 		await _click(tree, "phase_advance")
 		assert_eq(int(_run(tree).get("day", 0)), 24, "有睡眠內容時第 1 次點擊停在 D24 供玩家閱讀")
 		assert_true(bool(_run(tree).get("night_sleep_pending", false)), "第 1 次點擊設定 night_sleep_pending 為 true")
 		assert_true(_has_text(tree.get_root(), "二樓有人在走"), "3 張發狂卡時二樓有人在走達視野門檻，畫面文字可見 (K-68)")
 		assert_true((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "3 張發狂卡時二樓有人在走達視野門檻，成功落帳")
+
+		# K-123 斷言：停拍期間按鈕變為『進入隔天』
+		var adv_btn_pending := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")[0] as Button
+		assert_eq(adv_btn_pending.text, "進入隔天", "睡眠停拍期間推進按鈕文字為進入隔天 (K-123)")
+
+		# K-68 第三腳：驗證清回 2 張發狂卡後，視野門檻定日 beat 不再成立
+		var gs := CaseBaseClass.get_game_state(tree)
+		gs.call("lose_card", "madness#3")
+		var mcards_now: int = (gs.get("hand") as Array).filter(func(c: Variant) -> bool: return str(c).begins_with("madness")).size()
+		assert_eq(mcards_now, 2, "清掉 1 張發狂卡後手上剩 2 張")
+		var resolved_under_2: Dictionary = gs.call("resolved_night_content", "sanquan")
+		var p_beat: Dictionary = resolved_under_2.get("primary", {})
+		assert_true(p_beat.is_empty() or str(p_beat.get("id", "")) != "d24_night_bleed", "清回 2 張後視野門檻定日 beat (d24_night_bleed) 不再被選中 (K-68 第三腳)")
+
 		# 第 2 次點擊：換日進入隔天
 		await _click(tree, "phase_advance")
 		assert_eq(int(_run(tree).get("day", 0)), 25, "第 2 次點擊進入隔天 D25")
@@ -779,6 +802,11 @@ class UiCase extends CaseBaseClass:
 		assert_true(_has_text(tree.get_root(), "[發瘋 BE]"), "達到 cap 7 必須呈現 [發瘋 BE]")
 		assert_false(_has_text(tree.get_root(), "[結局 stub]"), "發瘋 BE 不得播出一般結局骨架")
 		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"), "發瘋 BE 觸發後地點面板必須收起")
+		assert_true(_visible_ids(tree, "location::").is_empty(), "發瘋 BE 觸發後地圖必須收起 (be_map_hidden, K-70)")
+		var adv_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")
+		assert_eq(adv_btns.size(), 1, "發瘋 BE 觸發後推進按鈕存在 (K-70)")
+		if not adv_btns.is_empty():
+			assert_false((adv_btns[0] as Button).disabled, "發瘋 BE 觸發後推進按鈕未 disabled (K-70)")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
 			"be_text_visible", "be_no_coda_stub", "be_map_hidden",
 		] } }
@@ -1026,6 +1054,11 @@ class UiCase extends CaseBaseClass:
 	func _night_resolution(tree: SceneTree, _main_node: Control) -> Dictionary:
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "D10 夜間免費地點初始可見")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "D10 夜間收費地點初始可見")
+
+		# K-123 斷言：未選定地點時推進按鈕文字為『直接睡』
+		var adv_btn_init := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")[0] as Button
+		assert_eq(adv_btn_init.text, "直接睡", "夜間初始推進按鈕文字為直接睡 (K-123)")
+
 		var count_before := (_run(tree).get("hand", []) as Array).size()
 		await _enter(tree, "n_landmark")
 		var texts := _texts(tree.get_root())
@@ -1045,9 +1078,26 @@ class UiCase extends CaseBaseClass:
 		var count_after := (_run(tree).get("hand", []) as Array).size()
 		assert_eq(count_after, count_before, "進入免費夜間地點手牌不應產生任何發狂卡")
 
-		# 一夜一個標記限制：選定 n_landmark 後，其他地點不可見/不可進
-		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "一夜最多開一個地點，已選過地點後其他地點不可見")
+		# K-123 斷言：選定地點後推進按鈕文字為『結束今晚』
+		var adv_btn_chosen := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")[0] as Button
+		assert_eq(adv_btn_chosen.text, "結束今晚", "選定夜間地點後推進按鈕文字為結束今晚 (K-123)")
+
+		# 一夜一個標記限制（K-91 斷言反轉）：選定 n_landmark 後，其他地點仍可見，但進入按鈕 disabled
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "一夜最多開一個地點，已選過地點後其他地點仍可見")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "已選定的夜間地點仍可重新查看")
+
+		var before_click_state := _state(tree)
+		await _click(tree, "location::n_ahong_1")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "night_status::n_ahong_1"), "其他地點詳情可開")
+		var enter_btn_list := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_ahong_1")
+		assert_eq(enter_btn_list.size(), 1, "其他地點進入按鈕存在")
+		if not enter_btn_list.is_empty():
+			var enter_btn := enter_btn_list[0] as Button
+			assert_true(enter_btn.disabled, "已選過地點後，其他地點進入按鈕 disabled")
+		await _click(tree, "night_enter::n_ahong_1", MOUSE_BUTTON_LEFT, true)
+		var after_click_state := _state(tree)
+		assert_eq(JSON.stringify(before_click_state), JSON.stringify(after_click_state), "點擊 disabled 進入按鈕狀態零變化")
+		await _close(tree)
 
 		return {
 			"ok": errors.is_empty(),
@@ -1077,9 +1127,26 @@ class UiCase extends CaseBaseClass:
 		assert_eq(mcards_after, mcards_before + 1, "進入收費夜間地點後手牌應增加 1 張發狂卡")
 		assert_true((_run(tree).get("hand", []) as Array).has("info_ahong_traces"), "進入 n_ahong_1 獲得真實 beat 獎勵情報卡 info_ahong_traces")
 
-		# 一夜一個標記限制：選定 n_ahong_1 後，其他地點不可見/不可進
-		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "一夜最多開一個地點，已選過收費地點後其他地點不可見")
+		# K-123 斷言：選定收費地點後推進按鈕文字為『結束今晚』
+		var adv_btn_paid := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")[0] as Button
+		assert_eq(adv_btn_paid.text, "結束今晚", "選定夜間收費地點後推進按鈕文字為結束今晚 (K-123)")
+
+		# 一夜一個標記限制（K-91 斷言反轉）：選定 n_ahong_1 後，其他地點仍可見，但進入按鈕 disabled
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "一夜最多開一個地點，已選過收費地點後其他地點仍可見")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "已選定的夜間收費地點仍可重新查看")
+
+		var before_click_state := _state(tree)
+		await _click(tree, "location::n_landmark")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "night_status::n_landmark"), "其他地點詳情可開")
+		var enter_btn_list := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_landmark")
+		assert_eq(enter_btn_list.size(), 1, "免費地點進入按鈕存在")
+		if not enter_btn_list.is_empty():
+			var enter_btn := enter_btn_list[0] as Button
+			assert_true(enter_btn.disabled, "已選過收費地點後，其他地點進入按鈕 disabled")
+		await _click(tree, "night_enter::n_landmark", MOUSE_BUTTON_LEFT, true)
+		var after_click_state := _state(tree)
+		assert_eq(JSON.stringify(before_click_state), JSON.stringify(after_click_state), "點擊 disabled 進入按鈕狀態零變化")
+		await _close(tree)
 
 		return {
 			"ok": errors.is_empty(),
