@@ -56,7 +56,7 @@
       "title": "有人走過的路",
       "text": "他在一條沒走過的路上，發現有人走過。\n腳印是工作鞋的，尺寸對得上；路邊落著一樣他認得的小東西。遠處霧裡有一個背影，等他追過去就沒有了。",
       "slots": [],
-      "on_enter": { "gain": ["info_ahong_traces"], "flag": { "opened_n_ahong_1": true } },
+      "on_enter": { "gain": ["info_ahong_traces"] },
       "note": "阿宏鏈第一級。第一輪要給的感覺是「我差一點就摸到他了」，不是「這條支線已經解完」"
     },
     {
@@ -150,12 +150,11 @@
       "slots": [],
       "requires": {
         "all": [
-          { "flag": "opened_n_ahong_1" },
+          { "night_seen": "n_ahong_1" },
           { "has_card": "info_ahong_private" }
         ]
       },
       "reject_reason": "（你手上沒有只有你們兩個人知道的事。）",
-      "on_enter": { "flag": { "opened_n_ahong_2": true } },
       "note": "阿宏鏈第二級。這是第 3 天那張私人情報卡在第一輪的兌現點（待決 2 結案），同時是「看不到的路等於不存在」的招牌案例。白天世界的阿宏已經失蹤兩天了，這裡的一切卻停在他失蹤之前。第一輪只到「矛盾成立」為止，不解釋機制"
     },
     {
@@ -192,9 +191,9 @@
       "title": "有人叫他的名字",
       "text": "霧裡有人清楚地叫出主角的名字。聲音的方向對不上任何一條路。",
       "slots": [],
-      "requires": { "flag": "opened_n_ahong_2" },
+      "requires": { "night_seen": "n_ahong_2" },
       "reject_reason": "（你還沒找到上一處痕跡。）",
-      "on_enter": { "gain": ["info_ahong_not_normal"], "flag": { "opened_n_ahong_3": true } },
+      "on_enter": { "gain": ["info_ahong_not_normal"] },
       "note": "阿宏鏈第三級，第一輪的高投入上限。結論仍只到「他跟夜裡有關」——不能定義他被困在哪裡、是否活著、能否救回"
     },
     {

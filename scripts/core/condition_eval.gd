@@ -9,7 +9,7 @@ extends RefCounted
 const KNOWN_KEYS := [
 	"day", "day_at_least", "has_card", "has_knowledge", "switch",
 	"switch_progress_at_least", "flag", "relation_at_least", "madness_at_least",
-	"count_at_least", "not", "all", "any",
+	"count_at_least", "not", "all", "any", "night_seen",
 ]
 
 static func eval(cond: Variant, gs: Node) -> bool:
@@ -28,6 +28,8 @@ static func eval(cond: Variant, gs: Node) -> bool:
 		return gs.call("has_card", str(d["has_card"]))
 	if d.has("has_knowledge"):
 		return gs.call("has_knowledge", str(d["has_knowledge"]))
+	if d.has("night_seen"):
+		return gs.call("night_location_seen", str(d["night_seen"]))
 	if d.has("madness_at_least"):
 		var mc: Variant = gs.get("madness_clock")
 		var count: int = (mc as Dictionary).size() if mc is Dictionary else 0

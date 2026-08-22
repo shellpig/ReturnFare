@@ -467,7 +467,7 @@
       "earliest_night": 11,
       "madness_cost": 1,
       "requires": {
-        "flag": "opened_n_ahong_1"
+        "night_seen": "n_ahong_1"
       },
       "reject_reason": "你還沒跟完上一段痕跡。",
       "day_counterpart": null,
@@ -531,7 +531,7 @@
       "earliest_night": 14,
       "madness_cost": 1,
       "requires": {
-        "flag": "opened_n_ahong_2"
+        "night_seen": "n_ahong_2"
       },
       "reject_reason": "你還沒跟完上一段痕跡。",
       "day_counterpart": null,
@@ -579,7 +579,7 @@
       "chapter": 2,
       "earliest_night": 20,
       "madness_cost": 1,
-      "requires": { "flag": "opened_n_ahong_3" },
+      "requires": { "night_seen": "n_ahong_3" },
       "reject_reason": "你還沒跟完上一段痕跡。",
       "day_counterpart": null,
       "night_reveal": null,

@@ -490,11 +490,12 @@ func _test_baseline_checkpoint_replay(tree: SceneTree, data_node: Node) -> int:
 	gs_grant.deserialize(base_dict)
 	var exp_grant: Dictionary = expected_dict.get("first_card_grant", {}) as Dictionary
 	var target_loc: String = str(exp_grant.get("target_location", "n_plaza"))
-	var actual_lines: PackedStringArray = gs_grant.open_night_marker(target_loc)
+	var actual_res: Dictionary = gs_grant.enter_night_location(target_loc)
+	var actual_lines: PackedStringArray = actual_res.get("lines", PackedStringArray())
 	var actual_grant: Dictionary = {
 		"target_location": target_loc,
 		"lines": Array(actual_lines),
-		"night_markers_opened": (gs_grant.get("night_markers_opened") as Dictionary).duplicate(true),
+		"night_locations_seen": (gs_grant.get("night_locations_seen") as Dictionary).duplicate(true),
 		"hand": (gs_grant.get("hand") as Array).duplicate(true),
 		"madness_clock": (gs_grant.get("madness_clock") as Dictionary).duplicate(true),
 	}
@@ -549,9 +550,11 @@ static func _reset_state(gs: Node) -> void:
 	gs.set("action_spent", false)
 	gs.set("npc_action_counts", {})
 	gs.set("knowledge", {})
+	gs.set("night_locations_seen", {})
+	gs.set("night_once_beats_seen", {})
 	gs.set("madness_clock", {})
-	gs.set("night_markers_opened", {})
 	gs.set("night_location_chosen", "")
+	gs.set("night_sleep_pending", false)
 	gs.set("indulgence_count", 0)
 	gs.set("madness_cards_cleared", 0)
 	gs.set("forced_pending", [])

@@ -99,6 +99,12 @@ func verify_references() -> PackedStringArray:
 			# 第二類的意思就是「白天去同一個位置」——座標不同就不是同一個地方。
 			problems.append("%s：座標與 day_counterpart %s 不一致" % [lid, counterpart])
 
+	# 地點級門檻 requires 引用檢查
+	for lid in locations:
+		var loc: Dictionary = locations[lid]
+		if loc.has("requires"):
+			_check_card_refs(loc["requires"], lid, "location.requires", problems)
+
 	# NPC 可及性：地點要存在，時段不能超出該地點開放的時段。
 	for nid in npcs:
 		var npc: Dictionary = npcs[nid]
@@ -174,6 +180,12 @@ func _check_card_refs(node: Variant, bid: String, where: String, problems: Packe
 				"has_card", "has_knowledge":
 					if not cards.has(v) and not DataFacts.is_pending_card_ref_by_design(str(v)):
 						problems.append("%s [%s]：%s 不存在 → %s" % [bid, where, k, v])
+				"night_seen":
+					var loc_id := str(v)
+					if not locations.has(loc_id):
+						problems.append("%s [%s]：%s 引用不存在的地點 → %s" % [bid, where, k, loc_id])
+					elif locations[loc_id].get("layer", "") != "night":
+						problems.append("%s [%s]：%s 引用的地點不是夜間地點 → %s" % [bid, where, k, loc_id])
 				_:
 					_check_card_refs(v, bid, where, problems)
 	elif node is Array:
@@ -679,6 +691,42 @@ static func lint_night_locations(loader: DataLoader) -> PackedStringArray:
 					errs.append("%s：madness_cost 必須為 >= 0 之整數（實際為 %s）" % [lid, str(cost_val)])
 
 	return errs
+
+
+## lint 13：舊夜間旗標退場檢查（規格書第十七節 lint 13 / P3-B）。
+## 遞迴掃整份 location 與 beat，含 slots[] 的 condition/requires/on_place/on_enter 等，
+## 任何 key 或字串值包含 "opened_n_" 都報錯。
+static func lint_legacy_night_flags(loader: DataLoader) -> PackedStringArray:
+	var problems: PackedStringArray = []
+	for lid: String in loader.locations:
+		var loc: Dictionary = loader.locations[lid] as Dictionary
+		_scan_legacy_flags(loc, lid, "location:" + lid, problems)
+	for b in loader.beats:
+		var bid: String = str(b.get("id", "?"))
+		_scan_legacy_flags(b, bid, "beat:" + bid, problems)
+	return problems
+
+
+static func _scan_legacy_flags(node: Variant, bid: String, where: String, problems: PackedStringArray) -> void:
+	if node is Dictionary:
+		var d := node as Dictionary
+		for k in d.keys():
+			var k_str := str(k)
+			if k_str.contains("opened_n_"):
+				problems.append("%s [%s]：包含舊夜間旗標鍵 → %s" % [bid, where, k_str])
+			var v: Variant = d[k]
+			if v is String and str(v).contains("opened_n_"):
+				problems.append("%s [%s.%s]：包含舊夜間旗標值 → %s" % [bid, where, k_str, str(v)])
+			else:
+				_scan_legacy_flags(v, bid, where + "." + k_str, problems)
+	elif node is Array:
+		var arr := node as Array
+		for i in range(arr.size()):
+			var item: Variant = arr[i]
+			if item is String and str(item).contains("opened_n_"):
+				problems.append("%s [%s[%d]]：包含舊夜間旗標值 → %s" % [bid, where, i, str(item)])
+			else:
+				_scan_legacy_flags(item, bid, "%s[%d]" % [where, i], problems)
 
 
 ## 某一天某個時段有哪些 beat（不解 condition，只挑時間對的）。

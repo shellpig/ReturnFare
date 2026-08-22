@@ -165,6 +165,16 @@ func _initialize() -> void:
 		return
 	print("夜間地點狀態完整性 (Lint 12)　0 錯誤")
 
+	# Lint 13: 舊夜間旗標退場檢查
+	var legacy_flag_errs := DataLoader.lint_legacy_night_flags(loader)
+	if legacy_flag_errs.size() > 0:
+		print("\n舊夜間旗標退場錯誤 %d 筆：" % legacy_flag_errs.size())
+		for e in legacy_flag_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("舊夜間旗標退場 (Lint 13)　0 錯誤")
+
 	print("\ntuning：手牌 %d／發狂上限 %d／倒數 %d 天／視野門檻 %d" % [
 		loader.tuning.get("hand_size", -1),
 		loader.tuning.get("madness_cap", -1),

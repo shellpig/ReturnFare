@@ -71,7 +71,7 @@ func _test_single_card_forced_lifecycle(gs: Node, _data: Node) -> int:
 
 	gs.set("day", 6)
 	gs.set("phase", "night")
-	gs.call("open_night_marker", "n_ahong_1")
+	gs.call("enter_night_location", "n_ahong_1")
 
 	var card_inst := "madness#1"
 	if not gs.call("has_card", card_inst):

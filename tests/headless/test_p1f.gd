@@ -272,17 +272,17 @@ func _test_night_resolution_and_free_locations(gs: Node, data_node: Node) -> int
 	else:
 		failed += _fail("第 10 夜免費地點 n_landmark view model 為空")
 
-	# 收費地點（madness_cost > 0）在 P1 呈灰 LOCKED 附 stub 理由
+	# 收費地點（madness_cost > 0）在 P3 已真值化，回傳真實 beat（如 n_ahong_1_ch1）
 	var view_paid := PanelBuilder.build("n_ahong_1", gs, data_node)
 	var beats_paid: Array = view_paid.get("beats", []) as Array
-	if beats_paid.size() == 1 and int(beats_paid[0].get("tri")) == PanelBuilder.TriState.LOCKED:
-		var reason: String = str(beats_paid[0].get("reason", ""))
-		if reason.contains("夜間標記尚未開放"):
-			failed += _ok("第 10 夜收費地點 n_ahong_1 呈灰 LOCKED 附 stub 理由")
+	if beats_paid.size() == 1 and int(beats_paid[0].get("tri")) == PanelBuilder.TriState.OPEN:
+		var bid: String = str(beats_paid[0].get("beat", {}).get("id", ""))
+		if bid == "n_ahong_1_ch1":
+			failed += _ok("第 10 夜收費地點 n_ahong_1 解析出真實 beat (n_ahong_1_ch1, OPEN)")
 		else:
-			failed += _fail("收費地點理由不符 stub: %s" % reason)
+			failed += _fail("收費地點 beat id 不符: %s" % bid)
 	else:
-		failed += _fail("收費地點狀態未正確呈灰 LOCKED")
+		failed += _fail("收費地點狀態未正確解析出 OPEN beat (beats: %s)" % str(beats_paid))
 
 	return failed
 

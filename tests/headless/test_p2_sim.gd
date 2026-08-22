@@ -97,7 +97,7 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 
 	var on_run_ended := func(eid: String) -> void:
 		endings_received.append(eid)
-		final_markers_box[0] = (gs.get("night_markers_opened") as Dictionary).duplicate()
+		final_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
 		var mcards: Array = []
 		for card in (gs.get("hand") as Array):
 			if str(card).begins_with("madness"):
@@ -106,6 +106,9 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 
 	gs.connect("run_ended", on_run_ended)
 	gs.call("end_run")
+	gs.set("night_locations_seen", {})
+	gs.set("night_once_beats_seen", {})
+	gs.set("knowledge", {})
 
 	var loader: DataLoader = data_node.get("loader")
 	var daily_max_madness: Array[int] = [] # 1-indexed (index 0 unused, 1..45)
@@ -318,29 +321,32 @@ static func _handle_night_phase(gs: Node, data_node: Node, day: int, strategy: S
 	var locs: Array[String] = PanelBuilder.available_locations(gs, data_node)
 	var chosen_loc := ""
 	var loader: DataLoader = data_node.get("loader") as DataLoader
-	var opened_markers: Dictionary = gs.get("night_markers_opened") as Dictionary
+	var opened_markers: Dictionary = gs.get("night_locations_seen") as Dictionary
 
 	for loc_id in locs:
 		var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
 		if int(loc.get("madness_cost", 0)) > 0 and not opened_markers.has(loc_id):
+			if loc.has("requires") and not ConditionEval.eval(loc["requires"], gs):
+				continue
 			chosen_loc = loc_id
 			break
 
 	if not chosen_loc.is_empty():
-		gs.open_night_marker(chosen_loc)
-		var view: Dictionary = gs.build_panel(chosen_loc)
-		for bv: Dictionary in view.get("beats", []) as Array:
-			if int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
-				var bid := str((bv["beat"] as Dictionary).get("id", ""))
-				if not bid.is_empty():
-					gs.play_beat(bid)
-		timeline.append({
-			"day": day,
-			"phase": "night",
-			"action": "open_night_marker",
-			"loc": chosen_loc,
-			"hand_after": _count_madness_in_hand(gs),
-		})
+		var entry_res: Dictionary = gs.enter_night_location(chosen_loc)
+		if entry_res.get("ok", false):
+			var view: Dictionary = gs.build_panel(chosen_loc)
+			for bv: Dictionary in view.get("beats", []) as Array:
+				if int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
+					var bid := str((bv["beat"] as Dictionary).get("id", ""))
+					if not bid.is_empty():
+						gs.play_beat(bid)
+			timeline.append({
+				"day": day,
+				"phase": "night",
+				"action": "open_night_marker",
+				"loc": chosen_loc,
+				"hand_after": _count_madness_in_hand(gs),
+			})
 
 
 static func _play_open_beats(gs: Node, data_node: Node) -> void:

@@ -160,7 +160,7 @@ func _test_main_scene_enters_normal_branch() -> int:
 	main.call("_route_view")
 	if not flow_text.visible:
 		failed += _fail("Day 1 night route_view FlowText 未顯示")
-	main.call("_on_location_selected", "n_corridor_1")
+	main.call("_on_location_selected", "n_corridor")
 	if flow_text.visible:
 		failed += _fail("開啟地點面板時 FlowText 未被隱藏（疊字 bug）")
 	elif not loc_panel.visible:

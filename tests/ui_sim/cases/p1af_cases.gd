@@ -1058,15 +1058,16 @@ class UiCase extends CaseBaseClass:
 	func _night_resolution_paid(tree: SceneTree, _main_node: Control) -> Dictionary:
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_ahong_1"), "D10 已到收費標記開放日")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "D10 免費標記可見")
-		var count_before := (_run(tree).get("hand", []) as Array).size()
+		var mcards_before: int = (_run(tree).get("hand", []) as Array).filter(func(c: Variant) -> bool: return str(c).begins_with("madness")).size()
 		await _enter(tree, "n_ahong_1")
-		assert_true(_has_text(tree.get_root(), "夜間標記尚未開放"), "付費夜間標記必須顯示鎖定 stub")
+		assert_true(_has_text(tree.get_root(), "腳印是工作鞋的") or _has_text(tree.get_root(), "有人走過"), "付費夜間標記顯示真實 beat 內容")
 		assert_true(_has_text(tree.get_root(), "獲得 1 張發狂卡"), "進入收費標記顯示發卡提示")
 		await _close(tree)
 
-		# 進入收費標記發放發狂卡（手牌張數恰好增加 1 張）
-		var count_after := (_run(tree).get("hand", []) as Array).size()
-		assert_eq(count_after, count_before + 1, "進入收費夜間地點後手牌應增加 1 張發狂卡")
+		# 進入收費標記發放發狂卡（發狂卡張數恰好增加 1 張）
+		var mcards_after: int = (_run(tree).get("hand", []) as Array).filter(func(c: Variant) -> bool: return str(c).begins_with("madness")).size()
+		assert_eq(mcards_after, mcards_before + 1, "進入收費夜間地點後手牌應增加 1 張發狂卡")
+		assert_true((_run(tree).get("hand", []) as Array).has("info_ahong_traces"), "進入 n_ahong_1 獲得真實 beat 獎勵情報卡 info_ahong_traces")
 
 		# 一夜一個標記限制：選定 n_ahong_1 後，其他地點不可見/不可進
 		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "一夜最多開一個地點，已選過收費地點後其他地點不可見")

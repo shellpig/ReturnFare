@@ -599,9 +599,9 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			if phase != "night":
 				printerr("p3a_night_baseline 後置條件失敗：預期 phase == 'night'，實際 %s" % phase)
 				return false
-			var opened: Dictionary = run.get("night_markers_opened", {}) as Dictionary
-			if not opened.is_empty():
-				printerr("p3a_night_baseline 後置條件失敗：預期 night_markers_opened 為空，實際 %s" % str(opened))
+			var chosen: String = str(run.get("night_location_chosen", ""))
+			if not chosen.is_empty():
+				printerr("p3a_night_baseline 後置條件失敗：預期 night_location_chosen 為空，實際 %s" % chosen)
 				return false
 			var madness_count := 0
 			for c in hand:
@@ -658,14 +658,15 @@ static func _generate_p3a_baseline(tree: SceneTree, data_node: Node, baseline_sn
 	if int(ldef.get("madness_cost", 0)) <= 0:
 		printerr("p3a_baseline: 指定的地點 %s 不是收費標記（madness_cost <= 0）" % paid_loc)
 		return false
-	var grant_lines: PackedStringArray = gs_grant.open_night_marker(paid_loc)
-	var grant_opened: Dictionary = (gs_grant.get("night_markers_opened") as Dictionary).duplicate(true)
+	var entry_res: Dictionary = gs_grant.enter_night_location(paid_loc)
+	var grant_lines: PackedStringArray = entry_res.get("lines", PackedStringArray())
+	var grant_seen: Dictionary = (gs_grant.get("night_locations_seen") as Dictionary).duplicate(true)
 	var grant_hand: Array = (gs_grant.get("hand") as Array).duplicate(true)
 	var grant_clock: Dictionary = (gs_grant.get("madness_clock") as Dictionary).duplicate(true)
 	var grant_res: Dictionary = {
 		"target_location": paid_loc,
 		"lines": Array(grant_lines),
-		"night_markers_opened": grant_opened,
+		"night_locations_seen": grant_seen,
 		"hand": grant_hand,
 		"madness_clock": grant_clock,
 	}

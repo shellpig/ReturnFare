@@ -62,6 +62,9 @@ func _fail(msg: String) -> int:
 
 func _reset_gs(gs: Node) -> void:
 	gs.call("end_run")
+	gs.set("night_locations_seen", {})
+	gs.set("night_once_beats_seen", {})
+	gs.set("knowledge", {})
 
 
 # ── 1. 第 6 夜進收費標記發卡、文字提示與當天不倒數 ───────────────────────────────
@@ -81,10 +84,11 @@ func _test_single_card_generation_night_marker(gs: Node, _data_node: Node) -> in
 		failed += _ok("初始手牌佔格為 1 (protagonist)")
 
 	# 首次進入收費地點 n_ahong_1 (madness_cost == 1)
-	var lines: PackedStringArray = gs.call("open_night_marker", "n_ahong_1")
+	var res: Dictionary = gs.call("enter_night_location", "n_ahong_1")
+	var lines: PackedStringArray = res.get("lines", PackedStringArray())
 	var hand: Array = gs.get("hand")
 	var clock: Dictionary = gs.get("madness_clock")
-	var opened: Dictionary = gs.get("night_markers_opened")
+	var seen: Dictionary = gs.get("night_locations_seen")
 	var chosen: String = str(gs.get("night_location_chosen"))
 
 	if lines.size() > 0 and lines[0].contains("發狂卡"):
@@ -102,10 +106,10 @@ func _test_single_card_generation_night_marker(gs: Node, _data_node: Node) -> in
 	else:
 		failed += _ok("發狂卡初始倒數為 7 天 (tuning.madness_countdown_days)")
 
-	if not opened.has("n_ahong_1"):
-		failed += _fail("night_markers_opened 未記錄 n_ahong_1")
+	if not seen.has("n_ahong_1"):
+		failed += _fail("night_locations_seen 未記錄 n_ahong_1")
 	else:
-		failed += _ok("night_markers_opened 記錄收費標記 n_ahong_1")
+		failed += _ok("night_locations_seen 記錄收費標記 n_ahong_1")
 
 	if chosen != "n_ahong_1":
 		failed += _fail("night_location_chosen 未設定為 n_ahong_1 (實際為 '%s')" % chosen)
@@ -137,7 +141,7 @@ func _test_daily_countdown_zeroing_and_clamp(gs: Node, _data_node: Node) -> int:
 	# 第 6 夜發卡
 	gs.set("day", 6)
 	gs.set("phase", "night")
-	gs.call("open_night_marker", "n_ahong_1")
+	gs.call("enter_night_location", "n_ahong_1")
 
 	# 推進至第 7 天 morning
 	gs.call("advance_phase")
@@ -200,7 +204,7 @@ func _test_independent_clocks(gs: Node, _data_node: Node) -> int:
 	# 第 6 夜開 n_ahong_1 -> madness#1 (7天)
 	gs.set("day", 6)
 	gs.set("phase", "night")
-	gs.call("open_night_marker", "n_ahong_1")
+	gs.call("enter_night_location", "n_ahong_1")
 
 	# 推進到第 7 天 night
 	gs.call("advance_phase") # D7 morning (madness#1 變 6)
@@ -209,7 +213,7 @@ func _test_independent_clocks(gs: Node, _data_node: Node) -> int:
 	gs.call("advance_phase") # D7 night
 
 	# 第 7 夜開 n_source -> madness#2 (7天)
-	gs.call("open_night_marker", "n_source")
+	gs.call("enter_night_location", "n_source")
 	var clock_d7: Dictionary = gs.get("madness_clock")
 	if int(clock_d7.get("madness#1", -1)) == 6 and int(clock_d7.get("madness#2", -1)) == 7:
 		failed += _ok("第 7 夜: madness#1 為 6 天，madness#2 為 7 天")
@@ -245,7 +249,7 @@ func _test_one_location_per_night(gs: Node, data_node: Node) -> int:
 		failed += _fail("夜間選地點前 available_locations 不符預期: %s" % str(initial_locs))
 
 	# 選定 n_ahong_1
-	gs.call("open_night_marker", "n_ahong_1")
+	gs.call("enter_night_location", "n_ahong_1")
 
 	# 選定後：available_locations 僅回傳該選定地點
 	var chosen_locs: Array[String] = PanelBuilder.available_locations(gs, data_node)
@@ -274,47 +278,55 @@ func _test_reentry_idempotent(gs: Node, _data_node: Node) -> int:
 
 	gs.set("day", 6)
 	gs.set("phase", "night")
-	var lines1: PackedStringArray = gs.call("open_night_marker", "n_ahong_1")
+	var res1: Dictionary = gs.call("enter_night_location", "n_ahong_1")
+	var lines1: PackedStringArray = res1.get("lines", PackedStringArray())
 
 	var hand_count_1: int = (gs.get("hand") as Array).size()
 	var clock_count_1: int = (gs.get("madness_clock") as Dictionary).size()
 
-	# 再次呼叫 open_night_marker("n_ahong_1")
-	var lines2: PackedStringArray = gs.call("open_night_marker", "n_ahong_1")
+	# 推進至下一夜（D7 night）再次進入 n_ahong_1
+	gs.call("advance_phase") # D7 morning
+	gs.call("advance_phase") # D7 afternoon
+	gs.call("advance_phase") # D7 evening
+	gs.call("advance_phase") # D7 night
+
+	var res2: Dictionary = gs.call("enter_night_location", "n_ahong_1")
+	var lines2: PackedStringArray = res2.get("lines", PackedStringArray())
 	var hand_count_2: int = (gs.get("hand") as Array).size()
 	var clock_count_2: int = (gs.get("madness_clock") as Dictionary).size()
 
-	if lines1.size() > 0 and lines2.is_empty() and hand_count_1 == hand_count_2 and clock_count_1 == clock_count_2:
-		failed += _ok("首次進收費標記回傳提示文字，重複進入回傳空陣列且手牌張數不變")
+	if lines1.size() > 0 and lines2.is_empty() and hand_count_1 == hand_count_2 and clock_count_1 == clock_count_2 and bool(res2.get("ok", false)):
+		failed += _ok("首次進收費標記回傳提示文字，次夜重複進入回傳空陣列且手牌張數不變")
 	else:
-		failed += _fail("重複進入收費地點斷言失敗 (lines1=%s, lines2=%s, hand1=%d, hand2=%d)" % [
-			str(lines1), str(lines2), hand_count_1, hand_count_2
+		failed += _fail("重複進入收費地點斷言失敗 (res1=%s, res2=%s, hand1=%d, hand2=%d)" % [
+			str(res1), str(res2), hand_count_1, hand_count_2
 		])
 
 	return failed
 
 
-# ── 6. 免費地點不發卡且不記入 night_markers_opened ───────────────────────────
+# ── 6. 免費地點不發卡但記入 night_locations_seen ─────────────────────────────
 
 func _test_free_location_no_madness(gs: Node, data_node: Node) -> int:
-	print("--- 6. free location (madness_cost == 0) does not grant madness or enter night_markers_opened ---")
+	print("--- 6. free location (madness_cost == 0) does not grant madness but is recorded in seen ---")
 	var failed := 0
 	_reset_gs(gs)
 
 	gs.set("day", 10)
 	gs.set("phase", "night")
-	var lines: PackedStringArray = gs.call("open_night_marker", "n_landmark")
+	var res: Dictionary = gs.call("enter_night_location", "n_landmark")
+	var lines: PackedStringArray = res.get("lines", PackedStringArray())
 
 	var hand: Array = gs.get("hand")
 	var clock: Dictionary = gs.get("madness_clock")
-	var opened: Dictionary = gs.get("night_markers_opened")
+	var seen: Dictionary = gs.get("night_locations_seen")
 	var chosen: String = str(gs.get("night_location_chosen"))
 
-	if lines.is_empty() and hand.size() == 1 and clock.is_empty() and not opened.has("n_landmark") and chosen == "n_landmark":
-		failed += _ok("進入免費地點 n_landmark 不發卡、不記入 night_markers_opened，但設為當夜選定地點")
+	if lines.is_empty() and hand.size() == 1 and clock.is_empty() and seen.has("n_landmark") and chosen == "n_landmark" and bool(res.get("ok", false)):
+		failed += _ok("進入免費地點 n_landmark 不發卡、記入 night_locations_seen，且設為當夜選定地點")
 	else:
-		failed += _fail("免費地點狀態異常 (lines=%s, hand=%s, clock=%s, opened=%s, chosen=%s)" % [
-			str(lines), str(hand), str(clock), str(opened), chosen
+		failed += _fail("免費地點狀態異常 (lines=%s, hand=%s, clock=%s, seen=%s, chosen=%s)" % [
+			str(lines), str(hand), str(clock), str(seen), chosen
 		])
 
 	var chosen_locs: Array[String] = PanelBuilder.available_locations(gs, data_node)
@@ -339,12 +351,11 @@ func _test_fixed_night_beat_no_marker_no_madness(gs: Node, _data_node: Node) -> 
 	var lines: PackedStringArray = gs.call("play_night_fixed")
 	var hand: Array = gs.get("hand")
 	var clock: Dictionary = gs.get("madness_clock")
-	var opened: Dictionary = gs.get("night_markers_opened")
 
-	if lines.size() > 0 and hand.size() == 1 and clock.is_empty() and opened.is_empty():
-		failed += _ok("第 1 夜 fixed beat (走廊) 演出成功且不算開標記、不發卡")
+	if lines.size() > 0 and hand.size() == 1 and clock.is_empty():
+		failed += _ok("第 1 夜 fixed beat (走廊) 演出成功且不發卡")
 	else:
-		failed += _fail("第 1 夜 fixed beat 狀態異常 (lines=%d, hand=%s, opened=%s)" % [lines.size(), str(hand), str(opened)])
+		failed += _fail("第 1 夜 fixed beat 狀態異常 (lines=%d, hand=%s)" % [lines.size(), str(hand)])
 
 	return failed
 
@@ -364,8 +375,9 @@ func _test_serialize_roundtrip_p2a(gs: Node) -> int:
 	gs.set("hand", hand)
 	gs.set("madness_clock", { "madness#1": 5, "madness#2": 6 })
 	gs.set("_madness_counter", 2)
-	gs.set("night_markers_opened", { "n_ahong_1": true, "n_source": true })
+	gs.set("night_locations_seen", { "n_ahong_1": true, "n_source": true })
 	gs.set("night_location_chosen", "n_source")
+	gs.set("night_sleep_pending", false)
 	gs.set("indulgence_count", 3)
 	gs.set("forced_pending", ["madness#1"] as Array[String])
 
@@ -379,7 +391,7 @@ func _test_serialize_roundtrip_p2a(gs: Node) -> int:
 
 	var restored_clock: Dictionary = gs.get("madness_clock")
 	var restored_counter: int = int(gs.get("_madness_counter"))
-	var restored_opened: Dictionary = gs.get("night_markers_opened")
+	var restored_seen: Dictionary = gs.get("night_locations_seen")
 	var restored_chosen: String = str(gs.get("night_location_chosen"))
 	var restored_ind_cnt: int = int(gs.get("indulgence_count"))
 	var restored_pending: Array = gs.get("forced_pending")
@@ -394,10 +406,10 @@ func _test_serialize_roundtrip_p2a(gs: Node) -> int:
 	else:
 		failed += _fail("_madness_counter 還原錯誤: %d" % restored_counter)
 
-	if restored_opened.has("n_ahong_1") and restored_opened.has("n_source") and not restored_opened.has("n_landmark"):
-		failed += _ok("序列化還原 night_markers_opened 收費集合正確")
+	if restored_seen.has("n_ahong_1") and restored_seen.has("n_source") and not restored_seen.has("n_landmark"):
+		failed += _ok("序列化還原 night_locations_seen 收費集合正確")
 	else:
-		failed += _fail("night_markers_opened 還原錯誤: %s" % str(restored_opened))
+		failed += _fail("night_locations_seen 還原錯誤: %s" % str(restored_seen))
 
 	if restored_chosen == "n_source":
 		failed += _ok("序列化還原 night_location_chosen 正確 ('n_source')")
@@ -420,8 +432,9 @@ func _test_end_run_resets_p2a(gs: Node) -> int:
 
 	gs.set("madness_clock", { "madness#1": 2 })
 	gs.set("_madness_counter", 3)
-	gs.set("night_markers_opened", { "n_ahong_1": true })
+	gs.set("night_locations_seen", { "n_ahong_1": true })
 	gs.set("night_location_chosen", "n_ahong_1")
+	gs.set("night_sleep_pending", true)
 	gs.set("indulgence_count", 4)
 	gs.set("forced_pending", ["madness#1"] as Array[String])
 
@@ -429,16 +442,17 @@ func _test_end_run_resets_p2a(gs: Node) -> int:
 
 	var clock: Dictionary = gs.get("madness_clock")
 	var counter: int = int(gs.get("_madness_counter"))
-	var opened: Dictionary = gs.get("night_markers_opened")
+	var seen: Dictionary = gs.get("night_locations_seen")
 	var chosen: String = str(gs.get("night_location_chosen"))
+	var slept: bool = bool(gs.get("night_sleep_pending"))
 	var ind_cnt: int = int(gs.get("indulgence_count"))
 	var pending: Array = gs.get("forced_pending")
 
-	if clock.is_empty() and counter == 0 and opened.is_empty() and chosen.is_empty() and ind_cnt == 0 and pending.is_empty():
-		failed += _ok("end_run 成功清空 madness_clock, _madness_counter, night_markers_opened, night_location_chosen, indulgence_count, forced_pending")
+	if clock.is_empty() and counter == 0 and seen.has("n_ahong_1") and chosen.is_empty() and not slept and ind_cnt == 0 and pending.is_empty():
+		failed += _ok("end_run 成功清空 madness_clock, _madness_counter, night_location_chosen, night_sleep_pending, indulgence_count, forced_pending，且保留 meta night_locations_seen")
 	else:
-		failed += _fail("end_run 未清空 P2 欄位 (clock=%s, counter=%d, opened=%s, chosen=%s, ind_cnt=%d, pending=%s)" % [
-			str(clock), counter, str(opened), chosen, ind_cnt, str(pending)
+		failed += _fail("end_run 重置 P2 欄位異常 (clock=%s, counter=%d, seen=%s, chosen=%s, slept=%s, ind_cnt=%d, pending=%s)" % [
+			str(clock), counter, str(seen), chosen, str(slept), ind_cnt, str(pending)
 		])
 
 	return failed

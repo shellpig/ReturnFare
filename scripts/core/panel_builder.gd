@@ -83,28 +83,6 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 				candidate_beats.append(b)
 	else:
 		# 夜間四步解析（規格書第九節）：
-		var loc: Dictionary = loader.locations.get(location_id, {}) as Dictionary
-		var madness_cost: int = int(loc.get("madness_cost", 0))
-
-		if madness_cost > 0:
-			# 收費地點在 P1 呈灰鎖定附 stub 理由
-			return {
-				"location": loc,
-				"beats": [
-					{
-						"beat": {
-							"id": location_id + "_locked",
-							"title": str(loc.get("name", location_id)),
-							"text": "",
-						},
-						"tri": TriState.LOCKED,
-						"reason": _REASON_NIGHT_LOCKED_STUB,
-						"slots": [],
-					}
-				]
-			}
-
-		# 免費地點：
 		# 1. 主內容：定日優先於章節變體
 		var primary_beat: Dictionary = {}
 		for b in loader.beats:

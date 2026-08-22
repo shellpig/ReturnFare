@@ -21,6 +21,8 @@ var phase: String = "morning"
 # --- 手牌群 ---
 var hand: Array[String] = []          # 佔格卡 id，有序；主角卡恆在 index 0（run 層）
 var knowledge: Dictionary = {}        # id -> true（Set；slotless 卡；meta 層，不隨輪重置）
+var night_locations_seen: Dictionary = {} # location_id -> true（meta 層，不隨輪重置）
+var night_once_beats_seen: Dictionary = {} # beat_id -> true（meta 層，不隨輪重置）
 var madness_clock: Dictionary = {}    # 實例 id -> 剩餘天數（P1 只建結構，P2 才走錶；run 層）
 var _madness_counter: int = 0         # 實例編號計數器（run 層）
 
@@ -39,8 +41,8 @@ var relations: Dictionary = {}        # npc -> int（單軸整數暫行案，規
 var action_spent: bool = false                 # 當前行動格是否已放過主角卡（run 層）
 var _actions_spent_ahead: int = 0              # 預先消耗之當日後續行動格數（泡湯特例／順延，run 層）
 var npc_action_counts: Dictionary = {}         # npc_id -> 本輪投入的主角行動數（run 層，規格書第十二節）
-var night_markers_opened: Dictionary = {}      # location_id -> true（本輪已開收費標記集合，run 層）
 var night_location_chosen: String = ""         # 當夜已選定的夜間地點 id（run 層，每夜重置，規格書第九節）
+var night_sleep_pending: bool = false          # 當夜是否已播完直接睡內容停在「進入隔天」（run 層，每夜重置）
 var indulgence_count: int = 0                  # 本輪縱慾次數（主動＋強制合計，run 層）
 var madness_cards_cleared: int = 0             # 本輪消除的發狂卡張數累計（run 層，避免依賴縱慾次數換算卡數）
 var forced_pending: Array[String] = []         # 已歸零、還沒吃到行動格的發狂卡實例 id（run 層）
@@ -100,6 +102,7 @@ func advance_phase() -> void:
 		_actions_spent_ahead = 0
 
 	night_location_chosen = ""
+	night_sleep_pending = false
 
 	# P2-C: 行動時段開始時執行強制縱慾（每個行動時段最多一次）
 	if ACTION_PHASES.has(phase) and not action_spent and not forced_pending.is_empty():
@@ -133,8 +136,8 @@ func end_run(ending_id: String = "ending_default") -> void:
 	npc_action_counts.clear()
 	madness_clock.clear()
 	_madness_counter = 0
-	night_markers_opened.clear()
 	night_location_chosen = ""
+	night_sleep_pending = false
 	indulgence_count = 0
 	madness_cards_cleared = 0
 	forced_pending.clear()
@@ -218,34 +221,99 @@ func sleep_night() -> PackedStringArray:
 	return PackedStringArray()
 
 
-## 開啟夜間收費標記（規格書第八、九節，P2-A）。
-## 首次進入該夜間地點時發 madness_cost 張發狂卡，回傳文字行。
-func open_night_marker(location_id: String) -> PackedStringArray:
-	var lines := PackedStringArray()
-	if phase == "night":
-		night_location_chosen = location_id
+## 查詢該夜間地點是否已曾到訪（規格書第九節、P3-B）。
+func night_location_seen(location_id: String) -> bool:
+	return night_locations_seen.has(location_id)
 
-	if Data == null or Data.loader == null:
-		return lines
+
+## 進入夜間地點唯一原子入口（規格書第九節、P3-B）。
+## 拒絕順序固定：
+## 1. not_night: phase != "night"
+## 2. unknown_location: location 不存在
+## 3. not_night_layer: location.layer != "night"
+## 4. teaser: bool(loc.teaser_only)
+## 5. too_early: day < earliest_night
+## 6. locked: loc.requires 不成立（附 reject_reason）
+## 7. already_chosen: night_location_chosen 非空
+## 8. already_slept: night_sleep_pending 為真
+## 任一步未過回 { "ok": false, "reason_code": code, "reason_text": text, "lines": [] }，狀態零變化。
+## 成功：寫 chosen -> 寫 meta seen -> 首次 paid 則發卡 + 批次 check cap -> 回傳提示文字（未結束本輪才回傳）。
+func enter_night_location(location_id: String) -> Dictionary:
+	if phase != "night":
+		return { "ok": false, "reason_code": "not_night", "reason_text": "", "lines": PackedStringArray() }
+
+	if Data == null or Data.loader == null or not Data.loader.locations.has(location_id):
+		return { "ok": false, "reason_code": "unknown_location", "reason_text": "", "lines": PackedStringArray() }
 
 	var loc: Dictionary = Data.loader.locations.get(location_id, {}) as Dictionary
+	if str(loc.get("layer", "")) != "night":
+		return { "ok": false, "reason_code": "not_night_layer", "reason_text": "", "lines": PackedStringArray() }
+
+	if bool(loc.get("teaser_only", false)):
+		return { "ok": false, "reason_code": "teaser", "reason_text": "", "lines": PackedStringArray() }
+
+	if day < int(loc.get("earliest_night", 1)):
+		return { "ok": false, "reason_code": "too_early", "reason_text": "", "lines": PackedStringArray() }
+
+	if loc.has("requires") and not ConditionEval.eval(loc["requires"], self):
+		return { "ok": false, "reason_code": "locked", "reason_text": str(loc.get("reject_reason", "")), "lines": PackedStringArray() }
+
+	if not night_location_chosen.is_empty():
+		return { "ok": false, "reason_code": "already_chosen", "reason_text": "", "lines": PackedStringArray() }
+
+	if night_sleep_pending:
+		return { "ok": false, "reason_code": "already_slept", "reason_text": "", "lines": PackedStringArray() }
+
+	night_location_chosen = location_id
+	var is_first_time: bool = not night_locations_seen.has(location_id)
+	night_locations_seen[location_id] = true
+
+	var lines := PackedStringArray()
+	if is_first_time:
+		var cost: int = int(loc.get("madness_cost", 0))
+		if cost > 0:
+			for i in range(cost):
+				gain_card("madness", false)
+			_check_madness_cap()
+			if day != 1 or phase == "night":
+				lines.append("推開了夜色深處的門。獲得 %d 張發狂卡。" % cost)
+
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+
+## 純查詢：進入該夜間地點是否會因首次 marker cost 觸發發瘋 BE（規格書第八、九節、P3-B）。
+func would_night_entry_end_run(location_id: String) -> bool:
+	if night_locations_seen.has(location_id):
+		return false
+	if Data == null or Data.loader == null or not Data.loader.locations.has(location_id):
+		return false
+	var loc: Dictionary = Data.loader.locations.get(location_id, {}) as Dictionary
+	if str(loc.get("layer", "")) != "night":
+		return false
+	if bool(loc.get("teaser_only", false)):
+		return false
+	if day < int(loc.get("earliest_night", 1)):
+		return false
+	if loc.has("requires") and not ConditionEval.eval(loc["requires"], self):
+		return false
 	var cost: int = int(loc.get("madness_cost", 0))
-
 	if cost <= 0:
-		# 免費地點不收費、不發卡、不計入夜間標記集合（night_markers_opened 僅收錄收費標記）
-		return lines
+		return false
+	var cap: int = int(Data.tuning("madness_cap", 0))
+	if cap <= 0:
+		return false
+	var madness_count := 0
+	for c: String in hand:
+		if _card_base_id(c) == "madness":
+			madness_count += 1
+	return (madness_count + cost) >= cap
 
-	if night_markers_opened.has(location_id):
-		return lines
 
-	night_markers_opened[location_id] = true
-
-	for i in range(cost):
-		gain_card("madness", false)
-	_check_madness_cap()
-
-	lines.append("推開了夜色深處的門。獲得 %d 張發狂卡。" % cost)
-	return lines
+## fixed 到訪私有 helper：驗證地點後寫 chosen 與 seen，明確跳過 marker cost（規格書第九節、P3-B）。
+func _record_forced_night_visit(location_id: String) -> void:
+	if Data != null and Data.loader != null and Data.loader.locations.has(location_id):
+		night_location_chosen = location_id
+		night_locations_seen[location_id] = true
 
 
 ## 每天 morning 開始時，桌上每張發狂卡的剩餘天數 −1（規格書第八節，P2-A）。
@@ -910,14 +978,16 @@ func serialize() -> Dictionary:
 			"switch_progress": switch_progress.duplicate(),
 			"relations": relations.duplicate(),
 			"npc_action_counts": npc_action_counts.duplicate(),
-			"night_markers_opened": night_markers_opened.duplicate(),
 			"night_location_chosen": night_location_chosen,
+			"night_sleep_pending": night_sleep_pending,
 			"indulgence_count": indulgence_count,
 			"madness_cards_cleared": madness_cards_cleared,
 			"forced_pending": forced_pending.duplicate(),
 		},
 		"meta": {
 			"knowledge": knowledge.duplicate(),
+			"night_locations_seen": night_locations_seen.duplicate(),
+			"night_once_beats_seen": night_once_beats_seen.duplicate(),
 		}
 	}
 
@@ -944,8 +1014,8 @@ func deserialize(d: Dictionary) -> void:
 	switch_progress = run.get("switch_progress", {}).duplicate()
 	relations = run.get("relations", {}).duplicate()
 	npc_action_counts = run.get("npc_action_counts", {}).duplicate()
-	night_markers_opened = run.get("night_markers_opened", {}).duplicate()
 	night_location_chosen = str(run.get("night_location_chosen", ""))
+	night_sleep_pending = bool(run.get("night_sleep_pending", false))
 	indulgence_count = int(run.get("indulgence_count", 0))
 	madness_cards_cleared = int(run.get("madness_cards_cleared", 0))
 	forced_pending.clear()
@@ -954,6 +1024,8 @@ func deserialize(d: Dictionary) -> void:
 
 	var meta: Dictionary = d.get("meta", {})
 	knowledge = meta.get("knowledge", {}).duplicate()
+	night_locations_seen = meta.get("night_locations_seen", {}).duplicate()
+	night_once_beats_seen = meta.get("night_once_beats_seen", {}).duplicate()
 
 
 # ── 內部工具 ─────────────────────────────────────────────────────────────────

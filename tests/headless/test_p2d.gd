@@ -416,8 +416,10 @@ func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) ->
 	var test_loc_id := "test_loc_heavy_cost"
 	var test_loc: Dictionary = {
 		"id": test_loc_id,
-		"name": "高危禁地",
+		"name": "測試收費標記",
+		"layer": "night",
 		"time": "night",
+		"earliest_night": 1,
 		"madness_cost": 3
 	}
 	loader.locations[test_loc_id] = test_loc
@@ -432,7 +434,7 @@ func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) ->
 	gs.set("phase", "night")
 
 	# 一次開 cost=3 的標記（總共衝到 4 張，超過 cap 2）
-	gs.call("open_night_marker", test_loc_id)
+	gs.call("enter_night_location", test_loc_id)
 
 	if emitted_endings.size() == 1 and emitted_endings == ["ending_madness_be"]:
 		failed += _ok("一次發多張衝破 cap 時，run_ended 恰好發射 1 次")

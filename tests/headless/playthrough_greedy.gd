@@ -33,8 +33,12 @@ func _initialize() -> void:
 				expected_total_madness_cost += int(cost_val)
 				expected_paid_ids.append(loc_id_key)
 
-	var opened_markers: Dictionary = res.get("final_night_markers", {}) as Dictionary
-	var opened_count: int = opened_markers.size()
+	var seen_locations: Dictionary = res.get("final_night_markers", {}) as Dictionary
+	var opened_count := 0
+	for loc_id in seen_locations.keys():
+		var loc: Dictionary = data_node.loader.locations.get(loc_id, {}) as Dictionary
+		if int(loc.get("madness_cost", 0)) > 0:
+			opened_count += 1
 	var madness_gained: int = int(res.get("final_madness_count", 0))
 	var madness_in_hand: int = (res.get("final_madness_cards", []) as Array).size()
 	var madness_cleared: int = int(res.get("final_madness_cards_cleared", 0))
@@ -133,7 +137,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 	var cb := func(eid: String):
 		run_ended_box[0] += 1
 		last_ending_box[0] = eid
-		final_night_markers_box[0] = (gs.get("night_markers_opened") as Dictionary).duplicate()
+		final_night_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
 		final_madness_count_box[0] = int(gs.get("_madness_counter"))
 		var mcards: Array = []
 		for card in (gs.get("hand") as Array):
@@ -436,20 +440,21 @@ static func execute_night_phase(gs: Node, data_node: Node, _day: int, open_marke
 	if loader != null:
 		for loc_id in locs:
 			var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
-			if int(loc.get("madness_cost", 0)) > 0 and not (gs.get("night_markers_opened") as Dictionary).has(loc_id):
+			if int(loc.get("madness_cost", 0)) > 0 and not (gs.get("night_locations_seen") as Dictionary).has(loc_id):
 				chosen_loc = loc_id
 				break
 	if chosen_loc.is_empty() and not locs.is_empty():
 		chosen_loc = locs[0]
 
 	if not chosen_loc.is_empty():
-		gs.open_night_marker(chosen_loc)
-		var view: Dictionary = gs.build_panel(chosen_loc)
-		for bv: Dictionary in view.get("beats", []) as Array:
-			if int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
-				var bid := str((bv["beat"] as Dictionary).get("id", ""))
-				if not bid.is_empty():
-					gs.play_beat(bid)
+		var entry_res: Dictionary = gs.enter_night_location(chosen_loc)
+		if entry_res.get("ok", false):
+			var view: Dictionary = gs.build_panel(chosen_loc)
+			for bv: Dictionary in view.get("beats", []) as Array:
+				if int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
+					var bid := str((bv["beat"] as Dictionary).get("id", ""))
+					if not bid.is_empty():
+						gs.play_beat(bid)
 
 	# 3. 夜間收尾：直接睡
 	gs.sleep_night()
