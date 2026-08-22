@@ -200,16 +200,16 @@ static func location_summary(location_id: String, gs: Node, data: Node) -> Dicti
 ## 5. 玩家尚未持有該 knowledge_id（gs.knowledge 中不存在）
 ## 通過以上所有檢查時 available: true
 static func alignment_offer(day_location_id: String, gs: Node, data: Node) -> Dictionary:
+	var current_phase: String = str(gs.get("phase")) if gs != null else ""
+	if current_phase != "morning" and current_phase != "afternoon":
+		return { "available": false, "knowledge_id": "", "night_ids": [] }
+
 	var loader: DataLoader = data.get("loader") as DataLoader if data != null else null
 	if loader == null or not loader.locations.has(day_location_id):
 		return { "available": false, "knowledge_id": "", "night_ids": [] }
 
 	var day_loc: Dictionary = loader.locations[day_location_id] as Dictionary
 	if str(day_loc.get("layer", "")) == "night":
-		return { "available": false, "knowledge_id": "", "night_ids": [] }
-
-	var current_phase: String = str(gs.get("phase")) if gs != null else ""
-	if current_phase != "morning" and current_phase != "afternoon":
 		return { "available": false, "knowledge_id": "", "night_ids": [] }
 
 	var seen_dict: Dictionary = gs.get("night_locations_seen") as Dictionary if gs != null and gs.get("night_locations_seen") is Dictionary else {}

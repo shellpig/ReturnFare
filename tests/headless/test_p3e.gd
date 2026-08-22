@@ -85,6 +85,11 @@ func _test_1to1_and_multi_row_alignment(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("confirm_night_alignment 失敗: %s" % str(res_1to1))
 
+	if not bool(gs.get("action_spent")) and (gs.get("slots_placed") as Dictionary).is_empty() and (gs.get("choices") as Dictionary).is_empty():
+		failed += _ok("一對一對位成功後 action_spent 仍為 false，slots/choices 均未寫入")
+	else:
+		failed += _fail("一對一對位成功後誤寫入行動格或槽位狀態")
+
 	var summary_1to1: Dictionary = PanelBuilder.location_summary("n_exit", gs, data_node)
 	if str(summary_1to1.get("status_text", "")) == "[已對位]" and str(summary_1to1.get("display_name", "")) == "山泉閣":
 		failed += _ok("一對一對位後 summary 顯示『山泉閣』且無分區後綴，狀態為 [已對位]")
@@ -112,6 +117,11 @@ func _test_1to1_and_multi_row_alignment(gs: Node, data_node: Node) -> int:
 		failed += _ok("多對一確認對位成功取得共用 k_night_temple")
 	else:
 		failed += _fail("多對一 confirm 失敗: %s" % str(res_multi))
+
+	if not bool(gs.get("action_spent")) and (gs.get("slots_placed") as Dictionary).is_empty() and (gs.get("choices") as Dictionary).is_empty():
+		failed += _ok("多對一對位成功後 action_spent 仍為 false，slots/choices 均未寫入")
+	else:
+		failed += _fail("多對一對位成功後誤寫入行動格或槽位狀態")
 
 	var sum_woodtags: Dictionary = PanelBuilder.location_summary("n_woodtags", gs, data_node)
 	var sum_music: Dictionary = PanelBuilder.location_summary("n_music", gs, data_node)
@@ -234,7 +244,7 @@ func _test_data_conflict_fixture(gs: Node, data_node: Node) -> int:
 	var failed := 0
 	_reset_gs(gs)
 
-	# 建立衝突 fixture：同一 day_counterpart 'conflict_day' 下有兩個夜間 row 指向不同 night_reveal
+	# 4.1 多 row 衝突 fixture：同一 day_counterpart 'conflict_day' 下有兩個夜間 row 指向不同 night_reveal
 	var fake_locations: Dictionary = {
 		"conflict_day": { "id": "conflict_day", "name": "衝突白天地點", "layer": "day" },
 		"n_conf_1": { "id": "n_conf_1", "name": "衝突夜間1", "layer": "night", "day_counterpart": "conflict_day", "night_reveal": "k_rev_1" },
@@ -253,7 +263,7 @@ func _test_data_conflict_fixture(gs: Node, data_node: Node) -> int:
 	var offer: Dictionary = PanelBuilder.alignment_offer("conflict_day", gs, fake_data)
 	fake_data.free()
 	if not bool(offer.get("available", true)):
-		failed += _ok("資料衝突 fixture 下 alignment_offer 回傳 available == false")
+		failed += _ok("資料衝突 fixture (多 row 衝突) 下 alignment_offer 回傳 available == false")
 	else:
 		failed += _fail("alignment_offer 未能阻擋資料衝突 fixture: %s" % str(offer))
 
@@ -266,14 +276,51 @@ func _test_data_conflict_fixture(gs: Node, data_node: Node) -> int:
 	data_node.loader = real_data_loader
 
 	if not bool(res.get("ok", true)) and str(res.get("reason_code", "")) == "data_conflict":
-		failed += _ok("confirm_night_alignment 遇到資料衝突回傳 reason_code == 'data_conflict'")
+		failed += _ok("confirm_night_alignment 遇到多 row 衝突回傳 reason_code == 'data_conflict'")
 	else:
 		failed += _fail("confirm_night_alignment 未回傳 data_conflict: %s" % str(res))
 
 	if snap_before == snap_after:
-		failed += _ok("data_conflict 拒絕後狀態零變化")
+		failed += _ok("data_conflict (多 row 衝突) 拒絕後狀態零變化")
 	else:
 		failed += _fail("data_conflict 拒絕造成狀態變異")
+
+	# 4.2 單一 row 缺失 night_reveal (null 或空字串) 同樣視為 data_conflict
+	_reset_gs(gs)
+	var fake_locations_missing: Dictionary = {
+		"missing_rev_day": { "id": "missing_rev_day", "name": "缺卡白天地點", "layer": "day" },
+		"n_missing_1": { "id": "n_missing_1", "name": "缺卡夜間1", "layer": "night", "day_counterpart": "missing_rev_day", "night_reveal": null },
+	}
+	var fake_loader_missing := DataLoader.new()
+	fake_loader_missing.locations = fake_locations_missing
+	var fake_data_missing := Node.new()
+	fake_data_missing.set("loader", fake_loader_missing)
+
+	seen_dict = gs.get("night_locations_seen") as Dictionary
+	seen_dict["n_missing_1"] = true
+
+	var offer_missing: Dictionary = PanelBuilder.alignment_offer("missing_rev_day", gs, fake_data_missing)
+	fake_data_missing.free()
+	if not bool(offer_missing.get("available", true)):
+		failed += _ok("單一 row 缺 night_reveal fixture 下 alignment_offer 回傳 available == false")
+	else:
+		failed += _fail("alignment_offer 未能阻擋單一 row 缺 night_reveal fixture: %s" % str(offer_missing))
+
+	data_node.loader = fake_loader_missing
+	snap_before = (gs.call("serialize") as Dictionary).duplicate(true)
+	var res_missing: Dictionary = gs.call("confirm_night_alignment", "missing_rev_day")
+	snap_after = (gs.call("serialize") as Dictionary).duplicate(true)
+	data_node.loader = real_data_loader
+
+	if not bool(res_missing.get("ok", true)) and str(res_missing.get("reason_code", "")) == "data_conflict":
+		failed += _ok("confirm_night_alignment 遇到單一 row 缺 night_reveal 回傳 reason_code == 'data_conflict'")
+	else:
+		failed += _fail("confirm_night_alignment 缺卡未回傳 data_conflict: %s" % str(res_missing))
+
+	if snap_before == snap_after:
+		failed += _ok("data_conflict (單 row 缺卡) 拒絕後狀態零變化")
+	else:
+		failed += _fail("data_conflict 缺卡拒絕造成狀態變異")
 
 	return failed
 
@@ -390,6 +437,9 @@ func _test_offer_and_confirm_criteria_alignment(gs: Node, data_node: Node) -> in
 		{ "name": "傳入夜間地點", "phase": "morning", "loc": "n_exit", "seen": ["n_exit"], "know": [], "expect_ok": false },
 		{ "name": "未到訪任何 row", "phase": "morning", "loc": "sanquan", "seen": [], "know": [], "expect_ok": false },
 		{ "name": "已持有知識卡", "phase": "morning", "loc": "sanquan", "seen": ["n_exit"], "know": ["k_night_sanquan"], "expect_ok": false },
+		{ "name": "交集：非白天 且 未知地點 (phase優先)", "phase": "evening", "loc": "unknown_loc", "seen": [], "know": [], "expect_ok": false, "expected_reason": "not_day_phase" },
+		{ "name": "交集：非白天 且 傳入夜間地點 (phase優先)", "phase": "night", "loc": "n_exit", "seen": ["n_exit"], "know": [], "expect_ok": false, "expected_reason": "not_day_phase" },
+		{ "name": "交集：非白天 且 已持有知識卡 (phase優先)", "phase": "evening", "loc": "sanquan", "seen": ["n_exit"], "know": ["k_night_sanquan"], "expect_ok": false, "expected_reason": "not_day_phase" },
 		{ "name": "合法可對位狀態", "phase": "morning", "loc": "sanquan", "seen": ["n_exit"], "know": [], "expect_ok": true },
 	]
 
@@ -416,7 +466,14 @@ func _test_offer_and_confirm_criteria_alignment(gs: Node, data_node: Node) -> in
 				failed += _fail("案例『%s』預期成功但分歧：offer=%s, confirm=%s" % [tc["name"], offer_avail, confirm_ok])
 		else:
 			if not offer_avail and not confirm_ok:
-				failed += _ok("案例『%s』：offer 與 confirm 一致為 false (reason=%s)" % [tc["name"], str(res.get("reason_code", ""))])
+				var code := str(res.get("reason_code", ""))
+				if tc.has("expected_reason"):
+					if code == str(tc["expected_reason"]):
+						failed += _ok("案例『%s』：offer 與 confirm 一致為 false 且 reason_code == %s" % [tc["name"], code])
+					else:
+						failed += _fail("案例『%s』reason_code 優先序不符 (實際: %s, 預期: %s)" % [tc["name"], code, str(tc["expected_reason"])])
+				else:
+					failed += _ok("案例『%s』：offer 與 confirm 一致為 false (reason=%s)" % [tc["name"], code])
 			else:
 				failed += _fail("案例『%s』預期拒絕但分歧：offer=%s, confirm=%s" % [tc["name"], offer_avail, confirm_ok])
 
