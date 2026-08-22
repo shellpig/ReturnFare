@@ -745,11 +745,17 @@ func night_beat_candidates(day: int, location_id: String, current_chapter: int) 
 	var primaries: Array[Dictionary] = []
 	var addons: Array[Dictionary] = []
 
-	# 1. 定日夜間候選（同地點、non-fixed、matches_time 成立）
+	# 1. 定日夜間候選（同地點、non-fixed、exact when.day 且 matches_time 成立）
 	for b in beats:
 		if str(b.get("location", "")) != location_id:
 			continue
 		if bool(b.get("fixed", false)):
+			continue
+		var w_raw: Variant = b.get("when")
+		if not (w_raw is Dictionary):
+			continue
+		var wd := w_raw as Dictionary
+		if not wd.has("day") or wd.has("day_from") or wd.has("day_to"):
 			continue
 		if DataFacts.beat_matches_time(b, day, "night"):
 			primaries.append(b)
@@ -779,7 +785,7 @@ func night_beat_candidates(day: int, location_id: String, current_chapter: int) 
 
 ## Lint 14: 夜間一次性 beat 完整性檢查（P3-C、SCHEMA.md）。
 ## 1. meta_once 僅能為 boolean true，且僅供 fixed: true 與 exact night when 的 beat。
-## 2. 所有 night-layer 地點上的 fixed beat（when.phase == 'night'）必須標記 meta_once: true。
+## 2. 所有 night-layer 地點上的 fixed beat（when.phase == 'night' 或 contains 'night'）必須標記 meta_once: true。
 ## 3. 同一個 when.day 至多只能有一個 night-layer fixed beat。
 static func lint_night_once(loader: DataLoader) -> PackedStringArray:
 	var problems := PackedStringArray()
@@ -794,7 +800,14 @@ static func lint_night_once(loader: DataLoader) -> PackedStringArray:
 
 		if w_raw is Dictionary:
 			var wd := w_raw as Dictionary
-			if str(wd.get("phase", "")) == "night" and wd.has("day") and not wd.has("day_from"):
+			var p_val: Variant = wd.get("phase")
+			var is_night_phase := false
+			if p_val is String:
+				is_night_phase = (p_val == "night")
+			elif p_val is Array:
+				is_night_phase = (p_val as Array).has("night")
+
+			if is_night_phase and wd.has("day") and not wd.has("day_from") and not wd.has("day_to"):
 				is_exact_night = true
 				beat_day = int(wd.get("day", -1))
 

@@ -208,13 +208,14 @@ func play_night_fixed() -> PackedStringArray:
 				continue
 
 		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-			if is_meta_once:
-				night_once_beats_seen[bid] = true
 			var loc_id := str(b.get("location", ""))
-			if Data.loader.locations.has(loc_id):
+			if Data != null and Data.loader != null and Data.loader.locations.has(loc_id):
 				var loc: Dictionary = Data.loader.locations[loc_id] as Dictionary
 				if str(loc.get("layer", "")) == "night":
-					_record_forced_night_visit(loc_id)
+					if not _record_forced_night_visit(loc_id):
+						continue
+			if is_meta_once:
+				night_once_beats_seen[bid] = true
 			var beat_lines := play_beat(bid)
 			lines.append_array(beat_lines)
 
@@ -377,13 +378,19 @@ func would_night_entry_end_run(location_id: String) -> bool:
 
 
 ## fixed 到訪私有 helper：驗證地點後寫 chosen 與 seen，明確跳過 marker cost（規格書第九節、P3-B/P3-C）。
-func _record_forced_night_visit(location_id: String) -> void:
+## 若當夜已選定地點或已就寢，回傳 false 並拒絕；成功寫入回傳 true。
+func _record_forced_night_visit(location_id: String) -> bool:
 	if not night_location_chosen.is_empty():
 		push_error("_record_forced_night_visit: night_location_chosen already set to '%s', refusing overwrite with '%s'" % [night_location_chosen, location_id])
-		return
+		return false
+	if night_sleep_pending:
+		push_error("_record_forced_night_visit: night_sleep_pending is true, refusing forced night visit to '%s'" % location_id)
+		return false
 	if Data != null and Data.loader != null and Data.loader.locations.has(location_id):
 		night_location_chosen = location_id
 		night_locations_seen[location_id] = true
+		return true
+	return false
 
 
 ## 每天 morning 開始時，桌上每張發狂卡的剩餘天數 −1（規格書第八節，P2-A）。

@@ -1,4 +1,4 @@
-﻿extends SceneTree
+extends SceneTree
 
 ## P3-C headless 驗收測試：
 ## 1. night_beat_candidates 候選收集與章節優先序、白天 beat 排除、addon 順序
@@ -39,7 +39,9 @@ func _initialize() -> void:
 	failed += _test_dual_run_d24_laozeng(gs, data_node)
 	failed += _test_dual_run_d3_n3_map_opens(gs, data_node)
 	failed += _test_lint_night_once_negative_fixtures(data_node)
+	failed += _test_forced_night_visit_rejection_and_abort(gs, data_node)
 	failed += _test_resolve_night_advance(gs, data_node)
+	failed += await _test_main_scene_advance_hint(self, gs, data_node)
 
 	if failed > 0:
 		push_error("\nP3-C: %d assertion(s) failed" % failed)
@@ -71,7 +73,7 @@ func _reset_gs(gs: Node) -> void:
 # ── 1. night_beat_candidates 候選收集與章節優先序 ─────────────────────────────
 
 func _test_candidate_priority_and_filtering(_gs: Node, _data_node: Node) -> int:
-	print("--- 1. night_beat_candidates priority, daytime exclusion & addon order ---")
+	print("--- 1. night_beat_candidates priority, daytime exclusion, range exclusion & addon order ---")
 	var failed := 0
 
 	# 建立合成 DataLoader 隔離測試
@@ -84,6 +86,7 @@ func _test_candidate_priority_and_filtering(_gs: Node, _data_node: Node) -> int:
 		{ "id": "syn_ch1", "location": "loc_syn", "chapter": 1 },
 		{ "id": "syn_dated_night", "location": "loc_syn", "when": { "day": 10, "phase": "night" } },
 		{ "id": "syn_daytime_morning", "location": "loc_syn", "when": { "day": 10, "phase": "morning" } },
+		{ "id": "syn_range_night", "location": "loc_syn", "when": { "day_from": 5, "day_to": 15, "phase": "night" } },
 		{ "id": "syn_ch3", "location": "loc_syn", "chapter": 3 },
 		{ "id": "syn_addon_2", "location": "loc_syn" },
 		{ "id": "syn_ch2", "location": "loc_syn", "chapter": 2 },
@@ -110,6 +113,11 @@ func _test_candidate_priority_and_filtering(_gs: Node, _data_node: Node) -> int:
 		failed += _ok("同地點白天 beat 未混入 night primaries")
 	else:
 		failed += _fail("同地點白天 beat 錯誤混入 night primaries")
+
+	if not prim_ids_ch3.has("syn_range_night") and not addon_ids_ch3.has("syn_range_night"):
+		failed += _ok("夜間候選正確排除區間 (day_from/day_to) beat")
+	else:
+		failed += _fail("夜間候選錯誤收錄了區間 beat")
 
 	if addon_ids_ch3 == PackedStringArray(["syn_addon_1", "syn_addon_2"]):
 		failed += _ok("addons 保持資料原始順序")
@@ -305,10 +313,10 @@ func _test_no_duplicate_when_scanning(gs: Node, _data_node: Node) -> int:
 	return failed
 
 
-# ── 5. 零內容地點回傳 empty_result 且不產生假 beat ─────────────────────────
+# ── 5. 零內容地點回傳 empty_result 且付費地點回傳真實 beat id ──────────────
 
 func _test_empty_result_and_no_fake_beats(gs: Node, data_node: Node) -> int:
-	print("--- 5. empty_result and no <location>_locked fake beats ---")
+	print("--- 5. empty_result and real beat ids in night panel (no fake beats) ---")
 	var failed := 0
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
@@ -316,15 +324,25 @@ func _test_empty_result_and_no_fake_beats(gs: Node, data_node: Node) -> int:
 	gs.set("day", 10)
 	gs.set("phase", "night")
 
-	# 檢查正式資料庫中無任何 <location>_locked 假 beat id
-	for b in loader.beats:
-		var bid: String = str(b.get("id", ""))
-		if bid.ends_with("_locked"):
-			failed += _fail("資料庫中發現殘留假 beat id: %s" % bid)
-			return failed
-	failed += _ok("正式資料庫 0 筆 <location>_locked 假 beat id")
+	# 1. 斷言收費夜間地點 build_panel 回傳真實 beat id（非 fake）
+	var paid_locs := ["n_ahong_1", "n_source"]
+	for ploc in paid_locs:
+		var panel_view: Dictionary = PanelBuilder.build(ploc, gs, data_node)
+		var beats_arr: Array = panel_view.get("beats", []) as Array
+		if beats_arr.is_empty():
+			failed += _fail("收費地點 %s build_panel 未回傳 beats" % ploc)
+			continue
+		for bv: Dictionary in beats_arr:
+			var beat_dict: Dictionary = bv.get("beat", {}) as Dictionary
+			var bid: String = str(beat_dict.get("id", ""))
+			if not loader.beats_by_id.has(bid):
+				failed += _fail("收費地點 %s 回傳了不存在於 beats 資料庫的假 id: %s" % [ploc, bid])
+			elif bid.ends_with("_locked"):
+				failed += _fail("收費地點 %s 回傳了帶有 _locked 假後綴的 id: %s" % [ploc, bid])
+			else:
+				failed += _ok("收費地點 %s 回傳真實 beat id: %s" % [ploc, bid])
 
-	# 測試合法但無內容的地點（例如給定一個無 beat 的地點）
+	# 2. 測試合法但無內容的地點（例如給定一個無 beat 的地點）
 	var original_locations := loader.locations.duplicate()
 	loader.locations["n_empty_test"] = { "id": "n_empty_test", "layer": "night", "earliest_night": 1 }
 	var panel_empty: Dictionary = PanelBuilder.build("n_empty_test", gs, data_node)
@@ -537,10 +555,10 @@ func _test_dual_run_d3_n3_map_opens(gs: Node, _data_node: Node) -> int:
 	return failed
 
 
-# ── 9. Lint 14 四種負向 fixture 驗證 ────────────────────────────────────────
+# ── 9. Lint 14 七種負向 fixture 驗證 ────────────────────────────────────────
 
 func _test_lint_night_once_negative_fixtures(_data_node: Node) -> int:
-	print("--- 9. Lint 14 four negative fixtures ---")
+	print("--- 9. Lint 14 negative fixtures (string & array phase) ---")
 	var failed := 0
 
 	# 負向 fixture 1: 非 night fixed 使用 meta_once
@@ -555,7 +573,7 @@ func _test_lint_night_once_negative_fixtures(_data_node: Node) -> int:
 	else:
 		failed += _fail("負向 fixture 1 未攔截: %s" % str(errs1))
 
-	# 負向 fixture 2: night-layer fixed 缺 meta_once
+	# 負向 fixture 2: night-layer fixed 缺 meta_once (字串 phase)
 	var loader2 := DataLoader.new()
 	loader2.locations = { "n_corridor": { "id": "n_corridor", "layer": "night" } }
 	loader2.beats = [
@@ -595,13 +613,118 @@ func _test_lint_night_once_negative_fixtures(_data_node: Node) -> int:
 	else:
 		failed += _fail("負向 fixture 4 未攔截: %s" % str(errs4))
 
+	# 負向 fixture 5: 陣列 phase 的 night-layer fixed 缺 meta_once
+	var loader5 := DataLoader.new()
+	loader5.locations = { "n_corridor": { "id": "n_corridor", "layer": "night" } }
+	loader5.beats = [
+		{ "id": "n_corridor_arr_phase", "location": "n_corridor", "fixed": true, "when": { "day": 1, "phase": ["evening", "night"] } }
+	]
+	var errs5 := DataLoader.lint_night_once(loader5)
+	if errs5.size() > 0 and errs5[0].contains("必須標記 meta_once: true"):
+		failed += _ok("負向 fixture 5: 陣列 phase night-layer fixed 缺 meta_once 成功攔截")
+	else:
+		failed += _fail("負向 fixture 5 未攔截: %s" % str(errs5))
+
+	# 負向 fixture 6: 陣列 phase 不包含 night 的 fixed 標記 meta_once
+	var loader6 := DataLoader.new()
+	loader6.locations = { "sanquan": { "id": "sanquan", "layer": "both" } }
+	loader6.beats = [
+		{ "id": "b_arr_no_night_meta", "location": "sanquan", "fixed": true, "meta_once": true, "when": { "day": 1, "phase": ["morning", "afternoon"] } }
+	]
+	var errs6 := DataLoader.lint_night_once(loader6)
+	if errs6.size() > 0 and errs6[0].contains("具有 exact night when"):
+		failed += _ok("負向 fixture 6: 陣列 phase 未含 night 標記 meta_once 成功攔截")
+	else:
+		failed += _fail("負向 fixture 6 未攔截: %s" % str(errs6))
+
+	# 負向 fixture 7: 陣列 phase 與字串 phase 在同一夜衝突
+	var loader7 := DataLoader.new()
+	loader7.locations = {
+		"n_corridor": { "id": "n_corridor", "layer": "night" },
+		"n_exit": { "id": "n_exit", "layer": "night" }
+	}
+	loader7.beats = [
+		{ "id": "n_corridor_ch1", "location": "n_corridor", "fixed": true, "meta_once": true, "when": { "day": 1, "phase": ["night"] } },
+		{ "id": "n_exit_ch1", "location": "n_exit", "fixed": true, "meta_once": true, "when": { "day": 1, "phase": "night" } }
+	]
+	var errs7 := DataLoader.lint_night_once(loader7)
+	if errs7.size() > 0 and errs7[0].contains("存在多個 night-layer fixed beat"):
+		failed += _ok("負向 fixture 7: 陣列 phase 與字串 phase 同夜衝突成功攔截")
+	else:
+		failed += _fail("負向 fixture 7 未攔截: %s" % str(errs7))
+
 	return failed
 
 
-# ── 10. resolve_night_advance 停拍與推進 ────────────────────────────────────
+# ── 10. _record_forced_night_visit 防線與 play_night_fixed 失敗阻斷 ─────────
+
+func _test_forced_night_visit_rejection_and_abort(gs: Node, _data_node: Node) -> int:
+	print("--- 10. _record_forced_night_visit defense & play_night_fixed abort (K-90, already_slept) ---")
+	var failed := 0
+
+	# Case 1: 當夜已選地點時，play_night_fixed 必須阻斷執行，不播 beat 且不燒掉 meta_once
+	_reset_gs(gs)
+	gs.set("day", 1)
+	gs.set("phase", "night")
+	gs.set("night_location_chosen", "n_source")
+	gs.set("night_once_beats_seen", {})
+
+	var lines_blocked: PackedStringArray = gs.call("play_night_fixed")
+	if lines_blocked.is_empty():
+		failed += _ok("chosen 已佔用時 play_night_fixed 成功阻斷執行並回傳空行 (K-90)")
+	else:
+		failed += _fail("chosen 已佔用時 play_night_fixed 錯誤執行了內容: %s" % str(lines_blocked))
+
+	if not (gs.get("night_once_beats_seen") as Dictionary).has("n_corridor_ch1"):
+		failed += _ok("阻斷後 meta night_once_beats_seen 未被提前寫入/永久燒掉")
+	else:
+		failed += _fail("阻斷後 meta night_once_beats_seen 錯誤寫入了 n_corridor_ch1")
+
+	if str(gs.get("night_location_chosen")) == "n_source":
+		failed += _ok("阻斷後 night_location_chosen 保持原值 'n_source'")
+	else:
+		failed += _fail("阻斷後 night_location_chosen 遭污染: %s" % str(gs.get("night_location_chosen")))
+
+	# Case 2: 當夜已進入睡眠 pending 時，play_night_fixed 同樣阻斷 (already_slept)
+	_reset_gs(gs)
+	gs.set("day", 1)
+	gs.set("phase", "night")
+	gs.set("night_location_chosen", "")
+	gs.set("night_sleep_pending", true)
+	gs.set("night_once_beats_seen", {})
+
+	var lines_sleep_blocked: PackedStringArray = gs.call("play_night_fixed")
+	if lines_sleep_blocked.is_empty():
+		failed += _ok("sleep_pending 為真時 play_night_fixed 成功阻斷執行")
+	else:
+		failed += _fail("sleep_pending 為真時 play_night_fixed 錯誤執行: %s" % str(lines_sleep_blocked))
+
+	if not (gs.get("night_once_beats_seen") as Dictionary).has("n_corridor_ch1"):
+		failed += _ok("sleep_pending 阻斷後 meta night_once_beats_seen 未被寫入")
+	else:
+		failed += _fail("sleep_pending 阻斷後 meta 遭錯誤寫入")
+
+	# Case 3: helper 直接呼叫傳回值驗證
+	_reset_gs(gs)
+	var ok_clean: bool = gs.call("_record_forced_night_visit", "n_corridor")
+	if ok_clean and str(gs.get("night_location_chosen")) == "n_corridor":
+		failed += _ok("乾淨狀態下 _record_forced_night_visit 回傳 true 並成功寫入 chosen")
+	else:
+		failed += _fail("乾淨狀態下 _record_forced_night_visit 寫入失敗")
+
+	var ok_repeat: bool = gs.call("_record_forced_night_visit", "n_exit")
+	if not ok_repeat and str(gs.get("night_location_chosen")) == "n_corridor":
+		failed += _ok("重複呼叫時 _record_forced_night_visit 回傳 false 並拒絕覆蓋")
+	else:
+		failed += _fail("重複呼叫時 _record_forced_night_visit 覆蓋成功")
+
+	return failed
+
+
+# ── 11. resolve_night_advance 停拍與推進 ────────────────────────────────────
 
 func _test_resolve_night_advance(gs: Node, _data_node: Node) -> int:
-	print("--- 10. resolve_night_advance flow, pending停拍 and chosen bypass ---")
+	print("--- 11. resolve_night_advance flow, pending停拍 and chosen bypass ---")
 	var failed := 0
 
 	# Case A: 未選地點按「直接睡」，有睡眠內容時先播、停在進入隔天；再次呼叫才換日
@@ -660,4 +783,75 @@ func _test_resolve_night_advance(gs: Node, _data_node: Node) -> int:
 	else:
 		failed += _fail("已到訪地點後錯誤觸發了 sleep: %s" % str(adv_chosen))
 
+	return failed
+
+
+# ── 12. _refresh_advance_hint 夜間按鈕三態真畫面斷言 ────────────────────────
+
+func _test_main_scene_advance_hint(tree: SceneTree, gs: Node, _data_node: Node) -> int:
+	print("--- 12. main.gd _refresh_advance_hint three night button states ---")
+	var failed := 0
+
+	var main_scene: Node = load("res://scenes/main.tscn").instantiate()
+	tree.get_root().add_child(main_scene)
+	await tree.process_frame
+
+	var advance_btn: Button = main_scene.get_node_or_null("AdvanceButton") as Button
+	if advance_btn == null:
+		failed += _fail("AdvanceButton 不存在")
+		main_scene.queue_free()
+		return failed
+
+	# 1. 夜間未選地點、無 pending -> 按鈕為「直接睡」
+	_reset_gs(gs)
+	main_scene.set("_is_showing_ending", false)
+	gs.set("day", 10)
+	gs.set("phase", "night")
+	main_scene.call("_refresh_status")
+	if advance_btn.text == "直接睡":
+		failed += _ok("夜間初始狀態按鈕文字為『直接睡』")
+	else:
+		failed += _fail("夜間初始按鈕文字不符: 預期『直接睡』, 實際『%s』" % advance_btn.text)
+
+	# 2. 觸發睡眠內容停拍 -> 按鈕變為「進入隔天」
+	_reset_gs(gs)
+	main_scene.set("_is_showing_ending", false)
+	gs.set("day", 24)
+	gs.set("phase", "night")
+	gs.call("set_flag", "boundary_bleeding", true)
+	gs.call("gain_card", "madness")
+	gs.call("gain_card", "madness")
+	gs.call("gain_card", "madness")
+	main_scene.call("_refresh_status")
+	# 第 1 次點擊推進按鈕：觸發停拍
+	main_scene.call("_on_advance_pressed")
+	if bool(gs.get("night_sleep_pending")):
+		failed += _ok("點擊『直接睡』後成功進入 pending 停拍")
+	else:
+		failed += _fail("點擊『直接睡』後未進入 pending")
+	if advance_btn.text == "進入隔天":
+		failed += _ok("睡眠停拍期間按鈕文字變為『進入隔天』(K-68, K-69)")
+	else:
+		failed += _fail("睡眠停拍期間按鈕文字不符: 預期『進入隔天』, 實際『%s』" % advance_btn.text)
+
+	# 第 2 次點擊推進按鈕：換日進入隔天 morning
+	main_scene.call("_on_advance_pressed")
+	if int(gs.get("day")) == 25 and str(gs.get("phase")) == "morning":
+		failed += _ok("點擊『進入隔天』後推進至第 25 天 morning")
+	else:
+		failed += _fail("點擊『進入隔天』未推進: day=%s, phase=%s" % [str(gs.get("day")), str(gs.get("phase"))])
+
+	# 3. 夜間選定地點後 -> 按鈕變為「結束今晚」
+	_reset_gs(gs)
+	main_scene.set("_is_showing_ending", false)
+	gs.set("day", 10)
+	gs.set("phase", "night")
+	gs.set("night_location_chosen", "n_landmark")
+	main_scene.call("_refresh_status")
+	if advance_btn.text == "結束今晚":
+		failed += _ok("夜間選定地點後按鈕文字為『結束今晚』")
+	else:
+		failed += _fail("夜間選定地點後按鈕文字不符: 預期『結束今晚』, 實際『%s』" % advance_btn.text)
+
+	main_scene.queue_free()
 	return failed
