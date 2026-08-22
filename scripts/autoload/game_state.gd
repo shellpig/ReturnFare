@@ -349,6 +349,58 @@ func enter_night_location(location_id: String) -> Dictionary:
 	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 
 
+## 白天地點對位確認的唯一規則層入口（規格書第十七節、P3-E）。
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "knowledge_id": String }
+## 六碼封閉拒絕矩陣（依序優先）：
+## 1. not_day_phase: phase != "morning" and phase != "afternoon"
+## 2. unknown_location: day_location_id 不在 locations.json
+## 3. not_day_layer: location.layer == "night"
+## 4. no_seen_row: 該白天地點對應的夜間 row 一個都未在 night_locations_seen 中
+## 5. data_conflict: 已到訪 row 之 night_reveal 存在衝突或遺失（同時 push_error）
+## 6. already_known: 對應之知識卡已在 knowledge 集合中
+## 拒絕時完整狀態零變化；成功時呼叫 gain_card(knowledge_id)，不消耗行動格。
+func confirm_night_alignment(day_location_id: String) -> Dictionary:
+	if phase != "morning" and phase != "afternoon":
+		return { "ok": false, "reason_code": "not_day_phase", "reason_text": "", "knowledge_id": "" }
+
+	if Data == null or Data.loader == null or not Data.loader.locations.has(day_location_id):
+		return { "ok": false, "reason_code": "unknown_location", "reason_text": "", "knowledge_id": "" }
+
+	var day_loc: Dictionary = Data.loader.locations.get(day_location_id, {}) as Dictionary
+	if str(day_loc.get("layer", "")) == "night":
+		return { "ok": false, "reason_code": "not_day_layer", "reason_text": "", "knowledge_id": "" }
+
+	var seen_night_ids: Array[String] = []
+	var reveals: Array[String] = []
+
+	for lid: String in Data.loader.locations:
+		var loc: Dictionary = Data.loader.locations[lid] as Dictionary
+		if str(loc.get("layer", "")) == "night" and str(loc.get("day_counterpart", "")) == day_location_id:
+			if night_locations_seen.has(lid):
+				seen_night_ids.append(lid)
+				var rev_val: Variant = loc.get("night_reveal")
+				if rev_val != null and not str(rev_val).is_empty():
+					var rev_str := str(rev_val)
+					if not reveals.has(rev_str):
+						reveals.append(rev_str)
+				else:
+					reveals.append("")
+
+	if seen_night_ids.is_empty():
+		return { "ok": false, "reason_code": "no_seen_row", "reason_text": "", "knowledge_id": "" }
+
+	if reveals.size() != 1 or reveals[0].is_empty():
+		push_error("confirm_night_alignment: data conflict or missing night_reveal for day location '%s'" % day_location_id)
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "", "knowledge_id": "" }
+
+	var reveal_card_id := reveals[0]
+	if knowledge.has(reveal_card_id):
+		return { "ok": false, "reason_code": "already_known", "reason_text": "", "knowledge_id": "" }
+
+	gain_card(reveal_card_id)
+	return { "ok": true, "reason_code": "", "reason_text": "", "knowledge_id": reveal_card_id }
+
+
 ## 純查詢：進入該夜間地點是否會因首次 marker cost 觸發發瘋 BE（規格書第八、九節、P3-B）。
 func would_night_entry_end_run(location_id: String) -> bool:
 	if night_locations_seen.has(location_id):

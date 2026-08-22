@@ -313,6 +313,27 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _write_p2b_state(output_dir, "p3d_aligned_multi", gs_p3d.serialize(), data_node):
 		return false
 
+	# 產生 P3-E 對位系統驗收情境（白天上午時段，seen 對應之夜間 row）
+	var gs_p3e: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+
+	# ① p3e_seen_counterpart: 白天上午，n_exit 已 seen，knowledge 缺 k_night_sanquan
+	_reset_state(gs_p3e)
+	gs_p3e.deserialize(d3am_dict)
+	var seen_p3e := gs_p3e.get("night_locations_seen") as Dictionary
+	seen_p3e["n_exit"] = true
+	(gs_p3e.get("knowledge") as Dictionary).erase("k_night_sanquan")
+	if not _write_p2b_state(output_dir, "p3e_seen_counterpart", gs_p3e.serialize(), data_node):
+		return false
+
+	# ② p3e_multi_first_seen: 白天上午 (D17)，多對一第一個 row (n_woodtags) 已 seen，knowledge 缺 k_night_temple
+	_reset_state(gs_p3e)
+	gs_p3e.deserialize(d17am_dict)
+	var seen_multi := gs_p3e.get("night_locations_seen") as Dictionary
+	seen_multi["n_woodtags"] = true
+	(gs_p3e.get("knowledge") as Dictionary).erase("k_night_temple")
+	if not _write_p2b_state(output_dir, "p3e_multi_first_seen", gs_p3e.serialize(), data_node):
+		return false
+
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
 	var d45_coda_decisions: Array[Dictionary] = [

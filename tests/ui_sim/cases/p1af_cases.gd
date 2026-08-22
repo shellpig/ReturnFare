@@ -87,6 +87,11 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p3d_04_near_cap_warning", "近 cap 狀態下收費地點詳情顯示無數字風險警告且免費地點無警告", "p2d_near_cap.json", "", "p3d_04_night_risk_warning", "", "p3d_04_warning"),
 		UiCase.new("p3d_05_sleep_pending", "直接睡停拍期間全部夜間進入按鈕 disabled 且點擊狀態零變化", "p2d_d24_three_cards.json", "", "p3d_05_sleep_pending_disabled", "", "p3d_05_sleep"),
 		UiCase.new("p3d_06_geometry", "夜間清單與詳情面板於 1280x720 幾何無重疊裁切溢出且長名稱可讀", "d33_night.json", "long_night_name", "p3d_06_night_list_geometry", "", "p3d_06_geo"),
+		UiCase.new("p3e_01_day_align_flow", "夜間 row 已 seen、白天尚未持有 reveal 卡；地圖無提示，進常態面板看見 night_align 按鈕", "p3e_seen_counterpart.json", "", "p3e_01_day_align_flow", "", "p3e_01"),
+		UiCase.new("p3e_02_wrong_locations", "同一狀態打開錯誤白天地點無對位按鈕、無理由提示、狀態不變", "p3e_seen_counterpart.json", "", "p3e_02_wrong_locations_noop", "", "p3e_02"),
+		UiCase.new("p3e_03_dialog_cancel", "點對位按鈕開確認彈窗，取消後狀態零變化", "p3e_seen_counterpart.json", "", "p3e_03_align_dialog_cancel", "", "p3e_03"),
+		UiCase.new("p3e_04_dialog_confirm", "確認對位後恰好獲得一張 reveal 知識卡、action_spent 仍 false、按鈕消失且知識詳情可讀", "p3e_seen_counterpart.json", "", "p3e_04_align_confirm_gain_knowledge", "", "p3e_04"),
+		UiCase.new("p3e_05_multi_auto_align", "多對一只確認一次，第二個 row 日後到訪自動顯示已對位且無二次確認", "p3e_multi_first_seen.json", "", "p3e_05_multi_row_auto_align", "", "p3e_05"),
 	]
 
 
@@ -227,6 +232,16 @@ class UiCase extends CaseBaseClass:
 				return await _p3d_05_sleep(tree)
 			"p3d_06_geo":
 				return await _p3d_06_geo(tree, main_node, run_dir)
+			"p3e_01":
+				return await _p3e_01(tree)
+			"p3e_02":
+				return await _p3e_02(tree)
+			"p3e_03":
+				return await _p3e_03(tree)
+			"p3e_04":
+				return await _p3e_04(tree)
+			"p3e_05":
+				return await _p3e_05(tree, main_node)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -239,6 +254,9 @@ class UiCase extends CaseBaseClass:
 
 	func _run(tree: SceneTree) -> Dictionary:
 		return _state(tree).get("run", {}) as Dictionary
+
+	func _meta(tree: SceneTree) -> Dictionary:
+		return _state(tree).get("meta", {}) as Dictionary
 
 	func _texts(root: Node) -> Array[String]:
 		var result: Array[String] = []
@@ -1532,3 +1550,117 @@ class UiCase extends CaseBaseClass:
 		assert_true(bool(geo_panel.get("ok", false)), "夜間詳情面板畫面幾何診斷通過: %s" % JSON.stringify(geo_panel))
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["night_list_geometry_clean"] } }
+
+	func _p3e_01(tree: SceneTree) -> Dictionary:
+		var btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::sanquan")
+		assert_eq(btns.size(), 1, "地圖清單中找到 location::sanquan 按鈕")
+		if not btns.is_empty():
+			var btn_text: String = (btns[0] as Button).text
+			assert_false(btn_text.contains("對位"), "白天地圖按鈕不含對位提示文字")
+			assert_false(btn_text.contains("見聞"), "白天地圖按鈕不含見聞提示文字")
+		await _enter(tree, "sanquan")
+		var align_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_align::sanquan")
+		assert_eq(align_btns.size(), 1, "常態面板中找到 night_align::sanquan 按鈕")
+		if not align_btns.is_empty():
+			assert_true((align_btns[0] as Control).is_visible_in_tree(), "night_align::sanquan 按鈕可見")
+			assert_eq((align_btns[0] as Button).text, "把兩邊對起來", "按鈕文字為『把兩邊對起來』")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["map_no_align_hint", "align_button_visible_after_beats"] } }
+
+	func _p3e_02(tree: SceneTree) -> Dictionary:
+		var snap_before := JSON.stringify(_state(tree))
+		await _enter(tree, "oldstreet")
+		var align_oldstreet := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_align::oldstreet")
+		assert_true(align_oldstreet.is_empty() or not (align_oldstreet[0] as Control).is_visible_in_tree(), "錯誤地點 oldstreet 無對位按鈕")
+		await _close(tree)
+
+		await _enter(tree, "temple")
+		var align_temple := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_align::temple")
+		assert_true(align_temple.is_empty() or not (align_temple[0] as Control).is_visible_in_tree(), "錯誤地點 temple 無對位按鈕")
+		await _close(tree)
+
+		var snap_after := JSON.stringify(_state(tree))
+		assert_eq(snap_after, snap_before, "打開錯誤白天地點後完整 serialize 狀態逐字不變")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["wrong_locations_no_align_button", "wrong_locations_state_unchanged"] } }
+
+	func _p3e_03(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		var snap_before := JSON.stringify(_state(tree))
+		await _click(tree, "night_align::sanquan")
+		var cancel_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "dialog_cancel::night_align")
+		assert_eq(cancel_btns.size(), 1, "彈出對話框中找到 dialog_cancel::night_align 取消按鈕")
+		if not cancel_btns.is_empty():
+			await _click(tree, "dialog_cancel::night_align")
+		var snap_after := JSON.stringify(_state(tree))
+		assert_eq(snap_after, snap_before, "開啟彈窗並取消後完整 serialize 狀態逐字不變")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["align_dialog_opened", "align_cancel_state_unchanged"] } }
+
+	func _p3e_04(tree: SceneTree) -> Dictionary:
+		var k_before: Dictionary = _meta(tree).get("knowledge", {}) as Dictionary
+		var k_count_before := k_before.size()
+		await _enter(tree, "sanquan")
+		await _click(tree, "night_align::sanquan")
+		await _click(tree, "dialog_confirm::night_align")
+
+		var k_after: Dictionary = _meta(tree).get("knowledge", {}) as Dictionary
+		assert_eq(k_after.size(), k_count_before + 1, "knowledge 恰好增加一張")
+		assert_true(k_after.has("k_night_sanquan"), "獲得正確對位知識卡 k_night_sanquan")
+		assert_false(bool(_run(tree).get("action_spent", true)), "對位後 action_spent 仍為 false")
+
+		var align_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_align::sanquan")
+		assert_true(align_btns.is_empty() or not (align_btns[0] as Control).is_visible_in_tree(), "確認對位後 night_align::sanquan 按鈕消失")
+		await _close(tree)
+
+		# 點開知識詳情核驗卡片內容
+		await _click(tree, "knowledge_entry")
+		var k_labels := tree.get_root().find_children("*", "Label", true, false)
+		var found_k_text := false
+		for lbl in k_labels:
+			if (lbl as Label).text.contains("山泉閣") or (lbl as Label).text.contains("石階"):
+				found_k_text = true
+				break
+		assert_true(found_k_text, "知識詳情彈窗中可讀到新獲得之知識卡")
+		await _click(tree, "dialog_confirm::card_detail")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["knowledge_gained_one", "action_not_spent", "align_button_vanished", "knowledge_detail_readable"] } }
+
+	func _p3e_05(tree: SceneTree, main_node: Control) -> Dictionary:
+		# 1. 白天對位 temple (多對一)
+		await _enter(tree, "temple")
+		await _click(tree, "night_align::temple")
+		await _click(tree, "dialog_confirm::night_align")
+		await _close(tree)
+
+		var know: Dictionary = _meta(tree).get("knowledge", {}) as Dictionary
+		assert_true(know.has("k_night_temple"), "白天對位獲得共用 k_night_temple")
+
+		# 2. 轉入夜間
+		var gs: Node = CaseBaseClass.get_game_state(tree)
+		gs.set("phase", "night")
+		main_node.call("_route_view")
+
+		# 3. 檢查第一個 row (n_woodtags) 為 [已對位]
+		var btns_wood := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_woodtags")
+		if not btns_wood.is_empty():
+			assert_true((btns_wood[0] as Button).text.contains("[已對位]"), "第一個 row n_woodtags 顯示 [已對位]")
+			assert_true((btns_wood[0] as Button).text.contains("廟＋廟埕・數木牌的屋子"), "第一個 row 顯示白天名・夜間名")
+
+		# 4. 檢查第二個 row (n_music) 仍為 [尚未到訪]
+		var btns_music := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_music")
+		if not btns_music.is_empty():
+			assert_true((btns_music[0] as Button).text.contains("[尚未到訪]"), "第二個 row n_music 仍為 [尚未到訪]")
+			assert_false((btns_music[0] as Button).text.contains("廟＋廟埕"), "第二個 row 未劇透白天地點名")
+
+		# 5. 首次進入第二個 row n_music
+		await _enter(tree, "n_music")
+		await _close(tree)
+
+		# 6. 回到夜間地圖，第二個 row 自動顯示 [已對位] 且無第二次確認
+		var btns_music_after := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_music")
+		if not btns_music_after.is_empty():
+			assert_true((btns_music_after[0] as Button).text.contains("[已對位]"), "第二個 row 到訪後自動顯示 [已對位]")
+			assert_true((btns_music_after[0] as Button).text.contains("廟＋廟埕・有音樂的地方"), "第二個 row 自動顯示白天名・夜間名")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["multi_row_first_aligned", "multi_row_second_unseen", "multi_row_second_auto_aligned"] } }
+

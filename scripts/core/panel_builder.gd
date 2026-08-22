@@ -191,6 +191,63 @@ static func location_summary(location_id: String, gs: Node, data: Node) -> Dicti
 	}
 
 
+## 計算白天地點是否可對位（P3-E）。
+## 回傳：{ "available": bool, "knowledge_id": String, "night_ids": Array[String] }
+## 1. 必須在 morning / afternoon 時段
+## 2. day_location_id 必須存在且 layer != "night"
+## 3. 找出所有 day_counterpart == day_location_id 的夜間 row，且至少有一個已被 gs.night_locations_seen 記錄
+## 4. 所有已到訪 row 必須具備相同的 non-empty night_reveal 卡片 ID；若衝突或遺失則 push_error 並回傳 available: false
+## 5. 玩家尚未持有該 knowledge_id（gs.knowledge 中不存在）
+## 通過以上所有檢查時 available: true
+static func alignment_offer(day_location_id: String, gs: Node, data: Node) -> Dictionary:
+	var loader: DataLoader = data.get("loader") as DataLoader if data != null else null
+	if loader == null or not loader.locations.has(day_location_id):
+		return { "available": false, "knowledge_id": "", "night_ids": [] }
+
+	var day_loc: Dictionary = loader.locations[day_location_id] as Dictionary
+	if str(day_loc.get("layer", "")) == "night":
+		return { "available": false, "knowledge_id": "", "night_ids": [] }
+
+	var current_phase: String = str(gs.get("phase")) if gs != null else ""
+	if current_phase != "morning" and current_phase != "afternoon":
+		return { "available": false, "knowledge_id": "", "night_ids": [] }
+
+	var seen_dict: Dictionary = gs.get("night_locations_seen") as Dictionary if gs != null and gs.get("night_locations_seen") is Dictionary else {}
+	var seen_night_ids: Array[String] = []
+	var reveals: Array[String] = []
+
+	for lid: String in loader.locations:
+		var loc: Dictionary = loader.locations[lid] as Dictionary
+		if str(loc.get("layer", "")) == "night" and str(loc.get("day_counterpart", "")) == day_location_id:
+			if seen_dict.has(lid):
+				seen_night_ids.append(lid)
+				var rev_val: Variant = loc.get("night_reveal")
+				if rev_val != null and not str(rev_val).is_empty():
+					var rev_str := str(rev_val)
+					if not reveals.has(rev_str):
+						reveals.append(rev_str)
+				else:
+					reveals.append("")
+
+	if seen_night_ids.is_empty():
+		return { "available": false, "knowledge_id": "", "night_ids": [] }
+
+	if reveals.size() != 1 or reveals[0].is_empty():
+		push_error("alignment_offer: data conflict or missing night_reveal for day location '%s'" % day_location_id)
+		return { "available": false, "knowledge_id": "", "night_ids": [] }
+
+	var knowledge_id := reveals[0]
+	var knowledge_dict: Dictionary = gs.get("knowledge") as Dictionary if gs != null and gs.get("knowledge") is Dictionary else {}
+	if knowledge_dict.has(knowledge_id):
+		return { "available": false, "knowledge_id": knowledge_id, "night_ids": seen_night_ids }
+
+	return {
+		"available": true,
+		"knowledge_id": knowledge_id,
+		"night_ids": seen_night_ids,
+	}
+
+
 ## 計算一個地點面板的 view model。
 ## 回傳：{ "beats": [ { "beat": Dictionary, "tri": TriState, "reason": String,
 ##                      "slots": [ { "slot": Dictionary, "tri": TriState, "reason": String, "is_choice": bool } ] } ] }

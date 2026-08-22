@@ -48,6 +48,8 @@ const _NIGHT_REJECT_TEXTS := {
 @onready var _back_btn: Button = $BackButton
 @onready var _advance_beat_btn: Button = $AdvanceBeatButton
 @onready var _night_enter_btn: Button = $NightEnterButton
+@onready var _night_align_btn: Button = $NightAlignButton
+@onready var _night_align_dialog: ConfirmationDialog = $NightAlignConfirmDialog
 @onready var _location_title: Label = $LocationTitle
 @onready var _description_label: Label = $DescriptionLabel
 @onready var _status_label: Label = Label.new()
@@ -69,6 +71,10 @@ func _ready() -> void:
 	_back_btn.pressed.connect(func(): closed.emit())
 	_advance_beat_btn.pressed.connect(_on_advance_beat_pressed)
 	_night_enter_btn.pressed.connect(_on_night_enter_pressed)
+	_night_align_btn.pressed.connect(_on_night_align_pressed)
+	_night_align_dialog.confirmed.connect(_on_night_align_confirmed)
+	_night_align_dialog.get_ok_button().set_meta("qa_id", "dialog_confirm::night_align")
+	_night_align_dialog.get_cancel_button().set_meta("qa_id", "dialog_cancel::night_align")
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_status_label)
 	move_child(_status_label, _back_btn.get_index() + 1)
@@ -80,6 +86,7 @@ func _ready() -> void:
 func show_location(location_id: String, extra_lines: PackedStringArray = PackedStringArray()) -> void:
 	_current_location = location_id
 	_night_enter_btn.visible = false
+	_night_align_btn.visible = false
 	_status_label.text = "\n".join(extra_lines) if not extra_lines.is_empty() else ""
 	_status_label.visible = not extra_lines.is_empty()
 	_pending_beat_ids.clear()
@@ -101,6 +108,7 @@ func show_night_details(location_id: String) -> void:
 	_current_played = false
 	_is_playing = false
 	_advance_beat_btn.visible = false
+	_night_align_btn.visible = false
 	_description_label.visible = false
 	_status_label.visible = false
 	_status_label.text = ""
@@ -155,6 +163,17 @@ func _on_night_enter_pressed() -> void:
 		night_entry_requested.emit(_current_location)
 
 
+func _on_night_align_pressed() -> void:
+	_night_align_dialog.popup_centered()
+
+
+func _on_night_align_confirmed() -> void:
+	var result: Dictionary = GameState.confirm_night_alignment(_current_location)
+	if result.get("ok", false):
+		state_changed.emit()
+	_rebuild()
+
+
 func _queue_open_beats() -> void:
 	var view: Dictionary = GameState.build_panel(_current_location)
 	for beat_view: Dictionary in view.get("beats", []) as Array:
@@ -186,6 +205,7 @@ func _on_advance_beat_pressed() -> void:
 
 func _rebuild() -> void:
 	_night_enter_btn.visible = false
+	_night_align_btn.visible = false
 	for child in _beat_container.get_children():
 		child.queue_free()
 
@@ -213,6 +233,14 @@ func _rebuild() -> void:
 	_description_label.visible = not description.is_empty()
 	for beat_view: Dictionary in view.get("beats", []) as Array:
 		_render_beat(beat_view, PackedStringArray(), true)
+
+	var offer: Dictionary = PanelBuilder.alignment_offer(_current_location, GameState, Data)
+	if bool(offer.get("available", false)):
+		_night_align_btn.visible = true
+		_night_align_btn.text = "把兩邊對起來"
+		_night_align_btn.set_meta("qa_id", "night_align::" + _current_location)
+	else:
+		_night_align_btn.visible = false
 
 
 func _find_beat(view: Dictionary, beat_id: String) -> Dictionary:
