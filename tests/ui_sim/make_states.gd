@@ -63,6 +63,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 		"d43_morning": { "day": 43, "phase": "morning" },
 		"d8_evening": { "day": 8, "phase": "evening" },
 		"d13_evening": { "day": 13, "phase": "evening" },
+		"d33_night": { "day": 33, "phase": "night" },
 		"p3a_night_baseline": { "day": 14, "phase": "night" },
 	}
 
@@ -265,6 +266,51 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	for i in range(near_cap_count):
 		gs_p2d.gain_card("madness")
 	if not _write_p2b_state(output_dir, "p2d_near_cap", gs_p2d.serialize(), data_node):
+		return false
+
+	# 產生 P3-D 夜間地點清單與詳情 UI 驗收情境。
+	# 起點皆為 D14 night 狀態（p3a_night_baseline 或 d10_night），以規則層入口加工。
+	var d14n_dict: Dictionary = _load_state(output_dir, "p3a_night_baseline.json")
+	if d14n_dict.is_empty():
+		d14n_dict = _load_state(output_dir, "d10_night.json")
+	if d14n_dict.is_empty():
+		printerr("P3-D 情境的來源 checkpoint (d14_night) 讀取失敗")
+		return false
+
+	var gs_p3d: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+
+	# ① p3d_seen_unaligned: 已到訪未對位（enter_night_location("n_exit")，seen 但 knowledge 缺 k_night_sanquan）
+	_reset_state(gs_p3d)
+	gs_p3d.deserialize(d14n_dict)
+	gs_p3d.enter_night_location("n_exit")
+	gs_p3d.set("night_location_chosen", "")
+	if not _write_p2b_state(output_dir, "p3d_seen_unaligned", gs_p3d.serialize(), data_node):
+		return false
+
+	# ② p3d_seen_nightonly: 已到訪夜間限定（enter_night_location("n_landmark")，seen 且無 day_counterpart）
+	_reset_state(gs_p3d)
+	gs_p3d.deserialize(d14n_dict)
+	gs_p3d.enter_night_location("n_landmark")
+	gs_p3d.set("night_location_chosen", "")
+	if not _write_p2b_state(output_dir, "p3d_seen_nightonly", gs_p3d.serialize(), data_node):
+		return false
+
+	# ③ p3d_aligned_1to1: 已對位一對一（enter_night_location("n_exit") + gain_card("k_night_sanquan")）
+	_reset_state(gs_p3d)
+	gs_p3d.deserialize(d14n_dict)
+	gs_p3d.enter_night_location("n_exit")
+	gs_p3d.gain_card("k_night_sanquan")
+	gs_p3d.set("night_location_chosen", "")
+	if not _write_p2b_state(output_dir, "p3d_aligned_1to1", gs_p3d.serialize(), data_node):
+		return false
+
+	# ④ p3d_aligned_multi: 已對位多對一（enter_night_location("n_corridor") + gain_card("k_night_jinghe_back")）
+	_reset_state(gs_p3d)
+	gs_p3d.deserialize(d14n_dict)
+	gs_p3d.enter_night_location("n_corridor")
+	gs_p3d.gain_card("k_night_jinghe_back")
+	gs_p3d.set("night_location_chosen", "")
+	if not _write_p2b_state(output_dir, "p3d_aligned_multi", gs_p3d.serialize(), data_node):
 		return false
 
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
@@ -592,6 +638,20 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			return day == 8 and phase == "evening"
 		"d13_evening":
 			return day == 13 and phase == "evening"
+		"d33_night":
+			return day == 33 and phase == "night"
+		"p3d_seen_unaligned":
+			var seen_unaligned: Dictionary = _state_meta(snapshot).get("night_locations_seen", {}) as Dictionary
+			return day == 14 and phase == "night" and seen_unaligned.has("n_exit") and not _state_knowledge(snapshot).has("k_night_sanquan")
+		"p3d_seen_nightonly":
+			var seen_nightonly: Dictionary = _state_meta(snapshot).get("night_locations_seen", {}) as Dictionary
+			return day == 14 and phase == "night" and seen_nightonly.has("n_landmark")
+		"p3d_aligned_1to1":
+			var seen_1to1: Dictionary = _state_meta(snapshot).get("night_locations_seen", {}) as Dictionary
+			return day == 14 and phase == "night" and seen_1to1.has("n_exit") and _state_knowledge(snapshot).has("k_night_sanquan")
+		"p3d_aligned_multi":
+			var seen_multi: Dictionary = _state_meta(snapshot).get("night_locations_seen", {}) as Dictionary
+			return day == 14 and phase == "night" and seen_multi.has("n_corridor") and _state_knowledge(snapshot).has("k_night_jinghe_back")
 		"p3a_night_baseline":
 			if day != 14:
 				printerr("p3a_night_baseline 後置條件失敗：預期 day == 14，實際 %d" % day)
@@ -731,3 +791,6 @@ static func _reset_state(gs: Node) -> void:
 
 static func _state_knowledge(snapshot: Dictionary) -> Dictionary:
 	return (snapshot.get("meta", {}) as Dictionary).get("knowledge", {}) as Dictionary
+
+static func _state_meta(snapshot: Dictionary) -> Dictionary:
+	return snapshot.get("meta", {}) as Dictionary

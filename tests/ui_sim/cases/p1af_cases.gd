@@ -77,6 +77,16 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p2d_01_vision_zero", "手上 2 張發狂卡時二樓有人在走完全不出現", "p2d_d24_two_cards.json", "", "p2d_01_vision_visibility", "", "p2d_01_zero"),
 		UiCase.new("p2d_01_vision_three", "手上 3 張發狂卡時二樓有人在走正確出現", "p2d_d24_three_cards.json", "", "p2d_01_vision_visibility", "", "p2d_01_three"),
 		UiCase.new("p2d_02_be_screen", "發狂卡達到 cap 時立即觸發發瘋 BE 且畫面呈現 [發瘋 BE] 並收起地圖與面板", "p2d_near_cap.json", "", "p2d_02_be_screen", "", "p2d_02"),
+		UiCase.new("p3d_01_status_unaligned", "已到訪未對位地點顯示引子名與 [已到訪，尚未對位]", "p3d_seen_unaligned.json", "", "p3d_01_night_status_texts", "", "p3d_01_unaligned"),
+		UiCase.new("p3d_01_status_nightonly", "已到訪夜間限定地點顯示 [已到訪] 且無尚未對位", "p3d_seen_nightonly.json", "", "p3d_01_night_status_texts", "", "p3d_01_nightonly"),
+		UiCase.new("p3d_01_status_no_number", "未到訪收費與免費地點狀態文字均不含數字與免費字樣", "p3a_night_baseline.json", "", "p3d_01_night_status_texts", "", "p3d_01_no_number"),
+		UiCase.new("p3d_02_aligned_1to1", "已對位一對一地點顯示白天地點名與 [已對位]", "p3d_aligned_1to1.json", "", "p3d_02_night_aligned_names", "", "p3d_02_1to1"),
+		UiCase.new("p3d_02_aligned_multi", "已對位多對一地點顯示白天名・引子名與 [已對位]", "p3d_aligned_multi.json", "", "p3d_02_night_aligned_names", "", "p3d_02_multi"),
+		UiCase.new("p3d_03_gated_ahong", "門檻未滿足之阿宏地點詳情顯示具體理由且進入按鈕 disabled 點擊零變化", "p3a_night_baseline.json", "", "p3d_03_night_detail_gated", "", "p3d_03_ahong"),
+		UiCase.new("p3d_03_gated_teaser", "第三章 teaser-only 地點顯示理由且無成功進入路徑", "d33_night.json", "", "p3d_03_night_detail_gated", "", "p3d_03_teaser"),
+		UiCase.new("p3d_04_near_cap_warning", "近 cap 狀態下收費地點詳情顯示無數字風險警告且免費地點無警告", "p2d_near_cap.json", "", "p3d_04_night_risk_warning", "", "p3d_04_warning"),
+		UiCase.new("p3d_05_sleep_pending", "直接睡停拍期間全部夜間進入按鈕 disabled 且點擊狀態零變化", "p2d_d24_three_cards.json", "", "p3d_05_sleep_pending_disabled", "", "p3d_05_sleep"),
+		UiCase.new("p3d_06_geometry", "夜間清單與詳情面板於 1280x720 幾何無重疊裁切溢出且長名稱可讀", "d33_night.json", "long_night_name", "p3d_06_night_list_geometry", "", "p3d_06_geo"),
 	]
 
 
@@ -197,6 +207,26 @@ class UiCase extends CaseBaseClass:
 				return await _p2d_01_three(tree)
 			"p2d_02":
 				return await _p2d_02(tree)
+			"p3d_01_unaligned":
+				return await _p3d_01_unaligned(tree)
+			"p3d_01_nightonly":
+				return await _p3d_01_nightonly(tree)
+			"p3d_01_no_number":
+				return await _p3d_01_no_number(tree)
+			"p3d_02_1to1":
+				return await _p3d_02_1to1(tree)
+			"p3d_02_multi":
+				return await _p3d_02_multi(tree)
+			"p3d_03_ahong":
+				return await _p3d_03_ahong(tree)
+			"p3d_03_teaser":
+				return await _p3d_03_teaser(tree)
+			"p3d_04_warning":
+				return await _p3d_04_warning(tree)
+			"p3d_05_sleep":
+				return await _p3d_05_sleep(tree)
+			"p3d_06_geo":
+				return await _p3d_06_geo(tree, main_node, run_dir)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -1312,3 +1342,193 @@ class UiCase extends CaseBaseClass:
 		assert_true(first_round_done, "完整走查必須走完第一輪並回到第二輪")
 		assert_true(second_round_arrival, "完整走查必須抵達第二輪第一天 evening")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "iterations": safety, "final_state": _state(tree), "evidence": ["full_walk_d45", "first_round_reset", "second_round_arrival", "second_round_protagonist_exactly_one"] } }
+
+	func _has_digits(s: String) -> bool:
+		for ch in s:
+			if ch >= "0" and ch <= "9":
+				return true
+		return false
+
+	func _p3d_01_unaligned(tree: SceneTree) -> Dictionary:
+		var btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_exit")
+		assert_eq(btns.size(), 1, "地圖清單中找到 location::n_exit 按鈕")
+		if not btns.is_empty():
+			assert_true((btns[0] as Button).text.contains("[已到訪，尚未對位]"), "未對位地點按鈕文字包含 [已到訪，尚未對位]")
+		await _click(tree, "location::n_exit")
+		var status_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_exit")
+		assert_eq(status_nodes.size(), 1, "詳情面板中找到 night_status::n_exit 節點")
+		if not status_nodes.is_empty():
+			assert_eq((status_nodes[0] as Label).text, "[已到訪，尚未對位]", "詳情狀態文字為 [已到訪，尚未對位]")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["status_seen_unaligned"] } }
+
+	func _p3d_01_nightonly(tree: SceneTree) -> Dictionary:
+		var btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_landmark")
+		assert_eq(btns.size(), 1, "地圖清單中找到 location::n_landmark 按鈕")
+		if not btns.is_empty():
+			assert_true((btns[0] as Button).text.contains("[已到訪]"), "夜間限定地點按鈕文字包含 [已到訪]")
+			assert_false((btns[0] as Button).text.contains("尚未對位"), "夜間限定地點按鈕文字不含『尚未對位』")
+		await _click(tree, "location::n_landmark")
+		var status_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_landmark")
+		assert_eq(status_nodes.size(), 1, "詳情面板中找到 night_status::n_landmark 節點")
+		if not status_nodes.is_empty():
+			assert_eq((status_nodes[0] as Label).text, "[已到訪]", "詳情狀態文字為 [已到訪]")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["status_seen_nightonly"] } }
+
+	func _p3d_01_no_number(tree: SceneTree) -> Dictionary:
+		var btn_paid_arr := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_ahong_1")
+		assert_eq(btn_paid_arr.size(), 1, "地圖清單中找到 location::n_ahong_1 按鈕")
+		if not btn_paid_arr.is_empty():
+			var btn_paid: Button = btn_paid_arr[0] as Button
+			assert_true(btn_paid.text.contains("[尚未到訪]"), "收費地點按鈕包含 [尚未到訪]")
+			assert_false(_has_digits(btn_paid.text), "收費地點按鈕文字不含數字")
+			assert_false(btn_paid.text.contains("免費"), "收費地點按鈕文字不含『免費』")
+		var btn_free_arr := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_woodtags")
+		assert_eq(btn_free_arr.size(), 1, "地圖清單中找到 location::n_woodtags 按鈕")
+		if not btn_free_arr.is_empty():
+			var btn_free: Button = btn_free_arr[0] as Button
+			assert_true(btn_free.text.contains("[尚未到訪]"), "免費地點按鈕包含 [尚未到訪]")
+			assert_false(_has_digits(btn_free.text), "免費地點按鈕文字不含數字")
+			assert_false(btn_free.text.contains("免費"), "免費地點按鈕文字不含『免費』")
+		await _click(tree, "location::n_ahong_1")
+		var status_paid := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_ahong_1")
+		if not status_paid.is_empty():
+			assert_eq((status_paid[0] as Label).text, "[尚未到訪]", "收費地點詳情狀態文字為 [尚未到訪]")
+			assert_false(_has_digits((status_paid[0] as Label).text), "收費地點詳情狀態文字不含數字")
+		await _close(tree)
+		await _click(tree, "location::n_woodtags")
+		var status_free := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_woodtags")
+		if not status_free.is_empty():
+			assert_eq((status_free[0] as Label).text, "[尚未到訪]", "免費地點詳情狀態文字為 [尚未到訪]")
+			assert_false(_has_digits((status_free[0] as Label).text), "免費地點詳情狀態文字不含數字")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["status_no_number"] } }
+
+	func _p3d_02_1to1(tree: SceneTree) -> Dictionary:
+		var btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_exit")
+		assert_eq(btns.size(), 1, "地圖清單中找到 location::n_exit 按鈕")
+		if not btns.is_empty():
+			var btn: Button = btns[0] as Button
+			assert_true(btn.text.contains("山泉閣"), "一對一對位按鈕包含白天地點名『山泉閣』")
+			assert_true(btn.text.contains("[已對位]"), "一對一對位按鈕包含 [已對位]")
+			assert_false(btn.text.contains("・"), "一對一對位按鈕不含中圓點")
+		await _click(tree, "location::n_exit")
+		var status_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_exit")
+		if not status_nodes.is_empty():
+			assert_eq((status_nodes[0] as Label).text, "[已對位]", "一對一詳情狀態為 [已對位]")
+		var title_node := tree.get_root().find_child("LocationTitle", true, false) as Label
+		if title_node != null:
+			assert_true(title_node.text.contains("山泉閣"), "一對一詳情標題包含白天地點名『山泉閣』")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["aligned_one_to_one_name"] } }
+
+	func _p3d_02_multi(tree: SceneTree) -> Dictionary:
+		var btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_corridor")
+		assert_eq(btns.size(), 1, "地圖清單中找到 location::n_corridor 按鈕")
+		if not btns.is_empty():
+			var btn: Button = btns[0] as Button
+			assert_true(btn.text.contains("靜和園後棟・很長的走廊"), "多對一對位按鈕包含『靜和園後棟・很長的走廊』")
+			assert_true(btn.text.contains("[已對位]"), "多對一對位按鈕包含 [已對位]")
+		await _click(tree, "location::n_corridor")
+		var status_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_corridor")
+		if not status_nodes.is_empty():
+			assert_eq((status_nodes[0] as Label).text, "[已對位]", "多對一詳情狀態為 [已對位]")
+		var title_node := tree.get_root().find_child("LocationTitle", true, false) as Label
+		if title_node != null:
+			assert_true(title_node.text.contains("靜和園後棟・很長的走廊"), "多對一詳情標題包含『靜和園後棟・很長的走廊』")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["aligned_multi_name"] } }
+
+	func _p3d_03_ahong(tree: SceneTree) -> Dictionary:
+		await _click(tree, "location::n_ahong_2")
+		var reason_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_reason::n_ahong_2")
+		assert_eq(reason_nodes.size(), 1, "詳情面板中找到 night_reason::n_ahong_2 節點")
+		if not reason_nodes.is_empty():
+			assert_true(reason_nodes[0].is_visible_in_tree(), "理由節點可見")
+			assert_eq((reason_nodes[0] as Label).text, "你還沒跟完上一段痕跡。", "門檻理由為『你還沒跟完上一段痕跡。』")
+		var enter_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_ahong_2")
+		assert_eq(enter_nodes.size(), 1, "詳情面板中找到 night_enter::n_ahong_2 節點")
+		if not enter_nodes.is_empty():
+			assert_true((enter_nodes[0] as Button).disabled, "進入按鈕為 disabled")
+		var s_before: Dictionary = _state(tree)
+		await QAStepClass.click(tree, "night_enter::n_ahong_2", MOUSE_BUTTON_LEFT, true)
+		var s_after: Dictionary = _state(tree)
+		assert_eq(JSON.stringify(s_after), JSON.stringify(s_before), "點擊 disabled 進入按鈕狀態零變化")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["gated_ahong_reason_disabled"] } }
+
+	func _p3d_03_teaser(tree: SceneTree) -> Dictionary:
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_corridor_end"), "第三章夜間地圖顯示 teaser location::n_corridor_end")
+		await _click(tree, "location::n_corridor_end")
+		var reason_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_reason::n_corridor_end")
+		assert_eq(reason_nodes.size(), 1, "詳情面板中找到 night_reason::n_corridor_end 節點")
+		if not reason_nodes.is_empty():
+			assert_true(reason_nodes[0].is_visible_in_tree(), "teaser 理由節點可見")
+			assert_eq((reason_nodes[0] as Label).text, "還沒有走到那裡。", "teaser 理由為『還沒有走到那裡。』")
+		var enter_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_corridor_end")
+		assert_eq(enter_nodes.size(), 1, "詳情面板中找到 night_enter::n_corridor_end 節點")
+		if not enter_nodes.is_empty():
+			assert_true((enter_nodes[0] as Button).disabled, "teaser 進入按鈕為 disabled")
+		var s_before: Dictionary = _state(tree)
+		await QAStepClass.click(tree, "night_enter::n_corridor_end", MOUSE_BUTTON_LEFT, true)
+		var s_after: Dictionary = _state(tree)
+		assert_eq(JSON.stringify(s_after), JSON.stringify(s_before), "teaser 地點點擊進入按鈕狀態零變化")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["gated_teaser_no_entry"] } }
+
+	func _p3d_04_warning(tree: SceneTree) -> Dictionary:
+		await _click(tree, "location::n_ahong_1")
+		var warn_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_warning::n_ahong_1")
+		assert_eq(warn_nodes.size(), 1, "詳情面板中找到 night_warning::n_ahong_1 節點")
+		if not warn_nodes.is_empty():
+			assert_true(warn_nodes[0].is_visible_in_tree(), "近 cap 收費地點顯示風險警告")
+			assert_eq((warn_nodes[0] as Label).text, "再往前，你可能回不來。", "風險警告文字為『再往前，你可能回不來。』")
+			assert_false(_has_digits((warn_nodes[0] as Label).text), "風險警告文字不含數字")
+		await _close(tree)
+		await _click(tree, "location::n_landmark")
+		var free_warns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_warning::n_landmark")
+		var free_warn_visible := false
+		if not free_warns.is_empty():
+			free_warn_visible = free_warns[0].is_visible_in_tree() and not (free_warns[0] as Label).text.is_empty()
+		assert_false(free_warn_visible, "免費地點詳情面板不顯示風險警告")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["warning_shown_no_number", "warning_absent_on_free"] } }
+
+	func _p3d_05_sleep(tree: SceneTree) -> Dictionary:
+		await _advance(tree)
+		assert_true(bool(_run(tree).get("night_sleep_pending", false)), "第 1 次推進進入 night_sleep_pending 停拍")
+		await _click(tree, "location::n_landmark")
+		var enter1 := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_landmark")
+		assert_eq(enter1.size(), 1, "找到 n_landmark 進入按鈕")
+		if not enter1.is_empty():
+			assert_true((enter1[0] as Button).disabled, "停拍期間 n_landmark 進入按鈕為 disabled")
+		var s_b1: Dictionary = _state(tree)
+		await QAStepClass.click(tree, "night_enter::n_landmark", MOUSE_BUTTON_LEFT, true)
+		var s_a1: Dictionary = _state(tree)
+		assert_eq(JSON.stringify(s_a1), JSON.stringify(s_b1), "停拍期間點擊 n_landmark 進入按鈕狀態零變化")
+		await _close(tree)
+		await _click(tree, "location::n_ahong_1")
+		var enter2 := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_ahong_1")
+		assert_eq(enter2.size(), 1, "找到 n_ahong_1 進入按鈕")
+		if not enter2.is_empty():
+			assert_true((enter2[0] as Button).disabled, "停拍期間 n_ahong_1 進入按鈕為 disabled")
+		var s_b2: Dictionary = _state(tree)
+		await QAStepClass.click(tree, "night_enter::n_ahong_1", MOUSE_BUTTON_LEFT, true)
+		var s_a2: Dictionary = _state(tree)
+		assert_eq(JSON.stringify(s_a2), JSON.stringify(s_b2), "停拍期間點擊 n_ahong_1 進入按鈕狀態零變化")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["sleep_pending_all_disabled", "sleep_pending_click_noop"] } }
+
+	func _p3d_06_geo(tree: SceneTree, main_node: Control, run_dir: String) -> Dictionary:
+		var cap_map := await QADiagnosticsClass.capture_interim_state(tree, main_node, run_dir, id, "night_list_map")
+		assert_true(bool(cap_map.get("ok", false)), "夜間清單幾何診斷擷取成功")
+		var geo_map: Dictionary = cap_map.get("geometry", {})
+		assert_true(bool(geo_map.get("ok", false)), "夜間清單畫面幾何診斷通過: %s" % JSON.stringify(geo_map))
+		await _click(tree, "location::n_corridor")
+		var cap_panel := await QADiagnosticsClass.capture_interim_state(tree, main_node, run_dir, id, "night_detail_panel")
+		assert_true(bool(cap_panel.get("ok", false)), "夜間詳情面板幾何診斷擷取成功")
+		var geo_panel: Dictionary = cap_panel.get("geometry", {})
+		assert_true(bool(geo_panel.get("ok", false)), "夜間詳情面板畫面幾何診斷通過: %s" % JSON.stringify(geo_panel))
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["night_list_geometry_clean"] } }

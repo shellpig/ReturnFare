@@ -429,6 +429,17 @@ foreach ($c in @($longCardData.cards)) {
 }
 $longCardData | ConvertTo-Json -Depth 30 | Set-Content -Path $longCardCardsPath -Encoding utf8
 
+$longNightNameData = Join-Path $dataVariantsDir "long_night_name"
+Copy-Item -Path $dataSource -Destination $longNightNameData -Recurse -Force
+$longNightLocationsPath = Join-Path $longNightNameData "locations.json"
+$longNightData = Get-Content -Path $longNightLocationsPath -Raw -Encoding utf8 | ConvertFrom-Json
+foreach ($loc in @($longNightData.night)) {
+    if ([string]$loc.id -eq "n_corridor") {
+        $loc.name = "這是一個非常非常長必定會測試自動換行與捲動邊界的夜間走廊地點名稱"
+    }
+}
+$longNightData | ConvertTo-Json -Depth 30 | Set-Content -Path $longNightLocationsPath -Encoding utf8
+
 $manifestPath = Join-Path $runDir "case-manifest.json"
 $manifestLog = Join-Path $runDir "case-manifest.log"
 $manifestArgs = @(
@@ -459,7 +470,7 @@ $catalogContractCount = $matrixContractIds.Count
 $actualCatalogIds = @($allCaseDefs | ForEach-Object { [string]$_.contract_id } | Sort-Object -Unique)
 $missingCatalogIds = @($matrixContractIds | Where-Object { $_ -notin $actualCatalogIds })
 $unexpectedCatalogIds = @($actualCatalogIds | Where-Object { $_ -notin $matrixContractIds })
-if ($catalogContractCount -ne 63 -or $missingCatalogIds.Count -gt 0 -or $unexpectedCatalogIds.Count -gt 0) {
+if ($catalogContractCount -ne 69 -or $missingCatalogIds.Count -gt 0 -or $unexpectedCatalogIds.Count -gt 0) {
     Write-Host "ERROR: Contract matrix/catalog mismatch. matrix=$catalogContractCount missing=$($missingCatalogIds -join ',') unexpected=$($unexpectedCatalogIds -join ',')" -ForegroundColor Red
     exit 1
 }

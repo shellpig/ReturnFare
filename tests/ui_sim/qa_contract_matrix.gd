@@ -26,6 +26,8 @@ const CONTRACT_IDS := [
 	"p2b_04_exit_thresholds",
 	"p2c_01_forced_text", "p2c_02_forced_action_spent", "p2c_03_forced_two_same_day",
 	"p2d_01_vision_visibility", "p2d_02_be_screen",
+	"p3d_01_night_status_texts", "p3d_02_night_aligned_names", "p3d_03_night_detail_gated",
+	"p3d_04_night_risk_warning", "p3d_05_sleep_pending_disabled", "p3d_06_night_list_geometry",
 ]
 
 const SPECIAL_EVIDENCE := {
@@ -63,6 +65,12 @@ const SPECIAL_EVIDENCE := {
 	"p2c_03_forced_two_same_day": ["forced_two_same_day", "forced_day_fully_eaten"],
 	"p2d_01_vision_visibility": ["vision_hidden_at_2", "vision_visible_at_3"],
 	"p2d_02_be_screen": ["be_text_visible", "be_no_coda_stub", "be_map_hidden"],
+	"p3d_01_night_status_texts": ["status_seen_unaligned", "status_seen_nightonly", "status_no_number"],
+	"p3d_02_night_aligned_names": ["aligned_one_to_one_name", "aligned_multi_name"],
+	"p3d_03_night_detail_gated": ["gated_ahong_reason_disabled", "gated_teaser_no_entry"],
+	"p3d_04_night_risk_warning": ["warning_shown_no_number", "warning_absent_on_free"],
+	"p3d_05_sleep_pending_disabled": ["sleep_pending_all_disabled", "sleep_pending_click_noop"],
+	"p3d_06_night_list_geometry": ["night_list_geometry_clean"],
 }
 
 ## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。
@@ -87,6 +95,16 @@ const VARIANT_EVIDENCE := {
 	"p2b_04_lust_relation": ["lust_relation_gate"],
 	"p2d_01_vision_zero": ["vision_hidden_at_2"],
 	"p2d_01_vision_three": ["vision_visible_at_3"],
+	"p3d_01_status_unaligned": ["status_seen_unaligned"],
+	"p3d_01_status_nightonly": ["status_seen_nightonly"],
+	"p3d_01_status_no_number": ["status_no_number"],
+	"p3d_02_aligned_1to1": ["aligned_one_to_one_name"],
+	"p3d_02_aligned_multi": ["aligned_multi_name"],
+	"p3d_03_gated_ahong": ["gated_ahong_reason_disabled"],
+	"p3d_03_gated_teaser": ["gated_teaser_no_entry"],
+	"p3d_04_near_cap_warning": ["warning_shown_no_number", "warning_absent_on_free"],
+	"p3d_05_sleep_pending": ["sleep_pending_all_disabled", "sleep_pending_click_noop"],
+	"p3d_06_geometry": ["night_list_geometry_clean"],
 }
 
 
