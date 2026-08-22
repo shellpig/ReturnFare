@@ -266,6 +266,7 @@ func enter_night_location(location_id: String) -> Dictionary:
 
 	night_location_chosen = location_id
 	var is_first_time: bool = not night_locations_seen.has(location_id)
+	var will_end_run: bool = would_night_entry_end_run(location_id)
 	night_locations_seen[location_id] = true
 
 	var lines := PackedStringArray()
@@ -275,7 +276,7 @@ func enter_night_location(location_id: String) -> Dictionary:
 			for i in range(cost):
 				gain_card("madness", false)
 			_check_madness_cap()
-			if day != 1 or phase == "night":
+			if not will_end_run:
 				lines.append("推開了夜色深處的門。獲得 %d 張發狂卡。" % cost)
 
 	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }

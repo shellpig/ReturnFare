@@ -1,6 +1,6 @@
 extends SceneTree
 
-## P2-A headless 驗收測試：發狂卡的產生、獨立倒數、tick_madness、open_night_marker、一夜一個標記、序列化往返。
+## P2-A headless 驗收測試：發狂卡的產生、獨立倒數、tick_madness、enter_night_location、一夜一個標記、序列化往返。
 ## 跑法：
 ##   Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p2a.gd
 ## 全綠 exit 0；任一失敗 exit 1。

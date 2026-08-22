@@ -2,7 +2,7 @@ extends SceneTree
 
 ## P2-E headless 驗收測試：三種玩家 45 天重演（發狂卡機制模擬驗證）。
 ## 重演 A 深潛、B 典型、C 謹慎三種玩家，逐項對齊 subdocs/驗證/發狂卡機制模擬.md 與 實作規格書.md > P2-E。
-## 走真的規則層入口（open_night_marker, indulge, advance_phase）。
+## 走真的規則層入口（enter_night_location, indulge, advance_phase）。
 ## 跑法：
 ##   Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p2_sim.gd
 ## 全通 exit 0；任一不符 exit 1。
@@ -343,7 +343,7 @@ static func _handle_night_phase(gs: Node, data_node: Node, day: int, strategy: S
 			timeline.append({
 				"day": day,
 				"phase": "night",
-				"action": "open_night_marker",
+				"action": "enter_night_location",
 				"loc": chosen_loc,
 				"hand_after": _count_madness_in_hand(gs),
 			})
@@ -448,30 +448,30 @@ func _verify_player_a(res: Dictionary, data_node: Node) -> int:
 func _verify_timeline_a(timeline: Array) -> int:
 	var failed := 0
 	var expected_timeline := [
-		{ "day": 6, "phase": "night", "action": "open_night_marker", "loc": "n_ahong_1", "hand_after": 1 },
-		{ "day": 7, "phase": "night", "action": "open_night_marker", "loc": "n_source", "hand_after": 2 },
-		{ "day": 8, "phase": "night", "action": "open_night_marker", "loc": "n_manydoors", "hand_after": 3 },
-		{ "day": 11, "phase": "night", "action": "open_night_marker", "loc": "n_ahong_2", "hand_after": 4 },
+		{ "day": 6, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_1", "hand_after": 1 },
+		{ "day": 7, "phase": "night", "action": "enter_night_location", "loc": "n_source", "hand_after": 2 },
+		{ "day": 8, "phase": "night", "action": "enter_night_location", "loc": "n_manydoors", "hand_after": 3 },
+		{ "day": 11, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_2", "hand_after": 4 },
 		{ "day": 13, "phase": "morning", "action": "forced_indulgence", "level": "light", "hand_after": 3 },
 		{ "day": 14, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 2 },
-		{ "day": 14, "phase": "night", "action": "open_night_marker", "loc": "n_plaza", "hand_after": 3 },
+		{ "day": 14, "phase": "night", "action": "enter_night_location", "loc": "n_plaza", "hand_after": 3 },
 		{ "day": 15, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 2 },
-		{ "day": 15, "phase": "night", "action": "open_night_marker", "loc": "n_ahong_3", "hand_after": 3 },
-		{ "day": 17, "phase": "night", "action": "open_night_marker", "loc": "n_litcorridor", "hand_after": 4 },
+		{ "day": 15, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_3", "hand_after": 3 },
+		{ "day": 17, "phase": "night", "action": "enter_night_location", "loc": "n_litcorridor", "hand_after": 4 },
 		{ "day": 18, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 3 },
-		{ "day": 20, "phase": "night", "action": "open_night_marker", "loc": "n_higher", "hand_after": 4 },
+		{ "day": 20, "phase": "night", "action": "enter_night_location", "loc": "n_higher", "hand_after": 4 },
 		{ "day": 21, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 3 },
-		{ "day": 21, "phase": "night", "action": "open_night_marker", "loc": "n_ahong_4", "hand_after": 4 },
+		{ "day": 21, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_4", "hand_after": 4 },
 		{ "day": 22, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 3 },
 		{ "day": 24, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 2 },
 		{ "day": 27, "phase": "morning", "action": "forced_indulgence", "level": "heavy", "hand_after": 1 },
 		{ "day": 28, "phase": "morning", "action": "forced_indulgence", "level": "heavy", "hand_after": 0 },
-		{ "day": 28, "phase": "night", "action": "open_night_marker", "loc": "n_ahong_5", "hand_after": 1 },
+		{ "day": 28, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_5", "hand_after": 1 },
 		{ "day": 35, "phase": "morning", "action": "forced_indulgence", "level": "heavy", "hand_after": 0 },
-		{ "day": 37, "phase": "night", "action": "open_night_marker", "loc": "n_steam_below", "hand_after": 1 },
-		{ "day": 38, "phase": "night", "action": "open_night_marker", "loc": "n_ahong_6", "hand_after": 2 },
-		{ "day": 42, "phase": "night", "action": "open_night_marker", "loc": "n_behind_temple", "hand_after": 3 },
-		{ "day": 43, "phase": "night", "action": "open_night_marker", "loc": "n_ahong_7", "hand_after": 4 },
+		{ "day": 37, "phase": "night", "action": "enter_night_location", "loc": "n_steam_below", "hand_after": 1 },
+		{ "day": 38, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_6", "hand_after": 2 },
+		{ "day": 42, "phase": "night", "action": "enter_night_location", "loc": "n_behind_temple", "hand_after": 3 },
+		{ "day": 43, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_7", "hand_after": 4 },
 		{ "day": 44, "phase": "morning", "action": "forced_indulgence", "level": "heavy", "hand_after": 3 },
 		{ "day": 45, "phase": "morning", "action": "forced_indulgence", "level": "heavy", "hand_after": 2 },
 	]

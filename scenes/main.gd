@@ -12,17 +12,6 @@ const _MSG_ADVANCE := "推進時段"
 const _MSG_ADVANCE_HINT := "推進時段（目前無可做動作）"
 const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 
-const NIGHT_REJECT_MESSAGES := {
-	"not_night": "非夜間時段無法進入。",
-	"unknown_location": "未知的地點。",
-	"not_night_layer": "非夜間地點。",
-	"teaser": "此處尚未開放探索。",
-	"too_early": "時候未到。",
-	"locked": "尚未滿足進入條件。",
-	"already_chosen": "今夜已選擇過地點。",
-	"already_slept": "今夜已就寢。",
-}
-
 @onready var _error_label: Label = $ErrorLabel
 @onready var _status_label: Label = $StatusLabel
 @onready var _advance_btn: Button = $AdvanceButton
