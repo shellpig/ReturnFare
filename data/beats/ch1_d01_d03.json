@@ -232,43 +232,13 @@
     },
     {
       "id": "n3_map_opens",
-      "location": "n_queue",
+      "location": "sanquan",
       "when": { "day": 3, "phase": "night" },
-      "fixed": false,
+      "fixed": true,
+      "meta_once": true,
       "title": "地圖打開了",
       "text": "三個沒有名字的標記出現。從這一夜起，開一個新標記，桌面上就會多發狂卡。",
-      "slots": [
-        {
-          "id": "open_queue",
-          "occupant": null,
-          "label": "很多人排隊的地方",
-          "accepts": ["protagonist"],
-          "on_place": {
-            "text": "一排人安靜地緩慢往前。他排到最後面。前面的人一個一個進去，沒有人出來。輪到他時，前面那個人回過頭：「你不用排。」",
-            "madness": 1
-          }
-        },
-        {
-          "id": "open_litwindow",
-          "occupant": null,
-          "label": "亮著的窗",
-          "accepts": ["protagonist"],
-          "on_place": {
-            "text": "一間屋子，一家人在吃飯。他敲窗，他們看不見他。桌上有一個空位，碗筷擺好了。",
-            "madness": 1
-          }
-        },
-        {
-          "id": "open_watersound",
-          "occupant": null,
-          "label": "有水聲的地方",
-          "accepts": ["protagonist"],
-          "on_place": {
-            "text": "河邊。但河是乾的，水聲從地底下傳來。地上有東西排成一列——走近看是鞋子，大小不一，排得很整齊。",
-            "madness": 1
-          }
-        }
-      ],
+      "slots": [],
       "note": "真相：排隊那個是名單，他不用排因為他已經在上面了（第 43 夜這句話會改口）。亮著的窗那家人在等一個沒回來的人。三個標記的價碼先全填 1，見待決 38。"
     }
   ]

@@ -157,9 +157,14 @@ func _test_main_scene_enters_normal_branch() -> int:
 	var loc_panel: Node = main.get_node_or_null("ContentView/LocationPanel")
 	gs.set("day", 1)
 	gs.set("phase", "night")
+	gs.set("night_once_beats_seen", {})
+	gs.set("night_locations_seen", {})
+	gs.set("night_location_chosen", "")
+	gs.set("beats_entered", {})
 	main.call("_route_view")
 	if not flow_text.visible:
 		failed += _fail("Day 1 night route_view FlowText 未顯示")
+	gs.set("night_location_chosen", "")
 	main.call("_on_location_selected", "n_corridor")
 	if flow_text.visible:
 		failed += _fail("開啟地點面板時 FlowText 未被隱藏（疊字 bug）")
@@ -169,12 +174,12 @@ func _test_main_scene_enters_normal_branch() -> int:
 		failed += _ok("開啟地點面板時 FlowText 正確隱藏、LocationPanel 顯示")
 
 	main.call("_on_panel_closed")
-	if not flow_text.visible or not map_list.visible:
-		failed += _fail("關閉地點面板後 FlowText 或 MapList 未恢復顯示")
+	if not map_list.visible:
+		failed += _fail("關閉地點面板後 MapList 未恢復顯示")
 	elif loc_panel.visible:
 		failed += _fail("關閉地點面板後 LocationPanel 未隱藏")
 	else:
-		failed += _ok("關閉地點面板後 FlowText 與 MapList 正確恢復顯示且無重疊")
+		failed += _ok("關閉地點面板後 MapList 正確恢復顯示且 LocationPanel 隱藏")
 
 	# 驗證 K-40: FlowText 為 ScrollContainer 具備 clip_contents，且夜間不蓋住 MapList。
 	# **比的是實際矩形，不是 offset。** 只比 offset 會漏掉錨點落差——FlowText 曾經帶
@@ -182,6 +187,10 @@ func _test_main_scene_enters_normal_branch() -> int:
 	# 「父節點底邊再往下 120」，兩個數字比得過，但整張地圖被蓋住、地點按鈕全部點不到。
 	gs.set("day", 1)
 	gs.set("phase", "night")
+	gs.set("night_once_beats_seen", {})
+	gs.set("night_locations_seen", {})
+	gs.set("night_location_chosen", "")
+	gs.set("beats_entered", {})
 	main.call("_route_view")
 	await process_frame
 	if not (flow_text is ScrollContainer):

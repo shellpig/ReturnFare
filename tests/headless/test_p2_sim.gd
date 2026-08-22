@@ -417,12 +417,12 @@ func _verify_player_a(res: Dictionary, data_node: Node) -> int:
 	else:
 		failed += _fail("A 吃掉行動格數不符: 預期 12, 實際 %d" % eaten)
 
-	# 7. 桌上 >= 3 張天數 19 / 45
+	# 7. 桌上 >= 3 張天數 18 / 45（P3-C: D15 固定造訪 n_plaza，開標記順延至 D16，D15 狂氣為 2）
 	var vision_days: Array = res["vision_days"] as Array
-	if vision_days.size() == 19:
-		failed += _ok("A 桌上 >= 3 張天數為 19 / 45 天")
+	if vision_days.size() == 18:
+		failed += _ok("A 桌上 >= 3 張天數為 18 / 45 天")
 	else:
-		failed += _fail("A 桌上 >= 3 張天數不符: 預期 19, 實際 %d (%s)" % [vision_days.size(), str(vision_days)])
+		failed += _fail("A 桌上 >= 3 張天數不符: 預期 18, 實際 %d (%s)" % [vision_days.size(), str(vision_days)])
 
 	# 8. 開到收費標記 14 / 14
 	var paid: int = int(res["paid_markers_opened"])
@@ -431,10 +431,10 @@ func _verify_player_a(res: Dictionary, data_node: Node) -> int:
 	else:
 		failed += _fail("A 開到的收費標記數不符: 預期 14, 實際 %d" % paid)
 
-	# 視野窗口比對：主窗口 第 8–23 天 (16天) + 第二窗口 第 42–44 天 (3天)
-	var expected_vision_a := [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 42, 43, 44]
+	# 視野窗口比對：主窗口 第 8–14 天 + 第 16-23 天 (15天) + 第二窗口 第 42–44 天 (3天)
+	var expected_vision_a := [8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 42, 43, 44]
 	if vision_days == expected_vision_a:
-		failed += _ok("A 視野窗口完全相符（第 8–23 天 ＋ 第 42–44 天）")
+		failed += _ok("A 視野窗口完全相符（第 8–14, 16–23 天 ＋ 第 42–44 天）")
 	else:
 		failed += _fail("A 視野窗口不符: 預期 %s, 實際 %s" % [str(expected_vision_a), str(vision_days)])
 
@@ -456,13 +456,13 @@ func _verify_timeline_a(timeline: Array) -> int:
 		{ "day": 14, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 2 },
 		{ "day": 14, "phase": "night", "action": "enter_night_location", "loc": "n_plaza", "hand_after": 3 },
 		{ "day": 15, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 2 },
-		{ "day": 15, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_3", "hand_after": 3 },
+		{ "day": 16, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_3", "hand_after": 3 },
 		{ "day": 17, "phase": "night", "action": "enter_night_location", "loc": "n_litcorridor", "hand_after": 4 },
 		{ "day": 18, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 3 },
 		{ "day": 20, "phase": "night", "action": "enter_night_location", "loc": "n_higher", "hand_after": 4 },
 		{ "day": 21, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 3 },
 		{ "day": 21, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_4", "hand_after": 4 },
-		{ "day": 22, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 3 },
+		{ "day": 23, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 3 },
 		{ "day": 24, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 2 },
 		{ "day": 27, "phase": "morning", "action": "forced_indulgence", "level": "heavy", "hand_after": 1 },
 		{ "day": 28, "phase": "morning", "action": "forced_indulgence", "level": "heavy", "hand_after": 0 },
@@ -546,12 +546,12 @@ func _verify_player_b(res: Dictionary, data_node: Node) -> int:
 	else:
 		failed += _fail("B 吃掉行動格數不符: 預期 12, 實際 %d" % eaten)
 
-	# 7. 桌上 >= 3 張天數 22 / 45
+	# 7. 桌上 >= 3 張天數 21 / 45（P3-C: D15 固定造訪 n_plaza，開標記順延至 D16，D15 狂氣為 2）
 	var vision_days: Array = res["vision_days"] as Array
-	if vision_days.size() == 22:
-		failed += _ok("B 桌上 >= 3 張天數為 22 / 45 天")
+	if vision_days.size() == 21:
+		failed += _ok("B 桌上 >= 3 張天數為 21 / 45 天")
 	else:
-		failed += _fail("B 桌上 >= 3 張天數不符: 預期 22, 實際 %d (%s)" % [vision_days.size(), str(vision_days)])
+		failed += _fail("B 桌上 >= 3 張天數不符: 預期 21, 實際 %d (%s)" % [vision_days.size(), str(vision_days)])
 
 	# 8. 開到收費標記 14 / 14
 	var paid: int = int(res["paid_markers_opened"])
@@ -560,10 +560,10 @@ func _verify_player_b(res: Dictionary, data_node: Node) -> int:
 	else:
 		failed += _fail("B 開到的收費標記數不符: 預期 14, 實際 %d" % paid)
 
-	# 視野窗口比對：主窗口 第 8–26 天 (19天) + 第二窗口 第 42–44 天 (3天)
-	var expected_vision_b := [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 42, 43, 44]
+	# 視野窗口比對：主窗口 第 8–14 天 + 第 16-26 天 (18天) + 第二窗口 第 42–44 天 (3天)
+	var expected_vision_b := [8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 42, 43, 44]
 	if vision_days == expected_vision_b:
-		failed += _ok("B 視野窗口完全相符（第 8–26 天 ＋ 第 42–44 天）")
+		failed += _ok("B 視野窗口完全相符（第 8–14, 16–26 天 ＋ 第 42–44 天）")
 	else:
 		failed += _fail("B 視野窗口不符: 預期 %s, 實際 %s" % [str(expected_vision_b), str(vision_days)])
 

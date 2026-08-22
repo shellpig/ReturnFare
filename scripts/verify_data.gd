@@ -175,6 +175,16 @@ func _initialize() -> void:
 		return
 	print("舊夜間旗標退場 (Lint 13)　0 錯誤")
 
+	# Lint 14: 夜間一次性 beat 完整性檢查
+	var night_once_errs := DataLoader.lint_night_once(loader)
+	if night_once_errs.size() > 0:
+		print("\n夜間一次性 beat 完整性錯誤 %d 筆：" % night_once_errs.size())
+		for e in night_once_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("夜間一次性 beat 完整性 (Lint 14)　0 錯誤")
+
 	print("\ntuning：手牌 %d／發狂上限 %d／倒數 %d 天／視野門檻 %d" % [
 		loader.tuning.get("hand_size", -1),
 		loader.tuning.get("madness_cap", -1),

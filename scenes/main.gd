@@ -10,6 +10,9 @@ const _MSG_ENDING_STUB := "[結局 stub]"
 const _MSG_ENDING_MADNESS_BE := "[發瘋 BE]"
 const _MSG_ADVANCE := "推進時段"
 const _MSG_ADVANCE_HINT := "推進時段（目前無可做動作）"
+const _MSG_ADVANCE_SLEEP := "直接睡"
+const _MSG_ADVANCE_NEXT_DAY := "進入隔天"
+const _MSG_ADVANCE_END_NIGHT := "結束今晚"
 const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 
 @onready var _error_label: Label = $ErrorLabel
@@ -115,7 +118,20 @@ func _on_advance_pressed() -> void:
 		return
 
 	if GameState.phase == "night":
-		GameState.sleep_night()
+		var night_res: Dictionary = GameState.resolve_night_advance()
+		if not bool(night_res.get("advance", false)):
+			var lines: PackedStringArray = night_res.get("lines", PackedStringArray())
+			if lines.size() > 0:
+				_flow_text.clear()
+				_flow_text.append_lines(lines)
+				_flow_text.visible = true
+				_flow_text.offset_top = 0.0
+				_flow_text.offset_bottom = 120.0
+				_map_list.offset_top = 130.0
+				_map_list.offset_bottom = 400.0
+			_refresh_advance_hint()
+			return
+
 	GameState.advance_phase()
 
 
@@ -184,6 +200,14 @@ func _refresh_advance_hint() -> void:
 		var has_action: bool = GameState.has_any_legal_action()
 		_advance_btn.text = _MSG_ADVANCE if has_action else _MSG_ADVANCE_HINT
 		_advance_btn.modulate = Color.WHITE if has_action else Color(1.0, 0.82, 0.4)
+	elif GameState.phase == "night":
+		if GameState.night_sleep_pending:
+			_advance_btn.text = _MSG_ADVANCE_NEXT_DAY
+		elif not GameState.night_location_chosen.is_empty():
+			_advance_btn.text = _MSG_ADVANCE_END_NIGHT
+		else:
+			_advance_btn.text = _MSG_ADVANCE_SLEEP
+		_advance_btn.modulate = Color.WHITE
 	else:
 		_advance_btn.text = _MSG_ADVANCE
 		_advance_btn.modulate = Color.WHITE

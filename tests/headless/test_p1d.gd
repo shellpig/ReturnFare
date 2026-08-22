@@ -460,13 +460,17 @@ func _test_attention_npc(gs: Node, data_node: Node) -> int:
 			  "on_place": { "text": "test" } },
 		],
 	}
-	loader.beats_by_id["p1d_synthetic_attn_night"] = {
+	var synth_night_beat := {
 		"id": "p1d_synthetic_attn_night",
+		"location": "sanquan",
+		"chapter": 1,
 		"slots": [
 			{ "id": "s1", "accepts": ["protagonist"], "attention_npc": "npc_synth_test",
 			  "on_place": { "text": "test" } },
 		],
 	}
+	loader.beats_by_id["p1d_synthetic_attn_night"] = synth_night_beat
+	loader.beats.append(synth_night_beat)
 
 	var failed := 0
 
@@ -527,6 +531,7 @@ func _test_attention_npc(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("attention_npc: rejected placement kept count = 0")
 
+	loader.beats.erase(synth_night_beat)
 	loader.beats_by_id.erase("p1d_synthetic_attn_day")
 	loader.beats_by_id.erase("p1d_synthetic_attn_night")
 	loader.beats_by_id.erase("p1d_synthetic_attn_reject")

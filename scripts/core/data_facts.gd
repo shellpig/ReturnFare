@@ -66,44 +66,37 @@ static func is_pending_card_ref_by_design(card_id: String) -> bool:
 
 
 
-## 檢查 beat 在給定的天數、時段（及章節）是否成立（P2-B，收攏 DataLoader 與 GameState 比對邏輯）
-static func beat_matches_time(beat: Dictionary, day: int, phase: String, chapter: int = 1) -> bool:
+## 檢查 beat 在給定的天數、時段是否成立（僅負責有 when beat 的日期／時段判準，P3-C）。
+static func beat_matches_time(beat: Dictionary, day: int, phase: String) -> bool:
 	var w: Variant = beat.get("when")
-	if w is Dictionary:
-		var wd := w as Dictionary
-		if wd.has("day") and wd.has("day_from"):
-			return false
-
-		# 日期比對
-		if wd.has("day"):
-			if int(wd.get("day", -1)) != day:
-				return false
-		elif wd.has("day_from") or wd.has("day_to"):
-			var from_d := int(wd.get("day_from", 1))
-			var to_d := int(wd.get("day_to", 45))
-			if day < from_d or day > to_d:
-				return false
-		else:
-			return false
-
-		# 時段比對
-		var p_val: Variant = wd.get("phase")
-		if p_val is Array:
-			if not (p_val as Array).has(phase):
-				return false
-		elif p_val is String:
-			if str(p_val) != phase:
-				return false
-		else:
-			return false
-
-		return true
-	else:
-		if phase == "night":
-			var ch: Variant = beat.get("chapter")
-			if ch != null:
-				return int(ch) <= chapter
-			# 附加夜間 beat（無 when、無 chapter）
-			return true
+	if not w is Dictionary:
 		return false
+	var wd := w as Dictionary
+	if wd.has("day") and wd.has("day_from"):
+		return false
+
+	# 日期比對
+	if wd.has("day"):
+		if int(wd.get("day", -1)) != day:
+			return false
+	elif wd.has("day_from") or wd.has("day_to"):
+		var from_d := int(wd.get("day_from", 1))
+		var to_d := int(wd.get("day_to", 45))
+		if day < from_d or day > to_d:
+			return false
+	else:
+		return false
+
+	# 時段比對
+	var p_val: Variant = wd.get("phase")
+	if p_val is Array:
+		if not (p_val as Array).has(phase):
+			return false
+	elif p_val is String:
+		if str(p_val) != phase:
+			return false
+	else:
+		return false
+
+	return true
 

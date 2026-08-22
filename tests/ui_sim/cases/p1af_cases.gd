@@ -741,23 +741,31 @@ class UiCase extends CaseBaseClass:
 		] } }
 
 	func _p2d_01_zero(tree: SceneTree) -> Dictionary:
-		# 手上 2 張發狂卡（未達門檻 3）：D24 night 睡眠時不觸發二樓有人在走（awei_heard_it 不落帳）
+		# 手上 2 張發狂卡（未達門檻 3）：D24 night 睡眠時不觸發二樓有人在走（awei_heard_it 不落帳，無停拍直接推進）
 		assert_eq(int(_run(tree).get("day", 0)), 24, "D24 night 起點")
 		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "睡眠前 awei_heard_it 為 false")
 		await _click(tree, "phase_advance")
-		assert_eq(int(_run(tree).get("day", 0)), 25, "睡眠推進至 D25")
+		assert_eq(int(_run(tree).get("day", 0)), 25, "無睡眠內容直接推進至 D25")
+		assert_false(_has_text(tree.get_root(), "二樓有人在走"), "2 張發狂卡時畫面上看不到二樓有人在走")
 		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "2 張發狂卡時二樓有人在走未達門檻，不得落帳")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
 			"vision_hidden_at_2",
 		] } }
 
 	func _p2d_01_three(tree: SceneTree) -> Dictionary:
-		# 手上 3 張發狂卡（達門檻 3）：D24 night 睡眠時成功觸發二樓有人在走（awei_heard_it 成功落帳）
+		# 手上 3 張發狂卡（達門檻 3）：D24 night 睡眠時成功觸發二樓有人在走（awei_heard_it 成功落帳，停拍顯示文字）
 		assert_eq(int(_run(tree).get("day", 0)), 24, "D24 night 起點")
 		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "睡眠前 awei_heard_it 為 false")
+		# 第 1 次點擊：停拍並顯示睡眠文字
 		await _click(tree, "phase_advance")
-		assert_eq(int(_run(tree).get("day", 0)), 25, "睡眠推進至 D25")
+		assert_eq(int(_run(tree).get("day", 0)), 24, "有睡眠內容時第 1 次點擊停在 D24 供玩家閱讀")
+		assert_true(bool(_run(tree).get("night_sleep_pending", false)), "第 1 次點擊設定 night_sleep_pending 為 true")
+		assert_true(_has_text(tree.get_root(), "二樓有人在走"), "3 張發狂卡時二樓有人在走達視野門檻，畫面文字可見 (K-68)")
 		assert_true((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "3 張發狂卡時二樓有人在走達視野門檻，成功落帳")
+		# 第 2 次點擊：換日進入隔天
+		await _click(tree, "phase_advance")
+		assert_eq(int(_run(tree).get("day", 0)), 25, "第 2 次點擊進入隔天 D25")
+		assert_false(bool(_run(tree).get("night_sleep_pending", false)), "換日後 night_sleep_pending 清除")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
 			"vision_visible_at_3",
 		] } }

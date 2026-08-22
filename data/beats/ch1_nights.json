@@ -8,6 +8,7 @@
       "chapter": 1,
       "when": { "day": 1, "phase": "night" },
       "fixed": true,
+      "meta_once": true,
       "title": "很長的走廊",
       "text": "一條走廊，兩側都是門，門上沒有號碼。走廊比任何他見過的走廊都長。\n推開一扇門：一間和室，桌上一副吃到一半的飯菜，還是熱的。沒有人。\n走廊盡頭有樓梯往下。下面是一個大浴池，蒸氣很濃。水面在動。",
       "slots": [],
@@ -19,6 +20,7 @@
       "chapter": 1,
       "when": { "day": 2, "phase": "night" },
       "fixed": true,
+      "meta_once": true,
       "title": "出口",
       "text": "同一條走廊，盡頭多了一扇門。門外是石階，往下走是一個鎮——但房子的位置不對，一盞燈都沒有。\n遠處有一群人提著燈在走。他跟過去，跟丟了。",
       "slots": []
@@ -202,6 +204,7 @@
       "chapter": 1,
       "when": { "day": 15, "phase": "night" },
       "fixed": true,
+      "meta_once": true,
       "title": "所有人都在",
       "text": "人群裡有一個背影，站的位置和搬貨的姿勢都對得上。\n只有叔叔不在。",
       "slots": [],

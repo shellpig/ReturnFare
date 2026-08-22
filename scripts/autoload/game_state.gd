@@ -185,7 +185,10 @@ func play_evening() -> PackedStringArray:
 	return lines
 
 
-## 夜間定日 fixed beat 強制播之唯一入口（UI、走查共用，規格書第九節第 1 步、K-26）。
+## 夜間固定演出規則層唯一入口（UI、走查腳本、測試共用，規格書第九節、P3-C）。
+## 遇 meta_once 且已在 night_once_beats_seen 則跳過；首次先記 seen 再播放。
+## 若掛 night-layer 地點，呼叫 _record_forced_night_visit() 記錄 chosen 與 seen。
+## 非 meta_once fixed 遇本輪 beats_entered 已有 id 時跳過（避免 route 重建重複播放）。
 func play_night_fixed() -> PackedStringArray:
 	var lines := PackedStringArray()
 	if Data == null or Data.loader == null:
@@ -193,32 +196,95 @@ func play_night_fixed() -> PackedStringArray:
 
 	var cur_day: int = day
 	for b in Data.loader.beats_at(cur_day, "night"):
-		if not b.get("fixed", false):
+		if not bool(b.get("fixed", false)):
 			continue
+		var bid := str(b.get("id", ""))
+		var is_meta_once := bool(b.get("meta_once", false))
+		if is_meta_once:
+			if night_once_beats_seen.has(bid):
+				continue
+		else:
+			if beats_entered.has(bid):
+				continue
+
 		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-			var beat_lines := play_beat(str(b.get("id", "")))
+			if is_meta_once:
+				night_once_beats_seen[bid] = true
+			var loc_id := str(b.get("location", ""))
+			if Data.loader.locations.has(loc_id):
+				var loc: Dictionary = Data.loader.locations[loc_id] as Dictionary
+				if str(loc.get("layer", "")) == "night":
+					_record_forced_night_visit(loc_id)
+			var beat_lines := play_beat(bid)
 			lines.append_array(beat_lines)
 
 	return lines
 
 
-## 直接睡＝解析旅館（sanquan）的當夜定日 beat（規格書第九節、P1-F）。
+## 取得地點在夜間的有狀態解析內容（P3-C，唯一求值入口）。
+## condition 成立之首個 primary 勝出（若定日不成立則退回章節變體）；addons 保留 condition 成立者。
+## requires 不參與候選選擇，不成立仍為選中之 LOCKED 內容。
+## 回傳：{ "primary": Dictionary, "addons": Array[Dictionary] }
+func resolved_night_content(location_id: String) -> Dictionary:
+	var primary: Dictionary = {}
+	var addons: Array[Dictionary] = []
+
+	if Data == null or Data.loader == null:
+		return { "primary": primary, "addons": addons }
+
+	var candidates: Dictionary = Data.loader.night_beat_candidates(day, location_id, chapter())
+
+	for cand: Dictionary in candidates.get("primaries", []) as Array:
+		if ConditionEval.eval(cand.get("condition"), self):
+			primary = cand
+			break
+
+	for addon_cand: Dictionary in candidates.get("addons", []) as Array:
+		if ConditionEval.eval(addon_cand.get("condition"), self):
+			addons.append(addon_cand)
+
+	return {
+		"primary": primary,
+		"addons": addons,
+	}
+
+
+## 直接睡＝解析旅館（sanquan）的夜間內容（規格書第九節、P3-C）。
+## 面板與睡覺共用 resolved_night_content("sanquan")；睡覺跳過 requires 不成立的內容。
 func sleep_night() -> PackedStringArray:
-	var cur_day: int = day
-	for b in Data.loader.beats:
-		if str(b.get("location", "")) != "sanquan":
-			continue
-		var w: Variant = b.get("when")
-		if not w is Dictionary:
-			continue
-		var wd := w as Dictionary
-		if int(wd.get("day", -1)) != cur_day or str(wd.get("phase", "")) != "night":
-			continue
-		if bool(b.get("fixed", false)):
-			continue
-		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-			return play_beat(str(b.get("id", "")))
-	return PackedStringArray()
+	var lines := PackedStringArray()
+	var resolved := resolved_night_content("sanquan")
+	var primary: Dictionary = resolved.get("primary", {})
+	if not primary.is_empty():
+		if ConditionEval.eval(primary.get("requires"), self):
+			var beat_lines := play_beat(str(primary.get("id", "")))
+			lines.append_array(beat_lines)
+
+	for addon in resolved.get("addons", []) as Array:
+		if addon is Dictionary and not (addon as Dictionary).is_empty():
+			if ConditionEval.eval((addon as Dictionary).get("requires"), self):
+				var addon_lines := play_beat(str((addon as Dictionary).get("id", "")))
+				lines.append_array(addon_lines)
+
+	return lines
+
+
+## 夜間推進唯一決策入口（P3-C，main.gd 與走查共用）。
+## 回傳：{ "advance": bool, "lines": PackedStringArray }
+func resolve_night_advance() -> Dictionary:
+	if not night_location_chosen.is_empty():
+		return { "advance": true, "lines": PackedStringArray() }
+
+	if night_sleep_pending:
+		night_sleep_pending = false
+		return { "advance": true, "lines": PackedStringArray() }
+
+	var lines := sleep_night()
+	if lines.size() > 0:
+		night_sleep_pending = true
+		return { "advance": false, "lines": lines }
+
+	return { "advance": true, "lines": PackedStringArray() }
 
 
 ## 查詢該夜間地點是否已曾到訪（規格書第九節、P3-B）。
@@ -310,8 +376,11 @@ func would_night_entry_end_run(location_id: String) -> bool:
 	return (madness_count + cost) >= cap
 
 
-## fixed 到訪私有 helper：驗證地點後寫 chosen 與 seen，明確跳過 marker cost（規格書第九節、P3-B）。
+## fixed 到訪私有 helper：驗證地點後寫 chosen 與 seen，明確跳過 marker cost（規格書第九節、P3-B/P3-C）。
 func _record_forced_night_visit(location_id: String) -> void:
+	if not night_location_chosen.is_empty():
+		push_error("_record_forced_night_visit: night_location_chosen already set to '%s', refusing overwrite with '%s'" % [night_location_chosen, location_id])
+		return
 	if Data != null and Data.loader != null and Data.loader.locations.has(location_id):
 		night_location_chosen = location_id
 		night_locations_seen[location_id] = true
@@ -335,9 +404,23 @@ func tick_madness() -> Array[String]:
 	return zeroed
 
 
-## 檢查 beat 在當前天與時段是否屬於合法範圍（K-18, P2-B）。
+## 檢查 beat 在當前天與時段是否屬於合法範圍（K-18, P2-B, P3-C）。
 func _is_beat_time_valid(beat: Dictionary) -> bool:
-	return DataFacts.beat_matches_time(beat, day, phase, chapter())
+	if phase != "night" or bool(beat.get("fixed", false)):
+		return DataFacts.beat_matches_time(beat, day, phase)
+
+	# 夜間 non-fixed beat：僅接受該地點當下 resolved_night_content 選中之 primary / addon id
+	var loc_id := str(beat.get("location", ""))
+	if loc_id.is_empty():
+		return false
+	var resolved := resolved_night_content(loc_id)
+	var bid := str(beat.get("id", ""))
+	if str(resolved.get("primary", {}).get("id", "")) == bid:
+		return true
+	for addon: Dictionary in resolved.get("addons", []) as Array:
+		if str(addon.get("id", "")) == bid:
+			return true
+	return false
 
 
 # ── 手牌操作 ────────────────────────────────────────────────────────────────

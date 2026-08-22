@@ -9,7 +9,6 @@ enum TriState { HIDDEN = 0, LOCKED = 1, OPEN = 2, RESOLVED = 3 }
 ## 資料沒寫 reject_reason 時的通用理由。三態的硬規則要求灰掉一定要附理由（企劃書第十七節），
 ## 所以這裡不能留空字串——但資料端該補的仍然要補，lint 2 會抓。
 const _REASON_FALLBACK := "（條件不足）"
-const _REASON_NIGHT_LOCKED_STUB := "（夜間標記尚未開放）"
 
 
 ## 當前天╱時段可到的地點 id 列表。
@@ -82,42 +81,14 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 			if str(b.get("location", "")) == location_id:
 				candidate_beats.append(b)
 	else:
-		# 夜間四步解析（規格書第九節）：
-		# 1. 主內容：定日優先於章節變體
-		var primary_beat: Dictionary = {}
-		for b in loader.beats:
-			if str(b.get("location", "")) != location_id:
-				continue
-			var w: Variant = b.get("when")
-			if w is Dictionary:
-				var wd := w as Dictionary
-				if int(wd.get("day", -1)) == current_day and str(wd.get("phase", "")) == "night":
-					primary_beat = b
-					break
-
-		if primary_beat.is_empty():
-			# 找章節變體：no when, has chapter, chapter <= current_chapter (取最大 chapter)
-			var best_ch := -1
-			for b in loader.beats:
-				if str(b.get("location", "")) != location_id:
-					continue
-				if b.has("when"):
-					continue
-				if b.has("chapter"):
-					var ch := int(b.get("chapter", 1))
-					if ch <= current_chapter and ch > best_ch:
-						best_ch = ch
-						primary_beat = b
-
-		if not primary_beat.is_empty():
-			candidate_beats.append(primary_beat)
-
-		# 2. 附加 beat 並列：no when, no chapter, location == location_id
-		for b in loader.beats:
-			if str(b.get("location", "")) != location_id:
-				continue
-			if not b.has("when") and not b.has("chapter"):
-				candidate_beats.append(b)
+		# 夜間：唯一有狀態求值入口（P3-C，K-30）
+		var resolved: Dictionary = gs.call("resolved_night_content", location_id)
+		var p: Dictionary = resolved.get("primary", {})
+		if not p.is_empty():
+			candidate_beats.append(p)
+		for addon in resolved.get("addons", []) as Array:
+			if addon is Dictionary and not (addon as Dictionary).is_empty():
+				candidate_beats.append(addon as Dictionary)
 
 	var beats_result: Array = []
 
@@ -206,9 +177,11 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 			"slots": slots_result,
 		})
 
+	var is_empty_result := (current_phase == "night" and beats_result.is_empty())
 	return {
 		"location": loader.locations.get(location_id, {}),
 		"beats": beats_result,
+		"empty_result": is_empty_result,
 	}
 
 

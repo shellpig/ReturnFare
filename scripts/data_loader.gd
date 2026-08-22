@@ -738,6 +738,94 @@ func beats_at(day: int, phase: String) -> Array[Dictionary]:
 	return out
 
 
+## 取得某地點在夜間的結構候選（P3-C，唯一結構候選入口）。
+## 純資料形狀選擇，不求值 condition / requires。
+## 回傳：{ "primaries": Array[Dictionary], "addons": Array[Dictionary] }
+func night_beat_candidates(day: int, location_id: String, current_chapter: int) -> Dictionary:
+	var primaries: Array[Dictionary] = []
+	var addons: Array[Dictionary] = []
+
+	# 1. 定日夜間候選（同地點、non-fixed、matches_time 成立）
+	for b in beats:
+		if str(b.get("location", "")) != location_id:
+			continue
+		if bool(b.get("fixed", false)):
+			continue
+		if DataFacts.beat_matches_time(b, day, "night"):
+			primaries.append(b)
+
+	# 2. 章節變體（同地點、無 when、has chapter、chapter <= current_chapter，chapter 由高至低排序，同章保留資料原序）
+	for ch in range(current_chapter, 0, -1):
+		for b in beats:
+			if str(b.get("location", "")) != location_id:
+				continue
+			if b.has("when"):
+				continue
+			if b.has("chapter") and int(b.get("chapter", 1)) == ch:
+				primaries.append(b)
+
+	# 3. 附加 beat（同地點、無 when、無 chapter，保留資料原序）
+	for b in beats:
+		if str(b.get("location", "")) != location_id:
+			continue
+		if not b.has("when") and not b.has("chapter"):
+			addons.append(b)
+
+	return {
+		"primaries": primaries,
+		"addons": addons,
+	}
+
+
+## Lint 14: 夜間一次性 beat 完整性檢查（P3-C、SCHEMA.md）。
+## 1. meta_once 僅能為 boolean true，且僅供 fixed: true 與 exact night when 的 beat。
+## 2. 所有 night-layer 地點上的 fixed beat（when.phase == 'night'）必須標記 meta_once: true。
+## 3. 同一個 when.day 至多只能有一個 night-layer fixed beat。
+static func lint_night_once(loader: DataLoader) -> PackedStringArray:
+	var problems := PackedStringArray()
+	var night_fixed_by_day: Dictionary = {} # day: int -> beat_id: String
+
+	for b in loader.beats:
+		var bid := str(b.get("id", ""))
+		var is_fixed := bool(b.get("fixed", false))
+		var w_raw: Variant = b.get("when")
+		var is_exact_night := false
+		var beat_day := -1
+
+		if w_raw is Dictionary:
+			var wd := w_raw as Dictionary
+			if str(wd.get("phase", "")) == "night" and wd.has("day") and not wd.has("day_from"):
+				is_exact_night = true
+				beat_day = int(wd.get("day", -1))
+
+		var has_meta_once := b.has("meta_once")
+		if has_meta_once:
+			var mo_val: Variant = b.get("meta_once")
+			if not (mo_val is bool and mo_val == true):
+				problems.append("%s：meta_once 欄位值必須為 boolean true" % bid)
+			if not is_fixed:
+				problems.append("%s：meta_once 只能用於 fixed: true 的 beat" % bid)
+			if not is_exact_night:
+				problems.append("%s：meta_once 只能用於具有 exact night when 的 beat" % bid)
+
+		var loc_id := str(b.get("location", ""))
+		var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
+		var is_night_layer := str(loc.get("layer", "")) == "night"
+
+		if is_fixed and is_exact_night and is_night_layer:
+			if not bool(b.get("meta_once", false)):
+				problems.append("%s：night-layer 地點 (%s) 的 fixed night beat 必須標記 meta_once: true" % [bid, loc_id])
+
+			if beat_day > 0:
+				if night_fixed_by_day.has(beat_day):
+					var prev_bid: String = night_fixed_by_day[beat_day]
+					problems.append("第 %d 夜存在多個 night-layer fixed beat：%s 與 %s（同一夜至多一個）" % [beat_day, prev_bid, bid])
+				else:
+					night_fixed_by_day[beat_day] = bid
+
+	return problems
+
+
 
 func _beat_files() -> PackedStringArray:
 	var out: PackedStringArray = []
