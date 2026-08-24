@@ -1514,8 +1514,14 @@ class UiCase extends CaseBaseClass:
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["warning_shown_no_number", "warning_absent_on_free"] } }
 
 	func _p3d_05_sleep(tree: SceneTree) -> Dictionary:
+		var adv_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")
+		assert_eq(adv_btns.size(), 1, "找到推進按鈕")
+		if not adv_btns.is_empty():
+			assert_eq((adv_btns[0] as Button).text, "直接睡", "停拍前推進按鈕文字為直接睡 (K-123)")
 		await _advance(tree)
 		assert_true(bool(_run(tree).get("night_sleep_pending", false)), "第 1 次推進進入 night_sleep_pending 停拍")
+		if not adv_btns.is_empty():
+			assert_eq((adv_btns[0] as Button).text, "進入隔天", "停拍期間推進按鈕文字為進入隔天 (K-123)")
 		await _click(tree, "location::n_landmark")
 		var enter1 := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_landmark")
 		assert_eq(enter1.size(), 1, "找到 n_landmark 進入按鈕")

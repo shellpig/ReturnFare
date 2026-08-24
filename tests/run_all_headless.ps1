@@ -11,7 +11,16 @@ $tests = @(
     "tests/headless/test_p1g.gd",
     "tests/headless/test_p2a.gd",
     "tests/headless/test_p2b.gd",
-    "tests/headless/playthrough_greedy.gd"
+    "tests/headless/test_p2c.gd",
+    "tests/headless/test_p2d.gd",
+    "tests/headless/test_p2_sim.gd",
+    "tests/headless/playthrough_greedy.gd",
+    "tests/headless/test_p3a.gd",
+    "tests/headless/test_p3b.gd",
+    "tests/headless/test_p3c.gd",
+    "tests/headless/test_p3d.gd",
+    "tests/headless/test_p3e.gd",
+    "tests/headless/test_p3f.gd"
 )
 
 $godot = "C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe"
