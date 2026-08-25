@@ -185,6 +185,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `name` | 卡面名稱 |
 | `text` | 卡面說明 |
 | `slotless` | `true` ＝ 不佔手牌格（只有 `knowledge`） |
+| `discardable` | **必填 boolean**；遭遇錯答消耗、主動丟棄與逃離支付的唯一真值，不得由 `type` 猜測 |
 | `stashable` | 可否放進備用區 |
 
 `type`：`protagonist` / `person` / `group` / `equipment` / `consumable` / `info` / `inference` / `document` / `knowledge` / `mood` / `madness` / `routine`
@@ -408,6 +409,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
     "per_round_slot_cost": 1,
     "escape_cost": 1,
     "allow_discard": true,
+    "after_finish": "stay",
     "rounds": [
       {
         "id": "first_demand",
@@ -422,6 +424,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
           }
         ],
         "fallback": {
+          "requires_discardable": true,
           "next_round": "second_demand",
           "on_resolve": { "text": "它收走了你的回答。" }
         }
@@ -438,23 +441,27 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 |---|---|
 | `repeat_each_run` | 選填 boolean，預設 false；只可用在**有明確整數 `when.day`** 的 fixed encounter，phase 可為 night。true 時不得 `meta_once` |
 | `charge_first_visit` | 選填 boolean，預設 false；true 時 beat 必須 `fixed:true`、有明確整數 `when.day`、`when.phase == "night"`，且所掛 location 的 `layer == "night"`。強制到訪前先保存是否終身 seen，只有此前未 seen 才按 location `madness_cost` 收一次；不是遭遇額外費用。這組限制只屬於本欄，不表示所有 night beat 都必須掛 night-layer location |
-| `per_round_slot_cost` | 必填正整數；每進一個 round 增加的壓力佔格。`start_encounter()` 直接進第一回合，沒有另一筆進場 cost；超載 penalty 是規則層明示例外 |
+| `per_round_slot_cost` | 必填正整數；每進一個 round 增加的壓力佔格。`start_encounter()` 只建立 intro，`acknowledge_encounter_intro()` 進第一回合時收唯一一次；沒有另一筆進場 cost。超載 penalty 是規則層明示例外 |
 | `escape_cost` | 必填；`null`＝不可逃，非負整數＝需支付的可丟棄卡數 |
 | `allow_discard` | 選填 boolean，預設 true；是否顯示並接受「主動丟一張卡」操作。D45 為 false；不影響 fallback 對錯答卡的處理 |
+| `after_finish` | 必填 enum：`stay`＝出口結算後留在原時段；`advance_phase`＝由規則層恰好推進一次。UI 不得依 beat id 自行推進 |
 | `rounds` | 非空陣列；第一筆是入口。`id` 在本 encounter 唯一 |
 | `demand` | 當前要求文字 |
 | `responses` | 非空陣列；同一回合可有多組合理回應 |
 | `responses[].id` | 回應分支 id；同一回合唯一，供測試／日誌定位 |
 | `responses[].accepts` | 非空的明確 card id 陣列；是隱藏正解集合，不是 UI 允許點擊集合。同回合各 response 不得重疊 |
-| `fallback` | 必填；沒有 response 命中時的結果。固定保留本回合壓力，並消耗卡型矩陣允許丟棄的卡；不可丟棄卡留手但仍記為已嘗試 |
-| `responses[].consume_card` | 必填 boolean；正解是否消耗提交卡。true 仍只可消耗卡型矩陣允許丟棄者；命中 response 固定釋放本回合壓力 |
+| `fallback` | 必填；沒有 response 命中時的結果。固定保留本回合壓力，並依 `cards.json.discardable` 決定能否消耗提交卡 |
+| `fallback.requires_discardable` | 選填 boolean，預設 false；true 時，未命中 response 的不可丟棄卡不是合法提交，規則層回 `card_not_submittable`，不標 attempted、不套效果、不推進。只限制 fallback，不會排除命中 response 的人物／主角／知識卡 |
+| `responses[].consume_card` | 必填 boolean；正解是否消耗提交卡。true 仍只可消耗 `discardable:true` 的卡；命中 response 固定釋放本回合壓力 |
 | `next_round` | 下一 round id 或 `null`。response 的 null＝勝利出口；fallback 的 null＝失敗出口 |
 | `on_resolve` | 必填；形狀同 `on_place` 效果。卡片轉化以明確 `lose`／`gain` 寫在此處 |
 | `on_victory`／`on_failure`／`on_escape` | 三者必填，形狀同效果；即使 `escape_cost:null` 也保留 `on_escape`，讓結構固定 |
 
-每張 base card 同一場只能提交一次。response 的 `consume_card` 與 fallback 都不得移除 person／protagonist 等不可丟棄卡；若未來要永久失去人物，必須另建明示的特殊事件規格，不能借 encounter 偷做。
+遭遇可提交持有集合精確等於 `hand ∪ knowledge`，持有判定共用 `GameState.has_card()`；壓力與容量只計 `hand`。view model 必須為每張候選標出來源與可選狀態，UI 不得因 knowledge 不在 hand 而漏掉它。
 
-`allow_discard` 與 `escape_cost` 都不是 fallback 的前置。不可丟棄卡答錯時仍留手、記 attempted、保留壓力並照 `next_round` 推進。若規則層判定沒有尚未嘗試的非發狂卡，也沒有可用的 discard／escape，直接套 `on_failure`；資料不另寫「無路可走」分支。
+每張 base card 同一場只能提交一次。response 的 `consume_card` 與 fallback 都不得移除 `discardable:false` 的卡；若未來要永久失去人物，必須另建明示的特殊事件規格，不能借 encounter 偷做。
+
+`allow_discard` 與 `escape_cost` 都不是 fallback 的前置。`requires_discardable` 省略／false 時，不可丟棄卡答錯仍留手並可照 fallback 推進；true 時則原子拒絕。若依當前 response 與 fallback 篩選後沒有合法尚未嘗試卡，也沒有可用的 discard／escape，直接套 `on_failure`；資料不另寫「無路可走」分支。
 
 round graph 必須從第一筆全部可達、所有 next_round 存在且每條路可抵達 null；不可用無出口 cycle 模擬「一直答到對」。第一輪暫時拿不到某 response 的卡是合法內容設計，不代表該 response 不可達。
 
