@@ -437,7 +437,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | 欄位 | 規約 |
 |---|---|
 | `repeat_each_run` | 選填 boolean，預設 false；只可用在**有明確整數 `when.day`** 的 fixed encounter，phase 可為 night。true 時不得 `meta_once` |
-| `charge_first_visit` | 選填 boolean，預設 false；只可用在 beat 所掛 location 的 `layer == "night"` 時。true＝強制到訪前先保存是否終身 seen，只有此前未 seen 才按 location `madness_cost` 收一次；不是遭遇額外費用 |
+| `charge_first_visit` | 選填 boolean，預設 false；true 時 beat 必須 `fixed:true`、有明確整數 `when.day`、`when.phase == "night"`，且所掛 location 的 `layer == "night"`。強制到訪前先保存是否終身 seen，只有此前未 seen 才按 location `madness_cost` 收一次；不是遭遇額外費用。這組限制只屬於本欄，不表示所有 night beat 都必須掛 night-layer location |
 | `per_round_slot_cost` | 必填正整數；每進一個 round 增加的壓力佔格。`start_encounter()` 直接進第一回合，沒有另一筆進場 cost；超載 penalty 是規則層明示例外 |
 | `escape_cost` | 必填；`null`＝不可逃，非負整數＝需支付的可丟棄卡數 |
 | `allow_discard` | 選填 boolean，預設 true；是否顯示並接受「主動丟一張卡」操作。D45 為 false；不影響 fallback 對錯答卡的處理 |
