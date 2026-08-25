@@ -324,7 +324,7 @@ BE 與不上車使用線性形狀：
 | `history_field` | 三組分別寫 `partner_variant`、`livelihood_variant`、`inn_appearance_variant`，不得重複 |
 | `rules[]` | 依序第一個 `when` 成立者命中；最後恰一筆 `{fallback:true}`，fallback 不得同時有 when |
 | `rules[].id` | 寫入 history 的穩定 variant id；同組唯一 |
-| `first_seen_pages`／`repeat_pages` | 皆必填陣列，可為空但欄位不可省略 |
+| `first_seen_pages`／`repeat_pages` | 皆必填陣列，可為空但欄位不可省略；空陣列表示該 variant 不增加頁面，不是建立一張 `text` 空白的頁 |
 | `lookup_fragments[].when_group` | 只在指定 group 命中指定 variant 時啟用；group／variant 必須存在 |
 | `source_field` | P5 封閉值只有 `most_invested_npc` |
 | `entries[].value` | 對該 source 的完整映射；`most_invested_npc` 必須覆蓋所有 `festival_proxy_eligible:true` 的 NPC |
@@ -645,7 +645,9 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 
 > **「不選」要不要給一個看得見的選項，由那一格自己決定。** 第 29 天的「不邀」是三個並列選項之一、而且是最差的那張牌，所以它明寫成一個組員並標 `default_if_unresolved:true`；選它跟直接走開結果完全相同。
 
-同一 group 若使用逾期預設，必須恰一槽為 true。該槽必須 `accepts:[]`、沒有 `condition`／`requires`／`delegation`，且可由既有無卡 `choose()` 原子結算；否則玩家可能在推進時卡死。預設槽的 `on_place` 照常套用並寫 choice／slot 記錄，不建立第二套「逾期結果」。
+同一 group 若使用逾期預設，必須恰一槽為 true，且父 beat 必須 `fixed:true`。該槽必須 `accepts:[]`、沒有 `condition`／`requires`／`delegation`，且可由既有無卡 `choose()` 原子結算；否則玩家可能在推進時卡死。
+
+離開時段前，規則層掃描當下 day／phase 成立的這類 fixed group；**不論玩家是否打開過父 beat 的面板、`beats_entered` 是否已有該 id**，只要 group 尚未結算就選 default。所有待結算 default 必須先整批驗證，任一資料或效果衝突都在 mutation 前拒絕。成功時只套 default 的 `on_place` 並寫 choice／slot 記錄，不呼叫父 beat 的 `on_enter`、不補 `beats_entered`，也不把其他白天 fixed beat 改成強制演出。D29 因此在完全沒開 invitation 面板時仍會固定慶典代付者。
 
 `choice_requires_card:true` 必須有非空 `accepts`，且不得與 `default_if_unresolved:true` 同槽。D43 的前老闆／周先生工作槽都設 true 並只收 protagonist，因此真正接受才會消耗下午；D22 的推論選擇與 D29 邀請維持省略／false，仍可直接選文字答案。無卡直呼 `choose()` 必須回 `card_required` 且零變化，不能只靠 UI 不顯示捷徑。
 
