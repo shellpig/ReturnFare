@@ -27,7 +27,7 @@
 | `locations.json` | `name`、`desc` |
 | `npcs.json` | `name`、`locked_name` |
 | `card_types.json` | `name` |
-| `beats/*.json` | `title`、`text`、`slots[].label`、`slots[].reject_reason`、`reject_reason`、`echo.text`、`on_enter.text`、`on_place.text` |
+| `beats/*.json` | `title`、`text`、`slots[].label`、`slots[].reject_reason`、`reject_reason`、`echo.text`、`on_enter.text`、`on_place.text`、`slots[].delegation.preview`、`slots[].delegation.tendency`、`slots[].delegation.report.text`、`encounter.rounds[].demand`、`encounter.rounds[].responses[].on_resolve.text`、`encounter.rounds[].fallback.on_resolve.text`、`encounter.on_victory.text`／`on_failure.text`／`on_escape.text` |
 
 `note` 與 `_comment` 是給開發者看的，**不翻譯、不抽取**。
 
@@ -44,7 +44,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | 你放進去的 | 意思 |
 |---|---|
 | **主角卡** | 把這個時段花在這裡 |
-| **人物卡（不放主角卡）** | **委託**——他去，你沒去（第 17 天起） |
+| **人物卡（不放主角卡）** | **委託**——他去，你沒去（第一次取得人物卡後可用） |
 | **道具卡／情報卡** | 使用這張卡 |
 | **情報卡／知識卡放進不收主角卡的槽** | **比對**——見下 |
 | **發狂卡** | **縱慾**——在這裡發洩，消掉這張卡 |
@@ -294,12 +294,12 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `fixed` | `true` ＝ 一定發生且**不吃行動格** |
 | `condition` | 出現條件，不成立則整個 beat 不存在 |
 | `requires` / `reject_reason` | beat 級門檻：不成立時整個 beat 灰掉＋理由（語意同槽級） |
-| `meta_once` | 選填 boolean；只供 `when.phase == "night"` 且 `fixed: true` 的 beat。`true` ＝整份存檔只自動播一次，id 記進 meta `night_once_beats_seen` |
+| `meta_once` | 選填 boolean；只供 `when.phase == "night"` 且 `fixed: true` 的 beat。`true` ＝整份存檔只自動播一次，id 記進 meta `night_once_beats_seen`。唯一相反形狀是 `encounter.repeat_each_run: true`：每輪重演，且不得同時 meta-once |
 | `title` / `text` | 面板標題與敘述 |
 | `slots` | 槽陣列 |
 | `on_enter` | beat 首次呈現給玩家時結算一次的效果；鍵同 `on_place` |
 | `echo` | 沒到場時留下什麼：`{day, text, condition}`——該天 `condition` 成立才播（企劃書第十七節殘響三級）。**`day` 必填且必須大於本 beat 的 `when.day`**：引擎掃的是 `echo.day == 今天`，缺欄的 echo 永遠不播。同一段 `text` 不得在多個 beat 重複（lint 8） |
-| `encounter` | 遭遇定義：`rounds[]{demand, on_wrong, accepts}`／`per_round_slot_cost`／`escape_cost`（規格書第十節） |
+| `encounter` | 遭遇定義，精確形狀見本節下方 `encounter` 專節 |
 | `chapter` | **只有夜間標記用**。同一個標記的章節變體，見下 |
 | `note` | 設計註記，引擎不讀 |
 
@@ -336,11 +336,123 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `requires` | 額外條件；不成立則灰掉 |
 | `reject_reason` | 灰掉時那一行字 |
 | `on_place` | 放進去產生什麼 |
+| `delegation` | **只有委託槽有**：回報時間、預覽與選填的隔日上午 report；見下方專節 |
 | `indulgence` | **只有縱慾出口槽有**：`{weight, auto, soak}`，見上方「縱慾出口」 |
 | `on_place_by_level` | **只有縱慾出口槽有**：強度級的追加效果，見上方「縱慾出口」 |
 | `choice_group` | 同組的槽互斥，見下 |
 | `attention_npc` | 此槽消耗主角行動時，投入帳記給哪位 NPC（選填；未標＝不計。供「不邀任何人時系統挑誰」判定，規格書第十二節） |
 | `note` | 設計註記，引擎不讀 |
+
+### `delegation`＝人物委託
+
+委託仍是一個 slot，不是新的事件類型。槽必須：
+
+- `accepts` 只放**一個明確的 person card id**，不可寫型別 `"person"`。
+- 與同一任務的親自處理槽及其他人物槽共用同一個非空 `choice_group`。
+- 用 `condition: {has_card: ...}` 隱藏未取得人物卡的路線；人物已取得但缺其他條件時才用 `requires`＋`reject_reason` 顯示灰槽。
+
+立即回報：
+
+```json
+{
+  "id": "ask_ajie",
+  "label": "請阿婕去問",
+  "accepts": ["npc_ajie"],
+  "condition": { "has_card": "npc_ajie" },
+  "choice_group": "prescription_route",
+  "delegation": {
+    "result_timing": "immediate",
+    "preview": "請她打聽這張處方的來源。",
+    "tendency": "熟人容易開口，但她可能先追問你為什麼在查。"
+  },
+  "on_place": { "text": "她很快帶著答案回來。" }
+}
+```
+
+隔日上午回報：
+
+```json
+{
+  "delegation": {
+    "result_timing": "next_morning",
+    "preview": "請他沿著送貨路線問一圈。",
+    "tendency": "範圍較廣，隔日上午才回報。",
+    "report": {
+      "text": "他把昨晚問到的名字寫在紙上。",
+      "gain": ["info_ajie_class"]
+    }
+  }
+}
+```
+
+| 欄位 | 規約 |
+|---|---|
+| `result_timing` | 必填 enum：`immediate`／`next_morning`。不支援任意 N 天 |
+| `preview` | 必填；選擇前看到的任務說明，不列完整結果 |
+| `tendency` | 必填；已知傾向或風險，不寫成功率 |
+| `report` | `next_morning` 必填、`immediate` 禁止；形狀同 `on_place` 效果 |
+
+`on_place` 仍必填：immediate 時承擔完整當場結果；next_morning 時只承擔派出當下的文字／旗標，真正回報放 `report`。關係增減若有，也寫在對應事件效果；委託沒有預設 relationship delta。任何可能成立到第 45 天的槽不得使用 `next_morning`，避免本輪結束後永遠收不到回報。
+
+人物卡成功受託後留在 hand；資料不寫外出天數、歸還日或人物暫存區。一天一次是 GameState 規則，不重複填在每個槽。
+
+### `encounter`＝遭遇
+
+遭遇掛在 fixed beat 上；beat 的 `text` 是進遭遇前演出，互動要求才放 `rounds[]`。完整形狀：
+
+```json
+{
+  "encounter": {
+    "repeat_each_run": true,
+    "charge_first_visit": true,
+    "per_round_slot_cost": 1,
+    "escape_cost": null,
+    "rounds": [
+      {
+        "id": "first_demand",
+        "demand": "它要你證明自己記得。",
+        "responses": [
+          {
+            "id": "answer_with_memory",
+            "accepts": ["k_forty_something"],
+            "consume_card": false,
+            "next_round": "second_demand",
+            "on_resolve": { "text": "門後的聲音停了一拍。" }
+          }
+        ],
+        "fallback": {
+          "next_round": "second_demand",
+          "on_resolve": { "text": "它收走了你的回答。" }
+        }
+      }
+    ],
+    "on_victory": { "text": "它暫時退開。" },
+    "on_failure": { "text": "你再也騰不出位置。" },
+    "on_escape": { "text": "你付出代價離開。" }
+  }
+}
+```
+
+| 欄位 | 規約 |
+|---|---|
+| `repeat_each_run` | 選填 boolean，預設 false；只可用在定日 fixed encounter。true 時不得 `meta_once` |
+| `charge_first_visit` | 選填 boolean，預設 false；只可用在 night-layer fixed encounter。true＝強制到訪仍按 location `madness_cost` 收終身第一次費用；不是遭遇額外費用 |
+| `per_round_slot_cost` | 必填正整數；每進一個 round 增加的壓力佔格 |
+| `escape_cost` | 必填；`null`＝不可逃，非負整數＝需支付的可丟棄卡數 |
+| `rounds` | 非空陣列；第一筆是入口。`id` 在本 encounter 唯一 |
+| `demand` | 當前要求文字 |
+| `responses` | 非空陣列；同一回合可有多組合理回應 |
+| `responses[].id` | 回應分支 id；同一回合唯一，供測試／日誌定位 |
+| `responses[].accepts` | 非空的明確 card id 陣列；是隱藏正解集合，不是 UI 允許點擊集合。同回合各 response 不得重疊 |
+| `fallback` | 必填；沒有 response 命中時的結果。固定保留本回合壓力，並消耗卡型矩陣允許丟棄的卡；不可丟棄卡留手但仍記為已嘗試 |
+| `responses[].consume_card` | 必填 boolean；正解是否消耗提交卡。true 仍只可消耗卡型矩陣允許丟棄者；命中 response 固定釋放本回合壓力 |
+| `next_round` | 下一 round id 或 `null`。response 的 null＝勝利出口；fallback 的 null＝失敗出口 |
+| `on_resolve` | 必填；形狀同 `on_place` 效果。卡片轉化以明確 `lose`／`gain` 寫在此處 |
+| `on_victory`／`on_failure`／`on_escape` | 三者必填，形狀同效果；即使 `escape_cost:null` 也保留 `on_escape`，讓結構固定 |
+
+每張 base card 同一場只能提交一次。response 的 `consume_card` 與 fallback 都不得移除 person／protagonist 等不可丟棄卡；若未來要永久失去人物，必須另建明示的特殊事件規格，不能借 encounter 偷做。
+
+round graph 必須從第一筆全部可達、所有 next_round 存在且每條路可抵達 null；不可用無出口 cycle 模擬「一直答到對」。第一輪暫時拿不到某 response 的卡是合法內容設計，不代表該 response 不可達。
 
 ### `choice_group`＝選擇題
 
@@ -462,7 +574,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 ## 目前的暫定決定（要記得回頭驗）
 
-- **第 1–3 天不發人物卡。** 人只作為槽上的 occupant 存在；人物卡等第 17 天委託登場再進手牌。這是為了不讓 prototype 早期就要處理「人在手上是什麼意思」。
+- **第 1–3 天不發人物卡。** 人只作為槽上的 occupant 存在。之後人物卡只由各 NPC 的明示故事效果取得，不在第 17 天自動發全員；委託教學跟第一張人物卡取得走，不綁日期。
 - **地圖座標先給示意值**，但保留相對位置——`待決事項.md` 第 29 項那條隱藏線索需要地理關係。
 - **標記價碼**：全輪 14 個 `madness_cost > 0` row，目前一律 1 張。規則是「往裡走收費，地形不產生卡」，且只收終身第一次主動到訪；多張價碼留給後續內容調整（待決 38 已結案）。
 - **章節變體已投入使用。** `n_litwindow` 與 `n_gathering` 現有跨章版本，多數一般 marker 有所屬章節版本；D1／D2 走定日 fixed，teaser 不需要內容。引擎仍必須支援「沒有當章版本時向下取最近版本」。
