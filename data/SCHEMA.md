@@ -218,7 +218,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `confirm_text` | 確認按鈕／提示文字 |
 | `requires`／`reject_reason` | 選填；不成立時選項仍顯示但鎖定。語彙同 condition；有 requires 必須有理由 |
 | `on_select` | 成功後初始化 run 再套的效果；形狀同 `on_place` |
-| `ending` | 不初始化 run，直接啟動的 ending id |
+| `ending` | 不初始化 run，直接啟動的 ending id；P5 正式值只允許 `ending_refuse_boarding`，source 固定為 `opening_choice` |
 
 每筆必須在 `on_select` 與 `ending` 中**恰有一個**。opening choice 不用 `condition` 隱藏；特別是「不上車」永遠可見，只由 `requires` 灰掉。`on_select` 不得再內藏 `ending`，避免同一選項有兩個結算入口。
 
@@ -303,7 +303,7 @@ BE 與不上車使用線性形狀：
     {
       "id": "uninvited_proxy",
       "when_group": { "group": "partner", "variant": "none" },
-      "source_field": "most_invested_npc",
+      "source_field": "festival_proxy_npc",
       "entries": [
         {
           "value": "ajie",
@@ -318,6 +318,8 @@ BE 與不上車使用線性形狀：
 
 組裝順序固定為：當次分支的 `prefix_pages` → `variant_groups` 陣列順序中各組命中的 pages → 成立的 `lookup_fragments` 陣列順序 → `suffix_pages`。first_seen 只在 history 尚無同 ending id 時使用；其餘使用 repeat。
 
+resolver 輸出的 `page_refs` 是有序 `Array[String]`。每一筆都用穩定 id 路徑，不含陣列 index，例如 `ending_replaced/first_seen/prefix_pages/replacement`、`ending_replaced/first_seen/variant_groups/partner/ajie/partner_ajie_long`、`ending_replaced/repeat/lookup_fragments/uninvited_proxy/acai/proxy_acai_short`。路徑每一段必須是既有 id，id 採 snake_case 且本身不得含 `/`；deserialize 只能接受能重新解析到同一正式 page 的 ref，不能把失效 ref 當空頁跳過。
+
 | 結構 | 規約 |
 |---|---|
 | `variant_groups[].id` | `ending_replaced` 正式資料恰有 `partner`、`livelihood`、`inn_appearance`，順序就是後日談順序 |
@@ -326,8 +328,8 @@ BE 與不上車使用線性形狀：
 | `rules[].id` | 寫入 history 的穩定 variant id；同組唯一 |
 | `first_seen_pages`／`repeat_pages` | 皆必填陣列，可為空但欄位不可省略；空陣列表示該 variant 不增加頁面，不是建立一張 `text` 空白的頁 |
 | `lookup_fragments[].when_group` | 只在指定 group 命中指定 variant 時啟用；group／variant 必須存在 |
-| `source_field` | P5 封閉值只有 `most_invested_npc` |
-| `entries[].value` | 對該 source 的完整映射；`most_invested_npc` 必須覆蓋所有 `festival_proxy_eligible:true` 的 NPC |
+| `source_field` | P5 封閉值只有 `festival_proxy_npc` |
+| `entries[].value` | 對該 source 的完整映射；`festival_proxy_npc` 必須覆蓋所有 `festival_proxy_eligible:true` 的 NPC |
 
 `when` 使用同一套 condition 語彙。規則重疊是合法的，因為順序承載優先權；lint 只保證 fallback 與引用完整，不假裝能證明兩個任意條件永不重疊。正式 livelihood rules 的順序必須先叔叔、再前老闆、再周先生、最後皆無；各路線與開關帶的組合直接反映在 variant id／when，不另存第四個 history 欄位。
 
@@ -460,6 +462,7 @@ BE 與不上車使用線性形狀：
 | `on_enter` | beat 首次呈現給玩家時結算一次的效果；鍵同 `on_place` |
 | `echo` | 沒到場時留下什麼：`{day, text, condition}`——該天 `condition` 成立才播（企劃書第十七節殘響三級）。**`day` 必填且必須大於本 beat 的 `when.day`**：引擎掃的是 `echo.day == 今天`，缺欄的 echo 永遠不播。同一段 `text` 不得在多個 beat 重複（lint 8） |
 | `encounter` | 遭遇定義，精確形狀見本節下方 `encounter` 專節 |
+| `phase_exit` | P5 選填；fixed beat 對離開當下時段的通用門檻與結局接點，精確形狀見下。UI 與規則層不得靠 beat id 或槽 id 特判 |
 | `chapter` | **只有夜間標記用**。同一個標記的章節變體，見下 |
 | `note` | 設計註記，引擎不讀 |
 
@@ -651,6 +654,21 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 
 `choice_requires_card:true` 必須有非空 `accepts`，且不得與 `default_if_unresolved:true` 同槽。D43 的前老闆／周先生工作槽都設 true 並只收 protagonist，因此真正接受才會消耗下午；D22 的推論選擇與 D29 邀請維持省略／false，仍可直接選文字答案。無卡直呼 `choose()` 必須回 `card_required` 且零變化，不能只靠 UI 不顯示捷徑。
 
+### `phase_exit`＝離開時段前的通用門檻（P5）
+
+```json
+"phase_exit": {
+  "required_slots": ["compare_registry"],
+  "ending": "ending_replaced",
+  "source": "d45_coda"
+}
+```
+
+- 只允許掛在有明確整數 `when.day`／合法 `when.phase` 的 `fixed:true` beat；`required_slots` 必填、非空、不得重複，且每個 id 必須引用同一父 beat 的槽。
+- 離開該時段前，所有 required slot 都必須已結算；否則 `advance_phase()` 回 `phase_requirements_incomplete`。這只擋離場，不自動放卡或套效果。
+- `ending` 與 `source` 必須同時存在或同時省略；P5 正式資料只有 D45 coda 使用 `ending_replaced`＋`d45_coda`。門檻成立後由規則層啟動結局，不先改 day／phase。
+- `phase_exit` 是資料形狀，不代表所有 fixed beat 都會自動打開面板。D45 仍依既有 fixed 演出進場；本欄只讓規則層可通用判斷「內容完成後才准離開」。
+
 ### `condition` / `requires` 語彙
 
 ```json
@@ -712,10 +730,11 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 
 例外不是保留舊名字，而是把語意寫準：若條件要求「本輪較早已看過某段內容」，使用明確的 run flag。P3-B 落地後，聚會常態內容寫 `saw_n_gathering_intro`，D31 特殊內容讀它；不得改讀 `night_seen: n_gathering`，因為進場會先寫 meta seen，且 meta seen 跨輪。
 
-#### `opening_choice`／`ending_seen`（P5）
+#### `opening_choice`／`ending_seen`／`festival_proxy_is`（P5）
 
 - `opening_choice` 比對當前 run 的 `opening_choice_id`；只在 run mode 可能成立。D7 的拒信回聲用這個，不另複製 `took_album` 旗標。
 - `ending_seen` 的值是 endings id；只查 meta `ending_history` 是否已有該 id，不看輪數、不看知識卡。開局「不上車」只用 `{ending_seen:"ending_replaced"}`。
+- `festival_proxy_is` 比對 run 已凍結的 `selected_festival_proxy_npc`；D31／D39 的候選人物內容只用此條件，不讀當下投入。值必須引用 `festival_proxy_eligible:true` 的 NPC。
 
 ### `on_place` 效果
 
@@ -772,9 +791,22 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 
 #### `ending`（P5）
 
-值是 `endings.json` 的 id。它永遠最後執行：固定效果順序為 `text` → `lose` → `gain` → `switch` → `switch_progress` → `relation` → `madness` → `flag` → `festival_proxy` → `ending`。ending 啟動後其餘 run mutation 會被 mode gate 擋住，因此資料不得在 ending 後期待另一個效果。
+值是 `endings.json` 的 id，但正式 beat effect **只允許** `ending_inventory_be`；其 source 固定為 `ending_effect`。其餘三種 ending 只能由各自專用規則接點提出，不能靠任意 beat 提早啟動。
 
-`gain`／`madness` 若在同一效果塊途中達發狂上限，只先提出 `ending_madness_be` request；等 `flag`／`festival_proxy` 等剩餘鍵完成後才啟動。資料作者看到的順序仍是上面一條，不存在「寫在 madness 後面的鍵可能跑到下一輪」的例外。
+合法的 source ↔ ending 封閉映射只有：
+
+| `source_id` | 唯一合法 ending |
+|---|---|
+| `madness_cap` | `ending_madness_be` |
+| `ending_effect` | `ending_inventory_be` |
+| `d45_coda` | `ending_replaced` |
+| `opening_choice` | `ending_refuse_boarding` |
+
+未知 source、已知 source 配錯 ending、或任意 beat effect 引用非 inventory ending 都是資料錯誤；runtime 仍以 `invalid_ending_source` 防禦。
+
+`ending` 永遠最後執行：固定效果順序為 `text` → `lose` → `gain` → `switch` → `switch_progress` → `relation` → `madness` → `flag` → `festival_proxy` → `ending`。但「最後」指成功 commit 的順序，不代表前面的 mutation 可以先寫入再發現衝突。
+
+套用前必須把同一玩家動作會觸發的全部效果塊合併 preflight（例如 `on_place`＋`on_place_by_level`），在複本狀態依固定鍵序純模擬並產生 mutation plan。`gain`／`madness` 達上限只提出 `ending_madness_be` request；明示 `ending` 提出 inventory request。同一 action 若得到兩個不同 ending request，整個 action 回 `data_conflict`，手牌、旗標、發狂值、槽／choice／行動紀錄全部零變化。preflight 也必須先把 action bookkeeping 與 ending snapshot 驗完；成功時才一次 commit effects → bookkeeping → active ending，不得在 mutation 後再跑可能失敗的 resolver。`EffectApply` 本身不得直接呼叫 `start_ending()`。
 
 ---
 
