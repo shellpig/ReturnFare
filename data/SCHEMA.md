@@ -406,7 +406,8 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
     "repeat_each_run": true,
     "charge_first_visit": true,
     "per_round_slot_cost": 1,
-    "escape_cost": null,
+    "escape_cost": 1,
+    "allow_discard": true,
     "rounds": [
       {
         "id": "first_demand",
@@ -435,10 +436,11 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 | 欄位 | 規約 |
 |---|---|
-| `repeat_each_run` | 選填 boolean，預設 false；只可用在定日 fixed encounter。true 時不得 `meta_once` |
-| `charge_first_visit` | 選填 boolean，預設 false；只可用在 night-layer fixed encounter。true＝強制到訪仍按 location `madness_cost` 收終身第一次費用；不是遭遇額外費用 |
-| `per_round_slot_cost` | 必填正整數；每進一個 round 增加的壓力佔格 |
+| `repeat_each_run` | 選填 boolean，預設 false；只可用在**有明確整數 `when.day`** 的 fixed encounter，phase 可為 night。true 時不得 `meta_once` |
+| `charge_first_visit` | 選填 boolean，預設 false；只可用在 beat 所掛 location 的 `layer == "night"` 時。true＝強制到訪前先保存是否終身 seen，只有此前未 seen 才按 location `madness_cost` 收一次；不是遭遇額外費用 |
+| `per_round_slot_cost` | 必填正整數；每進一個 round 增加的壓力佔格。`start_encounter()` 直接進第一回合，沒有另一筆進場 cost；超載 penalty 是規則層明示例外 |
 | `escape_cost` | 必填；`null`＝不可逃，非負整數＝需支付的可丟棄卡數 |
+| `allow_discard` | 選填 boolean，預設 true；是否顯示並接受「主動丟一張卡」操作。D45 為 false；不影響 fallback 對錯答卡的處理 |
 | `rounds` | 非空陣列；第一筆是入口。`id` 在本 encounter 唯一 |
 | `demand` | 當前要求文字 |
 | `responses` | 非空陣列；同一回合可有多組合理回應 |
@@ -451,6 +453,8 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `on_victory`／`on_failure`／`on_escape` | 三者必填，形狀同效果；即使 `escape_cost:null` 也保留 `on_escape`，讓結構固定 |
 
 每張 base card 同一場只能提交一次。response 的 `consume_card` 與 fallback 都不得移除 person／protagonist 等不可丟棄卡；若未來要永久失去人物，必須另建明示的特殊事件規格，不能借 encounter 偷做。
+
+`allow_discard` 與 `escape_cost` 都不是 fallback 的前置。不可丟棄卡答錯時仍留手、記 attempted、保留壓力並照 `next_round` 推進。若規則層判定沒有尚未嘗試的非發狂卡，也沒有可用的 discard／escape，直接套 `on_failure`；資料不另寫「無路可走」分支。
 
 round graph 必須從第一筆全部可達、所有 next_round 存在且每條路可抵達 null；不可用無出口 cycle 模擬「一直答到對」。第一輪暫時拿不到某 response 的卡是合法內容設計，不代表該 response 不可達。
 
