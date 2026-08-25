@@ -4,7 +4,7 @@
 
 最後更新：2026-08-25
 
-> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-H 已全部實作並驗證全綠**；**Phase 2 全數完工——P2-A 發狂卡的產生與倒數、P2-B 縱慾出口與主動縱慾、P2-C 強制縱慾與失控時段、P2-D 視野門檻與發瘋 BE、P2-E headless 重演三種玩家均已實作並驗收（全套 16 套 headless exit 0）**；**Phase 3 已完成規格拆分——P3-A～P3-F 三份階段文件與 Schema 契約均寫到可實作**；**P3-A 夜間資料真值化已實作並驗收（17 套 headless exit 0、`test_p3a` 17 項含 11 個獨立負向 fixture）**；**P3-B 夜間狀態與進入規則已實作並驗收（18 套 headless exit 0、`test_p3b` 12 組全綠、7 種變異測試逐條轉紅）**；**P3-C 夜間內容流程已實作並驗收（19 套 headless exit 0、`test_p3c` 12 組 69 條斷言全綠、驗收 13 條打勾 12 條，K-30／K-33／K-69 結案）**；**P3-D 夜間地點清單與詳情 UI 已實作並驗收（20 套 headless exit 0、UI 模擬工具鏈擴為 69 條 UI 契約／92 個案例變體、K-68／K-91／K-94／K-115 結案）**。**P3-E 對位系統已實作並驗收（21 套 headless exit 0、UI sim 97／74／0 failed、10 條驗收全打勾）。P3-F 全流程驗收機器層已完工並驗證全綠（22 套 headless exit 0、UI sim 97／74／0、K-122／K-123 結案），轉 🟦——剩 👤 人工體感 4 項待真人玩過落檔。**；**Phase 4 已完成規格拆分——P4-A～F 三份階段文件與 `data/SCHEMA.md` 的 `delegation`／`encounter` 契約均寫到可實作，兩輪 review 六條缺口結案（`46cb5ef`／`e3916e5`）。下一步依序實作 P4-A 資料與 SCHEMA 真值化。**
+> **當前進度**：第一輪資料層完成（三章 beats 鋪滿、headless 驗證全綠）；四份關鍵文件建立完成；**Phase 1（最小可玩迴圈）P1-A～P1-H 已全部實作並驗證全綠**；**Phase 2 全數完工——P2-A 發狂卡的產生與倒數、P2-B 縱慾出口與主動縱慾、P2-C 強制縱慾與失控時段、P2-D 視野門檻與發瘋 BE、P2-E headless 重演三種玩家均已實作並驗收（全套 16 套 headless exit 0）**；**Phase 3 已完成規格拆分——P3-A～P3-F 三份階段文件與 Schema 契約均寫到可實作**；**P3-A 夜間資料真值化已實作並驗收（17 套 headless exit 0、`test_p3a` 17 項含 11 個獨立負向 fixture）**；**P3-B 夜間狀態與進入規則已實作並驗收（18 套 headless exit 0、`test_p3b` 12 組全綠、7 種變異測試逐條轉紅）**；**P3-C 夜間內容流程已實作並驗收（19 套 headless exit 0、`test_p3c` 12 組 69 條斷言全綠、驗收 13 條打勾 12 條，K-30／K-33／K-69 結案）**；**P3-D 夜間地點清單與詳情 UI 已實作並驗收（20 套 headless exit 0、UI 模擬工具鏈擴為 69 條 UI 契約／92 個案例變體、K-68／K-91／K-94／K-115 結案）**。**P3-E 對位系統已實作並驗收（21 套 headless exit 0、UI sim 97／74／0 failed、10 條驗收全打勾）。P3-F 全流程驗收機器層已完工並驗證全綠（22 套 headless exit 0、UI sim 97／74／0、K-122／K-123 結案），轉 🟦——剩 👤 人工體感 4 項待真人玩過落檔。**；**Phase 4 已完成規格拆分——P4-A～F 三份階段文件與 `data/SCHEMA.md` 的 `delegation`／`encounter` 契約均寫到可實作，兩輪 review 六條缺口結案（`46cb5ef`／`e3916e5`）。Phase 5 規格亦已提前完成——P5-A～F、opening／ending schema、三章故事映射與跨輪邊界已對齊；不代表跳過 P4。下一步仍依序實作 P4-A 資料與 SCHEMA 真值化。**
 
 ---
 
@@ -45,7 +45,7 @@ headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點�
 
 > 狀態圖例（沿用 AfterTheModel 慣例）：✅ 完成（含可驗收）；🟦 待驗收；🟧 待 headless；📐 規格可實作（三份文件已寫到可動工、程式未開工）；⬜ 待開工／待規劃。
 >
-> **子階段一律一列一個，不得合併。** 一個 Phase 只要拆出了子階段，本表就照子階段列，不寫成「P2（含 A～E）」那種一列。理由是本表是進度的單一事實來源——合併之後看不出卡在哪一個子階段，而那正是要查這張表的時候想知道的事。尚未規劃子階段的 Phase（目前 P3 之後）維持一列，等規格寫出來再拆。
+> **子階段一律一列一個，不得合併。** 一個 Phase 只要拆出了子階段，本表就照子階段列，不寫成「P2（含 A～E）」那種一列。理由是本表是進度的單一事實來源——合併之後看不出卡在哪一個子階段，而那正是要查這張表的時候想知道的事。尚未規劃子階段的 Phase（目前 P6 之後）維持一列，等規格寫出來再拆。
 
 | Phase | 狀態 | 概要 |
 |---|---|---|
@@ -76,8 +76,13 @@ headless 實測（2026-08-14，`verify_data.gd`）：**54 張卡／48 個地點�
 | P4-D 遭遇規則 | 📐 | 遭遇狀態機、佔格、回應／錯答／丟棄／逃離、13 碼封閉拒絕矩陣與固定檢查順序、無合法解直接失敗；不消耗行動、不開縱慾備用區 |
 | P4-E 遭遇 UI 與 D8／D45 | 📐 | 共用卡片互動遭遇畫面、D8 首次到訪共用收費（已 seen 不重收）、D45 單回合不可逃不可丟；UI 不繞過規則層 |
 | P4-F 全流程與跨輪驗收 | 📐 | 委託／遭遇 matrix 從資料衍生、第一輪四狀態走 D17～19、第二輪保留 meta 清 run state、greedy 跨兩場遭遇、UI 契約＋人工四項體感 |
-| P5 結局、開局與迴圈 | ⬜ | 三結局、開局十分鐘、繼承完整版 |
-| i18n 管線 | ⬜ | 抽取工具、可翻譯欄位規約、id 凍結、引擎改走翻譯查詢。**銜接工作不是 Phase**；卡它的是資料 schema 定案（P4 是最後一次長欄位），放 P6 之前讓存檔格式一次定稿 |
+| P5-A 結局、開局與跨輪資料 | 📐 | `endings.json`／`opening_choices.json`、四 ending id、兩張新卡、D26／D29／D43 映射、lint 17～19；不接玩家操作 |
+| P5-B 頂層流程與結局狀態機 | 📐 | `opening`／`run`／`ending`、ending snapshot、逐頁 reveal／advance／skip、跨 mode 封鎖與序列化 |
+| P5-C 四類結局與組合後日談 | 📐 | 正常資料組合、兩種 BE、不上車、同 ending id 首見長版／重見摘要；不清 run |
+| P5-D 開局、歷輪摘要與跨輪重置 | 📐 | 三個 opening choice、唯一 `complete_ending()`、history、魔法物品例外、D29 逾期預設與第二輪重入 |
+| P5-E 開局與結局 UI | 📐 | 故事內開局、結局逐頁、按一下補整頁／再按翻頁、重見跳過；不做 title／save／history UI |
+| P5-F 多結局與跨輪全流程驗收 | 📐 | 首輪三類＋解鎖後不上車、連續多輪、P1～P4 reset／meta、headless＋UI sim＋真人閱讀 |
+| i18n 管線 | ⬜ | 抽取工具、可翻譯欄位規約、id 凍結、引擎改走翻譯查詢。**銜接工作不是 Phase**；卡它的是資料 schema 定案（P5 補完 opening／ending 玩家欄位），放 P6 之前讓存檔格式一次定稿 |
 | P6 存檔 UI | ⬜ | 槽位、version 遷移、輪中存讀 |
 | 內容期 | ⬜ | 文本／演出／UI 正式化／實際翻譯——引擎期玩過之後才排。UI 正式化第一天先拿佔位英文測版面（英文通常比中文長 40–80%） |
 
@@ -122,6 +127,7 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 
 ## 下一步
 
+- 2026-08-25：**P5 結局、開局與迴圈規格完成，提前拆成 P5-A～P5-F；仍須等 P4-A～F 實作完成後才開工。** 三份階段文件標題對齊，`data/SCHEMA.md` 新增 `opening_choices.json`／`endings.json`、`loop_persistent`、`festival_proxy_eligible`、`default_if_unresolved`、`choice_requires_card`、`festival_proxy`／`ending` 效果。拍板：四個穩定 ending id（首輪可達前三）；正常結局用伴侶／生計／旅館外觀組合；不上車只由正常替換 history 解鎖，走外地人生後早死並回圈；任一 ending 完成才 append history、發「我回來過」、清 run 回 opening；首見同 id 不可整段跳過，按一次補完整頁、再按翻頁。D29 首輪候選為阿婕／阿薇／阿財並在當日凍結；D43 前老闆／周先生都要求主角卡、消耗下午。普通物品不跨輪，第一輪正式魔法跨時物品為 0。P5 不含待決 25／26、history UI、title／save UI 或輪內錨點回溯。**下一個實作任務仍是 P4-A。**
 - 2026-08-25：**P4 委託與遭遇規格完成，拆成六個可獨立驗收子階段，並通過兩輪 review。** `實作規格書.md`、`開發設計方針.md`、`測試指南.md` 使用完全對齊的 P4-A～P4-F 標題；`data/SCHEMA.md` 補 `delegation`（`result_timing`／`preview`／`tendency`／`report`）與 `encounter`（`repeat_each_run`／`charge_first_visit`／`per_round_slot_cost`／`escape_cost`／`allow_discard`／round graph）兩組契約。核心拍板：委託是「放人物卡不放主角卡」的 slot、一天一人一次、immediate／next_morning 兩種回報、不吃行動格、不增 `npc_action_counts`；遭遇是每回合多佔一格手牌的面板、13 碼封閉拒絕矩陣＋四入口固定檢查順序、三出口、無合法解直接失敗；run 層只加三筆（`delegates_used_today`／`pending_delegation_reports`／`active_encounter`）、`end_run()` 全清；D8 是 `repeat_each_run`＋`charge_first_visit` 的 dated night 遭遇（地點 `n_manydoors`、首次到訪共用收費且已 seen 不重收）、D45 單回合不可逃不可丟、D17 退掉自動發三張人物卡（改具名事件取得）；P4 不做第二套卡組、戰鬥數值、成功率或通用永久失去人物。**第一輪 review 抓到六條缺口——遭遇拒絕碼未釘機器字串、進場佔格是否雙計語意、D45 discard 引用不存在欄位、`charge_first_visit` 重收語意、定日／night-layer 術語易混、fallback 無可丟棄卡的行為；`e3916e5` 六條全修並同批補齊測試指南驗收條目（含拒絕順序測試與 `discard_disabled`／無合法解 failure 兩條新驗收）。** 複審確認四份文件互相對齊、未引入新矛盾；剩一條極低觀察（`when.phase==night` 與 location `layer==night` 兩套判準未由 lint 強制一致，現行資料不變式下對 D8 一致，未落 K）。**下一步依序實作 P4-A，先定資料與 lint，不先接玩家操作。**
 - 2026-08-25：**P3-F 機器層完工並通過 verifier 驗證，測試指南七條機器條目全打勾，P3-F 轉 🟦（剩 👤 人工體感）**（`72b84ca` headless 套件＋K-123 契約、`98949f1` 模擬文件第四次重跑）。verifier 自跑證據：**22 套 headless 逐套 exit 0**（`test_p3f` 5 組：28-row 動態 matrix／路徑效率 13／最大壓力 14／第二輪五路徑抽樣／跨輪決定論）、**UI sim 97 變體／74 catalog／74 executed／failed 0**、11 條負向反證如期失敗。**K-122 結案**：`發狂卡機制模擬.md` 改第四次重跑，補路徑效率（13 Cost）與最大壓力（14 Cost）兩條具名策略，A 視野 18／B 21／窗口 8–14＋16–23＋42–44 與 `test_p2_sim.gd` 現行斷言逐項對上。**K-123 結案**：夜間按鈕三態塞進 `p3d_05_sleep`（「直接睡」→「進入隔天」）走真實 input event。code review：`open_night_marker` 全退場、builder／gs／main 無 night `when` 掃描，K-34／35 由 `test_p3f` 測試 1 明示斷言，K-68→`p2d_01_vision_three`、K-70→`p2d_02_be_screen` 兩契約綠，K-72 未被擴張（commit 僅動三檔）。**手牌溢位**落檔 B-05（warning-only 軟上限＝刻意，超載處置＝待決 34，觸發點 P4 後實際遊玩，不修）。**剩 👤 人工體感 4 項**（28 項掃讀不跳位／三種按鈕停拍／灰地點理由／多對一命名）未落檔，需真人玩第一輪＋第二輪抽查後逐項寫入，P3-F 才轉 ✅。
 - 2026-08-23：**P3-E 對位系統完工並通過 verifier 驗收，10 條驗收全打勾**（`cfd6796` 實作、`37f4b58` 修 review 三條次要觀察）。`cfd6796` 做 `PanelBuilder.alignment_offer()`（純衍生 offer）＋`GameState.confirm_night_alignment()`（六碼封閉拒絕矩陣、成功呼叫 `gain_card()` 不耗行動格）、`location_panel` 加 `NightAlignButton`＋`ConfirmationDialog`、UI sim 補 `p3e_01`～`05` 5 契約（catalog 69→74、變體 92→97）。**verifier 自跑證據**：21 套 headless exit 0（含 `test_p3e` 6 組）、UI sim **97 變體／74 契約／0 failed**、11 條負向反證如期失敗、`p3e_01`～`05` 全 OK。**第一輪 review 抓到三條次要觀察**（非假綠，都有測試會咬）：①`alignment_offer` 與 `confirm_night_alignment` 檢查順序分歧（offer 先查地點/layer、confirm 先查 phase）；②headless 成功路徑沒斷言 `action_spent` 不變/未寫 slot；③`data_conflict` 也涵蓋單 row 缺 `night_reveal` 但無測試釘。**`37f4b58` 三條全修**：offer 改先查 phase 與 confirm 同序、test 6 加 3 個交集案例驗 phase 優先；一對一/多對一 confirm 後補「action_spent=false 且 slots/choices 空」斷言；test 4.2 加單 row 缺卡 fixture。**verifier 獨立變異測試**：釘掉 `already_known` → `test_p3e` 轉 2 紅（reject 5.6 ＋ offer/confirm parity）；對調 confirm 的 phase/unknown 順序 → 交集案例轉 1 紅，均還原乾淨。**如實補充**：offer 只回 `available` 布林、不回 `reason_code`，其內部檢查順序對測試不可觀測——交集案例守的是 confirm 的優先序（可觀測那半），offer 重排屬防禦性一致化。**驗證過程插曲**：verifier 首輪變異測試誤用 `git checkout` 還原，把當時未提交的 `confirm_night_alignment` 一併還原掉，污染了兩次 UI sim 的 p3e_04/05 結果；逐字還原（52/0 與原 diffstat 吻合）後重跑全綠，已改用 Edit 正反做變異、不再對未提交碼用 checkout。

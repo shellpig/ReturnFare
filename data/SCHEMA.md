@@ -11,7 +11,7 @@
 | 時期 | 規則 |
 |---|---|
 | **i18n 管線建好之前**（現在） | `id` 可以自由改名。改完跑 `verify_data` 確認引用沒斷即可 |
-| **i18n 管線建好之後** | `beats[].id`、`slots[].id`、`cards[].id`、`locations[].id`、`npcs[].id` **全部凍結**。要換語意就新增一個 id，不改舊的 |
+| **i18n 管線建好之後** | `beats[].id`、`slots[].id`、`cards[].id`、`locations[].id`、`npcs[].id`、`opening_choices[].id`、`endings[].id` 與所有 ending page／variant id **全部凍結**。要換語意就新增一個 id，不改舊的 |
 
 管線的排程住 `開發設計方針.md > Phase 分期總表`（P5 之後、P6 之前）。**在那之前不必為了將來凍結而綁手綁腳**——這一條寫在這裡是為了讓凍結那天有明確的界線，不是現在就生效。
 
@@ -28,6 +28,8 @@
 | `npcs.json` | `name`、`locked_name` |
 | `card_types.json` | `name` |
 | `beats/*.json` | `title`、`text`、`slots[].label`、`slots[].reject_reason`、`reject_reason`、`echo.text`、`on_enter.text`、`on_place.text`、`slots[].delegation.preview`、`slots[].delegation.tendency`、`slots[].delegation.report.text`、`encounter.rounds[].demand`、`encounter.rounds[].responses[].on_resolve.text`、`encounter.rounds[].fallback.on_resolve.text`、`encounter.on_victory.text`／`on_failure.text`／`on_escape.text` |
+| `opening_choices.json` | `label`、`preview`、`confirm_text`、`reject_reason`、`on_select.text` |
+| `endings.json` | 所有 `pages[]`／`*_pages[]` 內的 `text` |
 
 `note` 與 `_comment` 是給開發者看的，**不翻譯、不抽取**。
 
@@ -176,6 +178,159 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 >
 > **為什麼不另開一個 `data/indulgence_exits.json` 頂層檔**：出口要走的是同一套 beat／槽／三態／`on_place` 機制，另開檔等於多一條解析路徑，而它們的差別只有「哪幾天成立」這一件事。擴 `when` 只動一個判斷式。
 
+## `opening_choices.json`（P5）
+
+故事內「出門前的十分鐘」選項，頂層是**有序陣列**。正式資料恰三筆，順序本身就是 UI 順序：
+
+```json
+[
+  {
+    "id": "take_family_album",
+    "label": "帶上父母留下的舊相簿",
+    "preview": "……",
+    "confirm_text": "……",
+    "on_select": { "gain": ["item_family_album"] }
+  },
+  {
+    "id": "return_missed_call",
+    "label": "回撥那通未接來電",
+    "preview": "……",
+    "confirm_text": "……",
+    "on_select": { "flag": { "outside_job_waiting": true } }
+  },
+  {
+    "id": "refuse_boarding",
+    "label": "不上車",
+    "preview": "……",
+    "confirm_text": "……",
+    "requires": { "ending_seen": "ending_replaced" },
+    "reject_reason": "你還沒有理由放棄這趟路。",
+    "ending": "ending_refuse_boarding"
+  }
+]
+```
+
+| 欄位 | 規約 |
+|---|---|
+| `id` | 全檔唯一。正式三 id 與順序如上 |
+| `label` | 選項列文字 |
+| `preview` | 確認前的故事預覽，不揭露完整結果 |
+| `confirm_text` | 確認按鈕／提示文字 |
+| `requires`／`reject_reason` | 選填；不成立時選項仍顯示但鎖定。語彙同 condition；有 requires 必須有理由 |
+| `on_select` | 成功後初始化 run 再套的效果；形狀同 `on_place` |
+| `ending` | 不初始化 run，直接啟動的 ending id |
+
+每筆必須在 `on_select` 與 `ending` 中**恰有一個**。opening choice 不用 `condition` 隱藏；特別是「不上車」永遠可見，只由 `requires` 灰掉。`on_select` 不得再內藏 `ending`，避免同一選項有兩個結算入口。
+
+## `endings.json`（P5）
+
+頂層是有序陣列，正式資料恰四筆：`ending_replaced`、`ending_madness_be`、`ending_inventory_be`、`ending_refuse_boarding`。ending id 是內部穩定鍵，不直接顯示給玩家。
+
+### 共用 page
+
+```json
+{ "id": "outside_years", "text": "……" }
+```
+
+- 同一 ending 內所有巢狀 page id 全域唯一；不能因 first／repeat 分支不同就重複。
+- `text` 必填且非空，是可翻譯欄位。顯示順序只由所在陣列決定。
+- runtime page ref 由 ending id、容器路徑與 page id 組成；存檔存 ref，不存中文全文。
+
+### `kind: "linear"`
+
+BE 與不上車使用線性形狀：
+
+```json
+{
+  "id": "ending_refuse_boarding",
+  "kind": "linear",
+  "first_seen": {
+    "pages": [
+      { "id": "outside_years", "text": "……" },
+      { "id": "early_death", "text": "……" }
+    ]
+  },
+  "repeat": {
+    "pages": [
+      { "id": "outside_summary", "text": "……" },
+      { "id": "return_again", "text": "……" }
+    ],
+    "skip_to": "return_again"
+  }
+}
+```
+
+`first_seen.pages` 與 `repeat.pages` 都必須非空。`repeat.skip_to` 必填：值為 repeat 分支內必達的 page id，或字面值 `"complete"`；首見永遠不可整段跳過，所以 first_seen 沒有 skip 欄位。
+
+### `kind: "composite"`
+
+正常替換結局用組合形狀，不為每個人生排列建立 ending id：
+
+```json
+{
+  "id": "ending_replaced",
+  "kind": "composite",
+  "first_seen": {
+    "prefix_pages": [{ "id": "replacement", "text": "……" }],
+    "suffix_pages": [{ "id": "long_return", "text": "……" }]
+  },
+  "repeat": {
+    "prefix_pages": [{ "id": "again", "text": "……" }],
+    "suffix_pages": [{ "id": "short_return", "text": "……" }],
+    "skip_to": "short_return"
+  },
+  "variant_groups": [
+    {
+      "id": "partner",
+      "history_field": "partner_variant",
+      "rules": [
+        {
+          "id": "ajie",
+          "when": { "flag": "invited_ajie" },
+          "first_seen_pages": [{ "id": "partner_ajie_long", "text": "……" }],
+          "repeat_pages": [{ "id": "partner_ajie_short", "text": "……" }]
+        },
+        {
+          "id": "none",
+          "fallback": true,
+          "first_seen_pages": [{ "id": "partner_none_long", "text": "……" }],
+          "repeat_pages": [{ "id": "partner_none_short", "text": "……" }]
+        }
+      ]
+    }
+  ],
+  "lookup_fragments": [
+    {
+      "id": "uninvited_proxy",
+      "when_group": { "group": "partner", "variant": "none" },
+      "source_field": "most_invested_npc",
+      "entries": [
+        {
+          "value": "ajie",
+          "first_seen_pages": [{ "id": "proxy_ajie_long", "text": "……" }],
+          "repeat_pages": [{ "id": "proxy_ajie_short", "text": "……" }]
+        }
+      ]
+    }
+  ]
+}
+```
+
+組裝順序固定為：當次分支的 `prefix_pages` → `variant_groups` 陣列順序中各組命中的 pages → 成立的 `lookup_fragments` 陣列順序 → `suffix_pages`。first_seen 只在 history 尚無同 ending id 時使用；其餘使用 repeat。
+
+| 結構 | 規約 |
+|---|---|
+| `variant_groups[].id` | `ending_replaced` 正式資料恰有 `partner`、`livelihood`、`inn_appearance`，順序就是後日談順序 |
+| `history_field` | 三組分別寫 `partner_variant`、`livelihood_variant`、`inn_appearance_variant`，不得重複 |
+| `rules[]` | 依序第一個 `when` 成立者命中；最後恰一筆 `{fallback:true}`，fallback 不得同時有 when |
+| `rules[].id` | 寫入 history 的穩定 variant id；同組唯一 |
+| `first_seen_pages`／`repeat_pages` | 皆必填陣列，可為空但欄位不可省略 |
+| `lookup_fragments[].when_group` | 只在指定 group 命中指定 variant 時啟用；group／variant 必須存在 |
+| `source_field` | P5 封閉值只有 `most_invested_npc` |
+| `entries[].value` | 對該 source 的完整映射；`most_invested_npc` 必須覆蓋所有 `festival_proxy_eligible:true` 的 NPC |
+
+`when` 使用同一套 condition 語彙。規則重疊是合法的，因為順序承載優先權；lint 只保證 fallback 與引用完整，不假裝能證明兩個任意條件永不重疊。正式 livelihood rules 的順序必須先叔叔、再前老闆、再周先生、最後皆無；各路線與開關帶的組合直接反映在 variant id／when，不另存第四個 history 欄位。
+
 ## `cards.json`
 
 | 欄位 | 說明 |
@@ -187,13 +342,16 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `slotless` | `true` ＝ 不佔手牌格（只有 `knowledge`） |
 | `discardable` | **必填 boolean**；遭遇錯答消耗、主動丟棄與逃離支付的唯一真值，不得由 `type` 猜測 |
 | `stashable` | 可否放進備用區 |
+| `loop_persistent` | **P5 起必填 boolean**；極少數真正穿越時間的魔法物品為 true。一般物品即使劇情重拿也填 false |
 
 `type`：`protagonist` / `person` / `group` / `equipment` / `consumable` / `info` / `inference` / `document` / `knowledge` / `mood` / `madness` / `routine`
 
 > `protagonist` 不可丟棄、不可寄放，但**可以放置**——放它就是花掉那個時段。
-> `knowledge` 不佔格、唯一跨迴圈繼承。
+> `knowledge` 不佔格，整個集合跨迴圈繼承；這不是 `loop_persistent`，兩者不可混用。
 > `madness` 不可丟棄、不可寄放，只能靠縱慾消掉。
 > **除 `madness` 外，所有卡都是 unique**：重複取得＝no-op（gain 冪等），不會出現第二張。`madness` 是唯一的多實例卡。堆疊卡等真需求出現再開欄位（規格書第三節）。
+
+`loop_persistent:true` 只可用於 `slotless:false`、unique、非 protagonist、非 madness 的卡。取得時寫入 meta persistent set；每輪開局按 cards 資料順序恢復。所有可能同時恢復的卡加 protagonist 不得超過 `tuning.hand_size`。P5 第一輪正式資料全部為 false；機制只用合成 fixture 驗證。
 
 ### 夜間對位知識卡（P3）
 
@@ -269,6 +427,7 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `locked_name` | 未揭露時 UI 顯示什麼；`null` ＝ 一開始就叫本名。NPC 版的地圖對位（企劃書第十五節） |
 | `reveal` | 改叫本名的條件，語彙同 `condition`；`locked_name` 為 `null` 時填 `null` |
 | `card` | 對應的 `person` 卡 id；沒有卡就 `null` |
+| `festival_proxy_eligible` | **P5 起必填 boolean**；是否可成為 D29 不邀路線的慶典代付候選。不是「有人物卡」的同義詞 |
 | `at[]` | 可及性，見下 |
 | `note` | 設計註記，引擎不讀 |
 
@@ -341,6 +500,8 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 | `indulgence` | **只有縱慾出口槽有**：`{weight, auto, soak}`，見上方「縱慾出口」 |
 | `on_place_by_level` | **只有縱慾出口槽有**：強度級的追加效果，見上方「縱慾出口」 |
 | `choice_group` | 同組的槽互斥，見下 |
+| `choice_requires_card` | 選填 boolean，預設 false；只有 choice_group 槽可用。true 時不得走無卡 `choose()`，必須提交 `accepts` 內的卡 |
+| `default_if_unresolved` | 選填 boolean，預設 false；該 choice group 離開時段仍未結算時，自動選本槽。限制見下 |
 | `attention_npc` | 此槽消耗主角行動時，投入帳記給哪位 NPC（選填；未標＝不計。供「不邀任何人時系統挑誰」判定，規格書第十二節） |
 | `note` | 設計註記，引擎不讀 |
 
@@ -467,14 +628,14 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 
 ### `choice_group`＝選擇題
 
-一組槽標同一個 `choice_group`，就變成一道選擇題：**最多選一個，也可以都不選。**
+一組槽標同一個 `choice_group`，就變成一道選擇題：**最多選一個。** 一般組可以都不選；明示逾期預設的組則在離開時段前自動結算預設槽。
 
 | | |
 |---|---|
-| 成本 | **不吃卡、不吃行動格** |
+| 成本 | 預設不吃卡、不吃行動格；`choice_requires_card:true` 時走正常放卡成本，提交 protagonist 就消耗該行動時段 |
 | 互斥 | 選了一個，同組其他的**收起來**（不是灰掉） |
-| 不選 | **合法結果**，而且是預設。走開就是不選 |
-| `accepts` | 在組裡是「**可以**放什麼」，不是「必須放什麼」 |
+| 不選 | 無 `default_if_unresolved` 的組＝合法且不套效果；有預設的組＝走開前由規則層選唯一預設槽 |
+| `accepts` | 一般組裡是「**可以**放什麼」，不是「必須放什麼」；`choice_requires_card:true` 才是硬成本 |
 
 最後一條是關鍵。第 22 天「你覺得哪裡不對」，手上有拍立得或情報卡的玩家可以拖過去比對，**沒有卡的玩家直接選下去，用主角自己的記憶並列**——故事線的硬規則是兩個入口都要通，而 `accepts` 在組外是硬門檻，在組內只是加分路徑。
 
@@ -482,7 +643,11 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 
 > **同一條時段限制照舊。** 因為不吃格，`choice_group` 只能出現在**同一個面板已經有槽吃掉主角卡**的地方，或 `fixed` beat 裡面。理由跟比對那條一樣（見上）：否則一個下午可以把三個地點的選擇題都做掉。
 
-> **「不選」要不要給一個看得見的選項，由那一格自己決定。** 第 29 天的「不邀」是三個並列選項之一、而且是最差的那張牌，所以它明寫成一個組員；選它跟直接走開結果相同，差別只在玩家知不知道自己選了。
+> **「不選」要不要給一個看得見的選項，由那一格自己決定。** 第 29 天的「不邀」是三個並列選項之一、而且是最差的那張牌，所以它明寫成一個組員並標 `default_if_unresolved:true`；選它跟直接走開結果完全相同。
+
+同一 group 若使用逾期預設，必須恰一槽為 true。該槽必須 `accepts:[]`、沒有 `condition`／`requires`／`delegation`，且可由既有無卡 `choose()` 原子結算；否則玩家可能在推進時卡死。預設槽的 `on_place` 照常套用並寫 choice／slot 記錄，不建立第二套「逾期結果」。
+
+`choice_requires_card:true` 必須有非空 `accepts`，且不得與 `default_if_unresolved:true` 同槽。D43 的前老闆／周先生工作槽都設 true 並只收 protagonist，因此真正接受才會消耗下午；D22 的推論選擇與 D29 邀請維持省略／false，仍可直接選文字答案。無卡直呼 `choose()` 必須回 `card_required` 且零變化，不能只靠 UI 不顯示捷徑。
 
 ### `condition` / `requires` 語彙
 
@@ -496,6 +661,8 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 { "flag": "ahong_missing" }
 { "madness_at_least": 3 }
 { "night_seen": "n_ahong_1" }
+{ "opening_choice": "take_family_album" }
+{ "ending_seen": "ending_replaced" }
 { "count_at_least": { "n": 2, "of": [ ... ] } }
 { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
 { "not": { ... } }
@@ -543,6 +710,11 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 
 例外不是保留舊名字，而是把語意寫準：若條件要求「本輪較早已看過某段內容」，使用明確的 run flag。P3-B 落地後，聚會常態內容寫 `saw_n_gathering_intro`，D31 特殊內容讀它；不得改讀 `night_seen: n_gathering`，因為進場會先寫 meta seen，且 meta seen 跨輪。
 
+#### `opening_choice`／`ending_seen`（P5）
+
+- `opening_choice` 比對當前 run 的 `opening_choice_id`；只在 run mode 可能成立。D7 的拒信回聲用這個，不另複製 `took_album` 旗標。
+- `ending_seen` 的值是 endings id；只查 meta `ending_history` 是否已有該 id，不看輪數、不看知識卡。開局「不上車」只用 `{ending_seen:"ending_replaced"}`。
+
 ### `on_place` 效果
 
 ```json
@@ -554,7 +726,9 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
   "switch_progress": { "s6": 1 },
   "relation": { "npc": "ajie", "delta": 1 },
   "madness":  1,
-  "flag":     { "ahong_last_seen": true }
+  "flag":     { "ahong_last_seen": true },
+  "festival_proxy": { "mode": "fixed", "npc": "ajie" },
+  "ending": "ending_inventory_be"
 }
 ```
 
@@ -573,13 +747,32 @@ round graph 必須從第一筆全部可達、所有 next_round 存在且每條�
 
 - `if` 用的是**同一套 `condition` / `requires` 語彙**（見上方「`condition` / `requires` 語彙」），沒有另立第二套。缺 `if` 等於恆成立。
 - **守衛下在單張卡上，不是整個效果塊。** 同一個 `on_enter` 裡的 `flag`、`text`、`switch` 都照跑——只有那一張卡被跳過。這是刻意的：升級型比對的那一格通常還要寫旗標，整塊擋掉會連坐。
-- `lose` 同樣支援，形狀一致。
+- `lose` 同樣支援條件，並可為真正跨輪物品明示永久失去：`{ "card":"item_magic", "if": {...}, "permanent":true }`。`permanent` 只允許 boolean、只對 `loop_persistent:true` 卡有意義；省略／false 只移出本輪 hand，true 另從 meta persistent set 移除。一般卡不得靠此欄偽造跨輪規則。
 
 **什麼時候需要它：知識卡跨輪保留，而 `beats_entered` 每輪清空。** 於是第二輪會重演同一個 beat，`on_enter` 又發一次卡。對一般卡沒差（`gain_card` 冪等、佔格卡 unique），但**升級型比對**會出事——舊版被 `lose` 掉之後，第二輪又被發回來，玩家同時持有升級前與升級後兩張。守衛就是用來讓升級保持單向的。
 
 第一個實例是 `d45_then`（第 45 天傍晚，`k_not_today` → `k_already_on_list`）。**之後每做一組升級型比對，都要在發舊版的地方加上這個守衛。**
 
 > **`switch` 與 `switch_progress` 不一樣。** `switch` 是翻開一個開關（一次就到位）；`switch_progress` 是**累計一格**——同一個開關可以被很多個槽各推一格，第 35 天才結算。目前只有開關 6（陪叔叔）是累計型：第二、三章任何一個**主動選的**診所時段都累計，上午那格固定事件不算。
+
+#### `festival_proxy`（P5）
+
+只用在 D29 invitation choice 的 `on_place`，成功後一次寫入 run `selected_festival_proxy_npc`：
+
+```json
+{ "festival_proxy": { "mode": "fixed", "npc": "ajie" } }
+{ "festival_proxy": { "mode": "highest_eligible", "fallback": "ajie" } }
+```
+
+- `fixed` 必須有 `npc`，且該 NPC 為 `festival_proxy_eligible:true`。
+- `highest_eligible` 必須有合法 `fallback`；只在 eligible NPC 中比較 `npc_action_counts`，最大者勝，同分按 `npcs.json` 陣列順序；全部為 0 使用 fallback。首輪 eligible 子序列固定為阿婕 → 阿薇 → 阿財。
+- 同一輪成功寫入後不得第二次覆寫；D31、D39 與 ending 只讀結果。資料衝突要拒絕整個 choice，不可靜默重算。
+
+#### `ending`（P5）
+
+值是 `endings.json` 的 id。它永遠最後執行：固定效果順序為 `text` → `lose` → `gain` → `switch` → `switch_progress` → `relation` → `madness` → `flag` → `festival_proxy` → `ending`。ending 啟動後其餘 run mutation 會被 mode gate 擋住，因此資料不得在 ending 後期待另一個效果。
+
+`gain`／`madness` 若在同一效果塊途中達發狂上限，只先提出 `ending_madness_be` request；等 `flag`／`festival_proxy` 等剩餘鍵完成後才啟動。資料作者看到的順序仍是上面一條，不存在「寫在 madness 後面的鍵可能跑到下一輪」的例外。
 
 ---
 
