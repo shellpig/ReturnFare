@@ -29,6 +29,11 @@
   - **NB2/NB3**：阿財委託回報文案改 immediate 一致（去掉「隔天」）；D22 過期 note 更新為三個觀察開關的實際寫入端。
   - `test_p4a` 補齊：runtime gate（3 條）、report 語彙/引用、encounter 巢狀引用、小數 cost/day、錯型別 boolean、response id 缺失/重複，共新增約 12 條斷言。
 
+- **Codex review 修正（第三批）**：
+  - lint 16 補 `demand` 必填；response/fallback 的 `next_round` 改成**必須有鍵**（缺鍵不再被 `.get()` 當成明示 null 而靜默提前結束遭遇，對齊 SCHEMA line 613/620）。
+  - lint 16 graph traversal（reachability 與 `_round_can_reach_null`）全面防呆：malformed round/response 先記錯後不再強制轉型，驗證器不會在回報前 runtime crash。
+  - `test_p4a` 補齊 P4-A 明定但先前缺的負向 fixture：`discardable` 缺欄/錯型別（lint 9）、`demand` 缺、response/fallback 缺 `next_round` 鍵、malformed round/response 不 crash，以及 **NB1 直接 regression**（第 8 夜 charge 撞發狂上限 → 恰一次 BE、重置回第 1 天、`beats_entered` 不含 `n_manydoors_ch1`）。
+
 - P5 文件 review 缺口已同步收斂至 `實作規格書.md`、`開發設計方針.md`、`測試指南.md`、`data/SCHEMA.md`：
   - `advance_phase() -> Dictionary` 自 P4-D 升級，P5-D 固定 mode → encounter → night staging → defaults → `phase_exit` → transition validation → atomic commit 的順序；`resolve_night_advance()` 於 P5-D 退場。
   - D45 coda 改由 beat `phase_exit.required_slots` 資料化，不在 `main.gd` 或 beat／slot id 特判。

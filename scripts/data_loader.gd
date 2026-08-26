@@ -1012,6 +1012,8 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 		for rid_k in round_by_id.keys():
 			var r: Dictionary = round_by_id[rid_k]
 			var rwhere := "%s round:%s" % [where, rid_k]
+			if str(r.get("demand", "")).is_empty():
+				problems.append("%s：round 缺 demand" % rwhere)
 			var resp_v: Variant = r.get("responses")
 			if not (resp_v is Array) or (resp_v as Array).is_empty():
 				problems.append("%s：responses 必須非空" % rwhere)
@@ -1053,7 +1055,10 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 						problems.append("%s response:%s：缺 on_resolve" % [rwhere, respid])
 					else:
 						_lint_effect(resp.get("on_resolve"), bid, "%s response:%s.on_resolve" % [rwhere, respid], problems)
-					_lint_next_round(resp.get("next_round"), round_ids, "%s response:%s" % [rwhere, respid], problems)
+					if not resp.has("next_round"):
+						problems.append("%s response:%s：缺 next_round（必須明示 id 或 null）" % [rwhere, respid])
+					else:
+						_lint_next_round(resp.get("next_round"), round_ids, "%s response:%s" % [rwhere, respid], problems)
 			var fb_v: Variant = r.get("fallback")
 			if not (fb_v is Dictionary):
 				problems.append("%s：缺 fallback" % rwhere)
@@ -1065,9 +1070,12 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 					problems.append("%s fallback：缺 on_resolve" % rwhere)
 				else:
 					_lint_effect(fb.get("on_resolve"), bid, "%s fallback.on_resolve" % rwhere, problems)
-				_lint_next_round(fb.get("next_round"), round_ids, "%s fallback" % rwhere, problems)
+				if not fb.has("next_round"):
+					problems.append("%s fallback：缺 next_round（必須明示 id 或 null）" % rwhere)
+				else:
+					_lint_next_round(fb.get("next_round"), round_ids, "%s fallback" % rwhere, problems)
 
-		if not round_by_id.is_empty():
+		if not round_by_id.is_empty() and rounds[0] is Dictionary:
 			var first_id := str((rounds[0] as Dictionary).get("id", ""))
 			var reachable := {}
 			var stack := [first_id]
@@ -1077,14 +1085,19 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 					continue
 				reachable[cur] = true
 				var cr: Dictionary = round_by_id[cur]
-				for resp_vv in cr.get("responses", []) as Array:
-					var nr: Variant = (resp_vv as Dictionary).get("next_round")
-					if nr != null:
-						stack.append(str(nr))
-				var fbb: Dictionary = cr.get("fallback", {}) as Dictionary
-				var fnr: Variant = fbb.get("next_round")
-				if fnr != null:
-					stack.append(str(fnr))
+				var cr_resps: Variant = cr.get("responses", [])
+				if cr_resps is Array:
+					for resp_vv in cr_resps as Array:
+						if not (resp_vv is Dictionary):
+							continue
+						var nr: Variant = (resp_vv as Dictionary).get("next_round")
+						if nr != null:
+							stack.append(str(nr))
+				var cr_fb: Variant = cr.get("fallback")
+				if cr_fb is Dictionary:
+					var fnr: Variant = (cr_fb as Dictionary).get("next_round")
+					if fnr != null:
+						stack.append(str(fnr))
 			for rid2 in round_ids.keys():
 				if not reachable.has(rid2):
 					problems.append("%s：round %s 不可從第一回合到達" % [where, rid2])
@@ -1142,18 +1155,25 @@ static func _round_can_reach_null(rid: String, round_by_id: Dictionary, visiting
 		return false
 	visiting[rid] = true
 	var r: Dictionary = round_by_id[rid]
-	for resp_vv in r.get("responses", []) as Array:
-		var nr: Variant = (resp_vv as Dictionary).get("next_round")
-		if nr == null:
+	var r_resps: Variant = r.get("responses", [])
+	if r_resps is Array:
+		for resp_vv in r_resps as Array:
+			if not (resp_vv is Dictionary):
+				continue
+			if not (resp_vv as Dictionary).has("next_round"):
+				continue
+			var nr: Variant = (resp_vv as Dictionary).get("next_round")
+			if nr == null:
+				return true
+			if _round_can_reach_null(str(nr), round_by_id, visiting):
+				return true
+	var r_fb: Variant = r.get("fallback")
+	if r_fb is Dictionary and (r_fb as Dictionary).has("next_round"):
+		var fnr: Variant = (r_fb as Dictionary).get("next_round")
+		if fnr == null:
 			return true
-		if _round_can_reach_null(str(nr), round_by_id, visiting):
+		if _round_can_reach_null(str(fnr), round_by_id, visiting):
 			return true
-	var fb: Dictionary = r.get("fallback", {}) as Dictionary
-	var fnr: Variant = fb.get("next_round")
-	if fnr == null:
-		return true
-	if _round_can_reach_null(str(fnr), round_by_id, visiting):
-		return true
 	return false
 
 

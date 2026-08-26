@@ -15,10 +15,12 @@ func _initialize() -> void:
 	await process_frame
 	print("=== P4-A 資料與 SCHEMA 真值化測試 ===")
 	_test_positive_real_data()
+	_test_lint9_discardable_negative()
 	_test_lint15_negative()
 	_test_lint16_negative()
 	_test_lint14_repeat_exception()
 	_test_runtime_gate()
+	_test_nb1_d8_be_regression()
 
 	if _failed > 0:
 		push_error("test_p4a: %d 個斷言失敗" % _failed)
@@ -170,6 +172,31 @@ func _test_positive_real_data() -> void:
 		_ok("D17 on_enter 無無條件人物卡發放（不再自動發三張）")
 	else:
 		_fail("D17 on_enter 仍無條件發人物卡：%s" % str(d17_gain))
+
+
+# ─────────────────────────── lint 9 discardable 負向 ───────────────────────────
+func _test_lint9_discardable_negative() -> void:
+	print("\n--- 1b. lint 9 discardable 缺欄/錯型別負向 ---")
+	var ct := {
+		"info": { "id": "info" }, "person": { "id": "person" },
+		"protagonist": { "id": "protagonist" }, "knowledge": { "id": "knowledge" },
+	}
+	# 缺欄
+	var loader1 := DataLoader.new()
+	loader1.card_types = ct
+	loader1.cards = { "c1": { "id": "c1", "type": "info" } }
+	if _errs_contain(DataLoader.lint_card_types(loader1), "缺少必填欄位 discardable"):
+		_ok("缺 discardable 欄位被抓")
+	else:
+		_fail("缺 discardable 未被抓")
+	# 錯型別
+	var loader2 := DataLoader.new()
+	loader2.card_types = ct
+	loader2.cards = { "c2": { "id": "c2", "type": "info", "discardable": "yes" } }
+	if _errs_contain(DataLoader.lint_card_types(loader2), "discardable 必須是 boolean"):
+		_ok("discardable 錯型別被抓")
+	else:
+		_fail("discardable 錯型別未被抓")
 
 
 # ─────────────────────────── lint 15 負向 ───────────────────────────
@@ -520,6 +547,44 @@ func _test_lint16_negative() -> void:
 	else:
 		_fail("encounter on_resolve.gain 壞引用未被抓")
 
+	# round 缺 demand
+	var ed1: Dictionary = base_enc.call(); ed1["rounds"][0].erase("demand")
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ed1), cards, locs)), "round 缺 demand"):
+		_ok("round 缺 demand 被抓")
+	else:
+		_fail("round 缺 demand 未被抓")
+
+	# response 缺 next_round 鍵（不得被 .get() 當成明示 null）
+	var ed2: Dictionary = base_enc.call(); ed2["rounds"][0]["responses"][0].erase("next_round")
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ed2), cards, locs)), "response:a：缺 next_round"):
+		_ok("response 缺 next_round 鍵被抓")
+	else:
+		_fail("response 缺 next_round 鍵未被抓")
+
+	# fallback 缺 next_round 鍵
+	var ed3: Dictionary = base_enc.call(); ed3["rounds"][0]["fallback"].erase("next_round")
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ed3), cards, locs)), "fallback：缺 next_round"):
+		_ok("fallback 缺 next_round 鍵被抓")
+	else:
+		_fail("fallback 缺 next_round 鍵未被抓")
+
+	# malformed 第一 round（非 Dictionary）不 crash，且記錯
+	var ed4: Dictionary = base_enc.call(); ed4["rounds"] = ["not_a_dict"]
+	var l_ed4 := DataLoader.lint_encounters(_make_loader(make_enc.call(ed4), cards, locs))
+	if _errs_contain(l_ed4, "round 不是 Dictionary"):
+		_ok("malformed round 記錯且未 crash（traversal 防呆）")
+	else:
+		_fail("malformed round 未被抓：%s" % str(l_ed4))
+
+	# malformed response（round 合法但 response 非 Dictionary）不 crash
+	var ed5: Dictionary = base_enc.call()
+	ed5["rounds"][0]["responses"] = ["bad", { "id": "g", "accepts": ["info_x"], "consume_card": false, "next_round": null, "on_resolve": { "text": "t" } }]
+	var l_ed5 := DataLoader.lint_encounters(_make_loader(make_enc.call(ed5), cards, locs))
+	if _errs_contain(l_ed5, "response 不是 Dictionary"):
+		_ok("malformed response 記錯且未 crash（reachability/can_reach_null 防呆）")
+	else:
+		_fail("malformed response 未被抓：%s" % str(l_ed5))
+
 	# 邊界：合法 D8 型（repeat+charge，night-layer）不報錯
 	var e_ok: Dictionary = base_enc.call(); e_ok["repeat_each_run"] = true; e_ok["charge_first_visit"] = true
 	if DataLoader.lint_encounters(_make_loader(make_enc.call(e_ok), cards, locs)).size() == 0:
@@ -603,3 +668,39 @@ func _test_runtime_gate() -> void:
 		_ok("親自處理槽提交 protagonist 成功並消耗行動格")
 	else:
 		_fail("親自處理槽未消耗行動格：ok=%s action_spent=%s" % [str(r3.get("ok")), str(gs.get("action_spent"))])
+
+
+# ─── 6. NB1 regression：D8 charge_first_visit 撞發狂上限，重置後不寫入 D8 beat ───
+func _test_nb1_d8_be_regression() -> void:
+	print("\n--- 6. NB1：D8 首次收費撞發狂上限，重置後不寫入 D8 beat ---")
+	var data_node := PlaythroughGreedy.setup_data(self)
+	var gs := PlaythroughGreedy.setup_game_state(self, data_node)
+	if data_node == null or gs == null or not bool(data_node.get("ok")):
+		_fail("GameState/Data 未就緒，跳過 NB1 regression")
+		return
+
+	var cap: int = int(data_node.call("tuning", "madness_cap", 7))
+	# 乾淨重置本輪與 meta seen（讓 D8 是終身首次），排到第 8 夜
+	gs.call("end_run")
+	(gs.get("night_locations_seen") as Dictionary).clear()
+	(gs.get("night_once_beats_seen") as Dictionary).clear()
+	(gs.get("beats_entered") as Dictionary).clear()
+	gs.set("day", 8)
+	gs.set("phase", "night")
+	# 先塞 cap-1 張發狂卡；D8 首次收費 +1 剛好撞上限
+	for _i in range(cap - 1):
+		gs.call("gain_card", "madness", false)
+
+	var ended := [0]
+	var cb := func(_eid: String): ended[0] += 1
+	gs.connect("run_ended", cb)
+	gs.call("play_night_fixed")
+	gs.disconnect("run_ended", cb)
+
+	var be_fired: bool = ended[0] == 1
+	var was_reset: bool = int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning"
+	var d8_not_written: bool = not (gs.get("beats_entered") as Dictionary).has("n_manydoors_ch1")
+	if be_fired and was_reset and d8_not_written:
+		_ok("D8 首次收費撞上限 → 恰觸發一次 BE、重置回第 1 天、且未把 n_manydoors_ch1 寫進新輪 beats_entered")
+	else:
+		_fail("NB1 regression：be_fired=%s reset=%s d8_not_written=%s" % [str(be_fired), str(was_reset), str(d8_not_written)])
