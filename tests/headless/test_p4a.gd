@@ -1,5 +1,7 @@
 extends SceneTree
 
+const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
+
 ## P4-A 資料與 SCHEMA 真值化測試（實作規格書 P4-A、測試指南 P4-A）。
 ## 正向：載入正式資料，驗 lint 15/16 全綠、每張卡有 boolean discardable，並動態數出
 ##       委託槽數、encounter beat 數、D8/D45 契約值（不預填完整表）。
@@ -10,11 +12,13 @@ var _failed := 0
 
 
 func _initialize() -> void:
+	await process_frame
 	print("=== P4-A 資料與 SCHEMA 真值化測試 ===")
 	_test_positive_real_data()
 	_test_lint15_negative()
 	_test_lint16_negative()
 	_test_lint14_repeat_exception()
+	_test_runtime_gate()
 
 	if _failed > 0:
 		push_error("test_p4a: %d 個斷言失敗" % _failed)
@@ -264,6 +268,22 @@ func _test_lint15_negative() -> void:
 	else:
 		_fail("缺 reject_reason 未被抓：%s" % str(l9))
 
+	# report 未知效果鍵（封閉語彙）
+	var s11: Dictionary = deleg_slot.call({ "delegation": { "result_timing": "next_morning", "preview": "x", "tendency": "y", "report": { "text": "r", "teleport": "z" } } })
+	var l11 := DataLoader.lint_delegations(_make_loader(make.call(s11), cards, locs))
+	if _errs_contain(l11, "未知效果鍵"):
+		_ok("report 未知效果鍵被抓")
+	else:
+		_fail("report 未知效果鍵未被抓：%s" % str(l11))
+
+	# report 引用不存在卡（verify_references 遞迴 delegation）
+	var s12: Dictionary = deleg_slot.call({ "delegation": { "result_timing": "next_morning", "preview": "x", "tendency": "y", "report": { "text": "r", "gain": ["ghost_card"] } } })
+	var vr12 := _make_loader(make.call(s12), cards, locs).verify_references()
+	if _errs_contain(vr12, "引用不存在的卡"):
+		_ok("report.gain 壞引用被 verify_references 抓")
+	else:
+		_fail("report.gain 壞引用未被抓：%s" % str(vr12))
+
 	# choice_group 缺親自處理槽
 	var lone := [{ "id": "b_lone", "location": "day_loc", "when": { "day": 20, "phase": "afternoon" },
 		"slots": [deleg_slot.call({})] }]
@@ -438,6 +458,68 @@ func _test_lint16_negative() -> void:
 	else:
 		_fail("charge_first_visit 非 night-layer location 未被抓")
 
+	# 小數 per_round_slot_cost（1.5 不得被 int() 截斷後接受）
+	var ef1: Dictionary = base_enc.call(); ef1["per_round_slot_cost"] = 1.5
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef1), cards, locs)), "per_round_slot_cost 必須為正整數"):
+		_ok("小數 per_round_slot_cost 被抓")
+	else:
+		_fail("小數 per_round_slot_cost 未被抓")
+
+	# 小數 escape_cost
+	var ef2: Dictionary = base_enc.call(); ef2["escape_cost"] = 1.5
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef2), cards, locs)), "escape_cost 必須為 null 或非負整數"):
+		_ok("小數 escape_cost 被抓")
+	else:
+		_fail("小數 escape_cost 未被抓")
+
+	# 小數 when.day（8.5）＋ repeat → 不算明確整數 day
+	var ef3: Dictionary = base_enc.call(); ef3["repeat_each_run"] = true
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef3, { "when": { "day": 8.5, "phase": "night" } }), cards, locs)), "repeat_each_run 只可用於"):
+		_ok("小數 when.day 不被視為明確整數 day（repeat 被抓）")
+	else:
+		_fail("小數 when.day 仍被當明確整數 day")
+
+	# 錯型別 boolean：repeat_each_run
+	var ef4: Dictionary = base_enc.call(); ef4["repeat_each_run"] = "yes"
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef4), cards, locs)), "repeat_each_run 必須是 boolean"):
+		_ok("repeat_each_run 錯型別被抓")
+	else:
+		_fail("repeat_each_run 錯型別未被抓")
+
+	# 錯型別 boolean：charge_first_visit
+	var ef5: Dictionary = base_enc.call(); ef5["charge_first_visit"] = 1
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef5), cards, locs)), "charge_first_visit 必須是 boolean"):
+		_ok("charge_first_visit 錯型別被抓")
+	else:
+		_fail("charge_first_visit 錯型別未被抓")
+
+	# response 缺 id
+	var ef6: Dictionary = base_enc.call()
+	ef6["rounds"][0]["responses"][0].erase("id")
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef6), cards, locs)), "response 缺 id"):
+		_ok("response 缺 id 被抓")
+	else:
+		_fail("response 缺 id 未被抓")
+
+	# response id 重複
+	var ef7: Dictionary = base_enc.call()
+	ef7["rounds"][0]["responses"] = [
+		{ "id": "dup", "accepts": ["info_x"], "consume_card": false, "next_round": null, "on_resolve": { "text": "t" } },
+		{ "id": "dup", "accepts": ["know_x"], "consume_card": false, "next_round": null, "on_resolve": { "text": "t" } },
+	]
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef7), cards, locs)), "response id 重複"):
+		_ok("response id 重複被抓")
+	else:
+		_fail("response id 重複未被抓")
+
+	# 巢狀效果引用不存在卡：on_resolve.gain（verify_references 遞迴 encounter）
+	var ef8: Dictionary = base_enc.call()
+	ef8["rounds"][0]["responses"][0]["on_resolve"] = { "text": "t", "gain": ["ghost_card"] }
+	if _errs_contain(_make_loader(make_enc.call(ef8), cards, locs).verify_references(), "引用不存在的卡"):
+		_ok("encounter on_resolve.gain 壞引用被 verify_references 抓")
+	else:
+		_fail("encounter on_resolve.gain 壞引用未被抓")
+
 	# 邊界：合法 D8 型（repeat+charge，night-layer）不報錯
 	var e_ok: Dictionary = base_enc.call(); e_ok["repeat_each_run"] = true; e_ok["charge_first_visit"] = true
 	if DataLoader.lint_encounters(_make_loader(make_enc.call(e_ok), cards, locs)).size() == 0:
@@ -477,3 +559,47 @@ func _test_lint14_repeat_exception() -> void:
 		_ok("repeat_each_run 與 meta_once 同時出現報錯")
 	else:
 		_fail("repeat + meta_once 同時未報錯")
+
+
+# ─────────────── 5. runtime gate（B1）：委託槽惰性 + choice_requires_card ───────────────
+func _test_runtime_gate() -> void:
+	print("\n--- 5. runtime gate：委託槽惰性化 + choice_requires_card 硬成本 ---")
+	var data_node := PlaythroughGreedy.setup_data(self)
+	var gs := PlaythroughGreedy.setup_game_state(self, data_node)
+	if data_node == null or gs == null or not bool(data_node.get("ok")):
+		_fail("GameState/Data 未就緒，跳過 runtime gate 測試")
+		return
+
+	# 進 D17 下午、備妥人物卡與主角卡、清掉可能殘留的選擇/放置
+	gs.set("day", 17)
+	gs.set("phase", "afternoon")
+	gs.set("action_spent", false)
+	(gs.get("choices") as Dictionary).clear()
+	(gs.get("slots_placed") as Dictionary).clear()
+	var hand: Array = gs.get("hand") as Array
+	hand.clear()
+	hand.append("protagonist")
+	hand.append("npc_ajie")
+
+	var before := str(gs.call("serialize"))
+
+	# 1. 委託槽被 gate（delegation_not_wired，零變化）
+	var r1: Dictionary = gs.call("try_place", "npc_ajie", "d17_19_prescription", "ask_ajie")
+	if str(r1.get("reason_code", "")) == "delegation_not_wired" and str(gs.call("serialize")) == before:
+		_ok("委託槽走 try_place→choose 被 gate（delegation_not_wired，零變化）")
+	else:
+		_fail("委託槽未被 gate：%s" % str(r1))
+
+	# 2. find_self 無卡直呼 choose → card_required，零變化
+	var r2: Dictionary = gs.call("choose", "d17_19_prescription", "prescription_route", "find_self", "")
+	if str(r2.get("reason_code", "")) == "card_required" and str(gs.call("serialize")) == before:
+		_ok("choice_requires_card 槽無卡直呼回 card_required（零變化）")
+	else:
+		_fail("無卡 choose 未回 card_required：%s" % str(r2))
+
+	# 3. 親自處理槽提交 protagonist → ok 且消耗行動格
+	var r3: Dictionary = gs.call("try_place", "protagonist", "d17_19_prescription", "find_self")
+	if bool(r3.get("ok", false)) and bool(gs.get("action_spent")):
+		_ok("親自處理槽提交 protagonist 成功並消耗行動格")
+	else:
+		_fail("親自處理槽未消耗行動格：ok=%s action_spent=%s" % [str(r3.get("ok")), str(gs.get("action_spent"))])

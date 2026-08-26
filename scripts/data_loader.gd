@@ -130,10 +130,15 @@ func verify_references() -> PackedStringArray:
 		for key in ["condition", "requires", "on_enter", "echo"]:
 			_check_card_refs(b.get(key), bid, key, problems)
 
+		# P4-A：encounter 的巢狀效果（response/fallback on_resolve、三種出口）也要走引用檢查。
+		_check_card_refs(b.get("encounter"), bid, "encounter", problems)
+
 		for s in b.get("slots", []):
 			var where := "slot:" + str(s.get("id", "?"))
 			_check_card_refs(s.get("requires"), bid, where, problems)
 			_check_card_refs(s.get("on_place"), bid, where, problems)
+			# P4-A：委託 delegation.report 的 gain/lose 引用檢查。
+			_check_card_refs(s.get("delegation"), bid, where + ".delegation", problems)
 			if s.has("on_place_by_level") and s["on_place_by_level"] is Dictionary:
 				for lvl in (s["on_place_by_level"] as Dictionary).values():
 					_check_card_refs(lvl, bid, where + ".on_place_by_level", problems)
@@ -822,7 +827,8 @@ static func lint_night_once(loader: DataLoader) -> PackedStringArray:
 
 		# P4-A：repeat_each_run 遭遇是 meta_once 的相反形狀（每輪重演），兩者不得同時存在。
 		var enc_raw: Variant = b.get("encounter")
-		var is_repeat := (enc_raw is Dictionary and bool((enc_raw as Dictionary).get("repeat_each_run", false)))
+		var repeat_raw: Variant = (enc_raw as Dictionary).get("repeat_each_run", false) if enc_raw is Dictionary else false
+		var is_repeat: bool = repeat_raw is bool and repeat_raw
 
 		var has_meta_once := b.has("meta_once")
 		if has_meta_once:
@@ -909,6 +915,9 @@ static func lint_delegations(loader: DataLoader) -> PackedStringArray:
 					problems.append("%s：next_morning 委託必須有 report" % where)
 				elif not (d["report"] is Dictionary) or str((d["report"] as Dictionary).get("text", "")).is_empty():
 					problems.append("%s：report 必須是含 text 的 Dictionary" % where)
+				else:
+					# report 共用 EffectApply 封閉效果鍵（不讓委託偷讀任意鍵）。
+					_lint_effect(d["report"], bid, where + ".report", problems)
 				var latest := _beat_latest_day(b)
 				if latest >= 45:
 					problems.append("%s：next_morning 委託最晚成立日 %d 會落到第 45 天之後" % [where, latest])
@@ -956,16 +965,20 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 		var where := "%s [encounter]" % bid
 
 		var prsc: Variant = enc.get("per_round_slot_cost")
-		if not (prsc is float or prsc is int) or int(prsc) <= 0:
+		if not _is_whole_number(prsc) or int(prsc) <= 0:
 			problems.append("%s：per_round_slot_cost 必須為正整數" % where)
 		if not enc.has("escape_cost"):
 			problems.append("%s：escape_cost 必填（null 或非負整數）" % where)
 		else:
 			var ec: Variant = enc.get("escape_cost")
-			if ec != null and (not (ec is float or ec is int) or int(ec) < 0):
+			if ec != null and (not _is_whole_number(ec) or int(ec) < 0):
 				problems.append("%s：escape_cost 必須為 null 或非負整數" % where)
 		if enc.has("allow_discard") and not (enc["allow_discard"] is bool):
 			problems.append("%s：allow_discard 必須是 boolean" % where)
+		if enc.has("repeat_each_run") and not (enc["repeat_each_run"] is bool):
+			problems.append("%s：repeat_each_run 必須是 boolean" % where)
+		if enc.has("charge_first_visit") and not (enc["charge_first_visit"] is bool):
+			problems.append("%s：charge_first_visit 必須是 boolean" % where)
 		var af := str(enc.get("after_finish", ""))
 		if af != "stay" and af != "advance_phase":
 			problems.append("%s：after_finish 必須是 stay 或 advance_phase -> %s" % [where, af])
@@ -1004,12 +1017,19 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 				problems.append("%s：responses 必須非空" % rwhere)
 			else:
 				var seen_accepts := {}
+				var seen_resp_ids := {}
 				for resp_vv in resp_v as Array:
 					if not (resp_vv is Dictionary):
 						problems.append("%s：response 不是 Dictionary" % rwhere)
 						continue
 					var resp := resp_vv as Dictionary
 					var respid := str(resp.get("id", "?"))
+					if not resp.has("id") or str(resp.get("id", "")).is_empty():
+						problems.append("%s：response 缺 id" % rwhere)
+					elif seen_resp_ids.has(respid):
+						problems.append("%s：response id 重複 -> %s" % [rwhere, respid])
+					else:
+						seen_resp_ids[respid] = true
 					var accs: Variant = resp.get("accepts")
 					if not (accs is Array) or (accs as Array).is_empty():
 						problems.append("%s response:%s：accepts 必須非空" % [rwhere, respid])
@@ -1076,11 +1096,13 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 		var wd := {}
 		if b.get("when") is Dictionary:
 			wd = b.get("when") as Dictionary
-		var has_exact_day: bool = wd.has("day") and not wd.has("day_from") and not wd.has("day_to")
-		if bool(enc.get("repeat_each_run", false)):
+		var has_exact_day: bool = wd.has("day") and not wd.has("day_from") and not wd.has("day_to") and _is_whole_number(wd.get("day"))
+		var repeat_val: Variant = enc.get("repeat_each_run", false)
+		if repeat_val is bool and repeat_val:
 			if not is_fixed or not has_exact_day:
 				problems.append("%s：repeat_each_run 只可用於有明確整數 when.day 的 fixed encounter" % where)
-		if bool(enc.get("charge_first_visit", false)):
+		var charge_val: Variant = enc.get("charge_first_visit", false)
+		if charge_val is bool and charge_val:
 			var phase_ok: bool = str(wd.get("phase", "")) == "night"
 			var loc_id := str(b.get("location", ""))
 			var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
@@ -1094,6 +1116,15 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 			if not layer_night:
 				problems.append("%s：charge_first_visit 要求所掛 location layer == night" % where)
 	return problems
+
+
+## 是否為整數值（JSON 數字可能是 int 或 float；8.5 這種小數不算）。
+static func _is_whole_number(v: Variant) -> bool:
+	if v is int:
+		return true
+	if v is float:
+		return float(v) == floor(float(v))
+	return false
 
 
 static func _lint_next_round(nr: Variant, round_ids: Dictionary, where: String, problems: PackedStringArray) -> void:

@@ -21,6 +21,14 @@
   - **引擎最小接線（經使用者授權，超出方針 P4-A 檔案列表）**：`game_state.gd::play_night_fixed()` 對 night-layer fixed beat 且 `encounter.charge_first_visit==true` 者，於強制到訪前保存是否終身 seen，未 seen 才按 location `madness_cost` 收一次。理由見「本次的取捨」。
   - **跨階段測試調整（實作者 owned 測試檔）**：`test_p2_sim.gd` A 玩家時間軸移除第 8 夜 n_manydoors 的 `enter_night_location` 事件（D8 改強制到訪，發狂卡仍在 day 8 收、視野窗口不變，26→25 事件）；`test_p3f.gd` sim 以 `_madness_counter` 差額把 D8 強制收費補進 `paid_entered_count`（總 marker cost 仍 13/14）。
 
+- **Codex review 修正（第二批，經使用者授權方案 1 最小 gate）**：
+  - **B1 委託槽惰性化（gate）**：`choose()` 對帶 `delegation` 鍵的槽回 `delegation_not_wired` 拒絕，使 P4-A 的委託資料如 encounter 一樣不接玩家操作（P4-B delegate() 兌現後拆除）。同時把 `choice_requires_card` 在規則層兌現：無卡直呼 `choose()` 回 `card_required`；提交 protagonist 的親自處理槽消耗行動時段。理由：Codex 正確指出 encounter 已惰性（`slots:[]`）但委託槽會被舊 UI/`try_place→choose` 真的改狀態，兩者不對稱。
+  - **B2 lint 引用/語彙缺口**：`verify_references()` 遞迴進 `encounter` 與 `slot.delegation` → 補齊 `on_resolve.gain`／`report.gain` 存在檢查；lint 15 對 `delegation.report` 跑 `_lint_effect`（封閉效果鍵）。
+  - **lint 16 型別缺口**：`per_round_slot_cost`／`escape_cost` 加整數檢查（拒 1.5）、`when.day` 小數（8.5）不算明確整數 day、`repeat_each_run`／`charge_first_visit` 加 boolean 型別檢查、`response.id` 缺失/重複檢查。
+  - **NB1**：`play_night_fixed` 的 charge_first_visit 收費若觸發發瘋 BE，`phase` 回 morning 即 return，不再 `play_beat` 寫進重置後新輪。
+  - **NB2/NB3**：阿財委託回報文案改 immediate 一致（去掉「隔天」）；D22 過期 note 更新為三個觀察開關的實際寫入端。
+  - `test_p4a` 補齊：runtime gate（3 條）、report 語彙/引用、encounter 巢狀引用、小數 cost/day、錯型別 boolean、response id 缺失/重複，共新增約 12 條斷言。
+
 - P5 文件 review 缺口已同步收斂至 `實作規格書.md`、`開發設計方針.md`、`測試指南.md`、`data/SCHEMA.md`：
   - `advance_phase() -> Dictionary` 自 P4-D 升級，P5-D 固定 mode → encounter → night staging → defaults → `phase_exit` → transition validation → atomic commit 的順序；`resolve_night_advance()` 於 P5-D 退場。
   - D45 coda 改由 beat `phase_exit.required_slots` 資料化，不在 `main.gd` 或 beat／slot id 特判。
@@ -49,6 +57,7 @@
 **P4-B 委託規則**（`實作規格書.md > P4-B`、`開發設計方針.md > P4-B`、`測試指南.md > P4-B`）：
 
 - P4-A 已把委託／遭遇資料與 lint 真值化；P4-B 起接 runtime。`delegate()` 原子入口、run 層三筆狀態、immediate／next_morning 結算、序列化與換日重置、11 碼拒絕矩陣，不吃行動格。
+- **P4-B 要拆除 P4-A 的臨時 gate**：`game_state.gd::choose()` 目前對帶 `delegation` 鍵的槽回 `delegation_not_wired`；delegate() 兌現後把委託槽導向 delegate() 而非直接拒絕。`choice_requires_card` 的規則層兌現（card_required／消耗行動格）已在 P4-A 做好，P4-B 可直接沿用。
 - 動工前先核對 P4-A 落地的資料形狀：`d17_19_prescription` 的 choice_group、三種 timing、人物卡條件 gain 接點（阿婕／阿珠／阿財）、`x_lust_ajie` 破壞與 `repair_ajie_trust` 修復。
 - 注意 P4-A 已在 `play_night_fixed` 做了 charge_first_visit 最小接線；P4-D 正式接遭遇引擎時要確認不與此重複收費。
 - 實作者只提供測試證據，不自行修改 `測試指南.md`、`驗證後已知問題.md` 或驗收勾選。

@@ -224,6 +224,10 @@ func play_night_fixed() -> PackedStringArray:
 							for _i_cfv in range(cost_cfv):
 								gain_card("madness", false)
 							_check_madness_cap()
+							# 首次收費若觸發發瘋 BE，end_run() 已重置本輪（phase 回 morning）；
+							# 不可再 play_beat 本 beat，否則把文字/beats_entered 寫進重置後的新輪。
+							if phase != "night":
+								return lines
 			if is_meta_once:
 				night_once_beats_seen[bid] = true
 			var beat_lines := play_beat(bid)
@@ -667,6 +671,8 @@ const _REASON_LOCKED := "locked"
 const _REASON_RESOLVED := "resolved"
 const _REASON_NOT_ACCEPTED := "not_accepted"
 const _REASON_ACTION_SPENT := "action_spent"
+const _REASON_CARD_REQUIRED := "card_required"
+const _REASON_DELEGATION_NOT_WIRED := "delegation_not_wired"
 const _REASON_LOCKED_FALLBACK := "（條件不足）"
 
 
@@ -866,6 +872,15 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 	if slot.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_SLOT, "reason_text": "", "lines": PackedStringArray() }
 
+	# P4-A interim gate（B1）：委託槽的正式入口是 P4-B 的 delegate()。在 delegate() 兌現前，
+	# 通用 choose() 拒絕委託槽，使 P4-A 的委託資料如 encounter 一樣惰性、不接玩家操作。
+	if slot.has("delegation"):
+		return { "ok": false, "reason_code": _REASON_DELEGATION_NOT_WIRED, "reason_text": "", "lines": PackedStringArray() }
+
+	# choice_requires_card:true 是硬成本槽（SCHEMA choice_group）：無卡直呼必須拒絕，不走免費捷徑。
+	if bool(slot.get("choice_requires_card", false)) and card_id.is_empty():
+		return { "ok": false, "reason_code": _REASON_CARD_REQUIRED, "reason_text": "", "lines": PackedStringArray() }
+
 	var state_result := _check_slot_state(beat, slot)
 	if not state_result.get("ok", false):
 		return {
@@ -891,6 +906,18 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 	var slot_key := beat_id + "::" + slot_id
 	choices[choice_key] = slot_id
 	slots_placed[slot_key] = true
+
+	# choice_requires_card 的親自處理槽提交 protagonist 就消耗該行動時段（SCHEMA choice_group）。
+	# 一般 choice_group（無此旗標）維持不吃行動格。
+	if bool(slot.get("choice_requires_card", false)) and not card_id.is_empty():
+		var cr_base := _card_base_id(card_id)
+		var cr_card: Dictionary = Data.loader.cards.get(cr_base, {})
+		if str(cr_card.get("type", "")) == "protagonist" and ACTION_PHASES.has(phase):
+			consume_action()
+			var cr_attn: Variant = slot.get("attention_npc")
+			if cr_attn != null:
+				var cr_npc := str(cr_attn)
+				npc_action_counts[cr_npc] = int(npc_action_counts.get(cr_npc, 0)) + 1
 
 	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 
