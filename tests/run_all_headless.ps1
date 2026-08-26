@@ -21,7 +21,8 @@ $tests = @(
     "tests/headless/test_p3d.gd",
     "tests/headless/test_p3e.gd",
     "tests/headless/test_p3f.gd",
-    "tests/headless/test_p4a.gd"
+    "tests/headless/test_p4a.gd",
+    "tests/headless/test_p4b.gd"
 )
 
 $godot = "C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe"

@@ -639,9 +639,9 @@ func _test_lint14_repeat_exception() -> void:
 		_fail("repeat + meta_once 同時未報錯")
 
 
-# ─────────────── 5. runtime gate（B1）：委託槽惰性 + choice_requires_card ───────────────
+# ─────────────── 5. runtime gate / delegate 轉導 + choice_requires_card ───────────────
 func _test_runtime_gate() -> void:
-	print("\n--- 5. runtime gate：委託槽惰性化 + choice_requires_card 硬成本 ---")
+	print("\n--- 5. runtime gate / delegate 轉導 + choice_requires_card 硬成本 ---")
 	var data_node := PlaythroughGreedy.setup_data(self)
 	var gs := PlaythroughGreedy.setup_game_state(self, data_node)
 	if data_node == null or gs == null or not bool(data_node.get("ok")):
@@ -661,26 +661,29 @@ func _test_runtime_gate() -> void:
 
 	var before := str(gs.call("serialize"))
 
-	# 1. 委託槽被 gate（delegation_not_wired，零變化）
-	var r1: Dictionary = gs.call("try_place", "npc_ajie", "d17_19_prescription", "ask_ajie")
-	if str(r1.get("reason_code", "")) == "delegation_not_wired" and str(gs.call("serialize")) == before:
-		_ok("委託槽走 try_place→choose 被 gate（delegation_not_wired，零變化）")
-	else:
-		_fail("委託槽未被 gate：%s" % str(r1))
-
-	# 2. find_self 無卡直呼 choose → card_required，零變化
+	# 1. find_self 無卡直呼 choose → card_required，零變化
 	var r2: Dictionary = gs.call("choose", "d17_19_prescription", "prescription_route", "find_self", "")
 	if str(r2.get("reason_code", "")) == "card_required" and str(gs.call("serialize")) == before:
 		_ok("choice_requires_card 槽無卡直呼回 card_required（零變化）")
 	else:
 		_fail("無卡 choose 未回 card_required：%s" % str(r2))
 
-	# 3. 親自處理槽提交 protagonist → ok 且消耗行動格
+	# 2. 親自處理槽提交 protagonist → ok 且消耗行動格
 	var r3: Dictionary = gs.call("try_place", "protagonist", "d17_19_prescription", "find_self")
 	if bool(r3.get("ok", false)) and bool(gs.get("action_spent")):
 		_ok("親自處理槽提交 protagonist 成功並消耗行動格")
 	else:
 		_fail("親自處理槽未消耗行動格：ok=%s action_spent=%s" % [str(r3.get("ok")), str(gs.get("action_spent"))])
+
+	# 3. 在乾淨狀態下測試委託槽走 try_place 轉導至 delegate() 成功且不消耗主角行動
+	(gs.get("choices") as Dictionary).clear()
+	(gs.get("slots_placed") as Dictionary).clear()
+	gs.set("action_spent", false)
+	var r1: Dictionary = gs.call("try_place", "npc_ajie", "d17_19_prescription", "ask_ajie")
+	if bool(r1.get("ok", false)) and not bool(gs.get("action_spent")):
+		_ok("委託槽走 try_place 成功轉導至 delegate() 且不消耗行動格")
+	else:
+		_fail("委託槽轉導 delegate 失敗：%s" % str(r1))
 
 
 # ─── 6. NB1 regression：D8 charge_first_visit 撞發狂上限，重置後不寫入 D8 beat ───

@@ -31,6 +31,11 @@ var beats_entered: Dictionary = {}    # beat_id -> true（一次性 on_enter 追
 var slots_placed: Dictionary = {}     # "beat_id::slot_id" -> true（P1-D 填入，P1-C 保留空結構）
 var choices: Dictionary = {}          # "beat_id::group_id" -> slot_id（P1-E 互斥選擇記錄，run 層）
 
+# --- 委託群（P4-B, run 層）---
+var delegates_used_today: Dictionary = {}         # person_card_id -> true（Set；今日已受託人物）
+var pending_delegation_reports: Array[Dictionary] = [] # [{due_day, beat_id, slot_id, person_id}]；隔日上午回報接點
+var last_delegation_report_lines: PackedStringArray = [] # 當前上午回報產生的演出文字行（transient UI）
+
 # --- 旗標／開關／關係群（P1-D, run 層）---
 var flags: Dictionary = {}            # name -> bool
 var switches: Dictionary = {}         # id -> true
@@ -70,6 +75,7 @@ func advance_phase() -> void:
 		phase = "evening"
 		action_spent = false
 		last_forced_lines.clear()
+		last_delegation_report_lines.clear()
 		phase_changed.emit(day, phase)
 		return
 
@@ -78,6 +84,7 @@ func advance_phase() -> void:
 		return
 
 	last_forced_lines.clear()
+	last_delegation_report_lines.clear()
 
 	# 一般推進
 	var idx := PHASES.find(phase)
@@ -107,6 +114,11 @@ func advance_phase() -> void:
 	# P2-C: 行動時段開始時執行強制縱慾（每個行動時段最多一次）
 	if ACTION_PHASES.has(phase) and not action_spent and not forced_pending.is_empty():
 		last_forced_lines = _settle_forced_indulgence()
+
+	# P4-B: 換日上午先完成既有發狂倒數／強制縱慾，再依 pending 順序回查並套 report，最後清前一日 daily set
+	if phase == "morning":
+		_settle_pending_delegation_reports()
+		delegates_used_today.clear()
 
 	phase_changed.emit(day, phase)
 
@@ -142,6 +154,9 @@ func end_run(ending_id: String = "ending_default") -> void:
 	madness_cards_cleared = 0
 	forced_pending.clear()
 	last_forced_lines.clear()
+	delegates_used_today.clear()
+	pending_delegation_reports.clear()
+	last_delegation_report_lines.clear()
 
 	day_changed.emit(day)
 	phase_changed.emit(day, phase)
@@ -672,7 +687,12 @@ const _REASON_RESOLVED := "resolved"
 const _REASON_NOT_ACCEPTED := "not_accepted"
 const _REASON_ACTION_SPENT := "action_spent"
 const _REASON_CARD_REQUIRED := "card_required"
-const _REASON_DELEGATION_NOT_WIRED := "delegation_not_wired"
+const _REASON_NOT_ACTION_PHASE := "not_action_phase"
+const _REASON_NOT_DELEGATION := "not_delegation"
+const _REASON_NOT_PERSON := "not_person"
+const _REASON_ALREADY_DELEGATED_TODAY := "already_delegated_today"
+const _REASON_ALREADY_RESOLVED := "already_resolved"
+const _REASON_DATA_CONFLICT := "data_conflict"
 const _REASON_LOCKED_FALLBACK := "（條件不足）"
 
 
@@ -872,10 +892,9 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 	if slot.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_SLOT, "reason_text": "", "lines": PackedStringArray() }
 
-	# P4-A interim gate（B1）：委託槽的正式入口是 P4-B 的 delegate()。在 delegate() 兌現前，
-	# 通用 choose() 拒絕委託槽，使 P4-A 的委託資料如 encounter 一樣惰性、不接玩家操作。
+	# 委託槽的正式入口是 delegate()。通用 choose() 轉導至 delegate()。
 	if slot.has("delegation"):
-		return { "ok": false, "reason_code": _REASON_DELEGATION_NOT_WIRED, "reason_text": "", "lines": PackedStringArray() }
+		return delegate(beat_id, slot_id, card_id)
 
 	# choice_requires_card:true 是硬成本槽（SCHEMA choice_group）：無卡直呼必須拒絕，不走免費捷徑。
 	if bool(slot.get("choice_requires_card", false)) and card_id.is_empty():
@@ -1080,11 +1099,175 @@ func _settle_forced_indulgence() -> PackedStringArray:
 	return lines
 
 
+## 隔日上午委託回報結算（規格書 P4-B、開發設計方針 P4-B）。
+## 由 advance_phase 於換日進入 morning 時呼叫（在強制縱慾之後、清空 delegates_used_today 之前）：
+## 依 pending_delegation_reports 順序套用 report 效果，並收集文字行。
+func _settle_pending_delegation_reports() -> void:
+	if pending_delegation_reports.is_empty():
+		return
+	var due_reports: Array[Dictionary] = []
+	var remaining_reports: Array[Dictionary] = []
+	for r: Dictionary in pending_delegation_reports:
+		if int(r.get("due_day", 0)) <= day:
+			due_reports.append(r)
+		else:
+			remaining_reports.append(r)
+	pending_delegation_reports = remaining_reports
+
+	var rep_lines: PackedStringArray = []
+	for r: Dictionary in due_reports:
+		var b_id := str(r.get("beat_id", ""))
+		var s_id := str(r.get("slot_id", ""))
+		var beat_dict: Dictionary = Data.loader.beats_by_id.get(b_id, {})
+		var slot_dict: Dictionary = _find_slot(beat_dict, s_id)
+		var del_dict: Dictionary = slot_dict.get("delegation", {}) as Dictionary
+		var rep_dict: Dictionary = del_dict.get("report", {}) as Dictionary
+		if not rep_dict.is_empty():
+			var out := EffectApply.apply(rep_dict, self)
+			rep_lines.append_array(out)
+	last_delegation_report_lines = rep_lines
+
+
+## 人物委託的唯一原子入口（UI 與 headless 共用，規格書 P4-B、開發設計方針 P4-B）。
+## 11 步固定檢查順序，任一步失敗則 GameState 零變化：
+## 1. not_action_phase：白天行動時段（morning / afternoon）
+## 2. unknown_beat：beat 存在、時段吻合且 condition 成立
+## 3. unknown_slot：slot 存在且 condition 成立
+## 4. not_delegation：slot 帶 delegation 字典
+## 5. not_held：person_card_id 非空且在手牌
+## 6. not_person：卡片 type 為 person
+## 7. not_accepted：slot accepts 包含該卡 base_id
+## 8. already_delegated_today：該人物今日未曾成功受託
+## 9. locked：beat / slot requires 條件成立（失敗帶 reject_reason）
+## 10. already_resolved：槽未放置且 choice_group 未結算
+## 11. data_conflict：timing / report 結構合法（immediate 無 report；next_morning 有合法 report 字典）
+##
+## 成功順序（原子性）：
+## - 寫 choices 與 slots_placed
+## - delegates_used_today[base_id] = true
+## - immediate：套 on_place 效果
+## - next_morning：套 on_place 效果（派出當下效果），並 append {due_day, beat_id, slot_id, person_id} 至 pending_delegation_reports
+## - 委託不消耗主角行動格、不增 npc_action_counts、不移動人物卡
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
+func delegate(beat_id: String, slot_id: String, person_card_id: String) -> Dictionary:
+	# 1. 白天行動時段
+	if not ACTION_PHASES.has(phase):
+		return { "ok": false, "reason_code": _REASON_NOT_ACTION_PHASE, "reason_text": "", "lines": PackedStringArray() }
+
+	# 2. beat 存在、時段吻合、condition 成立
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {})
+	if beat.is_empty() or not _is_beat_time_valid(beat) or not ConditionEval.eval(beat.get("condition"), self):
+		return { "ok": false, "reason_code": _REASON_UNKNOWN_BEAT, "reason_text": "", "lines": PackedStringArray() }
+
+	# 3. slot 存在、condition 成立
+	var slot: Dictionary = _find_slot(beat, slot_id)
+	if slot.is_empty() or not ConditionEval.eval(slot.get("condition"), self):
+		return { "ok": false, "reason_code": _REASON_UNKNOWN_SLOT, "reason_text": "", "lines": PackedStringArray() }
+
+	# 4. slot 必須帶 delegation
+	var del_val: Variant = slot.get("delegation")
+	if del_val == null or not (del_val is Dictionary):
+		return { "ok": false, "reason_code": _REASON_NOT_DELEGATION, "reason_text": "", "lines": PackedStringArray() }
+	var delegation := del_val as Dictionary
+
+	# 5. 卡在手
+	if person_card_id.is_empty() or not has_card(person_card_id):
+		return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "", "lines": PackedStringArray() }
+
+	# 6. 卡型別為 person
+	var base_id := _card_base_id(person_card_id)
+	var card: Dictionary = Data.loader.cards.get(base_id, {})
+	if str(card.get("type", "")) != "person":
+		return { "ok": false, "reason_code": _REASON_NOT_PERSON, "reason_text": "", "lines": PackedStringArray() }
+
+	# 7. accepts 命中
+	var accepts: Array = slot.get("accepts", []) as Array
+	if not accepts.has(base_id):
+		return { "ok": false, "reason_code": _REASON_NOT_ACCEPTED, "reason_text": "", "lines": PackedStringArray() }
+
+	# 8. 今日未受託
+	if bool(delegates_used_today.get(base_id, false)):
+		return { "ok": false, "reason_code": _REASON_ALREADY_DELEGATED_TODAY, "reason_text": "", "lines": PackedStringArray() }
+
+	# 9. requires 成立
+	if not ConditionEval.eval(beat.get("requires"), self):
+		return {
+			"ok": false,
+			"reason_code": _REASON_LOCKED,
+			"reason_text": str(beat.get("reject_reason", _REASON_LOCKED_FALLBACK)),
+			"lines": PackedStringArray(),
+		}
+	if not ConditionEval.eval(slot.get("requires"), self):
+		return {
+			"ok": false,
+			"reason_code": _REASON_LOCKED,
+			"reason_text": str(slot.get("reject_reason", _REASON_LOCKED_FALLBACK)),
+			"lines": PackedStringArray(),
+		}
+
+	# 10. choice_group 未結算、槽未放置過
+	var slot_key := beat_id + "::" + slot_id
+	if slots_placed.has(slot_key):
+		return { "ok": false, "reason_code": _REASON_ALREADY_RESOLVED, "reason_text": "", "lines": PackedStringArray() }
+	var choice_group: String = str(slot.get("choice_group", ""))
+	if not choice_group.is_empty() and choices.has(beat_id + "::" + choice_group):
+		return { "ok": false, "reason_code": _REASON_ALREADY_RESOLVED, "reason_text": "", "lines": PackedStringArray() }
+
+	# 11. timing / report 結構合法
+	var timing := str(delegation.get("result_timing", ""))
+	if timing != "immediate" and timing != "next_morning":
+		return { "ok": false, "reason_code": _REASON_DATA_CONFLICT, "reason_text": "", "lines": PackedStringArray() }
+	if timing == "next_morning":
+		var rep_val: Variant = delegation.get("report")
+		if rep_val == null or not (rep_val is Dictionary):
+			return { "ok": false, "reason_code": _REASON_DATA_CONFLICT, "reason_text": "", "lines": PackedStringArray() }
+	elif timing == "immediate":
+		if delegation.has("report"):
+			return { "ok": false, "reason_code": _REASON_DATA_CONFLICT, "reason_text": "", "lines": PackedStringArray() }
+
+	# ── 成功（原子操作）──
+	if not choice_group.is_empty():
+		choices[beat_id + "::" + choice_group] = slot_id
+	slots_placed[slot_key] = true
+	delegates_used_today[base_id] = true
+
+	var lines: PackedStringArray = EffectApply.apply(slot.get("on_place", {}), self)
+
+	if timing == "next_morning":
+		pending_delegation_reports.append({
+			"due_day": day + 1,
+			"beat_id": beat_id,
+			"slot_id": slot_id,
+			"person_id": base_id,
+		})
+
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+
+## 查詢人物卡當前受託狀態（UI 專用查詢，規格書 P4-B、開發設計方針 P4-B）。
+func delegation_status(person_card_id: String) -> Dictionary:
+	var base_id := _card_base_id(person_card_id)
+	var is_held := has_card(person_card_id)
+	var used_today := bool(delegates_used_today.get(base_id, false))
+	var has_pending := false
+	for r: Dictionary in pending_delegation_reports:
+		if str(r.get("person_id", "")) == base_id:
+			has_pending = true
+			break
+	return {
+		"held": is_held,
+		"delegated_today": used_today,
+		"available": is_held and not used_today,
+		"has_pending_report": has_pending,
+	}
+
+
 ## 放卡的唯一入口（UI 與 headless 走查共用；UI 內不做任何判斷）。
 ## 放置合法性四步檢查，順序固定（規格書第六節）：
 ## ①持有 → ②三態 OPEN（beat 與槽兩級 condition/requires 都要過，含一次性未放過）→
 ## ③accepts → ④action_spent（僅行動格內的主角卡）。
 ## 若該槽帶 choice_group，直接轉導 choose() 保證規則層單一入口（P1-E）。
+## 若該槽為委託槽，直接轉導 delegate() 保證規則層單一入口（P4-B）。
 ## 若卡片為發狂卡，直接轉導 indulge() 保證規則層單一入口（P2-B）。
 ## 任一步不過 → { ok=false, reason_code, reason_text, lines=[] }，GameState 零變化。
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
@@ -1104,6 +1287,9 @@ func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
 	var slot := _find_slot(beat, slot_id)
 	if slot.is_empty():
 		return { "ok": false, "reason_code": _REASON_UNKNOWN_SLOT, "reason_text": "", "lines": PackedStringArray() }
+
+	if slot.has("delegation"):
+		return delegate(beat_id, slot_id, card_id)
 
 	var choice_group: Variant = slot.get("choice_group")
 	if choice_group != null and not str(choice_group).is_empty():
@@ -1141,6 +1327,10 @@ func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
 # ── 序列化 ──────────────────────────────────────────────────────────────────
 
 func serialize() -> Dictionary:
+	var reports_copy: Array[Dictionary] = []
+	for r: Dictionary in pending_delegation_reports:
+		reports_copy.append(r.duplicate())
+
 	return {
 		"run": {
 			"day": day,
@@ -1163,6 +1353,8 @@ func serialize() -> Dictionary:
 			"indulgence_count": indulgence_count,
 			"madness_cards_cleared": madness_cards_cleared,
 			"forced_pending": forced_pending.duplicate(),
+			"delegates_used_today": delegates_used_today.duplicate(),
+			"pending_delegation_reports": reports_copy,
 		},
 		"meta": {
 			"knowledge": knowledge.duplicate(),
@@ -1201,6 +1393,14 @@ func deserialize(d: Dictionary) -> void:
 	forced_pending.clear()
 	for item in run.get("forced_pending", []):
 		forced_pending.append(str(item))
+	delegates_used_today.clear()
+	var dut: Dictionary = run.get("delegates_used_today", {})
+	for k in dut.keys():
+		delegates_used_today[str(k)] = bool(dut[k])
+	pending_delegation_reports.clear()
+	for item in run.get("pending_delegation_reports", []):
+		if item is Dictionary:
+			pending_delegation_reports.append((item as Dictionary).duplicate())
 
 	var meta: Dictionary = d.get("meta", {})
 	knowledge = meta.get("knowledge", {}).duplicate()
