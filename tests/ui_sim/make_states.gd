@@ -334,6 +334,27 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not _write_p2b_state(output_dir, "p3e_multi_first_seen", gs_p3e.serialize(), data_node):
 		return false
 
+	# 產生 P4-C 委託 UI 驗收情境。從既有 d17_morning checkpoint（標準走查器 custom_decisions=[]
+	# 產出，只到訪演出、不放任何卡，protagonist 已在第 1 天 evening 到站演出取得，
+	# d17_morning_phone 這個 fixed on_enter beat 尚未播過，人物卡尚未發出）推進一步到下午——
+	# d17_19_prescription 是 afternoon-only 槽，這是唯一能保證「乾淨、零人物卡」的可靠起點。
+	var gs_p4c: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+	_reset_state(gs_p4c)
+	gs_p4c.deserialize(d17am_dict)
+	gs_p4c.call("advance_phase") # morning -> afternoon
+
+	# ① p4c_d17_no_person: 零人物卡、教學未看過——委託候選應完全不出現，且是唯一能在
+	# 真實 UI 中觸發 delegation_tutorial_available 信號的起點（經由「跟阿財做事」的 gain）。
+	if not _write_p2b_state(output_dir, "p4c_d17_no_person", gs_p4c.serialize(), data_node):
+		return false
+
+	# ② p4c_d17_with_person: 已持有阿婕與阿珠兩張人物卡（跳過教學，用於候選確認流程案例）。
+	gs_p4c.call("gain_card", "npc_ajie")
+	gs_p4c.call("mark_delegation_tutorial_seen")
+	gs_p4c.call("gain_card", "npc_azhu")
+	if not _write_p2b_state(output_dir, "p4c_d17_with_person", gs_p4c.serialize(), data_node):
+		return false
+
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
 	var d45_coda_decisions: Array[Dictionary] = [
@@ -673,6 +694,14 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 		"p3d_aligned_multi":
 			var seen_multi: Dictionary = _state_meta(snapshot).get("night_locations_seen", {}) as Dictionary
 			return day == 14 and phase == "night" and seen_multi.has("n_corridor") and _state_knowledge(snapshot).has("k_night_jinghe_back")
+		"p4c_d17_no_person":
+			var meta_no_person: Dictionary = _state_meta(snapshot)
+			return day == 17 and phase == "afternoon" and hand.size() == 1 and hand.has("protagonist") \
+				and bool(meta_no_person.get("delegation_tutorial_seen", true)) == false
+		"p4c_d17_with_person":
+			var meta_with_person: Dictionary = _state_meta(snapshot)
+			return day == 17 and phase == "afternoon" and hand.has("npc_ajie") and hand.has("npc_azhu") \
+				and bool(meta_with_person.get("delegation_tutorial_seen", false)) == true
 		"p3a_night_baseline":
 			if day != 14:
 				printerr("p3a_night_baseline 後置條件失敗：預期 day == 14，實際 %d" % day)

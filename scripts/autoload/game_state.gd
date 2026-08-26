@@ -23,6 +23,7 @@ var hand: Array[String] = []          # 佔格卡 id，有序；主角卡恆在 
 var knowledge: Dictionary = {}        # id -> true（Set；slotless 卡；meta 層，不隨輪重置）
 var night_locations_seen: Dictionary = {} # location_id -> true（meta 層，不隨輪重置）
 var night_once_beats_seen: Dictionary = {} # beat_id -> true（meta 層，不隨輪重置）
+var delegation_tutorial_seen: bool = false # 委託教學是否已由 UI 顯示並關閉／略過（meta 層，不隨輪重置，P4-C）
 var madness_clock: Dictionary = {}    # 實例 id -> 剩餘天數（P1 只建結構，P2 才走錶；run 層）
 var _madness_counter: int = 0         # 實例編號計數器（run 層）
 
@@ -60,6 +61,7 @@ signal chapter_changed(chapter: int)
 signal run_ended(ending_id: String)
 signal hand_changed
 signal knowledge_changed
+signal delegation_tutorial_available # P4-C：玩家首次由零張變一張 person card 時發出，UI 顯示並關閉／略過後才呼叫 mark_delegation_tutorial_seen()
 
 
 # ── 時段狀態機 ──────────────────────────────────────────────────────────────
@@ -545,9 +547,22 @@ func gain_card(id: String, check_cap: bool = true) -> void:
 	# 其餘卡：unique（已持有 = no-op，含知識集合）
 	if has_card(id):
 		return
+
+	# P4-C：玩家由零張 person card 變一張時發出教學信號；不在此寫 delegation_tutorial_seen，
+	# 由 UI 實際顯示並關閉／略過後才呼叫 mark_delegation_tutorial_seen()。
+	var is_first_person_card := false
+	if str(card.get("type", "")) == "person" and not delegation_tutorial_seen:
+		is_first_person_card = true
+		for h: String in hand:
+			if str(Data.loader.cards.get(_card_base_id(h), {}).get("type", "")) == "person":
+				is_first_person_card = false
+				break
+
 	hand.append(id)
 	_check_hand_overflow(id)
 	hand_changed.emit()
+	if is_first_person_card:
+		delegation_tutorial_available.emit()
 
 
 ## 檢查手牌發狂卡是否達到上限（規格書第八節，P2-D）。
@@ -1291,6 +1306,11 @@ func delegation_status(person_card_id: String) -> Dictionary:
 	}
 
 
+## P4-C：UI 實際顯示委託教學並關閉／略過後呼叫，寫入 meta 層，跨輪保留。冪等。
+func mark_delegation_tutorial_seen() -> void:
+	delegation_tutorial_seen = true
+
+
 ## 放卡的唯一入口（UI 與 headless 走查共用；UI 內不做任何判斷）。
 ## 放置合法性四步檢查，順序固定（規格書第六節）：
 ## ①持有 → ②三態 OPEN（beat 與槽兩級 condition/requires 都要過，含一次性未放過）→
@@ -1389,6 +1409,7 @@ func serialize() -> Dictionary:
 			"knowledge": knowledge.duplicate(),
 			"night_locations_seen": night_locations_seen.duplicate(),
 			"night_once_beats_seen": night_once_beats_seen.duplicate(),
+			"delegation_tutorial_seen": delegation_tutorial_seen,
 		}
 	}
 
@@ -1435,6 +1456,7 @@ func deserialize(d: Dictionary) -> void:
 	knowledge = meta.get("knowledge", {}).duplicate()
 	night_locations_seen = meta.get("night_locations_seen", {}).duplicate()
 	night_once_beats_seen = meta.get("night_once_beats_seen", {}).duplicate()
+	delegation_tutorial_seen = bool(meta.get("delegation_tutorial_seen", false))
 
 
 # ── 內部工具 ─────────────────────────────────────────────────────────────────

@@ -63,3 +63,7 @@ offset_left = 20.0
 offset_top = 580.0
 offset_right = 1260.0
 offset_bottom = 720.0
+
+[node name="DelegationTutorialDialog" type="AcceptDialog" parent="."]
+title = "委託"
+dialog_text = "你拿到了第一張人物卡。你可以委託他們代你去做某些事——委託不佔用你的行動格，一天只能委託同一人一次，回報有些立即、有些要等到隔天上午。"

@@ -41,3 +41,6 @@ text = "進入"
 [node name="NightAlignConfirmDialog" type="ConfirmationDialog" parent="."]
 title = "確認對位"
 dialog_text = "要將白天地點與夜間見聞對位嗎？"
+
+[node name="DelegationConfirmDialog" type="ConfirmationDialog" parent="."]
+title = "確認委託"

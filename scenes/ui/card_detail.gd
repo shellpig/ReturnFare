@@ -36,6 +36,18 @@ func show_card(card_id: String) -> void:
 	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_content.add_child(desc_label)
 
+	if str(card_data.get("type", "")) == "person":
+		var status: Dictionary = GameState.delegation_status(card_id)
+		var status_label := Label.new()
+		if bool(status.get("has_pending_report", false)):
+			status_label.text = "委託狀態：委託中，回報待接"
+		elif bool(status.get("delegated_today", false)):
+			status_label.text = "委託狀態：今日已受託"
+		else:
+			status_label.text = "委託狀態：可委託"
+		status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_content.add_child(status_label)
+
 	popup_centered(Vector2i(600, 380))
 
 

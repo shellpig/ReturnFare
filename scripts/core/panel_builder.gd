@@ -351,6 +351,7 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 					"reason": slot_reason,
 					"is_choice": is_choice, # K-19
 					"accept_types": _accept_types(s, loader, data),
+					"delegation": _delegation_view(s, gs),
 				})
 
 		# beat 級 requires 語意相同：成立前整個 beat 呈灰卡狀態＋理由，內部槽不可互動
@@ -395,3 +396,28 @@ static func _accept_types(slot: Dictionary, loader: DataLoader, data: Node) -> P
 			display_name = type_id
 		result.append(display_name)
 	return result
+
+
+## 委託槽的 view model 附加欄位（P4-C）。非委託槽回傳空字典。
+## UI 只讀這份計算結果，不讀原始 delegation JSON、不呼叫 delegate()。
+## {result_timing, preview, tendency, delegated_today}
+static func _delegation_view(slot: Dictionary, gs: Node) -> Dictionary:
+	var delegation_val: Variant = slot.get("delegation")
+	if not (delegation_val is Dictionary):
+		return {}
+	var delegation := delegation_val as Dictionary
+
+	var delegated_today := false
+	if gs != null and gs.has_method("delegation_status"):
+		for accepted: Variant in slot.get("accepts", []) as Array:
+			var status: Dictionary = gs.call("delegation_status", str(accepted))
+			if bool(status.get("delegated_today", false)):
+				delegated_today = true
+				break
+
+	return {
+		"result_timing": str(delegation.get("result_timing", "")),
+		"preview": str(delegation.get("preview", "")),
+		"tendency": str(delegation.get("tendency", "")),
+		"delegated_today": delegated_today,
+	}

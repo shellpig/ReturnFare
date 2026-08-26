@@ -21,6 +21,8 @@ const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 @onready var _map_list: Node = $ContentView/MapList
 @onready var _location_panel: Node = $ContentView/LocationPanel
 @onready var _flow_text: FlowText = $ContentView/FlowText
+@onready var _hand_bar: Node = $HandBar
+@onready var _delegation_tutorial_dialog: AcceptDialog = $DelegationTutorialDialog
 
 var _is_showing_ending := false
 
@@ -43,11 +45,16 @@ func _ready() -> void:
 	GameState.day_changed.connect(_on_day_changed)
 	GameState.chapter_changed.connect(_on_chapter_changed)
 	GameState.run_ended.connect(_on_run_ended)
+	GameState.delegation_tutorial_available.connect(_on_delegation_tutorial_available)
 
 	_map_list.location_selected.connect(_on_location_selected)
 	_location_panel.closed.connect(_on_panel_closed)
 	_location_panel.state_changed.connect(_on_location_panel_state_changed)
 	_location_panel.night_entry_requested.connect(_on_night_entry_requested)
+
+	_delegation_tutorial_dialog.confirmed.connect(_on_delegation_tutorial_dismissed)
+	_delegation_tutorial_dialog.close_requested.connect(_on_delegation_tutorial_dismissed)
+	_delegation_tutorial_dialog.get_ok_button().set_meta("qa_id", "dialog_confirm::delegation_tutorial")
 
 	_refresh_status()
 	_route_view()
@@ -196,6 +203,17 @@ func _on_panel_closed() -> void:
 
 func _on_location_panel_state_changed() -> void:
 	_refresh_advance_hint()
+	_hand_bar.call("refresh")
+
+
+## P4-C：教學信號到達時彈出，不寫 meta；UI 顯示只是「已彈出」不等於「已看過」。
+func _on_delegation_tutorial_available() -> void:
+	_delegation_tutorial_dialog.popup_centered()
+
+
+## P4-C：關閉／略過教學彈窗才算「已看過」，此時才寫入 delegation_tutorial_seen。
+func _on_delegation_tutorial_dismissed() -> void:
+	GameState.mark_delegation_tutorial_seen()
 
 
 func _refresh_status() -> void:
@@ -279,7 +297,10 @@ func _route_view() -> void:
 
 func _play_forced_lines() -> void:
 	_flow_text.clear()
-	var lines: PackedStringArray = GameState.last_forced_lines
+	# P4-B 強制縱慾與 P4-C 委託延遲回報同屬「換日上午既有結算」產生的演出文字，
+	# 依 advance_phase() 內實際結算順序（強制縱慾先、委託回報後）合併播出。
+	var lines: PackedStringArray = GameState.last_forced_lines.duplicate()
+	lines.append_array(GameState.last_delegation_report_lines)
 	if lines.size() > 0:
 		_flow_text.append_lines(lines)
 		_flow_text.visible = true

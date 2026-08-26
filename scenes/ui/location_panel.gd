@@ -22,6 +22,15 @@ const _FMT_SLOT_TYPES := "（收：%s）"
 const _FMT_PREVIEW_TITLE := "預覽：%s"
 const _FMT_PREVIEW_CARDS := "可放置：%s"
 const _MSG_PREVIEW_EMPTY := "目前沒有可放的卡。"
+const _FMT_DELEGATE_BUTTON := "委託：%s"
+const _MSG_DELEGATED_TODAY := "今日已受託"
+const _MSG_DELEGATION_DIALOG_TITLE := "確認委託"
+const _FMT_DELEGATION_DIALOG_TEXT := "任務：%s\n%s\n\n%s\n傾向：%s"
+
+const _TIMING_LABELS := {
+	"immediate": "立即回報",
+	"next_morning": "隔日上午回報",
+}
 
 const _REASON_CODE_TEXTS := {
 	"not_held": "未持有此卡",
@@ -50,6 +59,7 @@ const _NIGHT_REJECT_TEXTS := {
 @onready var _night_enter_btn: Button = $NightEnterButton
 @onready var _night_align_btn: Button = $NightAlignButton
 @onready var _night_align_dialog: ConfirmationDialog = $NightAlignConfirmDialog
+@onready var _delegation_dialog: ConfirmationDialog = $DelegationConfirmDialog
 @onready var _location_title: Label = $LocationTitle
 @onready var _description_label: Label = $DescriptionLabel
 @onready var _status_label: Label = Label.new()
@@ -63,6 +73,7 @@ var _current_lines := PackedStringArray()
 var _current_played := false
 var _is_playing := false
 var _preview_dialog: AcceptDialog
+var _pending_delegation: Dictionary = {}
 
 
 func _ready() -> void:
@@ -75,6 +86,10 @@ func _ready() -> void:
 	_night_align_dialog.confirmed.connect(_on_night_align_confirmed)
 	_night_align_dialog.get_ok_button().set_meta("qa_id", "dialog_confirm::night_align")
 	_night_align_dialog.get_cancel_button().set_meta("qa_id", "dialog_cancel::night_align")
+	_delegation_dialog.confirmed.connect(_on_delegation_confirmed)
+	_delegation_dialog.canceled.connect(func(): _pending_delegation = {})
+	_delegation_dialog.get_ok_button().set_meta("qa_id", "dialog_confirm::delegation")
+	_delegation_dialog.get_cancel_button().set_meta("qa_id", "dialog_cancel::delegation")
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_status_label)
 	move_child(_status_label, _back_btn.get_index() + 1)
@@ -297,6 +312,9 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 	if not accept_types.is_empty():
 		label_text += _FMT_SLOT_TYPES % "、".join(accept_types)
 	var occupant: Variant = slot.get("occupant")
+	var delegation_view: Dictionary = slot_view.get("delegation", {}) as Dictionary
+	var is_delegation := not delegation_view.is_empty()
+	var delegated_today := is_delegation and bool(delegation_view.get("delegated_today", false))
 
 	var slot_lbl := Label.new()
 	slot_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -304,7 +322,9 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 	slot_lbl.gui_input.connect(_on_slot_gui_input.bind(beat_id, slot_id))
 	match tri:
 		PanelBuilder.TriState.OPEN:
-			if occupant != null:
+			if delegated_today:
+				slot_lbl.text = _FMT_SLOT_LOCKED % [label_text, _MSG_DELEGATED_TODAY]
+			elif occupant != null:
 				slot_lbl.text = _PREFIX_SLOT_OCCUPIED + label_text
 			else:
 				slot_lbl.text = _PREFIX_SLOT_EMPTY + label_text
@@ -327,6 +347,24 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 	if tri != PanelBuilder.TriState.OPEN:
 		return
 
+	# 委託槽（P4-C）：確認前只顯示任務／回報時機／傾向，不直接放卡；
+	# 今日已受託時候選位置保留但呈現鎖定，不生成任何委託按鈕。
+	if is_delegation:
+		if delegated_today:
+			var locked_btn := Button.new()
+			locked_btn.text = _MSG_DELEGATED_TODAY
+			locked_btn.disabled = true
+			locked_btn.set_meta("qa_id", "delegated_today::%s::%s" % [beat_id, slot_id])
+			_beat_container.add_child(locked_btn)
+			return
+		for card_id: String in GameState.placeable_cards(beat_id, slot_id):
+			var delegate_btn := Button.new()
+			delegate_btn.text = _FMT_DELEGATE_BUTTON % Data.card_display_name(card_id)
+			delegate_btn.set_meta("qa_id", "delegate::%s::%s::%s" % [beat_id, slot_id, card_id])
+			delegate_btn.pressed.connect(_on_delegate_candidate_pressed.bind(beat_id, slot_id, card_id, delegation_view))
+			_beat_container.add_child(delegate_btn)
+		return
+
 	var is_choice := bool(slot_view.get("is_choice", false))
 	if is_choice:
 		var choice_group := str(slot.get("choice_group", ""))
@@ -342,6 +380,38 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 		place_btn.set_meta("qa_id", "place::%s::%s::%s" % [beat_id, slot_id, card_id])
 		place_btn.pressed.connect(_on_place_pressed.bind(beat_id, slot_id, card_id))
 		_beat_container.add_child(place_btn)
+
+
+func _on_delegate_candidate_pressed(beat_id: String, slot_id: String, card_id: String, delegation_view: Dictionary) -> void:
+	_pending_delegation = { "beat_id": beat_id, "slot_id": slot_id, "card_id": card_id }
+	var beat_title := str((Data.loader.beats_by_id.get(beat_id, {}) as Dictionary).get("title", ""))
+	var timing := str(delegation_view.get("result_timing", ""))
+	var timing_label: String = str(_TIMING_LABELS.get(timing, timing))
+	_delegation_dialog.title = _MSG_DELEGATION_DIALOG_TITLE
+	_delegation_dialog.dialog_text = _FMT_DELEGATION_DIALOG_TEXT % [
+		beat_title,
+		str(delegation_view.get("preview", "")),
+		timing_label,
+		str(delegation_view.get("tendency", "")),
+	]
+	_delegation_dialog.popup_centered()
+
+
+func _on_delegation_confirmed() -> void:
+	if _pending_delegation.is_empty():
+		return
+	var beat_id := str(_pending_delegation.get("beat_id", ""))
+	var slot_id := str(_pending_delegation.get("slot_id", ""))
+	var card_id := str(_pending_delegation.get("card_id", ""))
+	_pending_delegation = {}
+	var result: Dictionary = GameState.try_place(card_id, beat_id, slot_id)
+	if result.get("ok", false):
+		_status_label.text = "\n".join(result.get("lines", PackedStringArray()))
+		_status_label.visible = not _status_label.text.is_empty()
+		state_changed.emit()
+	else:
+		_set_failure_status(result)
+	_rebuild()
 
 
 func _on_slot_gui_input(event: InputEvent, beat_id: String, slot_id: String) -> void:

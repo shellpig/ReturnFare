@@ -92,6 +92,11 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p3e_03_dialog_cancel", "點對位按鈕開確認彈窗，取消後狀態零變化", "p3e_seen_counterpart.json", "", "p3e_03_align_dialog_cancel", "", "p3e_03"),
 		UiCase.new("p3e_04_dialog_confirm", "確認對位後恰好獲得一張 reveal 知識卡、action_spent 仍 false、按鈕消失且知識詳情可讀", "p3e_seen_counterpart.json", "", "p3e_04_align_confirm_gain_knowledge", "", "p3e_04"),
 		UiCase.new("p3e_05_multi_auto_align", "多對一只確認一次，第二個 row 日後到訪自動顯示已對位且無二次確認", "p3e_multi_first_seen.json", "", "p3e_05_multi_row_auto_align", "", "p3e_05"),
+		UiCase.new("p4c_01_no_candidates", "零人物卡時委託候選完全不出現，親自處理槽仍在", "p4c_d17_no_person.json", "", "p4c_01_candidate_visibility", "", "p4c_01"),
+		UiCase.new("p4c_02_confirm_cancel", "委託確認彈窗只顯示任務／回報時機／傾向，取消後狀態零變化", "p4c_d17_with_person.json", "", "p4c_02_confirm_dialog", "", "p4c_02"),
+		UiCase.new("p4c_03_immediate_confirm", "確認委託阿婕後 immediate 效果套用，choice_group 同組其餘槽收起", "p4c_d17_with_person.json", "", "p4c_03_immediate_confirm", "", "p4c_03"),
+		UiCase.new("p4c_04_next_morning_confirm", "確認委託阿珠後派出當下不劇透，隔日上午既有結算後才播報回報", "p4c_d17_with_person.json", "", "p4c_04_next_morning_confirm", "", "p4c_04"),
+		UiCase.new("p4c_05_tutorial_dialog", "首次真實取得人物卡彈出委託教學，關閉後才寫入 delegation_tutorial_seen", "p4c_d17_no_person.json", "", "p4c_05_tutorial_dialog", "", "p4c_05"),
 	]
 
 
@@ -242,6 +247,16 @@ class UiCase extends CaseBaseClass:
 				return await _p3e_04(tree)
 			"p3e_05":
 				return await _p3e_05(tree, main_node)
+			"p4c_01":
+				return await _p4c_01(tree)
+			"p4c_02":
+				return await _p4c_02(tree)
+			"p4c_03":
+				return await _p4c_03(tree)
+			"p4c_04":
+				return await _p4c_04(tree)
+			"p4c_05":
+				return await _p4c_05(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -1669,4 +1684,78 @@ class UiCase extends CaseBaseClass:
 			assert_true((btns_music_after[0] as Button).text.contains("廟＋廟埕・有音樂的地方"), "第二個 row 自動顯示白天名・夜間名")
 
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["multi_row_first_aligned", "multi_row_second_unseen", "multi_row_second_auto_aligned"] } }
+
+	func _p4c_01(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		assert_no_qa_id(tree, "slot::d17_19_prescription::ask_ajie", "零人物卡不出現阿婕候選")
+		assert_no_qa_id(tree, "slot::d17_19_prescription::ask_azhu", "零人物卡不出現阿珠候選")
+		assert_no_qa_id(tree, "slot::d17_19_prescription::ask_acai", "零人物卡不出現阿財候選")
+		assert_has_qa_id(tree, "slot::d17_19_prescription::find_self", "親自處理槽仍在")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["no_candidates_hidden", "self_route_visible"] } }
+
+	func _p4c_02(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		var snap_before := JSON.stringify(_state(tree))
+		await _click(tree, "delegate::d17_19_prescription::ask_ajie::npc_ajie")
+		assert_has_qa_id(tree, "dialog_confirm::delegation", "委託確認彈窗出現")
+		assert_true(_has_text(tree.get_root(), "任務："), "確認畫面顯示任務標籤")
+		assert_true(_has_text(tree.get_root(), "回報"), "確認畫面顯示回報時機")
+		assert_true(_has_text(tree.get_root(), "傾向"), "確認畫面顯示傾向")
+		assert_false(_has_text(tree.get_root(), "doc_prescription"), "確認畫面不洩漏卡片 id")
+		assert_false(_has_text(tree.get_root(), "藥袋放到櫃檯"), "確認畫面不洩漏 on_place 效果正文")
+		await _click(tree, "dialog_cancel::delegation")
+		var snap_after := JSON.stringify(_state(tree))
+		assert_eq(snap_after, snap_before, "取消委託後完整 serialize 狀態逐字不變")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["delegation_dialog_preview_only", "delegation_cancel_state_unchanged"] } }
+
+	func _p4c_03(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		await _click(tree, "delegate::d17_19_prescription::ask_ajie::npc_ajie")
+		await _click(tree, "dialog_confirm::delegation")
+		var hand: Array = _run(tree).get("hand", []) as Array
+		assert_true(hand.has("doc_prescription"), "確認委託阿婕後取得 doc_prescription")
+		assert_true(hand.has("npc_ajie"), "委託後人物卡仍在手牌")
+		assert_no_qa_id(tree, "slot::d17_19_prescription::find_self", "choice_group 收起：親自處理槽消失")
+		assert_no_qa_id(tree, "slot::d17_19_prescription::ask_azhu", "choice_group 收起：阿珠候選消失")
+		assert_has_qa_id(tree, "slot::d17_19_prescription::ask_ajie", "已委託的阿婕槽仍在（RESOLVED）")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["immediate_effect_applied", "choice_group_collapsed"] } }
+
+	func _p4c_04(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		await _click(tree, "delegate::d17_19_prescription::ask_azhu::npc_azhu")
+		await _click(tree, "dialog_confirm::delegation")
+		var hand_now: Array = _run(tree).get("hand", []) as Array
+		assert_false(hand_now.has("doc_prescription"), "派出當下不劇透 doc_prescription")
+		assert_true(hand_now.has("npc_azhu"), "派出後人物卡仍在手牌")
+		await _close(tree)
+		await _advance(tree) # afternoon -> evening
+		await _advance(tree) # evening -> night
+		if str(_run(tree).get("phase", "")) == "night":
+			await _advance(tree) # night -> morning，或先進入直接睡的第一次點擊
+		if str(_run(tree).get("phase", "")) == "night":
+			await _advance(tree) # 第二次點擊完成直接睡流程
+		var run_after := _run(tree)
+		assert_eq(int(run_after.get("day", 0)), 18, "推進至第 18 天")
+		assert_eq(str(run_after.get("phase", "")), "morning", "推進至 morning")
+		var hand_after: Array = run_after.get("hand", []) as Array
+		assert_true(hand_after.has("doc_prescription"), "隔日上午回報取得 doc_prescription")
+		assert_true(hand_after.has("info_uncle_treated_20y"), "隔日上午回報取得 info_uncle_treated_20y")
+		assert_true(_has_text(tree.get_root(), "阿珠") or _has_text(tree.get_root(), "走廊"), "回報文字在既有結算後顯示在畫面上")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["next_morning_no_spoiler", "next_morning_report_after_settlement"] } }
+
+	func _p4c_05(tree: SceneTree) -> Dictionary:
+		await _enter(tree, "sanquan")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::delegation_tutorial"), "取得人物卡前教學彈窗不出現")
+		assert_false(bool(_meta(tree).get("delegation_tutorial_seen", false)), "教學未看過")
+		await _click(tree, "place::d17_pm_acai_intro::work::protagonist")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::delegation_tutorial"), "真實取得第一張人物卡後教學彈窗出現")
+		assert_true((_run(tree).get("hand", []) as Array).has("npc_acai"), "確實取得了人物卡")
+		assert_false(bool(_meta(tree).get("delegation_tutorial_seen", false)), "彈窗顯示當下尚未寫入 delegation_tutorial_seen")
+		await _click(tree, "dialog_confirm::delegation_tutorial")
+		assert_true(bool(_meta(tree).get("delegation_tutorial_seen", false)), "關閉教學彈窗後 delegation_tutorial_seen 寫入 true")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["tutorial_fires_on_real_gain", "tutorial_seen_only_after_dismiss"] } }
 

@@ -8,6 +8,8 @@ const CardDetailScene := preload("res://scenes/ui/card_detail.tscn")
 
 const _FMT_SLOTS := "手牌 %d / %d"
 const _FMT_KNOWLEDGE := "知識 (%d)"
+const _SUFFIX_DELEGATED_TODAY := "（今日已受託）"
+const _SUFFIX_DELEGATION_PENDING := "（委託中）"
 
 @onready var _slots_label: Label = $TopRow/SlotsLabel
 @onready var _knowledge_btn: Button = $TopRow/KnowledgeButton
@@ -31,6 +33,11 @@ func _ready() -> void:
 	_refresh()
 
 
+## 供 P4-C 委託確認後外部呼叫，強制立即重繪（委託不改動 hand/knowledge，不會自動觸發 hand_changed）。
+func refresh() -> void:
+	_refresh()
+
+
 func _refresh() -> void:
 	var limit: int = int(Data.tuning("hand_size"))
 	_slots_label.text = _FMT_SLOTS % [GameState.hand_slots_used(), limit]
@@ -48,6 +55,12 @@ func _refresh() -> void:
 		var display_text := Data.card_display_name(card_id)
 		if GameState.madness_clock.has(card_id):
 			display_text = "%s (%d天)" % [display_text, maxi(0, int(GameState.madness_clock[card_id]))]
+		elif str((Data.loader.cards.get(card_id.split("#")[0], {}) as Dictionary).get("type", "")) == "person":
+			var status: Dictionary = GameState.delegation_status(card_id)
+			if bool(status.get("has_pending_report", false)):
+				display_text += _SUFFIX_DELEGATION_PENDING
+			elif bool(status.get("delegated_today", false)):
+				display_text += _SUFFIX_DELEGATED_TODAY
 		btn.text = display_text
 		btn.set_meta("qa_id", "hand_card::%s" % card_id)
 		btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
