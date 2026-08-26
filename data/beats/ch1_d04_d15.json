@@ -765,8 +765,10 @@
             "protagonist"
           ],
           "on_place": {
-            "text": "她無意間提到，叔叔那個藥不是普通的藥。然後她就不講了。"
-          }
+            "text": "她無意間提到，叔叔那個藥不是普通的藥。然後她就不講了。",
+            "flag": { "azhu_shared_abnormal_medicine": true }
+          },
+          "note": "P4-A：阿珠 D9 揭露路線的寫入端。它是 npc_azhu 於 D17 早上取得的唯一前置（見 P4 映射表）"
         }
       ]
     },

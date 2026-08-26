@@ -65,6 +65,18 @@
             "text": "她把排班表推過來。「你要嘛決定，要嘛我決定。」",
             "relation": { "npc": "ajie", "delta": 1 }
           }
+        },
+        {
+          "id": "repair_ajie_trust",
+          "occupant": "npc_ajie",
+          "label": "把之前的事跟阿婕講清楚",
+          "accepts": ["protagonist"],
+          "condition": { "flag": "ajie_trust_broken" },
+          "on_place": {
+            "text": "你把話講開了。她沉默了一會，然後點頭。「那就這樣。」\n她願意再站在你這邊。",
+            "flag": { "ajie_trust_broken": false }
+          },
+          "note": "P4 首個明示修復接點。只有 ajie_trust_broken 成立時出現；修復直接把旗標設回 false，不另建 repaired flag。修復後她會在 D17 早上重新進手牌"
         }
       ]
     },
@@ -100,10 +112,13 @@
         { "id": "ajie", "occupant": "npc_ajie", "label": "阿婕（一邊算分工一邊咬指甲）", "accepts": [] }
       ],
       "on_enter": {
-        "gain": ["npc_ajie", "npc_azhu", "npc_acai"],
+        "gain": [
+          { "card": "npc_ajie", "if": { "not": { "flag": "ajie_trust_broken" } } },
+          { "card": "npc_azhu", "if": { "flag": "azhu_shared_abnormal_medicine" } }
+        ],
         "flag": { "pilgrimage_call": true, "prescription_missing": true }
       },
-      "note": "種：阿婕咬指甲。這通電話替第 16-19 天建立倒數。\n人物卡在這一格第一次進手牌（企劃書第六節、SCHEMA.md 暫定決定：第一章不發人物卡，委託第 17 天登場才開）——三張同時發，因為委託教學的重點是「同一件事交給不同的人會帶回不同的東西」，少一張就看不出差異"
+      "note": "種：阿婕咬指甲。這通電話替第 16-19 天建立倒數。\nP4-A：人物卡取得先由故事事件決定，不在此自動發三張（見 subdocs/故事線/故事線_第一輪_第二章.md > P4 人物卡取得與處方委託映射）。阿婕在 ajie_trust_broken 未成立時於此條件取得；阿珠須先在 D9 寫 azhu_shared_abnormal_medicine；阿財只在 D17-19 真的跟他做一個時段才取得。若三張都沒有，D17 下午只顯示親自處理路線，不彈空教學"
     },
     {
       "id": "d17_pm_pilgrimage",
@@ -132,60 +147,88 @@
             "text": "「不好意思，我們這幾天……」對方很客氣地掛了。\n阿婕鬆一口氣，但她沒說話。",
             "flag": { "pilgrimage_declined": true }
           }
-        },
-        {
-          "id": "find_self",
-          "occupant": null,
-          "label": "自己回旅館翻找藥單",
-          "accepts": ["protagonist"],
-          "on_place": {
-            "text": "在倉庫最裡面的箱子。花了一個下午，但你找到了，而且乾淨。",
-            "gain": ["doc_prescription"]
-          },
-          "note": "委託教學的對照組：自己做最乾淨，代價是這一格不能拿去處理進香團或叔叔"
         }
       ]
     },
     {
-      "id": "d17_pm_delegate",
+      "id": "d17_19_prescription",
       "location": "sanquan",
-      "when": { "day": 17, "phase": "afternoon" },
-      "title": "委託（第一次）",
-      "text": "你一個人做不完。而這裡有人可以幫你去。",
+      "when": { "day_from": 17, "day_to": 19, "phase": "afternoon" },
+      "title": "叔叔的舊藥單",
+      "text": "診所要的那份舊藥單找不到了。你可以自己回旅館翻，也可以請人去找。",
       "slots": [
+        {
+          "id": "find_self",
+          "occupant": null,
+          "label": "自己回旅館翻找",
+          "accepts": ["protagonist"],
+          "choice_group": "prescription_route",
+          "choice_requires_card": true,
+          "on_place": {
+            "text": "在倉庫最裡面的箱子。花了一個下午，但你找到了，而且乾淨。\n你少了一格能拿去處理進香團、叔叔或調查。",
+            "gain": ["doc_prescription"]
+          },
+          "note": "親自處理路線：主角一格，immediate。最乾淨，代價是這個下午沒了"
+        },
         {
           "id": "ask_ajie",
           "occupant": null,
           "label": "請阿婕去找",
           "accepts": ["npc_ajie"],
+          "condition": { "has_card": "npc_ajie" },
+          "choice_group": "prescription_route",
+          "delegation": {
+            "result_timing": "immediate",
+            "preview": "請她回旅館把那份舊藥單找出來。",
+            "tendency": "熟人容易辦成，但她可能順便看到不該看的東西。"
+          },
           "on_place": {
-            "text": "兩天後她把藥袋放到櫃檯上。「那個箱子裡還有你爸媽的東西欸。你知道嗎？」",
+            "text": "她很快把藥袋放到櫃檯上。「那個箱子裡還有你爸媽的東西欸。你知道嗎？」",
             "gain": ["doc_prescription", "info_ajie_saw_parents"]
-          }
+          },
+          "note": "委託阿婕（會知道太多）。immediate，人物卡留在手牌"
         },
         {
           "id": "ask_azhu",
           "occupant": null,
           "label": "請阿珠護士去查",
           "accepts": ["npc_azhu"],
+          "condition": { "has_card": "npc_azhu" },
+          "choice_group": "prescription_route",
+          "delegation": {
+            "result_timing": "next_morning",
+            "preview": "請她在診所那邊查這份處方的來源。",
+            "tendency": "範圍較廣，隔日上午才回報；而且她很怕。",
+            "report": {
+              "text": "隔天上午她把你叫到走廊上，講得很含糊，而且一直看門口。\n她查到叔叔二十年前就在同一間診所治療。",
+              "gain": ["doc_prescription", "info_uncle_treated_20y"]
+            }
+          },
           "on_place": {
-            "text": "兩天後她把你叫到走廊上，講得很含糊，而且一直看門口。",
-            "gain": ["doc_prescription", "info_uncle_treated_20y"]
-          }
+            "text": "她點點頭，說她試試看。「明天早上再跟你講。」"
+          },
+          "note": "委託阿珠（會出事）。next_morning，回報放 report；派出當下只有文字"
         },
         {
           "id": "ask_acai",
           "occupant": null,
           "label": "請阿財去找",
           "accepts": ["npc_acai"],
+          "condition": { "has_card": "npc_acai" },
+          "choice_group": "prescription_route",
+          "delegation": {
+            "result_timing": "immediate",
+            "preview": "請他去倉庫把那個箱子找出來。",
+            "tendency": "他做事快，但回報是他自己的主觀判斷。"
+          },
           "on_place": {
-            "text": "隔天他就找到了。「裡面沒什麼啊。」他把箱子擱在櫃檯上就去做別的了。",
+            "text": "隔天他就把箱子找到了。「裡面沒什麼啊。」他擱在櫃檯上就去做別的了。",
             "gain": ["info_acai_box"]
           },
-          "note": "他漏掉了重要文件，而且他不知道。這一條不給 doc_prescription——回報是主觀的"
+          "note": "委託阿財（回報是主觀的）。他漏掉重要文件而不自知，這一條不給 doc_prescription。immediate"
         }
       ],
-      "note": "企劃書第六節的委託教學。三種雜訊（會知道太多／會出事／回報是主觀的）用同一個事件框架定義完畢。單一玩家這輪只看得到自己委託的那一種"
+      "note": "P4 第一個完整委託案例（叔叔的舊藥單），第 17-19 天持續窗。親自處理與三名人物候選共用 choice_group prescription_route，任一結算後後續日不再重開。未取得人物卡靠 condition.has_card 隱藏。委託不吃行動格、人物卡留在手牌；映射見 subdocs/故事線/故事線_第一輪_第二章.md > P4 人物卡取得與處方委託映射"
     },
     {
       "id": "d17_pm_acai_intro",
@@ -201,11 +244,12 @@
           "accepts": ["protagonist"],
           "on_place": {
             "text": "搬完東西他坐在階梯上，下樓梯的時候先顧了一下左膝。「舊傷啦，年輕的時候摔的。」",
-            "flag": { "acai_obs_knee": true }
+            "flag": { "acai_obs_knee": true },
+            "gain": [{ "card": "npc_acai", "if": { "not": { "has_card": "npc_acai" } } }]
           }
         }
       ],
-      "note": "從今天起「跟阿財做事」是常駐的下午選項，而且看起來毫無回報。三個觀察開關（左膝／繭／疤）分散在第 17-19 天，全部當日常閒聊演，不要標記"
+      "note": "從今天起「跟阿財做事」是常駐的下午選項，而且看起來毫無回報。三個觀察開關（左膝／繭／疤）分散在第 17-19 天，全部當日常閒聊演，不要標記。P4-A：真的跟他做一個時段即取得 npc_acai（條件 gain，避免重複發卡）"
     },
 
     {
@@ -311,7 +355,8 @@
           "accepts": ["protagonist"],
           "on_place": {
             "text": "遞東西的時候你碰到他的手。虎口一層很厚的繭，跟他的年紀不太搭。",
-            "flag": { "acai_obs_hands": true }
+            "flag": { "acai_obs_hands": true },
+            "gain": [{ "card": "npc_acai", "if": { "not": { "has_card": "npc_acai" } } }]
           }
         },
         {
@@ -385,6 +430,27 @@
         }
       ],
       "note": "⚠️ requires 暫時掛在 k_forty_something 上，但故事線寫的門檻是「登山隊給的路線（第一章第 7-9 天）＋第 7 夜看過」。第一章沒有替登山隊路線建卡，也沒有「看過某個夜間標記」的條件語彙——這一條要回頭補。企劃書第十五節「夜裡看到的東西白天可以去驗」在這裡第一次全額兌現，座標與 n_source 相同"
+    },
+    {
+      "id": "d19_pm_acai_3",
+      "location": "sanquan",
+      "when": { "day": 19, "phase": "afternoon" },
+      "title": "跟阿財做事",
+      "text": "今天在後院卸貨。他捲起袖子。",
+      "slots": [
+        {
+          "id": "work",
+          "occupant": "npc_acai",
+          "label": "跟他做一個下午",
+          "accepts": ["protagonist"],
+          "on_place": {
+            "text": "他手臂上有一道很舊的疤，你以前沒注意過。「以前弄的啦。」他不太想講。",
+            "flag": { "acai_obs_scar": true },
+            "gain": [{ "card": "npc_acai", "if": { "not": { "has_card": "npc_acai" } } }]
+          }
+        }
+      ],
+      "note": "P4-A：第三個觀察開關（疤）的寫入端，之前沒有任何 beat 會給 acai_obs_scar（見舊 note 缺口）。跟他做一個時段即取得 npc_acai（條件 gain）"
     },
     {
       "id": "d19_evening_arrive",

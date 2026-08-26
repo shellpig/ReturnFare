@@ -82,35 +82,79 @@
     {
       "id": "n_manydoors_ch1",
       "location": "n_manydoors",
-      "chapter": 1,
+      "when": { "day": 8, "phase": "night" },
+      "fixed": true,
       "title": "很多門的巷子",
-      "text": "兩側全是門。有一個人每晚站在不同的門前敲門，沒有人應。他是唯一會說話的。",
+      "text": "兩側全是門。有一個人每晚站在不同的門前敲門，沒有人應。他是唯一會說話的。\n「你叫什麼名字？」\n你回答。那人想了一下：「不對。那個名字有人在用了。」\n然後他不走了。固定姓名問答到此為止——接下來才是三個可操作要求。",
       "encounter": {
+        "repeat_each_run": true,
+        "charge_first_visit": true,
+        "per_round_slot_cost": 1,
+        "escape_cost": 1,
+        "allow_discard": true,
+        "after_finish": "stay",
         "rounds": [
           {
-            "demand": "「你叫什麼名字？」",
-            "on_wrong": "他想了一下：「不對。那個名字有人在用了。」然後他不走了。",
-            "accepts": [],
-            "_pending": "接受哪張卡要等卡片清單（待決 22）"
+            "id": "name_since_when",
+            "demand": "「那個名字什麼時候開始是你的？」",
+            "responses": [
+              {
+                "id": "answer_not_today",
+                "accepts": ["k_not_today", "k_already_on_list"],
+                "consume_card": false,
+                "next_round": "who_remembers",
+                "on_resolve": { "text": "他停了一下。這個答案他沒有預料到。" }
+              }
+            ],
+            "fallback": {
+              "requires_discardable": true,
+              "next_round": "who_remembers",
+              "on_resolve": { "text": "他收走了你的回答。" }
+            }
           },
           {
+            "id": "who_remembers",
             "demand": "「那誰記得你？」",
-            "on_wrong": "「他們記得的不是你。」",
-            "accepts": [],
-            "_pending": "同上"
+            "responses": [
+              {
+                "id": "answer_who",
+                "accepts": ["info_chunama_pause", "info_ahong_private"],
+                "consume_card": false,
+                "next_round": "what_remains",
+                "on_resolve": { "text": "他往後退了半步。" }
+              }
+            ],
+            "fallback": {
+              "requires_discardable": true,
+              "next_round": "what_remains",
+              "on_resolve": { "text": "「他們記得的不是你。」他收走了你的回答。" }
+            }
           },
           {
+            "id": "what_remains",
             "demand": "「那你留下什麼？」",
-            "on_wrong": "他不再問了。他開始靠近。",
-            "accepts": [],
-            "_pending": "同上"
+            "responses": [
+              {
+                "id": "answer_remains",
+                "accepts": ["routine_debt", "equip_polaroid", "item_gradphoto"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": { "text": "他沉默了。這一晚結束了。" }
+              }
+            ],
+            "fallback": {
+              "requires_discardable": true,
+              "next_round": null,
+              "on_resolve": { "text": "他不再問了。他開始靠近。" }
+            }
           }
         ],
-        "per_round_slot_cost": 1,
-        "escape_cost": 1
+        "on_victory": { "text": "他退回門後。你走出巷子。", "flag": { "d8_encounter_victory": true } },
+        "on_failure": { "text": "你再也騰不出位置。他伸手，把你手上的東西拿走。", "flag": { "d8_encounter_failure": true } },
+        "on_escape": { "text": "你付出一張代價，退出巷子。", "flag": { "d8_encounter_escaped": true } }
       },
       "slots": [],
-      "note": "第一場遭遇，三個要求就收——它是教學場，玩家要學的只有「它要東西、我出卡、錯了卡就沒了」。隔天早上桌面上真的少了那張。真相：在用那個名字的是源頭裡的那一份。如果被吃掉的是阿婕拍的工作照或第 3 天那張情報卡，那會痛，而且後面的路會直接斷掉"
+      "note": "第一場遭遇（第 8 夜，dated night fixed encounter，repeat_each_run + charge_first_visit，非 meta_once）。三回合 response matrix 見 subdocs/故事線/故事線_第一輪_第一章.md > D8 response matrix。第一輪拿不到 k_not_today／k_already_on_list，所以第一題無正解，只要手上有可丟棄卡就必須失去或支付一張。真相：在用那個名字的是源頭裡的那一份"
     },
     {
       "id": "n_music_ch1",

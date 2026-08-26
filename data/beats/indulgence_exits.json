@@ -99,13 +99,16 @@
           "indulgence": { "weight": 5 },
           "on_place": {
             "text": "在混亂與衝動中，你將慾望宣洩在阿婕身上。",
-            "relation": { "npc": "ajie", "delta": 1 }
+            "relation": { "npc": "ajie", "delta": 1 },
+            "flag": { "ajie_trust_broken": true },
+            "lose": [{ "card": "npc_ajie", "if": { "has_card": "npc_ajie" } }]
           },
           "on_place_by_level": {
             "light": {
               "text": "關係在失控中產生了微妙的變化。"
             }
-          }
+          },
+          "note": "P4-A：對阿婕使用縱慾卡破壞委託資格。設 ajie_trust_broken=true 為阿婕資格的唯一真值；若已持有人物卡則同時 lose。D16 d16_pm_sanquan::repair_ajie_trust 是明示修復接點"
         },
         {
           "id": "x_soak",

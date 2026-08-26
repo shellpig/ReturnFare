@@ -453,7 +453,6 @@ func _verify_timeline_a(timeline: Array) -> int:
 	var expected_timeline := [
 		{ "day": 6, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_1", "hand_after": 1 },
 		{ "day": 7, "phase": "night", "action": "enter_night_location", "loc": "n_source", "hand_after": 2 },
-		{ "day": 8, "phase": "night", "action": "enter_night_location", "loc": "n_manydoors", "hand_after": 3 },
 		{ "day": 11, "phase": "night", "action": "enter_night_location", "loc": "n_ahong_2", "hand_after": 4 },
 		{ "day": 13, "phase": "morning", "action": "forced_indulgence", "level": "light", "hand_after": 3 },
 		{ "day": 14, "phase": "morning", "action": "forced_indulgence", "level": "normal", "hand_after": 2 },
@@ -495,7 +494,7 @@ func _verify_timeline_a(timeline: Array) -> int:
 				])
 
 	if match_all:
-		failed += _ok("A 逐項時間軸 26 個事件完全相符（首次最重落在第 27 天，峰值落在第 11 天，重置前留 2 張）")
+		failed += _ok("A 逐項時間軸 25 個事件完全相符（第 8 夜 n_manydoors 於 P4-A 起改為強制遭遇到訪：仍在 day 8 收 1 張發狂卡、視野窗口不變，但不再記為玩家選擇的 enter_night_location 事件。首次最重落在第 27 天，峰值落在第 11 天，重置前留 2 張）")
 
 	return failed
 

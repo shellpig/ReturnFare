@@ -154,6 +154,12 @@ static func lint_card_types(loader: DataLoader) -> PackedStringArray:
 		if not loader.card_types.has(type_id):
 			problems.append("卡片 %s：type 未在 card_types.json 定義 → %s" % [card_id, type_id])
 
+		# P4-A：discardable 升格為每張卡必填 boolean（遭遇丟棄與支付的唯一真值，不得由 type 猜）。
+		if not card.has("discardable"):
+			problems.append("卡片 %s：缺少必填欄位 discardable" % card_id)
+		elif not (card["discardable"] is bool):
+			problems.append("卡片 %s：discardable 必須是 boolean（實際型別錯誤）" % card_id)
+
 	for type_id: String in loader.card_types:
 		if not CARD_TYPES.has(type_id):
 			problems.append("card_types.json：未知型別 id → %s" % type_id)
@@ -298,13 +304,16 @@ static func lint_free_slot_rules(beats_list: Array[Dictionary]) -> Dictionary:
 	var warns: PackedStringArray = []
 
 	# 1. 檢查 choice 槽不可收 protagonist（K-22）
+	#    例外：choice_requires_card:true 是明示的硬成本槽，提交 protagonist 就消耗該行動時段
+	#    （SCHEMA choice_group：D43 工作槽、P4 prescription_route 的親自處理槽都走這條）。
 	for b in beats_list:
 		var bid: String = str(b.get("id", "?"))
 		for s: Dictionary in b.get("slots", []) as Array:
 			var cg: Variant = s.get("choice_group")
 			var is_choice := cg != null and not str(cg).is_empty()
 			var accepts: Array = s.get("accepts", []) as Array
-			if is_choice and accepts.has("protagonist"):
+			var requires_card := bool(s.get("choice_requires_card", false))
+			if is_choice and accepts.has("protagonist") and not requires_card:
 				errs.append("%s [slot:%s]：choice 槽的 accepts 不得包含 protagonist" % [bid, str(s.get("id", "?"))])
 
 	# 2. 同面板規約（K-27）：以 (day, phase, location) 為單位檢查非 fixed 面板是否至少有一格收主角卡
@@ -811,6 +820,10 @@ static func lint_night_once(loader: DataLoader) -> PackedStringArray:
 				is_exact_night = true
 				beat_day = int(wd.get("day", -1))
 
+		# P4-A：repeat_each_run 遭遇是 meta_once 的相反形狀（每輪重演），兩者不得同時存在。
+		var enc_raw: Variant = b.get("encounter")
+		var is_repeat := (enc_raw is Dictionary and bool((enc_raw as Dictionary).get("repeat_each_run", false)))
+
 		var has_meta_once := b.has("meta_once")
 		if has_meta_once:
 			var mo_val: Variant = b.get("meta_once")
@@ -820,14 +833,17 @@ static func lint_night_once(loader: DataLoader) -> PackedStringArray:
 				problems.append("%s：meta_once 只能用於 fixed: true 的 beat" % bid)
 			if not is_exact_night:
 				problems.append("%s：meta_once 只能用於具有 exact night when 的 beat" % bid)
+			if is_repeat:
+				problems.append("%s：encounter.repeat_each_run 與 meta_once 不得同時存在" % bid)
 
 		var loc_id := str(b.get("location", ""))
 		var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
 		var is_night_layer := str(loc.get("layer", "")) == "night"
 
 		if is_fixed and is_exact_night and is_night_layer:
-			if not bool(b.get("meta_once", false)):
-				problems.append("%s：night-layer 地點 (%s) 的 fixed night beat 必須標記 meta_once: true" % [bid, loc_id])
+			# 窄例外：fixed && exact night when && encounter.repeat_each_run 可不 meta_once（P4-A、D8）。
+			if not bool(b.get("meta_once", false)) and not is_repeat:
+				problems.append("%s：night-layer 地點 (%s) 的 fixed night beat 必須標記 meta_once: true（或為 repeat_each_run 遭遇）" % [bid, loc_id])
 
 			if beat_day > 0:
 				if night_fixed_by_day.has(beat_day):
@@ -838,6 +854,276 @@ static func lint_night_once(loader: DataLoader) -> PackedStringArray:
 
 	return problems
 
+
+
+## Lint 15：委託資料完整性（P4-A、SCHEMA delegation）。
+## 委託槽必須：accepts 恰一明確 person card id、與親自處理槽共用非空 choice_group、
+## result_timing/report 配對、next_morning 不落第 45 天之後、preview/tendency 齊全、鎖定附理由。
+static func lint_delegations(loader: DataLoader) -> PackedStringArray:
+	var problems := PackedStringArray()
+	for b in loader.beats:
+		var bid := str(b.get("id", ""))
+		# 本 beat 各 choice_group 是否有 protagonist（親自處理）槽
+		var group_has_protag := {}
+		for s0 in b.get("slots", []) as Array:
+			var acc0: Array = (s0 as Dictionary).get("accepts", []) as Array
+			var cg0 := str((s0 as Dictionary).get("choice_group", ""))
+			if not cg0.is_empty() and acc0.has("protagonist"):
+				group_has_protag[cg0] = true
+		for s in b.get("slots", []) as Array:
+			var slot := s as Dictionary
+			if not slot.has("delegation"):
+				continue
+			var sid := str(slot.get("id", "?"))
+			var where := "%s [slot:%s]" % [bid, sid]
+			var deleg: Variant = slot.get("delegation")
+			if not (deleg is Dictionary):
+				problems.append("%s：delegation 不是 Dictionary" % where)
+				continue
+			var d := deleg as Dictionary
+			# accepts 恰一明確 person card id
+			var acc: Array = slot.get("accepts", []) as Array
+			if acc.size() != 1 or not (acc[0] is String):
+				problems.append("%s：委託槽 accepts 必須恰好一個明確 person card id" % where)
+			else:
+				var pid := str(acc[0])
+				if pid == "person":
+					problems.append("%s：委託槽 accepts 不可用型別泛稱 person" % where)
+				elif not loader.cards.has(pid):
+					problems.append("%s：委託槽 accepts 引用不存在的卡 -> %s" % [where, pid])
+				elif str((loader.cards[pid] as Dictionary).get("type", "")) != "person":
+					problems.append("%s：委託槽 accepts 的卡 %s 型別不是 person" % [where, pid])
+			# choice_group 非空且本 beat 有親自處理槽共用
+			var cg := str(slot.get("choice_group", ""))
+			if cg.is_empty():
+				problems.append("%s：委託槽必須有非空 choice_group" % where)
+			elif not group_has_protag.has(cg):
+				problems.append("%s：委託槽的 choice_group %s 缺親自處理（protagonist）槽" % [where, cg])
+			# result_timing enum + report 配對
+			var timing := str(d.get("result_timing", ""))
+			if timing != "immediate" and timing != "next_morning":
+				problems.append("%s：result_timing 非法 -> %s" % [where, timing])
+			var has_report := d.has("report")
+			if timing == "next_morning":
+				if not has_report:
+					problems.append("%s：next_morning 委託必須有 report" % where)
+				elif not (d["report"] is Dictionary) or str((d["report"] as Dictionary).get("text", "")).is_empty():
+					problems.append("%s：report 必須是含 text 的 Dictionary" % where)
+				var latest := _beat_latest_day(b)
+				if latest >= 45:
+					problems.append("%s：next_morning 委託最晚成立日 %d 會落到第 45 天之後" % [where, latest])
+			elif timing == "immediate":
+				if has_report:
+					problems.append("%s：immediate 委託不得有 report" % where)
+			# preview / tendency 必填
+			if str(d.get("preview", "")).is_empty():
+				problems.append("%s：delegation 缺 preview" % where)
+			if str(d.get("tendency", "")).is_empty():
+				problems.append("%s：delegation 缺 tendency" % where)
+			# 鎖定條件必須附 reject_reason
+			if slot.has("requires") and str(slot.get("reject_reason", "")).is_empty():
+				problems.append("%s：委託槽有 requires 但缺 reject_reason" % where)
+	return problems
+
+
+## beat 最晚可能成立日（when.day 或 when.day_to；無 when 視為 45）。
+static func _beat_latest_day(b: Dictionary) -> int:
+	var w: Variant = b.get("when")
+	if not (w is Dictionary):
+		return 45
+	var wd := w as Dictionary
+	if wd.has("day"):
+		return int(wd.get("day", 45))
+	if wd.has("day_to"):
+		return int(wd.get("day_to", 45))
+	return 45
+
+
+## Lint 16：遭遇資料完整性（P4-A、SCHEMA encounter）。
+## round graph 從首回合可達、可結束；response 引用/不重疊；fallback/三出口/型別/enum；
+## per-run fixed 與首次收費適用範圍。
+static func lint_encounters(loader: DataLoader) -> PackedStringArray:
+	var problems := PackedStringArray()
+	for b in loader.beats:
+		if not b.has("encounter"):
+			continue
+		var bid := str(b.get("id", ""))
+		var enc_v: Variant = b.get("encounter")
+		if not (enc_v is Dictionary):
+			problems.append("%s [encounter]：encounter 不是 Dictionary" % bid)
+			continue
+		var enc := enc_v as Dictionary
+		var where := "%s [encounter]" % bid
+
+		var prsc: Variant = enc.get("per_round_slot_cost")
+		if not (prsc is float or prsc is int) or int(prsc) <= 0:
+			problems.append("%s：per_round_slot_cost 必須為正整數" % where)
+		if not enc.has("escape_cost"):
+			problems.append("%s：escape_cost 必填（null 或非負整數）" % where)
+		else:
+			var ec: Variant = enc.get("escape_cost")
+			if ec != null and (not (ec is float or ec is int) or int(ec) < 0):
+				problems.append("%s：escape_cost 必須為 null 或非負整數" % where)
+		if enc.has("allow_discard") and not (enc["allow_discard"] is bool):
+			problems.append("%s：allow_discard 必須是 boolean" % where)
+		var af := str(enc.get("after_finish", ""))
+		if af != "stay" and af != "advance_phase":
+			problems.append("%s：after_finish 必須是 stay 或 advance_phase -> %s" % [where, af])
+		for exit_key in ["on_victory", "on_failure", "on_escape"]:
+			if not (enc.get(exit_key) is Dictionary):
+				problems.append("%s：缺少或型別錯誤的 %s" % [where, exit_key])
+			else:
+				_lint_effect(enc.get(exit_key), bid, "%s.%s" % [where, exit_key], problems)
+
+		var rounds_v: Variant = enc.get("rounds")
+		if not (rounds_v is Array) or (rounds_v as Array).is_empty():
+			problems.append("%s：rounds 必須是非空陣列" % where)
+			continue
+		var rounds := rounds_v as Array
+		var round_ids := {}
+		var round_by_id := {}
+		for r_v in rounds:
+			if not (r_v is Dictionary):
+				problems.append("%s：round 不是 Dictionary" % where)
+				continue
+			var r := r_v as Dictionary
+			var rid := str(r.get("id", ""))
+			if rid.is_empty():
+				problems.append("%s：round 缺 id" % where)
+				continue
+			if round_ids.has(rid):
+				problems.append("%s：round id 重複 -> %s" % [where, rid])
+			round_ids[rid] = true
+			round_by_id[rid] = r
+
+		for rid_k in round_by_id.keys():
+			var r: Dictionary = round_by_id[rid_k]
+			var rwhere := "%s round:%s" % [where, rid_k]
+			var resp_v: Variant = r.get("responses")
+			if not (resp_v is Array) or (resp_v as Array).is_empty():
+				problems.append("%s：responses 必須非空" % rwhere)
+			else:
+				var seen_accepts := {}
+				for resp_vv in resp_v as Array:
+					if not (resp_vv is Dictionary):
+						problems.append("%s：response 不是 Dictionary" % rwhere)
+						continue
+					var resp := resp_vv as Dictionary
+					var respid := str(resp.get("id", "?"))
+					var accs: Variant = resp.get("accepts")
+					if not (accs is Array) or (accs as Array).is_empty():
+						problems.append("%s response:%s：accepts 必須非空" % [rwhere, respid])
+					else:
+						for c_v in accs as Array:
+							var cid := str(c_v)
+							if not loader.cards.has(cid):
+								problems.append("%s response:%s：accepts 引用不存在的卡 -> %s" % [rwhere, respid, cid])
+							if seen_accepts.has(cid):
+								problems.append("%s response:%s：accepts 卡 %s 與同 round 其他 response 重疊" % [rwhere, respid, cid])
+							else:
+								seen_accepts[cid] = respid
+					if not (resp.get("consume_card") is bool):
+						problems.append("%s response:%s：consume_card 必填 boolean" % [rwhere, respid])
+					elif bool(resp["consume_card"]):
+						for c_v2 in (resp.get("accepts", []) as Array):
+							var cid2 := str(c_v2)
+							if loader.cards.has(cid2) and not bool((loader.cards[cid2] as Dictionary).get("discardable", false)):
+								problems.append("%s response:%s：consume_card:true 不可消耗不可丟棄卡 %s（禁止通用事件永久失去人物）" % [rwhere, respid, cid2])
+					if not (resp.get("on_resolve") is Dictionary):
+						problems.append("%s response:%s：缺 on_resolve" % [rwhere, respid])
+					else:
+						_lint_effect(resp.get("on_resolve"), bid, "%s response:%s.on_resolve" % [rwhere, respid], problems)
+					_lint_next_round(resp.get("next_round"), round_ids, "%s response:%s" % [rwhere, respid], problems)
+			var fb_v: Variant = r.get("fallback")
+			if not (fb_v is Dictionary):
+				problems.append("%s：缺 fallback" % rwhere)
+			else:
+				var fb := fb_v as Dictionary
+				if fb.has("requires_discardable") and not (fb["requires_discardable"] is bool):
+					problems.append("%s fallback：requires_discardable 必須是 boolean" % rwhere)
+				if not (fb.get("on_resolve") is Dictionary):
+					problems.append("%s fallback：缺 on_resolve" % rwhere)
+				else:
+					_lint_effect(fb.get("on_resolve"), bid, "%s fallback.on_resolve" % rwhere, problems)
+				_lint_next_round(fb.get("next_round"), round_ids, "%s fallback" % rwhere, problems)
+
+		if not round_by_id.is_empty():
+			var first_id := str((rounds[0] as Dictionary).get("id", ""))
+			var reachable := {}
+			var stack := [first_id]
+			while not stack.is_empty():
+				var cur: String = str(stack.pop_back())
+				if reachable.has(cur) or not round_by_id.has(cur):
+					continue
+				reachable[cur] = true
+				var cr: Dictionary = round_by_id[cur]
+				for resp_vv in cr.get("responses", []) as Array:
+					var nr: Variant = (resp_vv as Dictionary).get("next_round")
+					if nr != null:
+						stack.append(str(nr))
+				var fbb: Dictionary = cr.get("fallback", {}) as Dictionary
+				var fnr: Variant = fbb.get("next_round")
+				if fnr != null:
+					stack.append(str(fnr))
+			for rid2 in round_ids.keys():
+				if not reachable.has(rid2):
+					problems.append("%s：round %s 不可從第一回合到達" % [where, rid2])
+			for rid3 in round_by_id.keys():
+				if not _round_can_reach_null(str(rid3), round_by_id, {}):
+					problems.append("%s：round %s 無法抵達任何結束出口（無出口 cycle）" % [where, rid3])
+
+		var is_fixed := bool(b.get("fixed", false))
+		var wd := {}
+		if b.get("when") is Dictionary:
+			wd = b.get("when") as Dictionary
+		var has_exact_day: bool = wd.has("day") and not wd.has("day_from") and not wd.has("day_to")
+		if bool(enc.get("repeat_each_run", false)):
+			if not is_fixed or not has_exact_day:
+				problems.append("%s：repeat_each_run 只可用於有明確整數 when.day 的 fixed encounter" % where)
+		if bool(enc.get("charge_first_visit", false)):
+			var phase_ok: bool = str(wd.get("phase", "")) == "night"
+			var loc_id := str(b.get("location", ""))
+			var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
+			var layer_night: bool = str(loc.get("layer", "")) == "night"
+			if not is_fixed:
+				problems.append("%s：charge_first_visit 要求 beat 為 fixed" % where)
+			if not has_exact_day:
+				problems.append("%s：charge_first_visit 要求明確整數 when.day" % where)
+			if not phase_ok:
+				problems.append("%s：charge_first_visit 要求 when.phase == night" % where)
+			if not layer_night:
+				problems.append("%s：charge_first_visit 要求所掛 location layer == night" % where)
+	return problems
+
+
+static func _lint_next_round(nr: Variant, round_ids: Dictionary, where: String, problems: PackedStringArray) -> void:
+	if nr == null:
+		return
+	if not (nr is String) or not round_ids.has(str(nr)):
+		problems.append("%s：next_round 引用不存在的 round -> %s" % [where, str(nr)])
+
+
+## 該 round 是否存在一條抵達 null 出口的路徑（無出口 cycle 回 false）。
+static func _round_can_reach_null(rid: String, round_by_id: Dictionary, visiting: Dictionary) -> bool:
+	if not round_by_id.has(rid):
+		return false
+	if visiting.has(rid):
+		return false
+	visiting[rid] = true
+	var r: Dictionary = round_by_id[rid]
+	for resp_vv in r.get("responses", []) as Array:
+		var nr: Variant = (resp_vv as Dictionary).get("next_round")
+		if nr == null:
+			return true
+		if _round_can_reach_null(str(nr), round_by_id, visiting):
+			return true
+	var fb: Dictionary = r.get("fallback", {}) as Dictionary
+	var fnr: Variant = fb.get("next_round")
+	if fnr == null:
+		return true
+	if _round_can_reach_null(str(fnr), round_by_id, visiting):
+		return true
+	return false
 
 
 func _beat_files() -> PackedStringArray:

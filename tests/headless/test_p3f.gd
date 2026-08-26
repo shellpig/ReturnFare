@@ -275,7 +275,11 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 
 		# ── 4. Night ──
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "night")
+		# P4-A：D8 起夜間 fixed 遭遇（charge_first_visit）於 play_night_fixed 強制到訪時收費，
+		# 不走顯式 enter_night_location，故在此以 _madness_counter 差額補進 paid_entered_count。
+		var madness_before_fixed: int = int(gs.get("_madness_counter"))
 		gs.play_night_fixed()
+		paid_entered_count += int(gs.get("_madness_counter")) - madness_before_fixed
 
 		var locs := PanelBuilder.available_locations(gs, data_node)
 		var chosen_loc := ""

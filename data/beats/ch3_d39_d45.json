@@ -696,81 +696,98 @@
       "fixed": true,
       "condition": { "flag": "final_day" },
       "title": "走廊盡頭",
-      "text": "它每回合要一個質性回應。你逃不掉。\n但每一種失敗都揭露一個條件。",
-      "slots": [
-        {
-          "id": "play_self",
-          "occupant": null,
-          "label": "自己的名字",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "「這個名字已經登記。」" }
-        },
-        {
-          "id": "play_her",
-          "occupant": null,
-          "label": "她",
-          "accepts": ["npc_ajie", "npc_awei"],
-          "on_place": { "text": "「她已經付過了。」" }
-        },
-        {
-          "id": "play_paper",
-          "occupant": null,
-          "label": "那張蓋印的舊紙",
-          "accepts": ["item_old_paper"],
-          "on_place": { "text": "「這不是同一本簿子。」" }
-        },
-        {
-          "id": "play_zhou",
-          "occupant": null,
-          "label": "周先生",
-          "accepts": ["info_zhou_waiting"],
-          "on_place": { "text": "「位置已經配對。」" }
-        },
-        {
-          "id": "play_uncle",
-          "occupant": null,
-          "label": "叔叔",
-          "accepts": ["info_uncle_gap"],
-          "on_place": { "text": "「他是我們做的。」" }
-        },
-        {
-          "id": "play_theory_exchange",
-          "occupant": null,
-          "label": "你寫下的那個結論",
-          "accepts": ["inf_health_disappearance"],
-          "on_place": {
-            "text": "世界用周先生與你的配對回應了它。\n不是「有關」。是「來自」。",
-            "lose": ["inf_health_disappearance"],
-            "gain": ["k_health_from_disappearance"]
-          },
-          "note": "方向正確的那張。翻面成知識卡——驗證的是交換因果，不是「她是不是她」"
-        },
-        {
-          "id": "play_theory_jinghe",
-          "occupant": null,
-          "label": "你寫下的那個結論",
-          "accepts": ["inf_jinghe_does_it"],
-          "on_place": {
-            "text": "「那棟房子只是我們用的地方之一。」\n你寫下的東西在你手上碎掉了。",
-            "lose": ["inf_jinghe_does_it"],
-            "gain": ["k_jinghe_not_entrance"]
-          },
-          "note": "錯誤推論破掉，產出較窄但為真的知識"
-        },
-        {
-          "id": "play_theory_hotspring",
-          "occupant": null,
-          "label": "你寫下的那個結論",
-          "accepts": ["inf_hotspring_kills"],
-          "on_place": {
-            "text": "「泡湯不會殺死任何人。」\n你寫下的東西在你手上碎掉了。",
-            "lose": ["inf_hotspring_kills"],
-            "gain": ["k_not_side_effect"]
-          },
-          "note": "同上。三張推論卡各自一個槽——玩家第 43 天只會寫下一張，所以只有一個槽收得到東西，另外兩個不會亮"
-        }
-      ],
-      "note": "第一輪正規遭遇共兩次：第 8 夜與第 45 天。這裡驗證的是交換因果，不是「她是不是她」。即使拿到正確知識，主角仍不知道備份、消失者去了哪、為何記憶完整"
+      "text": "它要一個質性回應。你逃不掉。\n但每一種回答都揭露一個條件。",
+      "encounter": {
+        "per_round_slot_cost": 1,
+        "escape_cost": null,
+        "allow_discard": false,
+        "after_finish": "advance_phase",
+        "rounds": [
+          {
+            "id": "final_demand",
+            "demand": "它要一個質性回應。",
+            "responses": [
+              {
+                "id": "self",
+                "accepts": ["protagonist"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": { "text": "「這個名字已經登記。」" }
+              },
+              {
+                "id": "her",
+                "accepts": ["npc_ajie", "npc_awei"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": { "text": "「她已經付過了。」" }
+              },
+              {
+                "id": "paper",
+                "accepts": ["item_old_paper"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": { "text": "「這不是同一本簿子。」" }
+              },
+              {
+                "id": "zhou",
+                "accepts": ["info_zhou_waiting"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": { "text": "「位置已經配對。」" }
+              },
+              {
+                "id": "uncle",
+                "accepts": ["info_uncle_gap"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": { "text": "「他是我們做的。」" }
+              },
+              {
+                "id": "theory_exchange",
+                "accepts": ["inf_health_disappearance"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": {
+                  "text": "世界用周先生與你的配對回應了它。\n不是「有關」。是「來自」。",
+                  "lose": ["inf_health_disappearance"],
+                  "gain": ["k_health_from_disappearance"]
+                }
+              },
+              {
+                "id": "theory_jinghe",
+                "accepts": ["inf_jinghe_does_it"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": {
+                  "text": "「那棟房子只是我們用的地方之一。」\n你寫下的東西在你手上碎掉了。",
+                  "lose": ["inf_jinghe_does_it"],
+                  "gain": ["k_jinghe_not_entrance"]
+                }
+              },
+              {
+                "id": "theory_hotspring",
+                "accepts": ["inf_hotspring_kills"],
+                "consume_card": false,
+                "next_round": null,
+                "on_resolve": {
+                  "text": "「泡湯不會殺死任何人。」\n你寫下的東西在你手上碎掉了。",
+                  "lose": ["inf_hotspring_kills"],
+                  "gain": ["k_not_side_effect"]
+                }
+              }
+            ],
+            "fallback": {
+              "next_round": null,
+              "on_resolve": { "text": "它沒有回答你打出的東西。" }
+            }
+          }
+        ],
+        "on_victory": { "text": "走廊安靜下來。" },
+        "on_failure": { "text": "走廊沒有盡頭。" },
+        "on_escape": { "text": "（沒有出口。）" }
+      },
+      "slots": [],
+      "note": "第一輪正規遭遇共兩次：第 8 夜與第 45 天。一 round、不可逃（escape_cost:null）、不可主動丟棄（allow_discard:false）、after_finish:advance_phase。各正式卡路線各一 response（自己名字／她／舊紙／周先生／叔叔／三張推論）。ending_replaced 由 d45_then 的 phase_exit 觸發（P5），不在本遭遇。這裡驗證的是交換因果，不是「她是不是她」"
     },
     {
       "id": "d45_then",

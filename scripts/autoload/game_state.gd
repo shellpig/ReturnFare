@@ -212,8 +212,18 @@ func play_night_fixed() -> PackedStringArray:
 			if Data != null and Data.loader != null and Data.loader.locations.has(loc_id):
 				var loc: Dictionary = Data.loader.locations[loc_id] as Dictionary
 				if str(loc.get("layer", "")) == "night":
+					var was_seen_cfv := night_locations_seen.has(loc_id)
 					if not _record_forced_night_visit(loc_id):
 						continue
+					# charge_first_visit 遭遇（P4-A、SCHEMA encounter.charge_first_visit）：
+					# 強制到訪前先保存是否終身 seen，只有此前未 seen 才按 location madness_cost 收一次。
+					var enc_cfv: Variant = b.get("encounter")
+					if enc_cfv is Dictionary and bool((enc_cfv as Dictionary).get("charge_first_visit", false)) and not was_seen_cfv:
+						var cost_cfv := int(loc.get("madness_cost", 0))
+						if cost_cfv > 0:
+							for _i_cfv in range(cost_cfv):
+								gain_card("madness", false)
+							_check_madness_cap()
 			if is_meta_once:
 				night_once_beats_seen[bid] = true
 			var beat_lines := play_beat(bid)

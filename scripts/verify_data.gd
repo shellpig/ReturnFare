@@ -185,6 +185,28 @@ func _initialize() -> void:
 		return
 	print("夜間一次性 beat 完整性 (Lint 14)　0 錯誤")
 
+	# Lint 15: 委託資料完整性
+	var deleg_errs := DataLoader.lint_delegations(loader)
+	if deleg_errs.size() > 0:
+		print("
+委託資料完整性錯誤 %d 筆：" % deleg_errs.size())
+		for e in deleg_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("委託資料完整性 (Lint 15)　0 錯誤")
+
+	# Lint 16: 遭遇資料完整性
+	var enc_errs := DataLoader.lint_encounters(loader)
+	if enc_errs.size() > 0:
+		print("
+遭遇資料完整性錯誤 %d 筆：" % enc_errs.size())
+		for e in enc_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("遭遇資料完整性 (Lint 16)　0 錯誤")
+
 	print("\ntuning：手牌 %d／發狂上限 %d／倒數 %d 天／視野門檻 %d" % [
 		loader.tuning.get("hand_size", -1),
 		loader.tuning.get("madness_cap", -1),
