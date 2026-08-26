@@ -52,6 +52,7 @@ var indulgence_count: int = 0                  # 本輪縱慾次數（主動＋�
 var madness_cards_cleared: int = 0             # 本輪消除的發狂卡張數累計（run 層，避免依賴縱慾次數換算卡數）
 var forced_pending: Array[String] = []         # 已歸零、還沒吃到行動格的發狂卡實例 id（run 層）
 var last_forced_lines: PackedStringArray = []  # 當前時段強制縱慾產生的演出文字行（transient UI）
+var run_generation: int = 0                    # 輪次世代計數（單調遞增，供 EffectApply 與結算器偵測 end_run）
 
 signal phase_changed(day: int, phase: String)
 signal day_changed(day: int)
@@ -130,6 +131,7 @@ func advance_phase() -> void:
 ## 輪結束結算與迴圈重置（規格書第十六節、P1-F、B-02）。
 ## 順序固定：發射 run_ended -> meta 層保留 -> run 層重置 -> 回第 1 天 morning。
 func end_run(ending_id: String = "ending_default") -> void:
+	run_generation += 1
 	run_ended.emit(ending_id)
 
 	day = 1
@@ -1143,12 +1145,14 @@ func _settle_pending_delegation_reports() -> void:
 		var del_dict: Dictionary = slot_dict["delegation"] as Dictionary
 		var rep_dict: Dictionary = del_dict["report"] as Dictionary
 
+		var gen_before := run_generation
 		var out := EffectApply.apply(rep_dict, self)
-		rep_lines.append_array(out)
 
-		# K-65 防呆：若回報效果觸發 BE / end_run，立即中斷後續回報迴圈
-		if day != current_day:
-			break
+		# K-65 防呆：若回報效果觸發 BE / end_run，立即中斷結算、不寫入文字
+		if run_generation != gen_before or day != current_day:
+			return
+
+		rep_lines.append_array(out)
 
 	last_delegation_report_lines = rep_lines
 

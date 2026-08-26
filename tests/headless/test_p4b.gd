@@ -1036,7 +1036,7 @@ func _test_data_conflict_and_k65_pending_resilience(gs: Node, data_node: Node) -
 	else:
 		failed += _fail("接點失效測試異常：valid_executed=%s invalid_retained=%s (size=%d) no_valid_in_pending=%s" % [str(valid_executed), str(invalid_retained), pending_after.size(), str(no_valid_in_pending)])
 
-	# (b) K-65 防呆：若回報效果觸發發狂 BE 重置，不繼續執行後續回報寫入新輪
+	# (b) K-65 防呆：同一筆回報觸發發狂 BE 後立即終止、不套後置 flag，且不污染新輪文字與後續回報
 	_reset_gs(gs)
 	var beat_k65: Dictionary = {
 		"id": "test_del_k65_beat",
@@ -1051,7 +1051,12 @@ func _test_data_conflict_and_k65_pending_resilience(gs: Node, data_node: Node) -
 					"result_timing": "next_morning",
 					"preview": "p",
 					"tendency": "t",
-					"report": { "text": "hit be", "madness": 10 } # 必破 cap
+					# 同一筆 report 包含 text + madness (觸發 BE) + 後置 flag
+					"report": {
+						"text": "hit be report text",
+						"madness": 10,
+						"flag": { "k65_intra_leaked_flag": true }
+					}
 				},
 				"on_place": { "text": "k65 be dispatched" }
 			},
@@ -1063,7 +1068,11 @@ func _test_data_conflict_and_k65_pending_resilience(gs: Node, data_node: Node) -
 					"result_timing": "next_morning",
 					"preview": "p",
 					"tendency": "t",
-					"report": { "text": "leak text into new run", "flag": { "k65_leaked_flag": true } }
+					# 第二筆 report 驗證迴圈中斷
+					"report": {
+						"text": "leak text into new run",
+						"flag": { "k65_inter_leaked_flag": true }
+					}
 				},
 				"on_place": { "text": "k65 after dispatched" }
 			}
@@ -1083,14 +1092,23 @@ func _test_data_conflict_and_k65_pending_resilience(gs: Node, data_node: Node) -
 	gs.call("advance_phase") # morning
 
 	# 因第 1 筆 report 灌入 10 張 madness 觸發 BE，end_run() 重置回 Day 1 morning
-	# 驗證：新輪的 flags 不包含 k65_leaked_flag（後續回報被 break，未洩漏進新輪）
+	# 驗證：
+	# 1. new_day == 1
+	# 2. 同一筆 report 的後置 flag（k65_intra_leaked_flag）未被寫入新輪
+	# 3. 第二筆 report 的 flag（k65_inter_leaked_flag）未被執行
+	# 4. last_delegation_report_lines 保持空陣列（未被污染）
 	var new_day: int = int(gs.get("day"))
+	var new_phase: String = str(gs.get("phase"))
 	var new_flags: Dictionary = gs.get("flags")
-	var leaked: bool = bool(new_flags.get("k65_leaked_flag", false))
+	var new_rep_lines: PackedStringArray = gs.get("last_delegation_report_lines")
 
-	if new_day == 1 and not leaked:
-		_ok("K-65 防呆：回報觸發 BE 重置後，後續回報迴圈立即中斷，未洩漏效果至新輪")
+	var intra_stopped := not bool(new_flags.get("k65_intra_leaked_flag", false))
+	var inter_stopped := not bool(new_flags.get("k65_inter_leaked_flag", false))
+	var lines_clean := new_rep_lines.is_empty()
+
+	if new_day == 1 and new_phase == "morning" and intra_stopped and inter_stopped and lines_clean:
+		_ok("K-65 防呆：同筆 report 觸發 BE 後立即終止後置效果，後續 report 迴圈中斷，新輪文字維持乾淨")
 	else:
-		failed += _fail("K-65 防呆失敗：new_day=%d leaked=%s" % [new_day, str(leaked)])
+		failed += _fail("K-65 防呆失敗：day=%d phase=%s intra_stopped=%s inter_stopped=%s lines_clean=%s lines=%s" % [new_day, new_phase, str(intra_stopped), str(inter_stopped), str(lines_clean), str(new_rep_lines)])
 
 	return failed

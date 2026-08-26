@@ -21,6 +21,7 @@ static func apply(effect: Variant, gs: Node) -> PackedStringArray:
 	if not effect is Dictionary:
 		return lines
 	var e := effect as Dictionary
+	var start_gen: int = int(gs.get("run_generation")) if (gs != null and "run_generation" in gs) else -1
 
 	var text: Variant = e.get("text")
 	if text is String and not (text as String).is_empty():
@@ -29,28 +30,40 @@ static func apply(effect: Variant, gs: Node) -> PackedStringArray:
 	for entry: Variant in e.get("lose", []) as Array:
 		if _entry_passes(entry, gs):
 			gs.call("lose_card", _entry_card_id(entry))
+		if start_gen != -1 and int(gs.get("run_generation")) != start_gen:
+			return PackedStringArray()
 
 	for entry: Variant in e.get("gain", []) as Array:
 		if _entry_passes(entry, gs):
 			gs.call("gain_card", _entry_card_id(entry))
+		if start_gen != -1 and int(gs.get("run_generation")) != start_gen:
+			return PackedStringArray()
 
 	if e.has("switch"):
 		gs.call("open_switch", str(e["switch"]))
+		if start_gen != -1 and int(gs.get("run_generation")) != start_gen:
+			return PackedStringArray()
 
 	if e.has("switch_progress"):
 		var sp: Dictionary = e["switch_progress"] as Dictionary
 		for switch_id: String in sp.keys():
 			gs.call("add_switch_progress", switch_id, int(sp[switch_id]))
+		if start_gen != -1 and int(gs.get("run_generation")) != start_gen:
+			return PackedStringArray()
 
 	if e.has("relation"):
 		var r: Dictionary = e["relation"] as Dictionary
 		gs.call("add_relation", str(r.get("npc", "")), int(r.get("delta", 0)))
+		if start_gen != -1 and int(gs.get("run_generation")) != start_gen:
+			return PackedStringArray()
 
 	if e.has("madness"):
 		var m_count := int(e["madness"])
 		for i in range(m_count):
 			gs.call("gain_card", "madness", false)
 		gs.call("_check_madness_cap")
+		if start_gen != -1 and int(gs.get("run_generation")) != start_gen:
+			return PackedStringArray()
 
 	if e.has("flag"):
 		var f: Dictionary = e["flag"] as Dictionary
