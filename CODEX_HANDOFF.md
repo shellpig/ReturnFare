@@ -4,17 +4,17 @@
 
 ## 目前階段
 
-**P1、P2 已完成；P3 機器層已完成，剩既有人工體感項；P4-A、P4-B 已實作並自驗全綠（機器層）；P4-C～F 與 P5-A～F 仍為規格。下一個實作任務是 P4-C（委託 UI 與首個案例）。P5 不得跳過 P4 提前實作。**
+**P1、P2 已完成；P3 機器層已完成，剩既有人工體感項；P4-A、P4-B 已實作並通過 verifier 複驗；P4-C～F 與 P5-A～F 仍為規格。下一個實作任務是 P4-C（委託 UI 與首個案例）。P5 不得跳過 P4 提前實作。**
 
 - 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；本檔只保存最近交接重點。
 - P4-A：委託／遭遇資料與 lint 真值化已完成。
-- P4-B：委託規則已實作完成，機器層 24 套 headless 測試全數 exit 0。
+- P4-B：委託規則已實作並通過 verifier 複驗，機器層 24 套 headless 測試全數 exit 0；K-65 結案。
 - P4-C～F（委託 UI、遭遇 runtime 與 UI）尚未開始。
 - P5：開局、四類結局、歷輪摘要、跨輪重置與 UI 已拆成 P5-A～F，尚未開始實作。
 
 ## 最近完成的工作
 
-- **P4-B 委託規則已實作完成，機器層自驗全綠（24 套 headless exit 0，含新 `test_p4b.gd`）。**
+- **P4-B 委託規則已實作完成並通過 verifier 複驗（24 套 headless exit 0，含 `test_p4b.gd`）。**
   - **Run 狀態擴充**：
     - `delegates_used_today: Dictionary`：追蹤今日已受託人物卡（單日單人限制）。
     - `pending_delegation_reports: Array[Dictionary]`：儲存 `[{due_day, beat_id, slot_id, person_id}]` 隔日上午待結算回報接點。
@@ -53,8 +53,8 @@
 
 ## 驗證狀態
 
-- P4-B 機器層自驗：**`tests/run_all_headless.ps1` 全部 24 套 exit 0**（含 `test_p4b.gd` 9 大測試段）。`verify_data.gd` lint 1～16 全 0 錯誤。
-- 這是實作者自跑證據，**verifier 打勾與 `PROJECT_BRIEF.md` 落檔尚未進行**。
+- P4-B verifier 複驗：**`tests/run_all_headless.ps1` 全部 24 套 exit 0**（含 `test_p4b.gd` 9 大測試段）。`verify_data.gd` 64／48／18／261、引用與 lint 1～16 全 0 錯誤；接點失效保留、嚴格回報順序、強制縱慾先行與 K-65 同筆／跨筆／文字三條均有可辨識斷言。
+- verifier 已完成複驗，`測試指南.md` 驗收項與 `PROJECT_BRIEF.md` 進度已同步落檔。
 
 ## 目前風險
 
