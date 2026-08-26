@@ -2,13 +2,14 @@ extends SceneTree
 
 ## P4-B headless 驗收測試：
 ## 1. 單日單人委託限制與跨時段持續
-## 2. 換日上午回報結算與 delegates_used_today 重置
+## 2. 換日上午回報結算與 delegates_used_today 重置（嚴格順序與強制縱慾優先因果）
 ## 3. immediate vs next_morning 差異與手牌保留
 ## 4. 委託不吃行動格、不增 npc_action_counts、與 choice_group 親自處理互斥
 ## 5. 關係增減完全由資料驅動、決定論無 RNG
 ## 6. pending 序列化往返、人物卡中途移除仍照常回報、end_run 清空
 ## 7. 11 碼封閉拒絕矩陣與狀態零變化
 ## 8. 拒絕優先順序反證測試
+## 9. 延遲回報接點失效保留（不靜默丟棄）與 K-65 回報迴圈防呆
 
 const DataLoader := preload("res://scripts/data_loader.gd")
 const ConditionEval := preload("res://scripts/core/condition_eval.gd")
@@ -36,6 +37,7 @@ func _initialize() -> void:
 	failed += _test_serialization_and_resilience(gs, data_node)
 	failed += _test_11_code_rejection_matrix(gs, data_node)
 	failed += _test_rejection_precedence(gs, data_node)
+	failed += _test_data_conflict_and_k65_pending_resilience(gs, data_node)
 
 	if failed > 0:
 		push_error("\nP4-B: %d assertion(s) failed\n" % failed)
@@ -193,7 +195,7 @@ func _test_single_day_person_delegation_limit(gs: Node, data_node: Node) -> int:
 	return failed
 
 
-# ─── 2. 換日上午回報結算與 delegates_used_today 重置 ───
+# ─── 2. 換日上午回報結算與 delegates_used_today 重置（嚴格順序與強制縱慾優先因果）───
 func _test_next_morning_resolution_and_reset(gs: Node, data_node: Node) -> int:
 	print("\n--- 2. 換日上午回報結算與 delegates_used_today 重置 ---")
 	var failed: int = 0
@@ -251,7 +253,7 @@ func _test_next_morning_resolution_and_reset(gs: Node, data_node: Node) -> int:
 	hand.append("npc_ajie")
 	hand.append("npc_acai")
 
-	# 在第 17 天上午派出阿婕，下午派出阿財
+	# (a) 在第 17 天上午派出阿婕，下午派出阿財
 	var r1: Dictionary = gs.call("delegate", "test_del_nm_1", "slot_nm_1", "npc_ajie")
 	gs.call("advance_phase") # -> afternoon
 	var r2: Dictionary = gs.call("delegate", "test_del_nm_2", "slot_nm_2", "npc_acai")
@@ -265,12 +267,6 @@ func _test_next_morning_resolution_and_reset(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("派出失敗：r1=%s, r2=%s" % [str(r1), str(r2)])
 
-	# 同時塞一張發狂卡倒數為 1，驗證換日順序：發狂倒數/強制縱慾先執行，接著才是回報
-	gs.call("gain_card", "madness", false)
-	var mc: Dictionary = gs.get("madness_clock")
-	for k: String in mc.keys():
-		mc[k] = 1
-
 	# advance: afternoon -> evening -> night -> morning (Day 18)
 	gs.call("advance_phase") # evening
 	gs.call("advance_phase") # night
@@ -283,14 +279,15 @@ func _test_next_morning_resolution_and_reset(gs: Node, data_node: Node) -> int:
 		var pending_now: Array = gs.get("pending_delegation_reports") as Array
 
 		var flags_ok: bool = bool(flags.get("rep_1_received", false)) and bool(flags.get("rep_2_received", false))
-		var lines_ok: bool = rep_lines.has("report 1 arrived") and rep_lines.has("report 2 arrived")
+		# 嚴格順序比對：第 0 行必須是 report 1，第 1 行必須是 report 2
+		var order_ok: bool = rep_lines.size() == 2 and rep_lines[0] == "report 1 arrived" and rep_lines[1] == "report 2 arrived"
 		var pending_cleared: bool = pending_now.is_empty()
 		var daily_cleared: bool = dut.is_empty()
 
-		if flags_ok and lines_ok and pending_cleared and daily_cleared:
-			_ok("Day 18 上午：pending reports 依序結算完成，flags 設定正確，文字收集完整，pending 清空，delegates_used_today 清空")
+		if flags_ok and order_ok and pending_cleared and daily_cleared:
+			_ok("Day 18 上午：pending reports 依派出順序嚴格結算（[0]=rep1, [1]=rep2），flags 正確，pending 清空，delegates_used_today 清空")
 		else:
-			failed += _fail("Day 18 上午結算不符：flags_ok=%s lines_ok=%s pending_cleared=%s daily_cleared=%s" % [str(flags_ok), str(lines_ok), str(pending_cleared), str(daily_cleared)])
+			failed += _fail("Day 18 上午結算不符：flags_ok=%s order_ok=%s lines=%s pending_cleared=%s daily_cleared=%s" % [str(flags_ok), str(order_ok), str(rep_lines), str(pending_cleared), str(daily_cleared)])
 
 		# 驗證 Day 18 上午阿婕可再次受託（清空後可再委託）
 		(gs.get("choices") as Dictionary).clear()
@@ -302,6 +299,67 @@ func _test_next_morning_resolution_and_reset(gs: Node, data_node: Node) -> int:
 			failed += _fail("Day 18 上午阿婕無法再次受託：%s" % str(r4))
 	else:
 		failed += _fail("推進至 Day 18 上午失敗：day=%s phase=%s" % [str(gs.get("day")), str(gs.get("phase"))])
+
+	# (b) 關鍵因果順序驗證：強制縱慾先、委託回報後
+	_reset_gs(gs)
+	var beat_causal: Dictionary = {
+		"id": "test_del_causal_beat",
+		"location": "clinic",
+		"when": { "day_from": 17, "day_to": 19, "phase": ["morning"] },
+		"slots": [
+			{
+				"id": "slot_causal_1",
+				"accepts": ["npc_ajie"],
+				"choice_group": "grp_causal",
+				"delegation": {
+					"result_timing": "next_morning",
+					"preview": "p",
+					"tendency": "t",
+					"report": {
+						"text": "causal report arrived",
+						# 若強制縱慾先跑，發狂卡已失去（not has_card: madness 成立），可獲得 doc_prescription
+						# 若回報先跑，發狂卡仍在手（not has_card: madness 失敗），不會獲得 doc_prescription
+						"gain": [
+							{
+								"card": "doc_prescription",
+								"if": { "not": { "has_card": "madness" } }
+							}
+						]
+					}
+				},
+				"on_place": { "text": "causal dispatched" }
+			}
+		]
+	}
+	loader.beats_by_id["test_del_causal_beat"] = beat_causal
+	hand = gs.get("hand") as Array
+	hand.append("npc_ajie")
+
+	# 第 17 天上午派出
+	gs.call("delegate", "test_del_causal_beat", "slot_causal_1", "npc_ajie")
+
+	# 加入一張發狂卡，設定 clock = 1，換日即歸零觸發強制縱慾
+	gs.call("gain_card", "madness", false)
+	var mc_causal: Dictionary = gs.get("madness_clock")
+	for k: String in mc_causal.keys():
+		mc_causal[k] = 1
+
+	# 推進至 Day 18 上午
+	gs.call("advance_phase") # afternoon
+	gs.call("advance_phase") # evening
+	gs.call("advance_phase") # night
+	gs.call("advance_phase") # morning
+
+	# 驗證：強制縱慾先消耗了發狂卡並消耗了行動格，隨後委託回報才能憑藉 (not has_card madness) 獲得 doc_prescription
+	var gained_doc: bool = bool(gs.call("has_card", "doc_prescription"))
+	var madness_lost: bool = not bool(gs.call("has_card", "madness"))
+	var action_spent: bool = bool(gs.get("action_spent"))
+	var ind_count: int = int(gs.get("indulgence_count"))
+
+	if gained_doc and madness_lost and action_spent and ind_count == 1:
+		_ok("順序因果成立：強制縱慾（消發狂卡＋耗行動）確實先於延遲委託回報執行")
+	else:
+		failed += _fail("順序因果失敗：gained_doc=%s madness_lost=%s action_spent=%s ind_count=%d" % [str(gained_doc), str(madness_lost), str(action_spent), ind_count])
 
 	return failed
 
@@ -893,5 +951,146 @@ func _test_rejection_precedence(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("delegation_status 今日已受託狀態異常：%s" % str(st2))
 	(gs.get("delegates_used_today") as Dictionary).clear()
+
+	return failed
+
+
+# ─── 9. 延遲回報接點失效保留（不靜默丟棄）與 K-65 回報迴圈防呆 ───
+func _test_data_conflict_and_k65_pending_resilience(gs: Node, data_node: Node) -> int:
+	print("\n--- 9. 延遲回報接點失效保留（不靜默丟棄）與 K-65 回報防呆 ---")
+	var failed: int = 0
+	_reset_gs(gs)
+
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var beat_valid: Dictionary = {
+		"id": "test_del_resil_valid",
+		"location": "clinic",
+		"when": { "day_from": 17, "day_to": 19, "phase": ["morning"] },
+		"slots": [
+			{
+				"id": "slot_valid",
+				"accepts": ["npc_ajie"],
+				"choice_group": "grp_valid",
+				"delegation": {
+					"result_timing": "next_morning",
+					"preview": "p",
+					"tendency": "t",
+					"report": { "text": "valid report arrived", "flag": { "resil_valid_done": true } }
+				},
+				"on_place": { "text": "valid dispatched" }
+			},
+			{
+				"id": "slot_bad_timing",
+				"accepts": ["npc_ajie"],
+				"choice_group": "grp_bad_timing",
+				"delegation": {
+					"result_timing": "immediate",
+					"preview": "p",
+					"tendency": "t"
+				},
+				"on_place": { "text": "imm dispatched" }
+			},
+			{
+				"id": "slot_missing_report",
+				"accepts": ["npc_ajie"],
+				"choice_group": "grp_no_rep",
+				"delegation": {
+					"result_timing": "next_morning",
+					"preview": "p",
+					"tendency": "t"
+				},
+				"on_place": { "text": "no rep dispatched" }
+			}
+		]
+	}
+	loader.beats_by_id["test_del_resil_valid"] = beat_valid
+
+	# 人工注入 4 筆失效接點與 1 筆有效接點（均到期於 Day 18）
+	var pending: Array = gs.get("pending_delegation_reports") as Array
+	pending.clear()
+	pending.append({ "due_day": 18, "beat_id": "ghost_beat", "slot_id": "slot_ghost_beat", "person_id": "npc_ajie" }) # 1. unknown beat
+	pending.append({ "due_day": 18, "beat_id": "test_del_resil_valid", "slot_id": "ghost_slot", "person_id": "npc_ajie" }) # 2. unknown slot
+	pending.append({ "due_day": 18, "beat_id": "test_del_resil_valid", "slot_id": "slot_bad_timing", "person_id": "npc_ajie" }) # 3. bad timing (immediate)
+	pending.append({ "due_day": 18, "beat_id": "test_del_resil_valid", "slot_id": "slot_missing_report", "person_id": "npc_ajie" }) # 4. missing report
+	pending.append({ "due_day": 18, "beat_id": "test_del_resil_valid", "slot_id": "slot_valid", "person_id": "npc_ajie" }) # 5. valid
+
+	# 推進至 Day 18 上午
+	gs.call("advance_phase") # afternoon
+	gs.call("advance_phase") # evening
+	gs.call("advance_phase") # night
+	gs.call("advance_phase") # morning (Day 18)
+
+	var pending_after: Array = gs.get("pending_delegation_reports") as Array
+	var flags: Dictionary = gs.get("flags")
+	var rep_lines: PackedStringArray = gs.get("last_delegation_report_lines")
+
+	var valid_executed := bool(flags.get("resil_valid_done", false)) and rep_lines.has("valid report arrived")
+	var invalid_retained := pending_after.size() == 4
+	var no_valid_in_pending := true
+	for p: Dictionary in pending_after:
+		if str(p.get("slot_id", "")) == "slot_valid":
+			no_valid_in_pending = false
+
+	if valid_executed and invalid_retained and no_valid_in_pending:
+		_ok("接點失效之 4 筆 pending reports 完整保留於隊列（不靜默丟棄），同批有效項目正常結算")
+	else:
+		failed += _fail("接點失效測試異常：valid_executed=%s invalid_retained=%s (size=%d) no_valid_in_pending=%s" % [str(valid_executed), str(invalid_retained), pending_after.size(), str(no_valid_in_pending)])
+
+	# (b) K-65 防呆：若回報效果觸發發狂 BE 重置，不繼續執行後續回報寫入新輪
+	_reset_gs(gs)
+	var beat_k65: Dictionary = {
+		"id": "test_del_k65_beat",
+		"location": "clinic",
+		"when": { "day_from": 17, "day_to": 19, "phase": ["morning"] },
+		"slots": [
+			{
+				"id": "slot_k65_be",
+				"accepts": ["npc_ajie"],
+				"choice_group": "grp_k65_1",
+				"delegation": {
+					"result_timing": "next_morning",
+					"preview": "p",
+					"tendency": "t",
+					"report": { "text": "hit be", "madness": 10 } # 必破 cap
+				},
+				"on_place": { "text": "k65 be dispatched" }
+			},
+			{
+				"id": "slot_k65_after",
+				"accepts": ["npc_acai"],
+				"choice_group": "grp_k65_2",
+				"delegation": {
+					"result_timing": "next_morning",
+					"preview": "p",
+					"tendency": "t",
+					"report": { "text": "leak text into new run", "flag": { "k65_leaked_flag": true } }
+				},
+				"on_place": { "text": "k65 after dispatched" }
+			}
+		]
+	}
+	loader.beats_by_id["test_del_k65_beat"] = beat_k65
+
+	pending = gs.get("pending_delegation_reports") as Array
+	pending.clear()
+	pending.append({ "due_day": 18, "beat_id": "test_del_k65_beat", "slot_id": "slot_k65_be", "person_id": "npc_ajie" })
+	pending.append({ "due_day": 18, "beat_id": "test_del_k65_beat", "slot_id": "slot_k65_after", "person_id": "npc_acai" })
+
+	# 推進至 Day 18 上午
+	gs.call("advance_phase") # afternoon
+	gs.call("advance_phase") # evening
+	gs.call("advance_phase") # night
+	gs.call("advance_phase") # morning
+
+	# 因第 1 筆 report 灌入 10 張 madness 觸發 BE，end_run() 重置回 Day 1 morning
+	# 驗證：新輪的 flags 不包含 k65_leaked_flag（後續回報被 break，未洩漏進新輪）
+	var new_day: int = int(gs.get("day"))
+	var new_flags: Dictionary = gs.get("flags")
+	var leaked: bool = bool(new_flags.get("k65_leaked_flag", false))
+
+	if new_day == 1 and not leaked:
+		_ok("K-65 防呆：回報觸發 BE 重置後，後續回報迴圈立即中斷，未洩漏效果至新輪")
+	else:
+		failed += _fail("K-65 防呆失敗：new_day=%d leaked=%s" % [new_day, str(leaked)])
 
 	return failed

@@ -1102,29 +1102,54 @@ func _settle_forced_indulgence() -> PackedStringArray:
 ## 隔日上午委託回報結算（規格書 P4-B、開發設計方針 P4-B）。
 ## 由 advance_phase 於換日進入 morning 時呼叫（在強制縱慾之後、清空 delegates_used_today 之前）：
 ## 依 pending_delegation_reports 順序套用 report 效果，並收集文字行。
+## 接點失效時視為資料衝突保留於 pending 並 push_error（不靜默丟棄）。
 func _settle_pending_delegation_reports() -> void:
 	if pending_delegation_reports.is_empty():
 		return
-	var due_reports: Array[Dictionary] = []
+
+	var current_day := day
 	var remaining_reports: Array[Dictionary] = []
+	var due_reports: Array[Dictionary] = []
+
 	for r: Dictionary in pending_delegation_reports:
-		if int(r.get("due_day", 0)) <= day:
-			due_reports.append(r)
-		else:
+		if int(r.get("due_day", 0)) > current_day:
 			remaining_reports.append(r)
+			continue
+
+		# 驗證接點合法性（beat 存在、slot 存在、delegation 為 next_morning 且 report 為非空字典）
+		var b_id := str(r.get("beat_id", ""))
+		var s_id := str(r.get("slot_id", ""))
+		var beat_dict: Dictionary = Data.loader.beats_by_id.get(b_id, {}) if (Data != null and Data.loader != null) else {}
+		var slot_dict: Dictionary = _find_slot(beat_dict, s_id)
+		var del_val: Variant = slot_dict.get("delegation")
+		var is_valid_del: bool = del_val is Dictionary and str((del_val as Dictionary).get("result_timing", "")) == "next_morning"
+		var rep_val: Variant = (del_val as Dictionary).get("report") if is_valid_del else null
+		var is_valid_rep: bool = rep_val is Dictionary and not (rep_val as Dictionary).is_empty()
+
+		if beat_dict.is_empty() or slot_dict.is_empty() or not is_valid_del or not is_valid_rep:
+			push_error("GameState: pending delegation report data conflict on beat '%s', slot '%s' (retaining in pending)" % [b_id, s_id])
+			remaining_reports.append(r)
+		else:
+			due_reports.append(r)
+
 	pending_delegation_reports = remaining_reports
 
 	var rep_lines: PackedStringArray = []
 	for r: Dictionary in due_reports:
 		var b_id := str(r.get("beat_id", ""))
 		var s_id := str(r.get("slot_id", ""))
-		var beat_dict: Dictionary = Data.loader.beats_by_id.get(b_id, {})
+		var beat_dict: Dictionary = Data.loader.beats_by_id[b_id]
 		var slot_dict: Dictionary = _find_slot(beat_dict, s_id)
-		var del_dict: Dictionary = slot_dict.get("delegation", {}) as Dictionary
-		var rep_dict: Dictionary = del_dict.get("report", {}) as Dictionary
-		if not rep_dict.is_empty():
-			var out := EffectApply.apply(rep_dict, self)
-			rep_lines.append_array(out)
+		var del_dict: Dictionary = slot_dict["delegation"] as Dictionary
+		var rep_dict: Dictionary = del_dict["report"] as Dictionary
+
+		var out := EffectApply.apply(rep_dict, self)
+		rep_lines.append_array(out)
+
+		# K-65 防呆：若回報效果觸發 BE / end_run，立即中斷後續回報迴圈
+		if day != current_day:
+			break
+
 	last_delegation_report_lines = rep_lines
 
 

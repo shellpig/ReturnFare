@@ -25,8 +25,10 @@
     - 委託成功不消耗主角行動格（`action_spent` 維持不變）、不增加 `npc_action_counts`、人物卡不移出手牌。
   - **`delegation_status(person_card_id) -> Dictionary` 查詢**：
     - 回傳 `{ held: bool, delegated_today: bool, available: bool, has_pending_report: bool }`。
-  - **隔日上午結算與重置**：
+  - **隔日上午結算與重置（含接點失效保留與 K-65 防呆）**：
     - `advance_phase()` 進入 morning 時，在既有發狂倒數與強制縱慾結算之後，呼叫 `_settle_pending_delegation_reports()` 依序套用 due reports 的 `report` 效果並收集文字行至 `last_delegation_report_lines`。
+    - 結算前完整驗證接點（beat/slot/timing/report）：若接點失效則保留於 pending 並 `push_error` 顯式回報 data_conflict，不靜默丟棄。
+    - 結算中若觸發發狂 BE / `end_run()` 重置，立即中斷後續回報迴圈（K-65 防呆，防止回報效果洩漏進新輪）。
     - 結算完成後呼叫 `delegates_used_today.clear()` 重置每日受託名單。
   - **P4-A 臨時 Gate 拆除與轉導**：
     - 拆除 `choose()` 原有的 `delegation_not_wired` 臨時 gate。
@@ -36,6 +38,11 @@
     - `serialize()` / `deserialize()` 完整支援 `delegates_used_today` 與 `pending_delegation_reports`。
     - 人物卡在派出後若被事件移除，隔日上午回報仍依接點如期結算。
     - `end_run()` 完整清空所有委託相關狀態。
+  - **驗收審查修正**：
+    - `test_p4b.gd` 補齊嚴格回報陣列索引比對（`lines[0]==rep1, lines[1]==rep2`）。
+    - `test_p4b.gd` 增加強制縱慾先於回報執行的因果依賴測試（消發狂卡後回報條件 gain 成立）。
+    - `test_p4b.gd` 增加第 9 測試段：4 類接點失效保留驗證與 K-65 迴圈中斷防呆驗證。
+    - `測試指南.md` 修正 line 413 關於 afternoon (`already_delegated_today`) 與 evening (`not_action_phase`) 拒絕碼文字說明。
 
 - **P4-A 資料與 SCHEMA 真值化（前期完成）**：
   - **卡片**：`cards.json` 全 64 張皆有必填 boolean `discardable`；lint 9 新增缺欄／錯型別檢查。
@@ -45,8 +52,8 @@
 
 ## 驗證狀態
 
-- P4-B 機器層自驗：**`tests/run_all_headless.ps1` 全部 24 套 exit 0**（含新增之 `test_p4b.gd`，8 大測試段覆蓋單日單人、隔日結算、timing 差異、行動成本與互斥、關係決定論、序列化往返、11 碼拒絕矩陣與檢查優先序）。`verify_data.gd` lint 1～16 全 0 錯誤。
-- 這是實作者自跑證據，**verifier 打勾與 `PROJECT_BRIEF.md`／`測試指南.md` 落檔尚未進行**——實作者未改 `測試指南.md`、`驗證後已知問題.md`、`PROJECT_BRIEF.md` 或驗收勾選。
+- P4-B 機器層自驗：**`tests/run_all_headless.ps1` 全部 24 套 exit 0**（含 `test_p4b.gd` 9 大測試段）。`verify_data.gd` lint 1～16 全 0 錯誤。
+- 這是實作者自跑證據，**verifier 打勾與 `PROJECT_BRIEF.md` 落檔尚未進行**。
 
 ## 目前風險
 
