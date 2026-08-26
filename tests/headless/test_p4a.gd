@@ -568,8 +568,12 @@ func _test_lint16_negative() -> void:
 	else:
 		_fail("fallback 缺 next_round 鍵未被抓")
 
-	# malformed 第一 round（非 Dictionary）不 crash，且記錯
-	var ed4: Dictionary = base_enc.call(); ed4["rounds"] = ["not_a_dict"]
+	# malformed 第一 round（非 Dictionary）＋第二筆合法 round：round_by_id 非空，
+	# 逼 traversal 真的走到 `rounds[0] is Dictionary` 守衛（拿掉守衛會在 cast 崩）。
+	var ed4: Dictionary = base_enc.call()
+	ed4["rounds"] = ["not_a_dict", { "id": "r_ok", "demand": "d", "responses": [
+		{ "id": "a", "accepts": ["info_x"], "consume_card": false, "next_round": null, "on_resolve": { "text": "t" } }
+	], "fallback": { "next_round": null, "on_resolve": { "text": "f" } } }]
 	var l_ed4 := DataLoader.lint_encounters(_make_loader(make_enc.call(ed4), cards, locs))
 	if _errs_contain(l_ed4, "round 不是 Dictionary"):
 		_ok("malformed round 記錯且未 crash（traversal 防呆）")
@@ -584,6 +588,15 @@ func _test_lint16_negative() -> void:
 		_ok("malformed response 記錯且未 crash（reachability/can_reach_null 防呆）")
 	else:
 		_fail("malformed response 未被抓：%s" % str(l_ed5))
+
+	# malformed fallback（round 合法但 fallback 非 Dictionary）不 crash：
+	# rounds[0] 合法讓 traversal 啟動，走到 fallback 的 `is Dictionary` 守衛（拿掉會 cast 崩）。
+	var ed6: Dictionary = base_enc.call(); ed6["rounds"][0]["fallback"] = "not_a_dict"
+	var l_ed6 := DataLoader.lint_encounters(_make_loader(make_enc.call(ed6), cards, locs))
+	if _errs_contain(l_ed6, "缺 fallback"):
+		_ok("malformed fallback 記錯且未 crash（traversal fallback 防呆）")
+	else:
+		_fail("malformed fallback 未被抓：%s" % str(l_ed6))
 
 	# 邊界：合法 D8 型（repeat+charge，night-layer）不報錯
 	var e_ok: Dictionary = base_enc.call(); e_ok["repeat_each_run"] = true; e_ok["charge_first_visit"] = true
