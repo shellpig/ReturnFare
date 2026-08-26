@@ -14,11 +14,14 @@ func _initialize() -> void:
 
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var output_dir := ""
+	var regen_p3a_baseline := false
 	var i := 0
 	while i < args.size():
 		if args[i] == "--output-dir" and i + 1 < args.size():
 			output_dir = args[i + 1]
 			i += 1
+		elif args[i] == "--p3a-baseline":
+			regen_p3a_baseline = true
 		i += 1
 
 	# 嚴禁 fallback 固定路徑：狀態產生失敗時 runner 若吃到上一次殘留在固定路徑
@@ -34,7 +37,7 @@ func _initialize() -> void:
 
 	DirAccess.make_dir_recursive_absolute(output_dir)
 
-	var ok := generate_all_states(self, output_dir)
+	var ok := generate_all_states(self, output_dir, regen_p3a_baseline)
 	if ok:
 		print("make_states: 全部情境狀態產生完畢且後置條件通過。輸出目錄: %s" % output_dir)
 		quit(0)
@@ -43,7 +46,7 @@ func _initialize() -> void:
 		quit(1)
 
 
-static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
+static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_baseline: bool = false) -> bool:
 	var data_node: Node = PlaythroughGreedy.setup_data(tree)
 
 	# 1. 產生標準走查路徑上的 checkpoints（無覆寫決策）
@@ -71,11 +74,13 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	if not res_std:
 		return false
 
-	var p3a_dict: Dictionary = _load_state(output_dir, "p3a_night_baseline.json")
-	if not p3a_dict.is_empty():
-		if not _generate_p3a_baseline(tree, data_node, p3a_dict):
-			printerr("p3a_baseline 產出失敗")
-			return false
+	# K-112：_qa/p3a_baseline/ 只在明示 --p3a-baseline 時重生，一般 UI launcher 不再順手改寫。
+	if regen_p3a_baseline:
+		var p3a_dict: Dictionary = _load_state(output_dir, "p3a_night_baseline.json")
+		if not p3a_dict.is_empty():
+			if not _generate_p3a_baseline(tree, data_node, p3a_dict):
+				printerr("p3a_baseline 產出失敗")
+				return false
 
 	# D3 的 requires 負向案例需要「尚未在 D2 下午拿到兩張情報」的合法起點；
 	# 仍由走查器建立，只在產生情境時刻意跳過那一個行動時段。
@@ -123,6 +128,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	var gs_mad: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
 	_reset_state(gs_mad)
 	gs_mad.deserialize(d10_dict)
+	_normalize_madness_only(gs_mad) # K-124：清掉標準路徑（D8）已合法產生的發狂卡，情境才是宣稱的精確張數
 	gs_mad.gain_card("madness") # madness#1
 	gs_mad.gain_card("madness") # madness#2
 	gs_mad.gain_card("madness") # madness#3
@@ -183,6 +189,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	# ④ 第 17 天上午、手上一張：暴力對人過了第 16 天門檻，性慾仍未達關係門檻
 	_reset_state(gs_p2b)
 	gs_p2b.deserialize(d17am_dict)
+	_normalize_madness_only(gs_p2b) # K-124：D17 起點可能已帶標準路徑（D8）的發狂卡，清掉才是宣稱的一張
 	gs_p2b.gain_card("madness")
 	if not _write_p2b_state(output_dir, "p2b_d17_madness", gs_p2b.serialize(), data_node):
 		return false
@@ -190,6 +197,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	# ⑤ 同上但與阿婕已達「疑似」（relation_scale.json 的序數是 1）：性慾槽出現
 	_reset_state(gs_p2b)
 	gs_p2b.deserialize(d17am_dict)
+	_normalize_madness_only(gs_p2b)
 	gs_p2b.gain_card("madness")
 	gs_p2b.add_relation("ajie", 1)
 	if not _write_p2b_state(output_dir, "p2b_d17_ajie", gs_p2b.serialize(), data_node):
@@ -209,6 +217,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	# ① 一張歸零：文字播出、時段內留存、行動格被吃掉
 	_reset_state(gs_p2c)
 	gs_p2c.deserialize(d10n_dict)
+	_normalize_madness_only(gs_p2c) # K-124：清掉標準路徑（D8）的發狂卡，情境才是宣稱的唯一一張
 	gs_p2c.gain_card("madness")
 	var mc_one: Dictionary = gs_p2c.get("madness_clock") as Dictionary
 	mc_one["madness#1"] = 1
@@ -218,6 +227,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	# ② 同日兩張歸零：上午一格、下午一格，那一天完全沒有行動格
 	_reset_state(gs_p2c)
 	gs_p2c.deserialize(d10n_dict)
+	_normalize_madness_only(gs_p2c)
 	gs_p2c.gain_card("madness")
 	gs_p2c.gain_card("madness")
 	var mc_two: Dictionary = gs_p2c.get("madness_clock") as Dictionary
@@ -237,6 +247,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	# ① D24 night 2 張發狂卡（二樓有人在走 HIDDEN）
 	_reset_state(gs_p2d)
 	gs_p2d.deserialize(d24n_dict)
+	_normalize_madness_only(gs_p2d) # K-124：清掉標準路徑（D8）的發狂卡，情境才是宣稱的精確張數
 	gs_p2d.set_flag("boundary_bleeding", true)
 	gs_p2d.set_flag("hold_d24am", false)
 	gs_p2d.set_flag("hold_d24pm", false)
@@ -248,6 +259,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	# ② D24 night 3 張發狂卡（二樓有人在走 OPEN）
 	_reset_state(gs_p2d)
 	gs_p2d.deserialize(d24n_dict)
+	_normalize_madness_only(gs_p2d)
 	gs_p2d.set_flag("boundary_bleeding", true)
 	gs_p2d.set_flag("hold_d24am", false)
 	gs_p2d.set_flag("hold_d24pm", false)
@@ -262,6 +274,7 @@ static func generate_all_states(tree: SceneTree, output_dir: String) -> bool:
 	# 變成「早就撞破」或「離 cap 還很遠」，而 UI 案例仍宣稱自己在驗 cap 邊界（K-114）。
 	_reset_state(gs_p2d)
 	gs_p2d.deserialize(d10n_dict)
+	_normalize_madness_only(gs_p2d) # K-124：清掉標準路徑（D8）的發狂卡，張數才是從乾淨底重算的 cap-1
 	var near_cap_count := int(data_node.tuning("madness_cap", 7)) - 1
 	for i in range(near_cap_count):
 		gs_p2d.gain_card("madness")
@@ -574,6 +587,60 @@ static func _write_p2b_state(output_dir: String, cp_name: String, snapshot: Dict
 	return true
 
 
+## Fixture-only 正規化（K-124）：只供「精確張數」合成情境使用。標準路徑（含 D8 定日遭遇）
+## 已合法產生的發狂卡會混進後續 checkpoint，讓「手上恰好 N 張」的宣稱失真；呼叫端在
+## deserialize() 之後、gain_card() 之前呼叫本函式，清掉 hand 內既有 madness instance、
+## 對應 madness_clock、forced_pending，並重設 _madness_counter，讓後續 gain_card() 生出的
+## instance id 從 #1 起算。不清其他 flags／relations／歷史計數——那些是標準路徑的真實歷史。
+static func _normalize_madness_only(gs: Node) -> void:
+	var kept: Array[String] = []
+	for c in (gs.get("hand") as Array):
+		var c_str := str(c)
+		if not c_str.begins_with("madness#"):
+			kept.append(c_str)
+	gs.set("hand", kept)
+	gs.set("madness_clock", {})
+	gs.set("forced_pending", [])
+	gs.set("_madness_counter", 0)
+	for c: String in kept:
+		if c.begins_with("madness#"):
+			push_error("_normalize_madness_only: 殘留 madness instance 未清除: %s" % c)
+
+
+## hand 內 madness instance 的張數（不含其他卡）。
+static func _madness_hand_count(hand: Array) -> int:
+	var n := 0
+	for c in hand:
+		if str(c).begins_with("madness#"):
+			n += 1
+	return n
+
+
+## madness_clock 的 key 集合必須與 hand 內的 madness instance 完全一致——
+## 不多（沒清乾淨的殘留）、不少（漏建 clock）。
+static func _madness_clock_matches_hand(run: Dictionary) -> bool:
+	var hand: Array = run.get("hand", []) as Array
+	var mc: Dictionary = run.get("madness_clock", {}) as Dictionary
+	var hand_set: Dictionary = {}
+	for c in hand:
+		var c_str := str(c)
+		if c_str.begins_with("madness#"):
+			hand_set[c_str] = true
+	if hand_set.size() != mc.size():
+		return false
+	for k in hand_set.keys():
+		if not mc.has(k):
+			return false
+	return true
+
+
+static func _fixture_card_base_id(id: String) -> String:
+	var hash_idx := id.rfind("#")
+	if hash_idx >= 0:
+		return id.substr(0, hash_idx)
+	return id
+
+
 static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictionary, data_node: Node = null) -> bool:
 	var run: Dictionary = snapshot.get("run", {}) as Dictionary
 	var flags: Dictionary = run.get("flags", {}) as Dictionary
@@ -604,7 +671,11 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 		"p1h_knowledge_full":
 			return day == 10 and phase == "night" and (_state_knowledge(snapshot).size() >= 10)
 		"p2a_multi_madness":
-			return day == 10 and phase == "night" and hand.has("madness#1") and hand.has("madness#2") and hand.has("madness#3")
+			var mc_p2a: Dictionary = run.get("madness_clock", {}) as Dictionary
+			return day == 10 and phase == "night" and _madness_clock_matches_hand(run) \
+				and _madness_hand_count(hand) == 3 \
+				and hand.has("madness#1") and hand.has("madness#2") and hand.has("madness#3") \
+				and int(mc_p2a.get("madness#1", -1)) == 7 and int(mc_p2a.get("madness#2", -1)) == 5 and int(mc_p2a.get("madness#3", -1)) == 3
 		"p2b_morning_madness":
 			return day == 3 and phase == "morning" and hand.has("madness#1") and hand.has("madness#2") \
 				and not bool(run.get("action_spent", true))
@@ -614,29 +685,36 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			return day == 3 and phase == "morning" and hand.has("madness#1") and hand.has("madness#2") \
 				and bool(run.get("action_spent", false))
 		"p2b_d17_madness":
-			return day == 17 and phase == "morning" and hand.has("madness#1") \
+			return day == 17 and phase == "morning" and _madness_clock_matches_hand(run) \
+				and _madness_hand_count(hand) == 1 and hand.has("madness#1") \
 				and int((run.get("relations", {}) as Dictionary).get("ajie", 0)) < 1
 		"p2b_d17_ajie":
-			return day == 17 and phase == "morning" and hand.has("madness#1") \
+			return day == 17 and phase == "morning" and _madness_clock_matches_hand(run) \
+				and _madness_hand_count(hand) == 1 and hand.has("madness#1") \
 				and int((run.get("relations", {}) as Dictionary).get("ajie", 0)) >= 1
 		"p2c_night_one_forced":
-			return day == 10 and phase == "night" and hand.has("madness#1") \
+			return day == 10 and phase == "night" and _madness_clock_matches_hand(run) \
+				and _madness_hand_count(hand) == 1 and hand.has("madness#1") \
 				and int((run.get("madness_clock", {}) as Dictionary).get("madness#1", 0)) == 1
 		"p2c_night_two_forced":
-			return day == 10 and phase == "night" \
+			return day == 10 and phase == "night" and _madness_clock_matches_hand(run) \
+				and _madness_hand_count(hand) == 2 \
 				and hand.has("madness#1") and hand.has("madness#2") \
 				and int((run.get("madness_clock", {}) as Dictionary).get("madness#1", 0)) == 1 \
 				and int((run.get("madness_clock", {}) as Dictionary).get("madness#2", 0)) == 1
 		"p2d_d24_two_cards":
-			return day == 24 and phase == "night" and hand.has("madness#1") and hand.has("madness#2") and not hand.has("madness#3")
+			return day == 24 and phase == "night" and _madness_clock_matches_hand(run) \
+				and _madness_hand_count(hand) == 2 and hand.has("madness#1") and hand.has("madness#2")
 		"p2d_d24_three_cards":
-			return day == 24 and phase == "night" and hand.has("madness#1") and hand.has("madness#2") and hand.has("madness#3")
+			return day == 24 and phase == "night" and _madness_clock_matches_hand(run) \
+				and _madness_hand_count(hand) == 3 and hand.has("madness#1") and hand.has("madness#2") and hand.has("madness#3")
 		"p2d_near_cap":
 			# 「手上恰好 cap-1 張」——張數與 instance 名都從 tuning 現算，不寫死 6／7（K-114）。
 			var cap := 7
 			if data_node != null and data_node.has_method("tuning"):
 				cap = int(data_node.tuning("madness_cap", 7))
-			return day == 10 and phase == "night" \
+			return day == 10 and phase == "night" and _madness_clock_matches_hand(run) \
+				and _madness_hand_count(hand) == cap - 1 \
 				and hand.has("madness#%d" % (cap - 1)) and not hand.has("madness#%d" % cap)
 		"d15_night":
 			return day == 15 and phase == "night"
@@ -695,8 +773,17 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			var seen_multi: Dictionary = _state_meta(snapshot).get("night_locations_seen", {}) as Dictionary
 			return day == 14 and phase == "night" and seen_multi.has("n_corridor") and _state_knowledge(snapshot).has("k_night_jinghe_back")
 		"p4c_d17_no_person":
+			# K-124：零人物卡按卡片 type 計數，不能用 hand.size()==1——D17 真實走查手上
+			# 合法帶著其他非人物卡（發狂卡、情報卡等），契約只承諾「沒有人物卡」。
+			if data_node == null:
+				return false
 			var meta_no_person: Dictionary = _state_meta(snapshot)
-			return day == 17 and phase == "afternoon" and hand.size() == 1 and hand.has("protagonist") \
+			var person_count := 0
+			for c: String in hand:
+				var cdef: Dictionary = data_node.loader.cards.get(_fixture_card_base_id(c), {}) as Dictionary
+				if str(cdef.get("type", "")) == "person":
+					person_count += 1
+			return day == 17 and phase == "afternoon" and person_count == 0 \
 				and bool(meta_no_person.get("delegation_tutorial_seen", true)) == false
 		"p4c_d17_with_person":
 			var meta_with_person: Dictionary = _state_meta(snapshot)
