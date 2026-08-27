@@ -205,8 +205,8 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			illegal_phases += 1
 		if res_a.get("placed", false):
 			actions_taken += 1
-		last_ind_count = int(gs.get("indulgence_count"))
-		gs.advance_phase()
+		if str(gs.get("phase")) == "afternoon":
+			gs.advance_phase()
 
 		if verbose:
 			print("  第 %2d 天 | morning: %-32s | afternoon: %-32s" % [
@@ -269,6 +269,18 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 
 
 static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: String, forced_indulged: bool = false) -> Dictionary:
+	# 遭遇處理（P4-D）：若當前時段已有活躍遭遇（如 D45 afternoon），先進行遭遇結算
+	if not (gs.get("active_encounter") as Dictionary).is_empty():
+		var enc_state: Dictionary = gs.get("active_encounter") as Dictionary
+		if str(enc_state.get("stage", "")) == "intro":
+			gs.acknowledge_encounter_intro()
+		var hand_cards: Array = gs.get("hand") as Array
+		for hc in hand_cards:
+			var res_resp: Dictionary = gs.respond_to_encounter(str(hc))
+			if res_resp.get("ok", false):
+				break
+		return { "ok": true, "placed": false, "category": "all_fixed", "detail": "遭遇結算", "summary": "[all_fixed] 遭遇結算" }
+
 	var locs := PanelBuilder.available_locations(gs, data_node)
 	var placed := false
 	var placed_info := ""

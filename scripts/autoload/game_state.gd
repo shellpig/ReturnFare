@@ -8,6 +8,7 @@ extends Node
 
 const DataFacts := preload("res://scripts/core/data_facts.gd")
 const Indulgence := preload("res://scripts/core/indulgence.gd")
+const Encounter := preload("res://scripts/core/encounter.gd")
 
 const CHAPTER_START_DAYS := DataFacts.CHAPTER_START_DAYS
 const LAST_DAY := 45
@@ -36,6 +37,9 @@ var choices: Dictionary = {}          # "beat_id::group_id" -> slot_id（P1-E �
 var delegates_used_today: Dictionary = {}         # person_card_id -> true（Set；今日已受託人物）
 var pending_delegation_reports: Array[Dictionary] = [] # [{due_day, beat_id, slot_id, person_id}]；隔日上午回報接點
 var last_delegation_report_lines: PackedStringArray = [] # 當前上午回報產生的演出文字行（transient UI）
+
+# --- 遭遇群（P4-D, run 層）---
+var active_encounter: Dictionary = {} # 空＝無遭遇；非空含 beat_id, stage, round_id, blocked_slots, attempted_card_ids
 
 # --- 旗標／開關／關係群（P1-D, run 層）---
 var flags: Dictionary = {}            # name -> bool
@@ -70,7 +74,10 @@ func chapter() -> int:
 	return DataFacts.chapter_for_day(day)
 
 
-func advance_phase() -> void:
+func advance_phase() -> Dictionary:
+	if not active_encounter.is_empty():
+		return { "ok": false, "reason_code": "encounter_active", "reason_text": "遭遇進行中，無法推進時段", "lines": PackedStringArray(), "phase_advanced": false }
+
 	var prev_ch := chapter()
 
 	# 第 45 天特殊路徑：afternoon → evening（結局 coda）→ end_run 回第 1 天 morning，不進 night
@@ -79,12 +86,13 @@ func advance_phase() -> void:
 		action_spent = false
 		last_forced_lines.clear()
 		last_delegation_report_lines.clear()
+		_check_fixed_encounter_for_current_phase()
 		phase_changed.emit(day, phase)
-		return
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "phase_advanced": true }
 
 	if day == LAST_DAY and phase == "evening":
 		end_run("ending_default")
-		return
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "phase_advanced": false }
 
 	last_forced_lines.clear()
 	last_delegation_report_lines.clear()
@@ -123,11 +131,15 @@ func advance_phase() -> void:
 		_settle_pending_delegation_reports()
 		delegates_used_today.clear()
 
+	_check_fixed_encounter_for_current_phase()
+
 	phase_changed.emit(day, phase)
 
 	var new_ch := chapter()
 	if new_ch != prev_ch:
 		chapter_changed.emit(new_ch)
+
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "phase_advanced": true }
 
 
 ## 輪結束結算與迴圈重置（規格書第十六節、P1-F、B-02）。
@@ -161,6 +173,7 @@ func end_run(ending_id: String = "ending_default") -> void:
 	delegates_used_today.clear()
 	pending_delegation_reports.clear()
 	last_delegation_report_lines.clear()
+	active_encounter.clear()
 
 	day_changed.emit(day)
 	phase_changed.emit(day, phase)
@@ -283,10 +296,37 @@ func resolved_night_content(location_id: String) -> Dictionary:
 	}
 
 
+## 檢查當前時段是否有應啟動的 fixed encounter（規格書第十三節、P4-D）。
+func _check_fixed_encounter_for_current_phase() -> void:
+	if Data == null or Data.loader == null:
+		return
+	if not active_encounter.is_empty():
+		return
+	if phase == "night":
+		return
+	for b in Data.loader.beats_at(day, phase):
+		if not bool(b.get("fixed", false)):
+			continue
+		if not b.has("encounter"):
+			continue
+		var enc: Dictionary = b.get("encounter", {}) as Dictionary
+		if enc.is_empty():
+			continue
+		var bid := str(b.get("id", ""))
+		var is_meta_once := bool(b.get("meta_once", false))
+		if is_meta_once and night_once_beats_seen.has(bid):
+			continue
+		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
+			start_encounter(bid)
+			break
+
+
 ## 直接睡＝解析旅館（sanquan）的夜間內容（規格書第九節、P3-C）。
 ## 面板與睡覺共用 resolved_night_content("sanquan")；睡覺跳過 requires 不成立的內容。
 func sleep_night() -> PackedStringArray:
 	var lines := PackedStringArray()
+	if not active_encounter.is_empty():
+		return lines
 	var resolved := resolved_night_content("sanquan")
 	var primary: Dictionary = resolved.get("primary", {})
 	if not primary.is_empty():
@@ -306,6 +346,9 @@ func sleep_night() -> PackedStringArray:
 ## 夜間推進唯一決策入口（P3-C，main.gd 與走查共用）。
 ## 回傳：{ "advance": bool, "lines": PackedStringArray }
 func resolve_night_advance() -> Dictionary:
+	if not active_encounter.is_empty():
+		return { "advance": false, "lines": PackedStringArray(), "reason_code": "encounter_active" }
+
 	if not night_location_chosen.is_empty():
 		return { "advance": true, "lines": PackedStringArray() }
 
@@ -329,18 +372,26 @@ func night_location_seen(location_id: String) -> bool:
 ## 進入夜間地點唯一原子入口（規格書第九節、P3-B）。
 ## 拒絕順序固定：
 ## 1. not_night: phase != "night"
-## 2. unknown_location: location 不存在
-## 3. not_night_layer: location.layer != "night"
-## 4. teaser: bool(loc.teaser_only)
-## 5. too_early: day < earliest_night
-## 6. locked: loc.requires 不成立（附 reject_reason）
-## 7. already_chosen: night_location_chosen 非空
-## 8. already_slept: night_sleep_pending 為真
+## 2. encounter_active: not active_encounter.is_empty()（P4-D）
+## 3. overloaded: is_overloaded()（P4-D）
+## 4. unknown_location: location 不存在
+## 5. not_night_layer: location.layer != "night"
+## 6. teaser: bool(loc.teaser_only)
+## 7. too_early: day < earliest_night
+## 8. locked: loc.requires 不成立（附 reject_reason）
+## 9. already_chosen: night_location_chosen 非空
+## 10. already_slept: night_sleep_pending 為真
 ## 任一步未過回 { "ok": false, "reason_code": code, "reason_text": text, "lines": [] }，狀態零變化。
 ## 成功：寫 chosen -> 寫 meta seen -> 首次 paid 則發卡 + 批次 check cap -> 回傳提示文字（未結束本輪才回傳）。
 func enter_night_location(location_id: String) -> Dictionary:
 	if phase != "night":
 		return { "ok": false, "reason_code": "not_night", "reason_text": "", "lines": PackedStringArray() }
+
+	if not active_encounter.is_empty():
+		return { "ok": false, "reason_code": "encounter_active", "reason_text": "遭遇進行中，無法進入地點", "lines": PackedStringArray() }
+
+	if is_overloaded():
+		return { "ok": false, "reason_code": "overloaded", "reason_text": "手牌超載，無法進入夜間地點", "lines": PackedStringArray() }
 
 	if Data == null or Data.loader == null or not Data.loader.locations.has(location_id):
 		return { "ok": false, "reason_code": "unknown_location", "reason_text": "", "lines": PackedStringArray() }
@@ -395,6 +446,9 @@ func enter_night_location(location_id: String) -> Dictionary:
 func confirm_night_alignment(day_location_id: String) -> Dictionary:
 	if phase != "morning" and phase != "afternoon":
 		return { "ok": false, "reason_code": "not_day_phase", "reason_text": "", "knowledge_id": "" }
+
+	if not active_encounter.is_empty():
+		return { "ok": false, "reason_code": "encounter_active", "reason_text": "遭遇進行中，無法對位", "knowledge_id": "" }
 
 	if Data == null or Data.loader == null or not Data.loader.locations.has(day_location_id):
 		return { "ok": false, "reason_code": "unknown_location", "reason_text": "", "knowledge_id": "" }
@@ -895,6 +949,9 @@ func placeable_cards(beat_id: String, slot_id: String) -> Array[String]:
 ## 重複呼叫為 no-op，回傳 { ok: false, reason_code: "resolved" }。
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
 func choose(beat_id: String, group_id: String, slot_id: String, card_id: String = "") -> Dictionary:
+	if not active_encounter.is_empty():
+		return { "ok": false, "reason_code": "encounter_active", "reason_text": "遭遇進行中，無法選擇", "lines": PackedStringArray() }
+
 	var choice_key := beat_id + "::" + group_id
 	if choices.has(choice_key):
 		return { "ok": false, "reason_code": _REASON_RESOLVED, "reason_text": "", "lines": PackedStringArray() }
@@ -974,6 +1031,9 @@ func choose(beat_id: String, group_id: String, slot_id: String, card_id: String 
 ## 企劃書第七節「任何時刻都必須至少有一個出口點得下去」靠的就是這一點。
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
 func indulge(beat_id: String, slot_id: String, card_inst_id: String) -> Dictionary:
+	if not active_encounter.is_empty():
+		return { "ok": false, "reason_code": "encounter_active", "reason_text": "遭遇進行中，無法縱慾", "lines": PackedStringArray() }
+
 	# 1. 卡持有檢查與 base_id 檢查
 	if card_inst_id.is_empty() or not has_card(card_inst_id):
 		return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "", "lines": PackedStringArray() }
@@ -1194,6 +1254,9 @@ func _settle_pending_delegation_reports() -> void:
 ## - 委託不消耗主角行動格、不增 npc_action_counts、不移動人物卡
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
 func delegate(beat_id: String, slot_id: String, person_card_id: String) -> Dictionary:
+	if not active_encounter.is_empty():
+		return { "ok": false, "reason_code": "encounter_active", "reason_text": "遭遇進行中，無法委託", "lines": PackedStringArray() }
+
 	# 1. 白天行動時段
 	if not ACTION_PHASES.has(phase):
 		return { "ok": false, "reason_code": _REASON_NOT_ACTION_PHASE, "reason_text": "", "lines": PackedStringArray() }
@@ -1321,6 +1384,9 @@ func mark_delegation_tutorial_seen() -> void:
 ## 任一步不過 → { ok=false, reason_code, reason_text, lines=[] }，GameState 零變化。
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
 func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
+	if not active_encounter.is_empty():
+		return { "ok": false, "reason_code": "encounter_active", "reason_text": "遭遇進行中，無法放置卡片", "lines": PackedStringArray() }
+
 	# K-17: 空卡 id 走 try_place 直接擋下，不轉導 choose
 	if card_id.is_empty():
 		return { "ok": false, "reason_code": _REASON_NOT_HELD, "reason_text": "", "lines": PackedStringArray() }
@@ -1373,6 +1439,405 @@ func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
 	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 
 
+# ── 遭遇系統（P4-D）─────────────────────────────────────────────────────────
+
+## 手牌是否超載（純查詢，不序列化，規格書第十三節、P4-D）。
+func is_overloaded() -> bool:
+	var max_hand: int = int(Data.tuning("hand_size", 7)) if Data != null else 7
+	return hand_slots_used() > max_hand
+
+
+## 啟動遭遇（規格書第十三節、開發設計方針 P4-D）。
+## 檢查順序固定：
+## 1. active:已有進行中遭遇（encounter_active）
+## 2. unknown beat:未知的 beat id 或無 encounter 欄位（unknown_beat）
+## 3. data conflict:遭遇資料結構異常（data_conflict）
+## 成功建立 stage == "intro"，blocked_slots 初始化為 0。
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String }
+func start_encounter(beat_id: String) -> Dictionary:
+	# 1. active
+	if not active_encounter.is_empty():
+		return { "ok": false, "reason_code": "encounter_active", "reason_text": "已有進行中的遭遇" }
+
+	# 2. unknown beat
+	if Data == null or Data.loader == null or not Data.loader.beats_by_id.has(beat_id):
+		return { "ok": false, "reason_code": "unknown_beat", "reason_text": "未知的遭遇事件" }
+
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary
+	if not beat.has("encounter"):
+		return { "ok": false, "reason_code": "unknown_beat", "reason_text": "未知的遭遇事件" }
+
+	var enc_val: Variant = beat.get("encounter")
+	if not enc_val is Dictionary:
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料格式錯誤" }
+
+	var enc := enc_val as Dictionary
+	# 3. data conflict
+	var rounds_val: Variant = enc.get("rounds")
+	if not rounds_val is Array or (rounds_val as Array).is_empty():
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料缺少回合定義" }
+	if not enc.has("per_round_slot_cost") or int(enc.get("per_round_slot_cost", 0)) <= 0:
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料 slot_cost 錯誤" }
+	if not enc.has("after_finish"):
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料缺少 after_finish" }
+
+	var attempted_ids: Array[String] = []
+	active_encounter = {
+		"beat_id": beat_id,
+		"stage": "intro",
+		"round_id": "",
+		"blocked_slots": 0,
+		"attempted_card_ids": attempted_ids
+	}
+
+	return { "ok": true, "reason_code": "", "reason_text": "" }
+
+
+## 確認開場演出並進入第一回合（規格書第十三節、開發設計方針 P4-D）。
+## 檢查順序固定：
+## 1. inactive:目前無遭遇（no_active_encounter）
+## 2. wrong stage:目前不是 intro 階段（wrong_stage）
+## 3. data conflict:第一回合資料異常（data_conflict）
+## 成功進入第一回合，超載時加一次 penalty，第一回合各加一次 cost；可用格歸零或無合法解直接 failure。
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
+func acknowledge_encounter_intro() -> Dictionary:
+	# 1. inactive
+	if active_encounter.is_empty():
+		return { "ok": false, "reason_code": "no_active_encounter", "reason_text": "目前沒有進行中的遭遇", "lines": PackedStringArray() }
+
+	# 2. wrong stage
+	if str(active_encounter.get("stage", "")) != "intro":
+		return { "ok": false, "reason_code": "wrong_stage", "reason_text": "目前不是開場演出階段", "lines": PackedStringArray() }
+
+	# 3. data conflict
+	var beat_id := str(active_encounter.get("beat_id", ""))
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary if Data != null and Data.loader != null else {}
+	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
+	var first_round_id := Encounter.get_first_round_id(enc)
+	if first_round_id.is_empty():
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料缺少第一回合定義", "lines": PackedStringArray() }
+
+	var first_round := Encounter.get_round(enc, first_round_id)
+	if first_round.is_empty():
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇第一回合資料遺失", "lines": PackedStringArray() }
+
+	var cost := int(enc.get("per_round_slot_cost", 1))
+
+	# 超載時先加一次 penalty cost
+	if is_overloaded():
+		active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
+		if _check_encounter_capacity_failure(enc):
+			var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+			return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
+
+	# 進入第一回合
+	active_encounter["stage"] = "round"
+	active_encounter["round_id"] = first_round_id
+	active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
+
+	# 檢查佔格是否已達/超出手牌上限
+	if _check_encounter_capacity_failure(enc):
+		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
+
+	# 檢查是否有合法動作
+	if not Encounter.has_legal_moves(enc, first_round, active_encounter, self, Data.loader):
+		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
+
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray() }
+
+
+## 遭遇 View Model（規格書第十三節、P4-D）。
+func encounter_view() -> Dictionary:
+	if active_encounter.is_empty() or Data == null or Data.loader == null:
+		return {}
+	var beat_id := str(active_encounter.get("beat_id", ""))
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary
+	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
+	return Encounter.build_view(enc, active_encounter, self, Data.loader, Data.loader.tuning)
+
+
+## 回應遭遇（規格書第十三節、開發設計方針 P4-D）。
+## 檢查順序固定：
+## 1. inactive:目前無遭遇（no_active_encounter）
+## 2. wrong stage:目前不是 round 階段（wrong_stage）
+## 3. unknown card:卡片不存在（unknown_card）
+## 4. not held:未持有該卡片（not_held）
+## 5. madness:發狂卡不可提交（madness_blocked）
+## 6. already attempted:同一 base card 本場已嘗試過（already_attempted）
+## 7. card not submittable:未命中 response 且 fallback.requires_discardable 且卡不可丟棄（card_not_submittable）
+## 8. data conflict:回合資料異常（data_conflict）
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
+func respond_to_encounter(card_id: String) -> Dictionary:
+	# 1. inactive
+	if active_encounter.is_empty():
+		return { "ok": false, "reason_code": "no_active_encounter", "reason_text": "目前沒有進行中的遭遇", "lines": PackedStringArray() }
+
+	# 2. wrong stage
+	if str(active_encounter.get("stage", "")) != "round":
+		return { "ok": false, "reason_code": "wrong_stage", "reason_text": "目前不是回應回合階段", "lines": PackedStringArray() }
+
+	# 3. unknown card
+	if card_id.is_empty():
+		return { "ok": false, "reason_code": "unknown_card", "reason_text": "未知的卡片", "lines": PackedStringArray() }
+	var base_id := _card_base_id(card_id)
+	if Data == null or Data.loader == null or not Data.loader.cards.has(base_id):
+		return { "ok": false, "reason_code": "unknown_card", "reason_text": "未知的卡片", "lines": PackedStringArray() }
+
+	# 4. not held
+	if not has_card(card_id):
+		return { "ok": false, "reason_code": "not_held", "reason_text": "未持有該卡片", "lines": PackedStringArray() }
+
+	# 5. madness
+	if base_id == "madness" or madness_clock.has(card_id):
+		return { "ok": false, "reason_code": "madness_blocked", "reason_text": "發狂卡不可作為回應提交", "lines": PackedStringArray() }
+
+	# 6. already attempted
+	var attempted: Array = active_encounter.get("attempted_card_ids", []) as Array
+	if attempted.has(base_id):
+		return { "ok": false, "reason_code": "already_attempted", "reason_text": "此卡片本場已嘗試過", "lines": PackedStringArray() }
+
+	# 取得當前回合定義
+	var beat_id := str(active_encounter.get("beat_id", ""))
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary
+	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
+	var round_id := str(active_encounter.get("round_id", ""))
+	var round_data := Encounter.get_round(enc, round_id)
+	if round_data.is_empty():
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "當前回合資料遺失", "lines": PackedStringArray() }
+
+	var card_def: Dictionary = Data.loader.cards.get(base_id, {}) as Dictionary
+	var is_discardable := bool(card_def.get("discardable", false))
+	var matching_resp := Encounter.find_matching_response(round_data, card_id, base_id)
+	var fallback: Dictionary = round_data.get("fallback", {}) as Dictionary
+	var req_discardable := bool(fallback.get("requires_discardable", false))
+
+	# 7. card not submittable
+	if matching_resp.is_empty() and req_discardable and not is_discardable:
+		return { "ok": false, "reason_code": "card_not_submittable", "reason_text": "該卡無法作為錯答提交", "lines": PackedStringArray() }
+
+	# 通過所有檢查 → 開始結算
+	attempted.append(base_id)
+	var cost := int(enc.get("per_round_slot_cost", 1))
+	var lines := PackedStringArray()
+
+	if not matching_resp.is_empty():
+		# ── 命中 Response ──
+		if bool(matching_resp.get("consume_card", false)) and is_discardable:
+			lose_card(card_id)
+
+		# 正解釋放本回合佔格
+		active_encounter["blocked_slots"] = max(0, int(active_encounter.get("blocked_slots", 0)) - cost)
+
+		# 套用 on_resolve
+		if matching_resp.has("on_resolve"):
+			lines.append_array(EffectApply.apply(matching_resp["on_resolve"], self))
+
+		var next_round_val: Variant = matching_resp.get("next_round")
+		if next_round_val == null or str(next_round_val).is_empty():
+			# 勝利出口
+			var fin_res := _finish_encounter("victory", enc.get("on_victory", {}))
+			lines.append_array(fin_res.get("lines", PackedStringArray()))
+			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+		else:
+			var next_rid := str(next_round_val)
+			active_encounter["round_id"] = next_rid
+			active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
+
+			if _check_encounter_capacity_failure(enc):
+				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+				lines.append_array(fail_res.get("lines", PackedStringArray()))
+				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+			var next_round := Encounter.get_round(enc, next_rid)
+			if not Encounter.has_legal_moves(enc, next_round, active_encounter, self, Data.loader):
+				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+				lines.append_array(fail_res.get("lines", PackedStringArray()))
+				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+	else:
+		# ── 未命中 Fallback ──
+		if is_discardable:
+			lose_card(card_id)
+		# 錯答保留佔格（不釋放）
+
+		if fallback.has("on_resolve"):
+			lines.append_array(EffectApply.apply(fallback["on_resolve"], self))
+
+		var next_round_val: Variant = fallback.get("next_round")
+		if next_round_val == null or str(next_round_val).is_empty():
+			# 失敗出口
+			var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+			lines.append_array(fail_res.get("lines", PackedStringArray()))
+			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+		else:
+			var next_rid := str(next_round_val)
+			active_encounter["round_id"] = next_rid
+			active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
+
+			if _check_encounter_capacity_failure(enc):
+				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+				lines.append_array(fail_res.get("lines", PackedStringArray()))
+				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+			var next_round := Encounter.get_round(enc, next_rid)
+			if not Encounter.has_legal_moves(enc, next_round, active_encounter, self, Data.loader):
+				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+				lines.append_array(fail_res.get("lines", PackedStringArray()))
+				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+
+## 主動丟棄卡片（規格書第十三節、開發設計方針 P4-D）。
+## 檢查順序固定：
+## 1. inactive:目前無遭遇（no_active_encounter）
+## 2. wrong stage:目前不是 round 階段（wrong_stage）
+## 3. discard disabled:此遭遇不允許主動丟棄（discard_disabled）
+## 4. unknown card:卡片不存在（unknown_card）
+## 5. not held:未持有該卡片（not_held）
+## 6. not discardable:發狂卡或 discardable:false 卡（not_discardable）
+## 成功移除該卡，不改 blocked_slots、不推進 round；若無合法解則失敗。
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
+func discard_in_encounter(card_id: String) -> Dictionary:
+	# 1. inactive
+	if active_encounter.is_empty():
+		return { "ok": false, "reason_code": "no_active_encounter", "reason_text": "目前沒有進行中的遭遇", "lines": PackedStringArray() }
+
+	# 2. wrong stage
+	if str(active_encounter.get("stage", "")) != "round":
+		return { "ok": false, "reason_code": "wrong_stage", "reason_text": "目前不是回應回合階段", "lines": PackedStringArray() }
+
+	# 3. discard disabled
+	var beat_id := str(active_encounter.get("beat_id", ""))
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary if Data != null and Data.loader != null else {}
+	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
+	if not bool(enc.get("allow_discard", true)):
+		return { "ok": false, "reason_code": "discard_disabled", "reason_text": "此遭遇不允許主動丟棄", "lines": PackedStringArray() }
+
+	# 4. unknown card
+	if card_id.is_empty():
+		return { "ok": false, "reason_code": "unknown_card", "reason_text": "未知的卡片", "lines": PackedStringArray() }
+	var base_id := _card_base_id(card_id)
+	if Data == null or Data.loader == null or not Data.loader.cards.has(base_id):
+		return { "ok": false, "reason_code": "unknown_card", "reason_text": "未知的卡片", "lines": PackedStringArray() }
+
+	# 5. not held
+	if not has_card(card_id):
+		return { "ok": false, "reason_code": "not_held", "reason_text": "未持有該卡片", "lines": PackedStringArray() }
+
+	# 6. not discardable
+	if base_id == "madness" or madness_clock.has(card_id):
+		return { "ok": false, "reason_code": "not_discardable", "reason_text": "發狂卡不可丟棄", "lines": PackedStringArray() }
+	var card_def: Dictionary = Data.loader.cards.get(base_id, {}) as Dictionary
+	if not bool(card_def.get("discardable", false)):
+		return { "ok": false, "reason_code": "not_discardable", "reason_text": "此卡片不可丟棄", "lines": PackedStringArray() }
+
+	lose_card(card_id)
+
+	# 檢查丟棄後是否仍有合法動作
+	var round_id := str(active_encounter.get("round_id", ""))
+	var round_data := Encounter.get_round(enc, round_id)
+	if not Encounter.has_legal_moves(enc, round_data, active_encounter, self, Data.loader):
+		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
+
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray() }
+
+
+## 逃離遭遇（規格書第十三節、開發設計方針 P4-D）。
+## 檢查順序固定：
+## 1. inactive:目前無遭遇（no_active_encounter）
+## 2. wrong stage:目前不是 round 階段（wrong_stage）
+## 3. cannot escape:escape_cost 為 null（cannot_escape）
+## 4. wrong escape count:支付卡片數量不等於 escape_cost（wrong_escape_count）
+## 5. duplicate payment:支付卡片存在重複 id（duplicate_payment）
+## 6. unknown card:支付卡片不存在（unknown_card）
+## 7. not held:未持有支付卡片（not_held）
+## 8. not discardable:支付卡片含發狂卡或不可丟棄卡（not_discardable）
+## 9. data conflict:遭遇資料格式錯誤（data_conflict）
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
+func escape_encounter(card_ids: Array[String]) -> Dictionary:
+	# 1. inactive
+	if active_encounter.is_empty():
+		return { "ok": false, "reason_code": "no_active_encounter", "reason_text": "目前沒有進行中的遭遇", "lines": PackedStringArray() }
+
+	# 2. wrong stage
+	if str(active_encounter.get("stage", "")) != "round":
+		return { "ok": false, "reason_code": "wrong_stage", "reason_text": "目前不是回應回合階段", "lines": PackedStringArray() }
+
+	# 3. cannot escape
+	var beat_id := str(active_encounter.get("beat_id", ""))
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary if Data != null and Data.loader != null else {}
+	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
+	var esc_val: Variant = enc.get("escape_cost")
+	if esc_val == null:
+		return { "ok": false, "reason_code": "cannot_escape", "reason_text": "此遭遇無法逃離", "lines": PackedStringArray() }
+
+	# 4. wrong escape count
+	var esc_cost := int(esc_val)
+	if card_ids.size() != esc_cost:
+		return { "ok": false, "reason_code": "wrong_escape_count", "reason_text": "逃離支付張數不正確", "lines": PackedStringArray() }
+
+	# 5. duplicate payment
+	var seen_ids: Dictionary = {}
+	for cid in card_ids:
+		if seen_ids.has(cid):
+			return { "ok": false, "reason_code": "duplicate_payment", "reason_text": "支付卡片重複", "lines": PackedStringArray() }
+		seen_ids[cid] = true
+
+	# 6. unknown card, 7. not held, 8. not discardable
+	for cid in card_ids:
+		if cid.is_empty():
+			return { "ok": false, "reason_code": "unknown_card", "reason_text": "未知的卡片", "lines": PackedStringArray() }
+		var base_id := _card_base_id(cid)
+		if Data == null or Data.loader == null or not Data.loader.cards.has(base_id):
+			return { "ok": false, "reason_code": "unknown_card", "reason_text": "未知的卡片", "lines": PackedStringArray() }
+		if not has_card(cid):
+			return { "ok": false, "reason_code": "not_held", "reason_text": "未持有支付卡片", "lines": PackedStringArray() }
+		if base_id == "madness" or madness_clock.has(cid):
+			return { "ok": false, "reason_code": "not_discardable", "reason_text": "發狂卡不可作為逃離代價", "lines": PackedStringArray() }
+		var card_def: Dictionary = Data.loader.cards.get(base_id, {}) as Dictionary
+		if not bool(card_def.get("discardable", false)):
+			return { "ok": false, "reason_code": "not_discardable", "reason_text": "不可丟棄卡無法作為逃離代價", "lines": PackedStringArray() }
+
+	# 支付代價
+	for cid in card_ids:
+		lose_card(cid)
+
+	var fin_res := _finish_encounter("escape", enc.get("on_escape", {}))
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": fin_res.get("lines", PackedStringArray()) }
+
+
+## 遭遇結束出口（內部 helper）。
+func _finish_encounter(outcome: String, effect_data: Dictionary) -> Dictionary:
+	var beat_id := str(active_encounter.get("beat_id", ""))
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary if Data != null and Data.loader != null else {}
+	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
+	var after_finish := str(enc.get("after_finish", "stay"))
+
+	active_encounter.clear()
+
+	var lines := PackedStringArray()
+	if not effect_data.is_empty():
+		lines.append_array(EffectApply.apply(effect_data, self))
+
+	if after_finish == "advance_phase":
+		var adv_res := advance_phase()
+		lines.append_array(adv_res.get("lines", PackedStringArray()))
+
+	return { "ok": true, "outcome": outcome, "lines": lines }
+
+
+## 檢查可用格數是否歸零或小於 0（容量超載失敗）。
+func _check_encounter_capacity_failure(enc: Dictionary) -> bool:
+	var hand_size := int(Data.tuning("hand_size", 7)) if Data != null else 7
+	var blocked := int(active_encounter.get("blocked_slots", 0))
+	return (hand_size - hand.size() - blocked) <= 0
+
+
 # ── 序列化 ──────────────────────────────────────────────────────────────────
 
 func serialize() -> Dictionary:
@@ -1404,6 +1869,7 @@ func serialize() -> Dictionary:
 			"forced_pending": forced_pending.duplicate(),
 			"delegates_used_today": delegates_used_today.duplicate(),
 			"pending_delegation_reports": reports_copy,
+			"active_encounter": active_encounter.duplicate(true),
 		},
 		"meta": {
 			"knowledge": knowledge.duplicate(),
@@ -1451,6 +1917,18 @@ func deserialize(d: Dictionary) -> void:
 	for item in run.get("pending_delegation_reports", []):
 		if item is Dictionary:
 			pending_delegation_reports.append((item as Dictionary).duplicate())
+
+	active_encounter.clear()
+	var enc_raw: Dictionary = run.get("active_encounter", {})
+	if not enc_raw.is_empty():
+		active_encounter["beat_id"] = str(enc_raw.get("beat_id", ""))
+		active_encounter["stage"] = str(enc_raw.get("stage", "intro"))
+		active_encounter["round_id"] = str(enc_raw.get("round_id", ""))
+		active_encounter["blocked_slots"] = int(enc_raw.get("blocked_slots", 0))
+		var att: Array[String] = []
+		for item in enc_raw.get("attempted_card_ids", []):
+			att.append(str(item))
+		active_encounter["attempted_card_ids"] = att
 
 	var meta: Dictionary = d.get("meta", {})
 	knowledge = meta.get("knowledge", {}).duplicate()

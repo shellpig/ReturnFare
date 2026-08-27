@@ -262,7 +262,8 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 
 		PlaythroughGreedy.execute_action_phase(gs, data_node, d, "afternoon", forced_a)
 		last_ind_count = int(gs.get("indulgence_count"))
-		gs.advance_phase()
+		if str(gs.get("phase")) == "afternoon":
+			gs.advance_phase()
 
 		# ── 3. Evening ──
 		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "evening")
@@ -330,11 +331,11 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 			var loc_dict: Dictionary = loader.locations.get(chosen_loc, {}) as Dictionary
 			var cost_val: int = int(loc_dict.get("madness_cost", 0))
 			var is_first: bool = not (gs.get("night_locations_seen") as Dictionary).has(chosen_loc)
-			if cost_val > 0 and is_first:
-				paid_entered_count += cost_val
 
 			var entry_res: Dictionary = gs.enter_night_location(chosen_loc)
 			if entry_res.get("ok", false):
+				if cost_val > 0 and is_first:
+					paid_entered_count += cost_val
 				var view: Dictionary = gs.build_panel(chosen_loc)
 				for bv: Dictionary in view.get("beats", []) as Array:
 					if int(bv.get("tri", -1)) == PanelBuilder.TriState.OPEN:

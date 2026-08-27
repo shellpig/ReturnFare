@@ -4,92 +4,73 @@
 
 ## 目前階段
 
-**P1、P2 已完成；P3 機器層已完成，剩既有人工體感項；P4-A～P4-C 已通過 verifier 複驗，K-124／K-125 結案，P4-C 維持 ✅。下一個任務是 P4-D 遭遇規則；不得先做 P4-E，也不得跳到 P5。**
+**P1、P2 已完成；P3 機器層已完成；P4-A～P4-C 已完成；P4-D 遭遇規則實作完成，機器層 26 套 headless 測試全數 exit 0。目前等待 verifier 審核與驗證打分。下一步任務為 P4-E 遭遇 UI 與 D8／D45 接線。**
 
 - 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；本檔只保存最近交接重點。
 - P4-A：委託／遭遇資料與 lint 真值化已完成。
-- P4-B：委託規則已實作並通過 verifier 複驗，機器層 24 套 headless 測試全數 exit 0；K-65 結案。
-- P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已實作並完成第三輪 verifier 關門；K-124／K-125 結案，25 套 headless 全綠，完整 UI sim 104／104 variants、81／81 contracts、0 failed；verifier targeted P4-C headless 與必要 UI 7／7 全綠。
-- P4-D～F（遭遇 runtime、UI 與全流程）尚未開始。
+- P4-B：委託規則已實作並通過 verifier 複驗，K-65 結案。
+- P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已實作並完成第三輪 verifier 關門；K-124／K-125 結案，完整 UI sim 104／104 variants、81／81 contracts、0 failed。
+- P4-D：遭遇規則與狀態機實作完成，`test_p4d.gd` 覆蓋 14 大項驗收標準，26 套 headless 全數 exit 0 通過。
+- P4-E～F（遭遇 UI、D8／D45 接線與全流程整合）：待 P4-D 驗證後開工。
 - P5：開局、四類結局、歷輪摘要、跨輪重置與 UI 已拆成 P5-A～F，尚未開始實作。
 
 ## 最近完成的工作
 
-- **P4-C 第三輪缺口經 verifier 複驗通過並完成文件關門（最新）。** `247c716` 的阿婕縱慾破壞→D16 修復→D17 重取、阿珠 D9→D17、阿財 D17～19 共事、`task_title`／`delegation_state` 契約與 `p4c_07` 整合 UI 均核對無矛盾。verifier 自跑 `test_p4c.gd` 12 段 exit 0；只跑必要 UI `p4c_01`～`p4c_07`，7／7、failed 0，catalog 81；完整 launcher 證據為 104／104 variants、81／81 contracts、0 failed、11 條負向反證如期失敗。測試指南 423／424 依使用者已拍板的 (a) 記錄正式內容不可達邊界，以 headless／view-model 認列；428／429 明記代表性 UI＋真實路徑 headless。未發現新 blocker 或非阻擋問題，下一步 P4-D。
-- **P4-C 第三輪：把上一輪的偷懶捷徑改成真實入口（最新，尚待 verifier 複驗）。** verifier 指出前一輪破壞／取得測試仍直接寫旗標、task_title 契約未回填、UI 仍只 D17：
-  - **阿婕破壞走真實縱慾**：`test_p4c` 第 6／7 段改以 `indulge("exit_sanquan","x_lust_ajie",<madness_inst>)` 驅動（前置：持 npc_ajie＋一張發狂卡＋關係達「疑似」），由該出口的 on_place 同時設 `ajie_trust_broken`、`lose` npc_ajie、阻止 D17 on_enter 條件 gain；第 7 段續接 D16 `try_place` 修復槽＋D17 `play_beat` 重取，全程真實入口、不直接寫旗標。共用 helper `_break_ajie_via_indulgence()`。
-  - **阿珠走真實 D9 寫入端**：第 11 段改 `try_place("protagonist","d9_morning_clinic","ask")` 寫入 `azhu_shared_abnormal_medicine`＋「沒走 D9 則 D17 不發卡」負向對照，證明 D9 是可正常操作的寫入端。
-  - **task_title 契約回填**：`開發設計方針.md` P4-C view model 欄位列補 `task_title`（`{result_timing, preview, tendency, task_title, delegation_state}`），契約與實作一致。
-  - **428 的縱慾 UI 主張補證**：新增 UI 契約 `p4c_07_indulge_hides_candidate`＋fixture `p4c_ajie_indulge_ready`——D17 下午對阿婕縱慾後 `ask_ajie` 委託候選在面板當場消失（P2→P4-C 動態整合，非冗餘 render 重測）。catalog 80→81，launcher `-ne 80`→`-ne 81`。
-  - **證據**：25 套 headless exit 0（`test_p4c` 擴為 12 段、破壞／取得全走真實入口）；完整 UI sim run `20260827-110733-658-p21796-eeab56f6` 為 **104 variants／81 contracts／81 completed／0 failed**、11 條負向反證如期失敗。
-- **P4-C verifier 回列五條缺口的實作補強（前一輪，第 6／7／11 段當時仍直接寫旗標，已被本輪取代）。** 針對交接檔列的缺口逐條處理：
-  - **① 契約統一**：view model 委託欄位改封閉語彙 `delegation_state`（`"available"`／`"delegated_today"`），`panel_builder._delegation_view()` 與 `location_panel` 同步；`GameState.delegation_status()` 查詢仍回 `delegated_today`（hand_bar／card_detail 的人物卡狀態消費端，與 slot view model 不同層，刻意不動）。
-  - **② UI 不讀原始 JSON**：`_delegation_view()` 新增 `task_title`（由 beat title 衍生），委託確認畫面改讀它；`location_panel._on_delegate_candidate_pressed()` 移除 `Data.loader.beats_by_id` 直讀。
-  - **④ 阿婕修復走真實路徑**：`test_p4c` 第 7 段改 D16 下午 `try_place("protagonist","d16_pm_sanquan","repair_ajie_trust")` 清 `ajie_trust_broken`＋D17 `play_beat("d17_morning_phone")` on_enter 條件 gain 重取 `npc_ajie`，不再 `EffectApply.apply()`＋手動 `gain_card()`。
-  - **⑤ 阿珠／阿財取得閘門**：`test_p4c` 第 11 段驗阿珠僅 `azhu_shared_abnormal_medicine`（D9 揭露路線）成立時 D17 on_enter 取得、阿財僅真實「跟阿財做事」放卡取得。
-  - **③ 排序**：新增 UI 契約 `p4c_06_candidate_order` 驗處方候選照資料槽序渲染（catalog 79→80，launcher `-ne 79`→`-ne 80` 同步）。
-  - **證據**：25 套 headless exit 0（`test_p4c` 擴為 12 段）；完整 UI sim run `20260827-102810-305-p77376-2f5ad2f5` 為 **103 variants／80 contracts／80 completed／0 failed**，11 條負向反證如期失敗。
-  - **未竟（見風險段）**：③ 的「今日已受託仍在原位＋disabled＋隔日恢復」與「條件不足資料理由」在 P4-C 唯一委託 beat 內容不可達，需 verifier 決定收斂勾項或投資合成 data variant。
-- **P4-C 接線 A 複驗完成，但未通過完整關門（前一輪）。** `64e5d98` 已在 `origin/main`；即時委託確認後面板正確關閉，回報由 `main.gd` 寫入 FlowText，原 K-125 路徑未回歸。證據：25 套 headless 全綠；完整 UI sim run `20260827-094822-316-p25656-6b4f4a0f` 為 102／102 variants、79／79 contracts、0 failed，11 條負向反證如期失敗；資料為 64 cards／48 locations／18 NPC／261 beats，引用 0、lint 1～16 全 0。**未關門原因**：① 方針要求 `delegation_state`，實作與測試仍使用 `delegated_today`；② `location_panel.gd` 的 P4-C 確認流程仍直接讀 `Data.loader.beats_by_id` 取得標題，違反「UI 不讀原始 JSON」；③ UI catalog 仍未直接驗今日已受託保持原位／disabled／隔日上午恢復，以及條件不足資料理由；④ 阿婕修復測試直接 `EffectApply.apply()` 再手動 `gain_card()`，未驗真實放卡與 D17 `on_enter` 接線；⑤ 阿珠僅由 D9、阿財僅由 D17～19 取得，以及 D18／D19 UI 路徑，尚無文件所宣稱的 headless＋UI 直接證據。這次 verifier 未修改任何文件、未建立 commit、未 push；既有 4 個未追蹤 `.uid` 保持不動。
-- **P4-C 接線 A 補強與四條缺口補測（本次，尚待 verifier 複驗與文件關門）。** 委託即時回報改由 `main.gd` 經 `delegate()` 意圖信號寫入 FlowText（`location_panel.gd` 只發 `delegation_requested`，不再自呼 `try_place()`／寫面板內 `_status_label`），與隔日回報同一處呈現，成功後關面板回地圖；失敗經 `report_delegation_failure()` 保留面板顯示原因。補 `test_p4c.gd` 四段：阿婕信任修復重取、D18／D19 完成處方、任一路線結算後跨日回 `already_resolved`、候選永遠照資料槽序。UI sim `p4c_03` 改斷言即時回報落 FlowText＋面板關閉＋choice 收起（evidence 改 `immediate_report_in_flowtext`，`qa_contract_matrix.gd` 同步）。**證據：25 套 headless exit 0（`test_p4c` 10 段全綠）；完整 UI sim 102／102 variants、79／79 contracts、0 failed、11 條負向反證如期失敗。** 這批補的是先前七條打勾中缺直接證據的六項（今日已受託顯示、穩定排序、修復重取、D18／D19、跨日不重複、immediate→FlowText），打勾與文件關門仍由 verifier 落。
-- **K-125 修復經 verifier 複驗結案，P4-C 文件關門（`7a439f6`）。** `drain_beats()` 優先以真實輸入處理已知教學 modal，dialog 與 beat 分開計數；D17 回歸斷言教學曾處理且 meta 已寫入。原 4 個失敗變體全數通過；完整 run `20260827-081934-525-p21024-40718853` 為 102／102 variants、79／79 contracts、0 failed，11 條負向反證如期失敗。P4-C 七條驗收全數打勾並轉 ✅。
-- **K-124 修復經 verifier 複驗結案（`4b0ba1c`）。** 8 組精確 madness fixture 逐案正規化，後置條件改驗精確張數／clock／day／phase，P4-C 零人物卡改按 type 計數；同批結 K-112，P3-A baseline 只在明示旗標時產生。獨立 fixture 生成 exit 0、baseline mtime 不變、25 套 headless 全綠。
-- **P4-C 完整 UI launcher 首次跑到底並定位 K-125。** Run `20260827-074010-986-p50004-a1c03a80`：102 variants、79 contracts 全執行、98 variants 通過、76 contracts 完成、11 條負向反證如期失敗；4 個失敗變體都由 D17 教學 modal 遮住底層 `beat_advance`，而 `drain_beats()` 只看 tree visibility 所致。production 玩家可按 OK 繼續，不是 beat 無限迴圈。
-
-- **P4-B 委託規則已實作完成並通過 verifier 複驗（24 套 headless exit 0，含 `test_p4b.gd`）。**
-  - **Run 狀態擴充**：
-    - `delegates_used_today: Dictionary`：追蹤今日已受託人物卡（單日單人限制）。
-    - `pending_delegation_reports: Array[Dictionary]`：儲存 `[{due_day, beat_id, slot_id, person_id}]` 隔日上午待結算回報接點。
-    - `last_delegation_report_lines: PackedStringArray`：收集當前上午回報所產生的文字演出行。
-    - `run_generation: int`：單調遞增的世代計數器，供 `EffectApply` 與結算器無瑕疵偵測 `end_run()` 重置事件。
-  - **`delegate(beat_id, slot_id, person_card_id) -> Dictionary` 入口**：
-    - 嚴格落實 11 步檢查順序：`not_action_phase` → `unknown_beat` → `unknown_slot` → `not_delegation` → `not_held` → `not_person` → `not_accepted` → `already_delegated_today` → `locked` → `already_resolved` → `data_conflict`。
-    - 成功時原子寫入 `choices`、`slots_placed`、`delegates_used_today`。`immediate` 當場套用 `on_place`；`next_morning` 當場套用 `on_place` 並將接點 append 至 `pending_delegation_reports`。
-    - 委託成功不消耗主角行動格（`action_spent` 維持不變）、不增加 `npc_action_counts`、人物卡不移出手牌。
-  - **`delegation_status(person_card_id) -> Dictionary` 查詢**：
-    - 回傳 `{ held: bool, delegated_today: bool, available: bool, has_pending_report: bool }`。
-  - **隔日上午結算與重置（含接點失效保留與 K-65 徹底修復）**：
-    - `advance_phase()` 進入 morning 時，在既有發狂倒數與強制縱慾結算之後，呼叫 `_settle_pending_delegation_reports()` 依序套用 due reports 的 `report` 效果並收集文字行至 `last_delegation_report_lines`。
-    - 結算前完整驗證接點（beat/slot/timing/report）：若接點失效則保留於 pending 並 `push_error` 顯式回報 data_conflict，不靜默丟棄。
-    - **K-65 根因徹底修復**：`EffectApply.apply` 於 `_check_madness_cap()` 觸發重置時立即停止後續效果鍵（flag 等），回傳空陣列；結算器偵測到重置時立即 `return`，不寫入文字、不覆蓋已清空的 `last_delegation_report_lines`、且中斷後續回報迴圈。
-    - 結算完成後呼叫 `delegates_used_today.clear()` 重置每日受託名單。
-  - **P4-A 臨時 Gate 拆除與轉導**：
-    - 拆除 `choose()` 原有的 `delegation_not_wired` 臨時 gate。
-    - `choose()` 與 `try_place()` 遇到帶 `delegation` 鍵的槽時，自動轉導至 `delegate()` 處理。
-    - 更新 `test_p4a.gd` 第 5 組測試，使 choice_requires_card 與委託轉導各自獨立驗證。
-  - **序列化與健全度**：
-    - `serialize()` / `deserialize()` 完整支援 `delegates_used_today` 與 `pending_delegation_reports`。
-    - 人物卡在派出後若被事件移除，隔日上午回報仍依接點如期結算。
-    - `end_run()` 完整清空所有委託相關狀態。
-  - **驗收審查修正**：
-    - `test_p4b.gd` 補齊嚴格回報陣列索引比對（`lines[0]==rep1, lines[1]==rep2`）。
-    - `test_p4b.gd` 增加強制縱慾先於回報執行的因果依賴測試（消發狂卡後回報條件 gain 成立）。
-    - `test_p4b.gd` 增加第 9 測試段：4 類接點失效保留驗證，以及同筆 report 後置 flag/文字阻擋 + 跨 report 迴圈中斷防呆驗證。
-    - `測試指南.md` 修正 line 413 關於 afternoon (`already_delegated_today`) 與 evening (`not_action_phase`) 拒絕碼文字說明。
-
-- **P4-A 資料與 SCHEMA 真值化（前期完成）**：
-  - **卡片**：`cards.json` 全 64 張皆有必填 boolean `discardable`；lint 9 新增缺欄／錯型別檢查。
-  - **D8**（`n_manydoors_ch1`）改為 dated night encounter；**D45**（`d45_encounter`）改為一 round encounter。
-  - **D17-19 委託**：`d17_19_prescription` 建立親自處理＋阿婕 immediate／阿珠 next_morning+report／阿財 immediate 路線。
-  - **lint 15 / 16**：委託與遭遇資料結構 lint 全綠。
+- **P4-D 遭遇規則實作完成（最新，待 verifier 複驗與打分）。**
+  - **核心模組建立 (`scripts/core/encounter.gd`)**：
+    - 建立 `Encounter` 類別，負責遭遇純判斷、Graph 節點查找、Response 匹配、合法動作求值（`has_legal_moves`）與 View Model 構建（`build_view`）。
+    - 嚴格落實資料封裝與無狀態設計（runtime 狀態皆由 `GameState.active_encounter` 持有）。
+    - `build_view()` 絕不外洩未達到的 round 或正解 `accepts` / `fallback` 結構。
+  - **GameState Autoload 遭遇狀態機與 API 實作 (`scripts/autoload/game_state.gd`)**：
+    - `active_encounter: Dictionary`：追蹤當前遭遇狀態 `{ beat_id, stage, round_id, blocked_slots, attempted_card_ids }`。
+    - `is_overloaded() -> bool`：純查詢 `hand_slots_used() > int(Data.tuning("hand_size", 14))`。
+    - **5 大遭遇操作 API**：
+      - `start_encounter(beat_id) -> Dictionary`：檢查 active → unknown beat → data conflict，成功時 stage 為 `"intro"`，`blocked_slots = 0`。
+      - `acknowledge_encounter_intro() -> Dictionary`：檢查 inactive → wrong stage → data conflict，超載時加收 penalty cost，進入第一 round（`blocked_slots += cost`），若可用格歸零或無合法解自動結算 failure。
+      - `encounter_view() -> Dictionary`：提供給 UI 或走查的安全 View Model。
+      - `respond_to_encounter(card_id) -> Dictionary`：檢查 inactive → wrong stage → unknown card → not held → madness → attempted → card not submittable → data conflict。正解命中釋放本回合 cost、套用 on_resolve；錯答保留 cost、若要求 discardable 則檢查扣卡並轉入 fallback；若為最後回合則走 victory/failure 結算。
+      - `discard_in_encounter(card_id) -> Dictionary`：檢查 inactive → wrong stage → discard disabled → unknown card → not held → not discardable。扣除卡片、不改 blocked_slots、不推進回合。
+      - `escape_encounter(card_ids: Array[String]) -> Dictionary`：檢查 inactive → wrong stage → cannot escape → wrong count → duplicate payment → unknown card → not held → not discardable → data conflict。扣除卡片並套用 on_escape 結算。
+    - **15 碼封閉拒絕代碼與固定優先順序**：
+      - `encounter_active`, `no_active_encounter`, `wrong_stage`, `unknown_beat`, `unknown_card`, `not_held`, `madness_blocked`, `already_attempted`, `card_not_submittable`, `discard_disabled`, `not_discardable`, `cannot_escape`, `wrong_escape_count`, `duplicate_payment`, `data_conflict`。
+    - **既有 API 升級與阻擋接線**：
+      - `advance_phase() -> Dictionary`：遇活躍遭遇時拒絕推進（`{ ok: false, reason_code: "encounter_active", phase_advanced: false }`）；白天時段切換時自動掃描應觸發之定日 fixed encounter（如 D45 afternoon）；夜間 fixed beats 仍走 `play_night_fixed()` 流程。
+      - `try_place()`, `choose()`, `delegate()`, `indulge()`, `confirm_night_alignment()`, `enter_night_location()`, `resolve_night_advance()` 全面加入 `encounter_active` 阻擋。
+      - `enter_night_location()` 加入 `overloaded` 檢查阻擋。
+    - **序列化與健全度**：
+      - `serialize()` 與 `deserialize()` 完整保存／還原 `active_encounter`。
+      - `end_run()` 完整清空 `active_encounter`。
+  - **自動化測試套件 (`tests/headless/test_p4d.gd`)**：
+    - 撰寫 12 大測試組，完整涵蓋 測試指南 P4-D 的 14 項驗收標準：
+      1. 遭遇啟動與開場確認（intro 階段 blocked_slots=0，acknowledge 後進入 round 1 blocked_slots=1）
+      2. 遭遇進行中時段與各類操作阻擋（advance_phase, try_place, choose, delegate, indulge, enter_night_location 等）
+      3. 15 碼封閉拒絕代碼矩陣
+      4. 拒絕優先順序驗證（如 madness_blocked > already_attempted, not_night > encounter_active > overloaded）
+      5. 超載規則（is_overloaded 查詢、enter_night_location 阻擋、開場 penalty 佔格）
+      6. 佔格計算與扣除（正解釋放 cost、錯答保留 cost）
+      7. 主動丟棄與逃離遭遇
+      8. 無合法解自動結算 failure
+      9. 容量上限失敗結算
+      10. 遭遇勝利與結束推進（after_finish: "advance_phase" 推進時段、"stay" 停留原時段）
+      11. 序列化與還原往返
+      12. 故事線遭遇契約驗證（D8 n_manydoors_ch1, D45 d45_encounter）
+    - 全專案 26 套 headless 測試（`tests/run_all_headless.ps1`）全數 exit 0 通過。
 
 ## 驗證狀態
 
-- K-124／K-125：**已修、已複驗**。fixture pipeline 與教學 modal 輸入 blocker 均解除。
-- P4-C：**已關門，狀態 ✅。** 25 套 headless 全綠（`test_p4c` 12 段，破壞／取得全走真實入口）；完整 UI sim **104 variants／81 contracts／0 failed**，11 條負向反證如期失敗；verifier targeted P4-C headless exit 0、必要 UI 7／7 failed 0。接線 A、契約統一、三人取得與阿婕破壞／修復、D18／D19、跨日不重複及 P2→P4-C UI 整合均已證。
-- P4-B verifier 複驗：**`tests/run_all_headless.ps1` 全部 24 套 exit 0**（含 `test_p4b.gd` 9 大測試段）。`verify_data.gd` 64／48／18／261、引用與 lint 1～16 全 0 錯誤；接點失效保留、嚴格回報順序、強制縱慾先行與 K-65 同筆／跨筆／文字三條均有可辨識斷言。
+- P4-D：**實作完成，機器層全通。** `tests/run_all_headless.ps1` 包含的 26 套 headless 測試全部 exit 0；`test_p4d.gd` 12 大項斷言全部通過。待外部 reviewer / verifier 審核與驗收打分。
+- P4-C：已關門，狀態 ✅。完整 UI sim 104 variants／81 contracts／0 failed。
+- P4-B：已關門，狀態 ✅。
+- P4-A：已關門，狀態 ✅。
 
 ## 目前風險
 
-- P4-C 無未結 blocker。已接受邊界：測試指南 423／424 的每日鎖定／隔日恢復與條件不足理由在目前正式委託內容不可達；使用者 2026-08-27 拍板 (a)，以 headless／view-model 規則證據認列，不投資合成 UI data variant。428／429 採代表性 UI＋真實路徑 headless，避免對同一 render 管線只換日窗做重複 UI 案。
-- 低優先觀察：未列入白名單的未知 modal 仍可能最終被 helper 報成 beat 上限，而非立即回具名 blocking-dialog 錯誤；只影響失敗診斷精度，未證實為 production 缺陷。
-- P4-D～F、P5 都仍是規格狀態；遭遇 runtime／UI 與 P5 各項系統尚未兌現。
+- P4-D 為純規則與狀態機層，遭遇 UI 與主畫面整合留待 P4-E 實作。
+- D8（`n_manydoors_ch1`）與 D45（`d45_encounter`）的正式 UI 呈現、intro 文字演播與按鈕切換需在 P4-E 完成。
 - 本專案沒有 Art Bible，也沒有 `.venv`；目前任務不涉及素材或 Python。
 
 ## 下一個任務
 
-**實作 P4-D 遭遇規則**：
-
-- 開工前依 Phase 查閱規則讀 `實作規格書.md`、`開發設計方針.md`、`測試指南.md` 的 P4-D 段落，並核對 `data/SCHEMA.md` 的 encounter 契約。
-- 實作遭遇狀態機、intro／round 推進、回應／錯答／丟棄／逃離與封閉拒絕矩陣，補專屬 headless 回歸。
-- 保持 P4-D 範圍：先完成規則層與機器驗收，不先做 P4-E 遭遇 UI。
+**Verifier 審核驗收 P4-D，隨後進入 P4-E 遭遇 UI 與 D8／D45 接線**：
+- Verifier 審核 P4-D 程式碼、測試與交接報告並進行打分。
+- 下一階段 P4-E 範圍：新增 `scenes/ui/encounter_panel.gd/.tscn`、`main.gd`、`hand_bar.gd`、D8／D45 遭遇 UI 接線與 UI sim 驗證。
