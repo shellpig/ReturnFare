@@ -91,8 +91,11 @@ headless 實測（2026-08-26，`verify_data.gd`）：**64 張卡／48 個地點�
 ```powershell
 C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://scripts/verify_data.gd
 C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/playthrough_greedy.gd   # P1-F 起
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run_all_headless.ps1                    # 全套 headless
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background       # 全套 UI 模擬
 ```
 
+- **UI 模擬一律加 `-Background`**：視窗開在獨立 Windows desktop 上，不佔畫面、不搶焦點、不碰實體滑鼠，跑全套時機器照樣能用。**產物與前景模式逐位元組相同**，不是比較弱的驗法；要親眼看畫面時才拿掉開關。做法見 `開發設計方針.md > UI 模擬驗證 > 背景模式`，怎麼驗見 `測試指南.md`。
 - sandbox 內 headless 會因 `user://logs` 權限 crash：直接 escalated 執行（`AGENTS.md > Godot Headless 驗證`）。
 - 搬動 `.tscn` / `.gd` 後先 `--import`。
 - 最新測試結果不在本檔維護：看 `git log` 最近 commit message。

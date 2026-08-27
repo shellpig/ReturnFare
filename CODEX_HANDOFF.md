@@ -7,6 +7,7 @@
 **P1～P3 已完成；P4-A～P4-D 已完成；P4-E 遭遇 UI 面板、D8／D45 生命週期接線、CardDetail 整合、F1～F6 與 N1～N6 驗收補強全數完成。全套 27 套 headless 測試全數 exit 0（含 test_p4e.gd 15 大項整合測試），全套 UI Sim（85 契約、108 變體與負向測試）全數 exit 0（0 failed checks）。**已通過 verifier 三輪複驗關門：`測試指南.md > P4-E` 七條全打勾、`PROJECT_BRIEF.md` 轉 ✅、K-153～K-164 結案，低度殘留 K-165～K-168 留待 P4-F。**下一步 P4-F 全流程與跨輪驗收。**
 
 - 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；本檔只保存最近交接重點。
+- **工具變更（2026-08-27）：UI 模擬新增 `-Background`，之後跑一律加。** `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`。每個 Godot 行程開在獨立 Windows desktop 上，不佔畫面、不搶焦點、不碰實體滑鼠；產物與前景模式逐位元組相同（2078 張截圖與 2078 份 dump 全部 SHA256 相同）。機制與已排除的四種做法見 `開發設計方針.md > UI 模擬驗證 > 背景模式`——**那四種都實測失敗過，不要再試一次**。
 - P4-A：委託／遭遇資料與 lint 真值化已完成。
 - P4-B：委託規則已實作並通過 verifier 複驗，K-65 結案。
 - P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已完成。
