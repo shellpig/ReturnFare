@@ -28,24 +28,43 @@ $tests = @(
 )
 
 $godot = "C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe"
-$project = "C:\_work\AI_Work\Projects\ReturnFare"
+$project = Split-Path -Parent $PSScriptRoot
 
 foreach ($t in $tests) {
     Write-Host "=== Running $t ===" -ForegroundColor Cyan
-    $output = & $godot --headless --path $project --script $t 2>&1
+    $outFile = [System.IO.Path]::GetTempFileName()
+    $errFile = [System.IO.Path]::GetTempFileName()
+
+    $cmdLine = "`"$godot`" --headless --path `"$project`" --script `"$t`" > `"$outFile`" 2> `"$errFile`""
+    cmd.exe /c $cmdLine
     $exitCode = $LASTEXITCODE
-    $output | ForEach-Object { Write-Host $_ }
+
+    $outText = ""
+    $errText = ""
+    if (Test-Path $outFile) { $outText = [System.IO.File]::ReadAllText($outFile) }
+    if (Test-Path $errFile) { $errText = [System.IO.File]::ReadAllText($errFile) }
+    Remove-Item $outFile, $errFile -ErrorAction SilentlyContinue
+
+    if ($outText) { Write-Host $outText -NoNewline }
+    if ($errText) { Write-Host $errText -NoNewline }
+
     if ($exitCode -ne 0) {
-        Write-Host "FAILED: $t (ExitCode: $exitCode)" -ForegroundColor Red
+        Write-Host "`nFAILED: $t (ExitCode: $exitCode)" -ForegroundColor Red
         exit 1
     }
-    # K-144 步驟 4：runner 守門，擋引擎級錯誤（即使 exit 0 也判失敗）
-    $engineErrors = @($output | Where-Object { $_ -match "SCRIPT ERROR: Assertion failed|Invalid access|Invalid index|Invalid call" })
-    if ($engineErrors.Count -gt 0) {
-        Write-Host "FAILED: $t detected engine error in output despite exit 0" -ForegroundColor Red
+
+    # K-144 Step 4 / K-149: Gatekeep engine-level errors in stderr
+    $hasEngineErr = ($errText.IndexOf("SCRIPT ERROR") -ge 0) -or `
+                    ($errText.IndexOf("Assertion failed") -ge 0) -or `
+                    ($errText.IndexOf("Invalid access") -ge 0) -or `
+                    ($errText.IndexOf("Invalid index") -ge 0) -or `
+                    ($errText.IndexOf("Invalid call") -ge 0)
+
+    if ($hasEngineErr) {
+        Write-Host "`nFAILED: $t detected engine error in output despite exit 0" -ForegroundColor Red
         exit 1
     }
 }
 
-Write-Host "ALL HEADLESS TESTS PASSED!" -ForegroundColor Green
+Write-Host "`nALL HEADLESS TESTS PASSED!" -ForegroundColor Green
 exit 0
