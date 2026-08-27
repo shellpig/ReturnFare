@@ -32,9 +32,17 @@ $project = "C:\_work\AI_Work\Projects\ReturnFare"
 
 foreach ($t in $tests) {
     Write-Host "=== Running $t ===" -ForegroundColor Cyan
-    & $godot --headless --path $project --script $t
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "FAILED: $t (ExitCode: $LASTEXITCODE)" -ForegroundColor Red
+    $output = & $godot --headless --path $project --script $t 2>&1
+    $exitCode = $LASTEXITCODE
+    $output | ForEach-Object { Write-Host $_ }
+    if ($exitCode -ne 0) {
+        Write-Host "FAILED: $t (ExitCode: $exitCode)" -ForegroundColor Red
+        exit 1
+    }
+    # K-144 步驟 4：runner 守門，擋引擎級錯誤（即使 exit 0 也判失敗）
+    $engineErrors = @($output | Where-Object { $_ -match "SCRIPT ERROR: Assertion failed|Invalid access|Invalid index|Invalid call" })
+    if ($engineErrors.Count -gt 0) {
+        Write-Host "FAILED: $t detected engine error in output despite exit 0" -ForegroundColor Red
         exit 1
     }
 }

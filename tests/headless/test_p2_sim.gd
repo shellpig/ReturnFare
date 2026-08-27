@@ -10,6 +10,7 @@ extends SceneTree
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
 const Indulgence := preload("res://scripts/core/indulgence.gd")
 const ConditionEval := preload("res://scripts/core/condition_eval.gd")
+const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 
 
 func _initialize() -> void:
@@ -122,13 +123,15 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 	var active_count_box := [0]
 	var actions_eaten_box := [0]
 	var events_timeline: Array[Dictionary] = []
+	var desync_errors: Array[String] = []
 	var last_indulgence_count := int(gs.get("indulgence_count"))
 
 	for d in range(1, 46):
 		var d_max := _count_madness_in_hand(gs)
 
 		# ── Morning ──
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "morning")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "morning":
+			desync_errors.append("Day %d morning desync: day=%d, phase=%s" % [d, int(gs.get("day")), str(gs.get("phase"))])
 		# 檢查 morning 跨日是否自動觸發強制縱慾
 		var cur_ind_count := int(gs.get("indulgence_count"))
 		if cur_ind_count > last_indulgence_count:
@@ -157,10 +160,12 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 		)
 		last_indulgence_count = int(gs.get("indulgence_count"))
 		d_max = max(d_max, _count_madness_in_hand(gs))
+		PlaythroughGreedy.solve_active_encounter_if_any(gs)
 		gs.advance_phase()
 
 		# ── Afternoon ──
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "afternoon")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "afternoon":
+			desync_errors.append("Day %d afternoon desync: day=%d, phase=%s" % [d, int(gs.get("day")), str(gs.get("phase"))])
 		cur_ind_count = int(gs.get("indulgence_count"))
 		if cur_ind_count > last_indulgence_count:
 			var lvl := Indulgence.level_for(cur_ind_count, loader.tuning)
@@ -188,12 +193,16 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 		)
 		last_indulgence_count = int(gs.get("indulgence_count"))
 		d_max = max(d_max, _count_madness_in_hand(gs))
-		gs.advance_phase()
+		PlaythroughGreedy.solve_active_encounter_if_any(gs)
+		if str(gs.get("phase")) == "afternoon":
+			gs.advance_phase()
 
 		# ── Evening ──
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "evening")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "evening":
+			desync_errors.append("Day %d evening desync: day=%d, phase=%s" % [d, int(gs.get("day")), str(gs.get("phase"))])
 		gs.play_evening()
 		d_max = max(d_max, _count_madness_in_hand(gs))
+		PlaythroughGreedy.solve_active_encounter_if_any(gs)
 		gs.advance_phase()
 
 		# 第 45 天 evening 推進後已呼叫 end_run，不進第 45 夜
@@ -205,8 +214,10 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 			break
 
 		# ── Night ──
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "night")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "night":
+			desync_errors.append("Day %d night desync: day=%d, phase=%s" % [d, int(gs.get("day")), str(gs.get("phase"))])
 		gs.play_night_fixed()
+		PlaythroughGreedy.solve_active_encounter_if_any(gs)
 
 		# 根據策略決定是否開啟夜間收費標記
 		_handle_night_phase(gs, data_node, d, strategy_type, events_timeline)
@@ -248,6 +259,7 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 		"paid_markers_opened": opened_paid_count,
 		"events_timeline": events_timeline,
 		"daily_max_madness": daily_max_madness,
+		"desync_errors": desync_errors,
 		"final_state": gs.call("serialize"),
 	}
 
@@ -377,6 +389,13 @@ func _verify_player_a(res: Dictionary, data_node: Node) -> int:
 	print("\n--- 1. Player A (Deep Dive) verification ---")
 	var failed := 0
 
+	if res.is_empty():
+		return _fail("A 模擬未跑完，回傳空結果")
+
+	var desyncs: Array = res.get("desync_errors", []) as Array
+	for err_msg in desyncs:
+		failed += _fail(str(err_msg))
+
 	# 1. 桌面峰值 4 (第 11 天)
 	var peak: int = int(res["peak_madness"])
 	var peak_day: int = int(res["peak_day"])
@@ -505,6 +524,13 @@ func _verify_player_b(res: Dictionary, data_node: Node) -> int:
 	print("\n--- 2. Player B (Typical) verification ---")
 	var failed := 0
 
+	if res.is_empty():
+		return _fail("B 模擬未跑完，回傳空結果")
+
+	var desyncs: Array = res.get("desync_errors", []) as Array
+	for err_msg in desyncs:
+		failed += _fail(str(err_msg))
+
 	# 1. 桌面峰值 3 (第 8 天)
 	var peak: int = int(res["peak_madness"])
 	var peak_day: int = int(res["peak_day"])
@@ -578,6 +604,13 @@ func _verify_player_c(res: Dictionary, data_node: Node) -> int:
 	print("\n--- 3. Player C (Cautious) verification ---")
 	var failed := 0
 
+	if res.is_empty():
+		return _fail("C 模擬未跑完，回傳空結果")
+
+	var desyncs: Array = res.get("desync_errors", []) as Array
+	for err_msg in desyncs:
+		failed += _fail(str(err_msg))
+
 	# 1. 桌面峰值 1 (第 6 天)
 	var peak: int = int(res["peak_madness"])
 	var peak_day: int = int(res["peak_day"])
@@ -646,6 +679,17 @@ func _test_determinism(gs: Node, data_node: Node) -> int:
 
 	var run1 := _run_simulation(gs, data_node, "A_deep_dive")
 	var run2 := _run_simulation(gs, data_node, "A_deep_dive")
+
+	if run1.is_empty() or run2.is_empty():
+		return _fail("決定論測試：模擬未跑完，回傳空結果")
+
+	var desyncs1: Array = run1.get("desync_errors", []) as Array
+	for err_msg in desyncs1:
+		failed += _fail("run1 desync: " + str(err_msg))
+
+	var desyncs2: Array = run2.get("desync_errors", []) as Array
+	for err_msg in desyncs2:
+		failed += _fail("run2 desync: " + str(err_msg))
 
 	var state1: Dictionary = run1["final_state"] as Dictionary
 	var state2: Dictionary = run2["final_state"] as Dictionary

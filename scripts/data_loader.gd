@@ -1104,6 +1104,8 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 			for rid3 in round_by_id.keys():
 				if not _round_can_reach_null(str(rid3), round_by_id, {}):
 					problems.append("%s：round %s 無法抵達任何結束出口（無出口 cycle）" % [where, rid3])
+			if _round_graph_has_cycle(round_by_id):
+				problems.append("%s：round graph 不得存在任何 cycle（必須為 DAG）" % where)
 
 		var is_fixed := bool(b.get("fixed", false))
 		var wd := {}
@@ -1145,6 +1147,44 @@ static func _lint_next_round(nr: Variant, round_ids: Dictionary, where: String, 
 		return
 	if not (nr is String) or not round_ids.has(str(nr)):
 		problems.append("%s：next_round 引用不存在的 round -> %s" % [where, str(nr)])
+
+
+## 檢查 round graph 是否存在 cycle（必須為 DAG）。
+static func _round_graph_has_cycle(round_by_id: Dictionary) -> bool:
+	var visited := {}
+	var rec_stack := {}
+	for rid in round_by_id.keys():
+		if _dfs_cycle_check(str(rid), round_by_id, visited, rec_stack):
+			return true
+	return false
+
+
+static func _dfs_cycle_check(rid: String, round_by_id: Dictionary, visited: Dictionary, rec_stack: Dictionary) -> bool:
+	if rec_stack.has(rid):
+		return true
+	if visited.has(rid):
+		return false
+	visited[rid] = true
+	rec_stack[rid] = true
+
+	var r: Dictionary = round_by_id.get(rid, {}) as Dictionary
+	var r_resps: Variant = r.get("responses", [])
+	if r_resps is Array:
+		for resp_vv in r_resps as Array:
+			if resp_vv is Dictionary:
+				var nr: Variant = (resp_vv as Dictionary).get("next_round")
+				if nr != null and round_by_id.has(str(nr)):
+					if _dfs_cycle_check(str(nr), round_by_id, visited, rec_stack):
+						return true
+	var r_fb: Variant = r.get("fallback")
+	if r_fb is Dictionary:
+		var fnr: Variant = (r_fb as Dictionary).get("next_round")
+		if fnr != null and round_by_id.has(str(fnr)):
+			if _dfs_cycle_check(str(fnr), round_by_id, visited, rec_stack):
+				return true
+
+	rec_stack.erase(rid)
+	return false
 
 
 ## 該 round 是否存在一條抵達 null 出口的路徑（無出口 cycle 回 false）。

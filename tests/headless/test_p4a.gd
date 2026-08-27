@@ -598,6 +598,26 @@ func _test_lint16_negative() -> void:
 	else:
 		_fail("malformed fallback 未被抓：%s" % str(l_ed6))
 
+	# round graph 存在 cycle 必須被 lint 抓出（K-146 DAG 規則）
+	var ed_cycle: Dictionary = base_enc.call()
+	ed_cycle["rounds"] = [
+		{
+			"id": "r1", "demand": "d1",
+			"responses": [{ "id": "resp1", "accepts": ["info_x"], "consume_card": false, "next_round": "r2", "on_resolve": { "text": "t1" } }],
+			"fallback": { "next_round": "r2", "on_resolve": { "text": "f1" } }
+		},
+		{
+			"id": "r2", "demand": "d2",
+			"responses": [{ "id": "resp2", "accepts": ["info_x"], "consume_card": false, "next_round": "r1", "on_resolve": { "text": "t2" } }],
+			"fallback": { "next_round": null, "on_resolve": { "text": "f2" } }
+		}
+	]
+	var l_cycle := DataLoader.lint_encounters(_make_loader(make_enc.call(ed_cycle), cards, locs))
+	if _errs_contain(l_cycle, "round graph 不得存在任何 cycle"):
+		_ok("round graph cycle 正確被 lint 阻擋（K-146 DAG 契約）")
+	else:
+		_fail("round graph cycle 未被抓：%s" % str(l_cycle))
+
 	# 邊界：合法 D8 型（repeat+charge，night-layer）不報錯
 	var e_ok: Dictionary = base_enc.call(); e_ok["repeat_each_run"] = true; e_ok["charge_first_visit"] = true
 	if DataLoader.lint_encounters(_make_loader(make_enc.call(e_ok), cards, locs)).size() == 0:

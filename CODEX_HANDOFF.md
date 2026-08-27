@@ -16,8 +16,26 @@
 
 ## 最近完成的工作
 
-- **P4-D 遭遇規則實作與 18 條待修項目（K-126～K-143）全面修復完成，變異測試全部轉紅驗收。**
-  - **核心規則層與引擎防禦修復**：
+- **P4-D 遭遇規則實作、18 條待修項目（K-126～K-143）與第二波待修（K-144～K-147）全面修復完成，變異測試全部轉紅驗收。**
+  - **第二波待修項目（K-144～K-147）修復**：
+    - **K-144（4 步全部完成）**：
+      1. `test_p2_sim.gd` 接入 `PlaythroughGreedy.solve_active_encounter_if_any(gs)` 完整跨過 D8 入夜與 D45 下午遭遇。
+      2. `_run_simulation()` 移除 `assert`，改為記錄 `desync_errors: Array[String]` 並納入回傳字典。
+      3. `_verify_player_a/b/c()` 與 `_test_determinism()` 增加 `is_empty()` 空結果防禦與 `desync_errors` 逐條報錯。
+      4. `tests/run_all_headless.ps1` 加入 runner 守門，捕捉 `SCRIPT ERROR: Assertion failed`、`Invalid access` 等引擎錯誤並直接判失敗（即使 exit 0）。
+      - 三種玩家（A 峰值 4/18 天、B 峰值 3/21 天、C 峰值 1/0 天）45 天 8 大指標與時間軸全數吻合通過。
+    - **K-145（3 件全部完成）**：
+      1. `開發設計方針.md > P4-D` 註明 `card_not_submittable` 與 `data_conflict` 觸發條件互斥、順序不可觀測。
+      2. `test_p4d.gd` 補齊 K-133 世代守衛回歸測試（`ending_madness_be` 重置後不推進時段，拿掉守衛即轉紅）。
+      3. `test_p4d.gd` 移除 `(K-132)` 標籤並修正為 `(K-131)`。
+    - **K-146（3 件全部完成）**：
+      1. `GameState.respond_to_encounter()` cycle 分支改回 `ok: true`（語意為失敗結算而非阻擋）。
+      2. `DataLoader.lint_encounters()` 增加 DAG cycle 檢查，`data/SCHEMA.md` 改為「不得有任何 cycle」，`test_p4a.gd` 補 cycle 壞資料 fixture。
+      3. `test_p4d.gd` cycle 測試同步斷言 `ok == true`、遭遇清空且 `on_failure` 效果套用。
+    - **K-147（2 件全部完成）**：
+      1. `test_p4d.gd` 升級為 exact key allowlist 比對（intro 5 鍵、round 12 鍵、candidate 7 鍵，注入 `solution_cards` 即轉紅）。
+      2. `開發設計方針.md > P4-D` 載明三組 key allowlist 定義。
+  - **核心規則層與引擎防禦修復（K-126～K-143）**：
     - **K-126**：`GameState.play_night_fixed()` 正式接上遭遇啟動邏輯，播完 fixed beat 且帶 `encounter` 時自動呼叫 `start_encounter(bid)`。
     - **K-132**：`respond_to_encounter` 順序調整，`card_not_submittable` 先於 `data_conflict`，嚴格遵從方針。
     - **K-133**：`_finish_encounter` 加入 `gen_before := run_generation` 世代守衛，若重置則不推進 `advance_phase`。

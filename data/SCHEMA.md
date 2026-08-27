@@ -627,7 +627,7 @@ resolver 輸出的 `page_refs` 是有序 `Array[String]`。每一筆都用穩定
 
 `allow_discard` 與 `escape_cost` 都不是 fallback 的前置。`requires_discardable` 省略／false 時，不可丟棄卡答錯仍留手並可照 fallback 推進；true 時則原子拒絕。若依當前 response 與 fallback 篩選後沒有合法尚未嘗試卡，也沒有可用的 discard／escape，直接套 `on_failure`；資料不另寫「無路可走」分支。
 
-round graph 必須從第一筆全部可達、所有 next_round 存在且每條路可抵達 null；不可用無出口 cycle 模擬「一直答到對」。第一輪暫時拿不到某 response 的卡是合法內容設計，不代表該 response 不可達。
+round graph 必須為有向無環圖（DAG），不得有任何 cycle，必須從第一筆全部可達、所有 next_round 存在且每條路可抵達 null。第一輪暫時拿不到某 response 的卡是合法內容設計，不代表該 response 不可達。
 
 ### `choice_group`＝選擇題
 

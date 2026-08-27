@@ -5,7 +5,7 @@ extends SceneTree
 ## 2. 遭遇自動啟動 hook 覆蓋（D45 下午 advance_phase 與 D8 入夜 play_night_fixed 自動建立 intro，K-126/K-127）
 ## 3. 遭遇進行中時段與各類放置／委託／縱慾／夜間操作阻擋（encounter_active）
 ## 4. 15 碼封閉拒絕矩陣（比對 serialize 零狀態變化，K-128）
-## 5. 5 大遭遇入口固定拒絕順序優先驗證（雙條件交集衝突測試，K-131/K-132）
+## 5. 5 大遭遇入口固定拒絕順序優先驗證（雙條件交集衝突測試，K-131）
 ## 6. encounter_view 候選完整性、來源標記與答案不洩漏負向斷言（K-129）
 ## 7. 超載規則（is_overloaded 查詢、enter_night_location 阻擋、開場 penalty 佔格）
 ## 8. 佔格計算與扣除（進入回合加佔格、正解釋放本回合佔格、錯答保留佔格）
@@ -13,7 +13,7 @@ extends SceneTree
 ## 10. 無合法解自動結算 failure 與容量上限失敗結算（手牌數＋佔格數 >= 容量）
 ## 11. 遭遇勝利與效果套用（累加型效果只套一次，K-140；不消耗 action、不開縱慾與備用區，K-141）
 ## 12. 遭遇結束推進（after_finish: "advance_phase" 推進時段、"stay" 停留原時段，K-130）
-## 13. 回合循環偵測防禦（visited_round_ids 防止 cycle 重複收費，K-134）
+## 13. 回合循環偵測防禦（visited_round_ids 偵測 cycle 自動結算 failure，K-146）
 ## 14. 序列化往返與未存檔對照組逐字比對（K-139）
 ## 15. 故事線真實遭遇路徑驗證（D8 n_manydoors_ch1、D45 d45_encounter，K-138）
 
@@ -462,7 +462,7 @@ func _test_15_code_rejection_matrix_zero_mutation(gs: Node, data_node: Node) -> 
 	return failed
 
 
-# ── 5. 五大遭遇入口固定拒絕順序優先驗證（K-131/K-132）───────────────────────
+# ── 5. 五大遭遇入口固定拒絕順序優先驗證（K-131）───────────────────────
 
 func _test_rejection_priority_orders_all_endpoints(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
@@ -509,14 +509,14 @@ func _test_rejection_priority_orders_all_endpoints(gs: Node, data_node: Node) ->
 	else:
 		failed += _ok("respond_to_encounter: madness_blocked > already_attempted verified")
 
-	# already_attempted > card_not_submittable (K-132)
+	# already_attempted > card_not_submittable (K-131)
 	enc_def["rounds"][0]["fallback"]["requires_discardable"] = true
 	(gs.active_encounter["attempted_card_ids"] as Array).append("protagonist")
 	var r_resp_att_sub: Dictionary = gs.respond_to_encounter("protagonist")
 	if str(r_resp_att_sub.get("reason_code", "")) != "already_attempted":
 		failed += _err("respond_to_encounter: already_attempted must take priority over card_not_submittable")
 	else:
-		failed += _ok("respond_to_encounter: already_attempted > card_not_submittable verified (K-132)")
+		failed += _ok("respond_to_encounter: already_attempted > card_not_submittable verified (K-131)")
 
 	# ── Entry 4: discard_in_encounter ──
 	enc_def["allow_discard"] = false
@@ -612,11 +612,35 @@ func _test_view_model_completeness_and_non_leakage(gs: Node, data_node: Node) ->
 	gs.hand.append("item_toy")
 
 	gs.start_encounter("mock_enc_view_test")
+
+	# 1. Intro 階段 key allowlist 驗證 (K-147)
+	var intro_view: Dictionary = gs.encounter_view()
+	var expected_intro_keys := ["stage", "beat_id", "blocked_slots", "capacity", "available_slots"]
+	var intro_keys: Array = intro_view.keys()
+	intro_keys.sort()
+	var sorted_exp_intro := expected_intro_keys.duplicate()
+	sorted_exp_intro.sort()
+	if intro_keys != sorted_exp_intro:
+		failed += _err("intro view keys do not match allowlist exactly: actual=%s, expected=%s (K-147)" % [str(intro_keys), str(sorted_exp_intro)])
+	else:
+		failed += _ok("intro view keys match allowlist exactly (K-147)")
+
 	gs.acknowledge_encounter_intro()
 
 	var view: Dictionary = gs.encounter_view()
 
-	# 1. 正向驗證 view 欄位
+	# 2. Round 階段 key allowlist 驗證 (K-147)
+	var expected_round_keys := ["stage", "beat_id", "round_id", "demand", "blocked_slots", "capacity", "available_slots", "can_escape", "escape_cost", "allow_discard", "candidates", "attempted_card_ids"]
+	var round_keys: Array = view.keys()
+	round_keys.sort()
+	var sorted_exp_round := expected_round_keys.duplicate()
+	sorted_exp_round.sort()
+	if round_keys != sorted_exp_round:
+		failed += _err("round view keys do not match allowlist exactly: actual=%s, expected=%s (K-147)" % [str(round_keys), str(sorted_exp_round)])
+	else:
+		failed += _ok("round view keys match allowlist exactly (K-147)")
+
+	# 正向驗證 view 欄位數值
 	if str(view.get("stage", "")) != "round":
 		failed += _err("view stage should be 'round'")
 	if str(view.get("demand", "")) != "請出示線索一":
@@ -630,34 +654,30 @@ func _test_view_model_completeness_and_non_leakage(gs: Node, data_node: Node) ->
 		failed += _err("view candidates size should be 4 (hand ∪ knowledge), got %d" % candidates.size())
 	else:
 		var found_sources: Dictionary = {}
+		var expected_cand_keys := ["card_id", "base_id", "source", "name", "submittable", "disabled_reason", "discardable"]
+		var sorted_exp_cand := expected_cand_keys.duplicate()
+		sorted_exp_cand.sort()
+		var cand_keys_ok := true
 		for c in candidates:
 			var c_dict := c as Dictionary
 			found_sources[str(c_dict.get("source", ""))] = true
-			if not c_dict.has("card_id") or not c_dict.has("base_id") or not c_dict.has("name") or not c_dict.has("submittable"):
-				failed += _err("candidate missing required view fields: %s" % str(c_dict))
-		if not found_sources.has("hand") or not found_sources.has("knowledge"):
-			failed += _err("candidates must correctly distinguish 'hand' and 'knowledge' sources")
-		else:
-			failed += _ok("view candidates correctly contain hand ∪ knowledge with proper source tags (K-129)")
+			var c_keys: Array = c_dict.keys()
+			c_keys.sort()
+			if c_keys != sorted_exp_cand:
+				cand_keys_ok = false
+				failed += _err("candidate view keys do not match allowlist exactly: actual=%s, expected=%s (K-147)" % [str(c_keys), str(sorted_exp_cand)])
+				break
+		if cand_keys_ok:
+			if not found_sources.has("hand") or not found_sources.has("knowledge"):
+				failed += _err("candidates must correctly distinguish 'hand' and 'knowledge' sources")
+			else:
+				failed += _ok("view candidates match allowlist and correctly distinguish 'hand' and 'knowledge' sources (K-129/K-147)")
 
-	# 2. 負向不洩漏斷言 (K-129)
-	var leaked_keys: Array[String] = []
-	for forbidden_key in ["accepts", "fallback", "on_resolve", "responses", "rounds", "next_round"]:
-		if view.has(forbidden_key):
-			leaked_keys.append(forbidden_key)
-	for cand in candidates:
-		var c_dict := cand as Dictionary
-		if c_dict.has("accepts") or c_dict.has("responses") or c_dict.has("fallback"):
-			leaked_keys.append("candidate_internal_logic")
-
-	# 負向：未到達的 r2 需求不能洩漏在 view 頂層
+	# 3. 負向：未到達的 r2 需求不能洩漏在 view 頂層
 	if str(view.get("demand", "")).contains("線索二"):
-		leaked_keys.append("future_round_demand")
-
-	if not leaked_keys.is_empty():
-		failed += _err("encounter_view leaked internal answer/graph data: %s (K-129 violation)" % str(leaked_keys))
+		failed += _err("future round demand leaked in current round view (K-129)")
 	else:
-		failed += _ok("encounter_view strict non-leakage negative assertions verified (K-129)")
+		failed += _ok("future round demand non-leakage negative assertion verified (K-129)")
 
 	_clean_mock_beat(data_node, "mock_enc_view_test")
 	_clean_mock_cards(data_node, ["k_view_1", "k_view_2", "item_toy"])
@@ -1060,8 +1080,27 @@ func _test_after_finish_stay_and_advance(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("after_finish: 'stay' correctly remained on current day and phase (K-130)")
 
+	# 3. after_finish: "advance_phase" with ending_madness_be (K-133 regression: generation guard prevents advance on reset)
+	var mock_enc_be: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": null, "allow_discard": true, "after_finish": "advance_phase",
+		"rounds": [{ "id": "r1", "demand": "需求", "responses": [{ "accepts": ["k_sol"], "next_round": null }], "fallback": { "requires_discardable": false, "next_round": null } }],
+		"on_victory": { "gain": ["madness", "madness", "madness", "madness", "madness", "madness", "madness"] }
+	}
+	_create_mock_encounter_beat(data_node, "mock_enc_be", mock_enc_be)
+	gs.day = 15
+	gs.phase = "afternoon"
+	gs.start_encounter("mock_enc_be")
+	gs.acknowledge_encounter_intro()
+	gs.respond_to_encounter("k_sol")
+
+	if gs.day != 1 or gs.phase != "morning":
+		failed += _err("K-133 regression: BE reset must result in day 1 morning without extra advance, got day=%d, phase=%s" % [gs.day, gs.phase])
+	else:
+		failed += _ok("K-133 regression: generation guard correctly prevented advance_phase after run reset (K-133)")
+
 	_clean_mock_beat(data_node, "mock_enc_adv")
 	_clean_mock_beat(data_node, "mock_enc_stay")
+	_clean_mock_beat(data_node, "mock_enc_be")
 	_clean_mock_cards(data_node, ["k_sol"])
 	return failed
 
@@ -1104,14 +1143,16 @@ func _test_cycle_detection(gs: Node, data_node: Node) -> int:
 	if not bool(res_r1.get("ok", false)) or str(gs.active_encounter.get("round_id", "")) != "r2":
 		failed += _err("advance to r2 should succeed")
 
-	# r2 -> r1 (cycle back to r1: must be caught and return data_conflict)
+	# r2 -> r1 (cycle back to r1: caught by runtime guard, settled as failure with ok: true, K-146)
 	var res_r2: Dictionary = gs.respond_to_encounter("k_cycle_b")
-	if bool(res_r2.get("ok", true)) or str(res_r2.get("reason_code", "")) != "data_conflict":
-		failed += _err("re-entering visited round r1 should be rejected with 'data_conflict' (K-134)")
+	if not bool(res_r2.get("ok", false)):
+		failed += _err("re-entering visited round r1 should settle as failure with ok: true (K-146), got %s" % str(res_r2))
 	elif not gs.active_encounter.is_empty():
 		failed += _err("encounter should be closed after cycle failure")
+	elif not bool(gs.flags.get("cycle_caught", false)):
+		failed += _err("on_failure effect should be applied on cycle failure")
 	else:
-		failed += _ok("round graph cycle correctly detected and rejected with data_conflict (K-134)")
+		failed += _ok("round graph cycle correctly detected and settled as failure with ok: true (K-146)")
 
 	_clean_mock_beat(data_node, "mock_enc_cycle")
 	_clean_mock_cards(data_node, ["k_cycle_a", "k_cycle_b"])

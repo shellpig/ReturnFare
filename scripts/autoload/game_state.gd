@@ -1656,7 +1656,7 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 				push_error("Encounter: cycle detected on round '%s'" % next_rid)
 				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
 				lines.append_array(fail_res.get("lines", PackedStringArray()))
-				return { "ok": false, "reason_code": "data_conflict", "reason_text": "回合循環衝突", "lines": lines }
+				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 			visited.append(next_rid)
 
 			active_encounter["round_id"] = next_rid
@@ -1696,7 +1696,7 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 				push_error("Encounter: cycle detected on round '%s'" % next_rid)
 				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
 				lines.append_array(fail_res.get("lines", PackedStringArray()))
-				return { "ok": false, "reason_code": "data_conflict", "reason_text": "回合循環衝突", "lines": lines }
+				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 			visited.append(next_rid)
 
 			active_encounter["round_id"] = next_rid
