@@ -227,9 +227,11 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 	var events_timeline: Array[Dictionary] = []
 	var paid_entered_count := 0
 
+	var sync_errors: Array[String] = []
 	for d in range(1, 46):
 		# ── 1. Morning ──
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "morning")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "morning":
+			sync_errors.append("時間同步錯誤 (morning): 預期第 %d 天 morning, 實際第 %d 天 %s" % [d, int(gs.get("day")), str(gs.get("phase"))])
 		var cur_ind_count := int(gs.get("indulgence_count"))
 		var forced_m := (cur_ind_count > last_ind_count)
 		if forced_m:
@@ -247,7 +249,8 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 		gs.advance_phase()
 
 		# ── 2. Afternoon ──
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "afternoon")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "afternoon":
+			sync_errors.append("時間同步錯誤 (afternoon): 預期第 %d 天 afternoon, 實際第 %d 天 %s" % [d, int(gs.get("day")), str(gs.get("phase"))])
 		cur_ind_count = int(gs.get("indulgence_count"))
 		var forced_a := (cur_ind_count > last_ind_count)
 		if forced_a:
@@ -266,7 +269,8 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 			gs.advance_phase()
 
 		# ── 3. Evening ──
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "evening")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "evening":
+			sync_errors.append("時間同步錯誤 (evening): 預期第 %d 天 evening, 實際第 %d 天 %s" % [d, int(gs.get("day")), str(gs.get("phase"))])
 		PlaythroughGreedy.execute_evening_phase(gs, data_node, d)
 		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
@@ -275,7 +279,8 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 			break
 
 		# ── 4. Night ──
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "night")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "night":
+			sync_errors.append("時間同步錯誤 (night): 預期第 %d 天 night, 實際第 %d 天 %s" % [d, int(gs.get("day")), str(gs.get("phase"))])
 		# P4-A：D8 起夜間 fixed 遭遇（charge_first_visit）於 play_night_fixed 強制到訪時收費，
 		# 不走顯式 enter_night_location，故在此以 _madness_counter 差額補進 paid_entered_count。
 		var madness_before_fixed: int = int(gs.get("_madness_counter"))
@@ -358,6 +363,7 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 
 	return {
 		"strategy": strategy_type,
+		"errors": sync_errors,
 		"endings": endings_received,
 		"final_night_markers": final_markers_box[0],
 		"final_madness_cards": final_madness_cards_box[0],
@@ -376,6 +382,13 @@ func _test_first_round_path_efficiency_13(gs: Node, data_node: Node) -> int:
 	_reset_gs(gs)
 
 	var res := _run_first_round_sim(gs, data_node, "path_efficiency_13")
+
+	var sync_errs: Array = res.get("errors", []) as Array
+	if not sync_errs.is_empty():
+		for err in sync_errs:
+			failed += _fail("時間同步異常 (K-148): %s" % str(err))
+	else:
+		failed += _ok("全 45 天時間軸同步無異常 (K-148)")
 
 	# 驗證收費標記數與發放發狂卡
 	var paid_cost: int = int(res.get("paid_entered_count", 0))
@@ -425,6 +438,13 @@ func _test_first_round_max_pressure_14(gs: Node, data_node: Node) -> int:
 	_reset_gs(gs)
 
 	var res := _run_first_round_sim(gs, data_node, "max_pressure_14")
+
+	var sync_errs: Array = res.get("errors", []) as Array
+	if not sync_errs.is_empty():
+		for err in sync_errs:
+			failed += _fail("時間同步異常 (K-148): %s" % str(err))
+	else:
+		failed += _ok("全 45 天時間軸同步無異常 (K-148)")
 
 	var paid_cost: int = int(res.get("paid_entered_count", 0))
 	if paid_cost == 14:

@@ -513,6 +513,13 @@ func _test_greedy_playthrough_45_days(gs: Node, data_node: Node) -> int:
 	_reset_gs(gs)
 	var res: Dictionary = PlaythroughGreedy.run_greedy_walk(gs, data_node, false)
 
+	var sync_errors: Array = res.get("errors", []) as Array
+	if not sync_errors.is_empty():
+		for err in sync_errors:
+			failed += _fail("貪心走查時間同步異常 (K-148): %s" % str(err))
+	else:
+		failed += _ok("全 45 天時間軸同步無異常 (K-148)")
+
 	if int(res.get("illegal_phases", 0)) > 0:
 		failed += _fail("存在 %d 個未放置且未列入合法原因之行動格 (K-25)" % int(res.get("illegal_phases", 0)))
 	else:

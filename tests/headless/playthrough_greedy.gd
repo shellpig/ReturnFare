@@ -72,6 +72,14 @@ func _initialize() -> void:
 	# ── 驗收迴圈重置狀態 ──
 	print("\n=== 45 天走查完畢，驗收重置狀態 ===")
 
+	var sync_errors: Array = res.get("errors", []) as Array
+	if not sync_errors.is_empty():
+		for err in sync_errors:
+			push_error("FAIL: %s" % str(err))
+			failed += 1
+	else:
+		print("  ok  全 45 天時間軸同步無異常 (K-148)")
+
 	if int(res.get("illegal_phases", 0)) > 0:
 		push_error("FAIL: 存在 %d 個未放置且未列入合法原因之行動格 (K-25)" % int(res.get("illegal_phases", 0)))
 		failed += 1
@@ -169,13 +177,18 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		"illegal": 0,
 	}
 
+	var errors: Array[String] = []
 	var last_ind_count := int(gs.get("indulgence_count"))
 
 	for d in range(1, 46):
 		day_counter = d
 
 		# 1. Morning
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "morning", "時間同步錯誤 (morning)")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "morning":
+			var err_m := "時間同步錯誤 (morning): 預期第 %d 天 morning, 實際第 %d 天 %s" % [d, int(gs.get("day")), str(gs.get("phase"))]
+			errors.append(err_m)
+			if verbose:
+				push_error(err_m)
 		var forced_m := (int(gs.get("indulgence_count")) > last_ind_count)
 		last_ind_count = int(gs.get("indulgence_count"))
 		var res_m := execute_action_phase(gs, data_node, d, "morning", forced_m)
@@ -192,7 +205,11 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		gs.advance_phase()
 
 		# 2. Afternoon
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "afternoon", "時間同步錯誤 (afternoon)")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "afternoon":
+			var err_a := "時間同步錯誤 (afternoon): 預期第 %d 天 afternoon, 實際第 %d 天 %s" % [d, int(gs.get("day")), str(gs.get("phase"))]
+			errors.append(err_a)
+			if verbose:
+				push_error(err_a)
 		var forced_a := (int(gs.get("indulgence_count")) > last_ind_count)
 		last_ind_count = int(gs.get("indulgence_count"))
 		var res_a := execute_action_phase(gs, data_node, d, "afternoon", forced_a)
@@ -219,7 +236,11 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			])
 
 		# 3. Evening
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "evening", "時間同步錯誤 (evening)")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "evening":
+			var err_e := "時間同步錯誤 (evening): 預期第 %d 天 evening, 實際第 %d 天 %s" % [d, int(gs.get("day")), str(gs.get("phase"))]
+			errors.append(err_e)
+			if verbose:
+				push_error(err_e)
 		execute_evening_phase(gs, data_node, d)
 		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
@@ -229,7 +250,11 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			break
 
 		# 4. Night
-		assert(int(gs.get("day")) == d and str(gs.get("phase")) == "night", "時間同步錯誤 (night)")
+		if int(gs.get("day")) != d or str(gs.get("phase")) != "night":
+			var err_n := "時間同步錯誤 (night): 預期第 %d 天 night, 實際第 %d 天 %s" % [d, int(gs.get("day")), str(gs.get("phase"))]
+			errors.append(err_n)
+			if verbose:
+				push_error(err_n)
 		execute_night_phase(gs, data_node, d)
 		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
@@ -254,10 +279,11 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			print("  異常/非法空時段:          %2d 格" % stats["illegal"])
 		print("=========================================\n")
 
-	var is_walk_ok: bool = (illegal_phases == 0 and int(run_ended_box[0]) == 1 and int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning")
+	var is_walk_ok: bool = (errors.is_empty() and illegal_phases == 0 and int(run_ended_box[0]) == 1 and int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning")
 
 	return {
 		"ok": is_walk_ok,
+		"errors": errors,
 		"actions_taken": actions_taken,
 		"illegal_phases": illegal_phases,
 		"stats": stats,

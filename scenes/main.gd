@@ -445,7 +445,7 @@ func _show_encounter() -> void:
 	_location_panel.visible = false
 	_encounter_panel.visible = true
 	_advance_btn.visible = true
-	_advance_btn.disabled = true
+	_refresh_advance_hint()
 
 	var view: Dictionary = GameState.encounter_view()
 	var stage := str(view.get("stage", "intro"))

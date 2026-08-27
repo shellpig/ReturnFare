@@ -1961,6 +1961,12 @@ class UiCase extends CaseBaseClass:
 		await _click(tree, "dialog_confirm::encounter_respond")
 		assert_true(_has_text(tree.get_root(), "誰記得你"), "進入 R2 demand")
 
+		# K-165 ②: 進入 R2 後候選清單更新且不可提交卡呈現 disabled
+		var r2_pro_cands := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::protagonist")
+		assert_true(not r2_pro_cands.is_empty(), "R2 主角卡候選按鈕在場")
+		if not r2_pro_cands.is_empty():
+			assert_true((r2_pro_cands[0] as Button).disabled, "R2 主角卡按鈕 disabled")
+
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["madness_blocked_reason", "discard_cancel_ok", "escape_cancel_ok", "respond_cancel_ok", "advance_to_r2"] } }
 
 	func _p4e_03(tree: SceneTree) -> Dictionary:
@@ -2014,5 +2020,12 @@ class UiCase extends CaseBaseClass:
 
 		# coda 地點面板同時開啟
 		assert_true(_has_text(tree.get_root(), "靜和園") or _has_text(tree.get_root(), "後棟"), "Coda 地點面板開啟")
+
+		# K-165 ③: 斷言無殘留遮罩、placeholder 或不可操作 hand
+		var enc_panels := QAStepClass.find_controls_by_name(tree.get_root(), "EncounterPanel")
+		if not enc_panels.is_empty():
+			assert_false((enc_panels[0] as Control).is_visible_in_tree(), "EncounterPanel 遭遇結束後隱藏")
+		assert_no_qa_id(tree, "encounter_blocked::0", "遭遇結束後無殘留 encounter_blocked placeholder")
+
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["d45_respond_success", "d45_phase_evening_after", "flow_text_exit_lines_preserved"] } }
 

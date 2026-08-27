@@ -356,10 +356,17 @@ func _test_9_d45_response_paths_and_cards_retained(gs: Node, _data_node: Node) -
 	if not gs.has_knowledge("k_health_from_disappearance"):
 		failed += _err("Should gain k_health_from_disappearance")
 
-	# Path 3: Full 14-card hand on D45 must succeed and not fail capacity (F2 fix)
+	# Path 3: Full 14-card hand on D45 must succeed and not fail capacity (F2 fix / K-168)
 	_setup_gs_for_d45(gs)
-	while gs.hand.size() < 14:
-		gs.hand.append("routine_debt")
+	var fill_cards: Array[String] = [
+		"routine_debt", "equip_polaroid", "item_gradphoto", "item_old_paper",
+		"doc_prescription", "info_ajie_saw_parents", "info_uncle_treated_20y", "info_acai_box",
+		"info_husband_version", "info_wife_version", "info_ahong_private", "info_ajie_class",
+		"info_chunama_pause"
+	]
+	for cid in fill_cards:
+		if gs.hand.size() < 14:
+			gs.gain_card(cid)
 	gs.acknowledge_encounter_intro()
 	var req3 = gs.respond_to_encounter("protagonist")
 	if not bool(req3.get("ok", false)):
@@ -412,6 +419,8 @@ func _test_12_d8_night_actions_blocked_and_protagonist_not_consumed(gs: Node, _d
 	var sleep_lines: PackedStringArray = gs.sleep_night()
 	if not sleep_lines.is_empty():
 		failed += _err("sleep_night during encounter intro should return empty lines")
+	if JSON.stringify(gs.serialize()) != snap_before:
+		failed += _err("State mutated after sleep_night during intro")
 		
 	var enter_res = gs.enter_night_location("sanquan")
 	if bool(enter_res.get("ok", true)) or str(enter_res.get("reason_code", "")) != "encounter_active":
@@ -431,13 +440,45 @@ func _test_12_d8_night_actions_blocked_and_protagonist_not_consumed(gs: Node, _d
 		
 	# 2. Transition to round: sleep_night() and advance_phase() are still blocked
 	gs.acknowledge_encounter_intro()
+	var snap_before_round := JSON.stringify(gs.serialize())
 	var sleep_lines_r: PackedStringArray = gs.sleep_night()
 	if not sleep_lines_r.is_empty():
 		failed += _err("sleep_night during encounter round should return empty lines")
+	if JSON.stringify(gs.serialize()) != snap_before_round:
+		failed += _err("State mutated after sleep_night during round")
 		
 	var adv_round_res = gs.advance_phase()
 	if bool(adv_round_res.get("ok", true)) or str(adv_round_res.get("reason_code", "")) != "encounter_active":
 		failed += _err("advance_phase during encounter round should be rejected with 'encounter_active', got '%s'" % adv_round_res.get("reason_code"))
+
+	# 2b. K-166 可證偽對照測試：D24 颱風夜在有可播定日 sleep 內容時，若有活躍遭遇，sleep_night 仍被阻斷
+	var gs_control: Node = (load("res://scripts/autoload/game_state.gd") as GDScript).new()
+	gs_control.name = "GSControlK166"
+	gs_control.set("Data", _data_node)
+	get_root().add_child(gs_control)
+	_reset_gs(gs_control)
+	gs_control.day = 24
+	gs_control.phase = "night"
+	gs_control.flags["boundary_bleeding"] = true
+	gs_control.flags["hold_d24am"] = true
+	# 正常無遭遇時，D24 睡覺有內容
+	var d24_normal_lines: PackedStringArray = gs_control.sleep_night()
+	if d24_normal_lines.is_empty():
+		failed += _err("K-166 control: D24 normal sleep should have bleed lines")
+	# 注入遭遇後，D24 睡覺必須被阻斷回空且狀態不變
+	_reset_gs(gs_control)
+	gs_control.day = 24
+	gs_control.phase = "night"
+	gs_control.flags["boundary_bleeding"] = true
+	gs_control.flags["hold_d24am"] = true
+	gs_control.active_encounter = { "stage": "round", "beat_id": "mock_enc" }
+	var snap_d24_before := JSON.stringify(gs_control.serialize())
+	var d24_blocked_lines: PackedStringArray = gs_control.sleep_night()
+	if not d24_blocked_lines.is_empty():
+		failed += _err("K-166: sleep_night with active encounter on D24 should return empty lines")
+	if JSON.stringify(gs_control.serialize()) != snap_d24_before:
+		failed += _err("K-166: sleep_night with active encounter on D24 should not mutate state")
+	gs_control.queue_free()
 		
 	# 3. In R1, trying protagonist (not discardable, not in R1 response) is rejected with card_not_submittable
 	var pro_res = gs.respond_to_encounter("protagonist")
