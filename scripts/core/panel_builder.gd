@@ -351,7 +351,7 @@ static func build(location_id: String, gs: Node, data: Node) -> Dictionary:
 					"reason": slot_reason,
 					"is_choice": is_choice, # K-19
 					"accept_types": _accept_types(s, loader, data),
-					"delegation": _delegation_view(s, gs),
+					"delegation": _delegation_view(s, gs, str(b.get("title", ""))),
 				})
 
 		# beat 級 requires 語意相同：成立前整個 beat 呈灰卡狀態＋理由，內部槽不可互動
@@ -399,25 +399,30 @@ static func _accept_types(slot: Dictionary, loader: DataLoader, data: Node) -> P
 
 
 ## 委託槽的 view model 附加欄位（P4-C）。非委託槽回傳空字典。
-## UI 只讀這份計算結果，不讀原始 delegation JSON、不呼叫 delegate()。
-## {result_timing, preview, tendency, delegated_today}
-static func _delegation_view(slot: Dictionary, gs: Node) -> Dictionary:
+## UI 只讀這份計算結果，不讀原始 delegation JSON、beat JSON，也不呼叫 delegate()。
+## {result_timing, preview, tendency, task_title, delegation_state}
+## - task_title：確認畫面的「任務」標題，由 beat title 衍生（UI 不再自讀 beats_by_id）。
+## - delegation_state：僅 OPEN 委託槽有意義的封閉語彙，"available"（可委託）或
+##   "delegated_today"（該人物今日已受託，槽原位保留但鎖定）。條件不足另由槽三態
+##   LOCKED＋reason 承接，不由本欄位表達。
+static func _delegation_view(slot: Dictionary, gs: Node, task_title: String) -> Dictionary:
 	var delegation_val: Variant = slot.get("delegation")
 	if not (delegation_val is Dictionary):
 		return {}
 	var delegation := delegation_val as Dictionary
 
-	var delegated_today := false
+	var state := "available"
 	if gs != null and gs.has_method("delegation_status"):
 		for accepted: Variant in slot.get("accepts", []) as Array:
 			var status: Dictionary = gs.call("delegation_status", str(accepted))
 			if bool(status.get("delegated_today", false)):
-				delegated_today = true
+				state = "delegated_today"
 				break
 
 	return {
 		"result_timing": str(delegation.get("result_timing", "")),
 		"preview": str(delegation.get("preview", "")),
 		"tendency": str(delegation.get("tendency", "")),
-		"delegated_today": delegated_today,
+		"task_title": task_title,
+		"delegation_state": state,
 	}

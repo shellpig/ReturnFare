@@ -97,6 +97,7 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p4c_03_immediate_confirm", "確認委託阿婕後面板關閉、即時回報落 FlowText，choice_group 同組其餘槽收起", "p4c_d17_with_person.json", "", "p4c_03_immediate_confirm", "", "p4c_03"),
 		UiCase.new("p4c_04_next_morning_confirm", "確認委託阿珠後派出當下不劇透，隔日上午既有結算後才播報回報", "p4c_d17_with_person.json", "", "p4c_04_next_morning_confirm", "", "p4c_04"),
 		UiCase.new("p4c_05_tutorial_dialog", "首次真實取得人物卡彈出委託教學，關閉後才寫入 delegation_tutorial_seen", "p4c_d17_no_person.json", "", "p4c_05_tutorial_dialog", "", "p4c_05"),
+		UiCase.new("p4c_06_candidate_order", "持有阿婕＋阿珠時處方候選照資料槽序渲染，順序不因取得狀態跳動", "p4c_d17_with_person.json", "", "p4c_06_candidate_order", "", "p4c_06"),
 	]
 
 
@@ -257,6 +258,8 @@ class UiCase extends CaseBaseClass:
 				return await _p4c_04(tree)
 			"p4c_05":
 				return await _p4c_05(tree)
+			"p4c_06":
+				return await _p4c_06(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -1766,4 +1769,18 @@ class UiCase extends CaseBaseClass:
 		assert_true(bool(_meta(tree).get("delegation_tutorial_seen", false)), "關閉教學彈窗後 delegation_tutorial_seen 寫入 true")
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["tutorial_fires_on_real_gain", "tutorial_seen_only_after_dismiss"] } }
+
+	func _p4c_06(tree: SceneTree) -> Dictionary:
+		# 持有阿婕＋阿珠、未取得阿財：處方候選須照資料槽序渲染，阿財不出現而非亂序補位。
+		# 與 p4c_01（零人物卡→只有 find_self）併看，證明順序由資料位置決定、不因取得狀態跳動。
+		await _enter(tree, "sanquan")
+		var slot_ctrls := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "slot::d17_19_prescription::")
+		var order: Array[String] = []
+		for ctrl in slot_ctrls:
+			if ctrl.is_visible_in_tree():
+				order.append(str(ctrl.get_meta("qa_id")).trim_prefix("slot::d17_19_prescription::"))
+		assert_eq(JSON.stringify(order), JSON.stringify(["find_self", "ask_ajie", "ask_azhu"]),
+			"處方候選照資料槽序渲染 [find_self, ask_ajie, ask_azhu]（阿財未取得不出現）")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["candidate_order_follows_data"] } }
 

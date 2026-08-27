@@ -315,7 +315,7 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 	var occupant: Variant = slot.get("occupant")
 	var delegation_view: Dictionary = slot_view.get("delegation", {}) as Dictionary
 	var is_delegation := not delegation_view.is_empty()
-	var delegated_today := is_delegation and bool(delegation_view.get("delegated_today", false))
+	var delegated_today := is_delegation and str(delegation_view.get("delegation_state", "")) == "delegated_today"
 
 	var slot_lbl := Label.new()
 	slot_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -385,7 +385,8 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 
 func _on_delegate_candidate_pressed(beat_id: String, slot_id: String, card_id: String, delegation_view: Dictionary) -> void:
 	_pending_delegation = { "beat_id": beat_id, "slot_id": slot_id, "card_id": card_id }
-	var beat_title := str((Data.loader.beats_by_id.get(beat_id, {}) as Dictionary).get("title", ""))
+	# P4-C：確認標題由 view model 的 task_title 提供，UI 不自讀原始 beat JSON。
+	var beat_title := str(delegation_view.get("task_title", ""))
 	var timing := str(delegation_view.get("result_timing", ""))
 	var timing_label: String = str(_TIMING_LABELS.get(timing, timing))
 	_delegation_dialog.title = _MSG_DELEGATION_DIALOG_TITLE

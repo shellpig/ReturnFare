@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## P4-C headless 驗收測試：
-## 1. 委託槽 view model 欄位（result_timing／preview／tendency／delegated_today）
+## 1. 委託槽 view model 欄位（result_timing／preview／tendency／task_title／delegation_state）
 ## 2. 未取得候選完全不進面板；持有後在原位置出現
 ## 3. 今日已受託時 view model 正確反映（獨立於 choice_group 是否已永久結算）
 ## 4. 委託教學信號：零到一張 person card 才發、不寫 meta、mark_ 後才算看過、跨輪保留
@@ -38,6 +38,7 @@ func _initialize() -> void:
 	failed += _test_prescription_d18_d19(gs, data_node)
 	failed += _test_prescription_no_repeat_subsequent_day(gs, data_node)
 	failed += _test_candidate_stable_ordering(gs, data_node)
+	failed += _test_azhu_acai_acquisition_gates(gs, data_node)
 
 	if failed > 0:
 		push_error("\nP4-C: %d assertion(s) failed\n" % failed)
@@ -105,8 +106,9 @@ func _test_view_model_fields(gs: Node, data_node: Node) -> int:
 		if str(deleg.get("result_timing", "")) == "immediate" \
 			and not str(deleg.get("preview", "")).is_empty() \
 			and not str(deleg.get("tendency", "")).is_empty() \
-			and bool(deleg.get("delegated_today", true)) == false:
-			_ok("ask_ajie view model 含 result_timing/preview/tendency，delegated_today=false")
+			and str(deleg.get("task_title", "")) == "叔叔的舊藥單" \
+			and str(deleg.get("delegation_state", "")) == "available":
+			_ok("ask_ajie view model 含 result_timing/preview/tendency/task_title，delegation_state=available")
 		else:
 			failed += _fail("ask_ajie view model 欄位不符：%s" % str(deleg))
 
@@ -162,7 +164,7 @@ func _test_delegated_today_view(gs: Node, data_node: Node) -> int:
 
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 	# 兩個各自獨立 choice_group 的委託槽，同接受 npc_ajie；委託其中一個之後，
-	# 另一個槽本身未被 choice_group／slots_placed 鎖住，純靠 delegated_today 呈現「今日已受託」。
+	# 另一個槽本身未被 choice_group／slots_placed 鎖住，純靠 delegation_state 呈現「今日已受託」。
 	var beat_a: Dictionary = {
 		"id": "test_p4c_today_a",
 		"location": "clinic",
@@ -203,19 +205,19 @@ func _test_delegated_today_view(gs: Node, data_node: Node) -> int:
 
 	var panel_before: Dictionary = gs.call("build_panel", "clinic")
 	var before_view := _find_slot_view(panel_before, "test_p4c_today_b", "slot_b")
-	var before_flag: bool = bool((before_view.get("delegation", {}) as Dictionary).get("delegated_today", true))
+	var before_state: String = str((before_view.get("delegation", {}) as Dictionary).get("delegation_state", ""))
 
 	gs.call("delegate", "test_p4c_today_a", "slot_a", "npc_ajie")
 
 	var panel_after: Dictionary = gs.call("build_panel", "clinic")
 	var after_view := _find_slot_view(panel_after, "test_p4c_today_b", "slot_b")
 	var after_tri: int = int(after_view.get("tri", -1))
-	var after_flag: bool = bool((after_view.get("delegation", {}) as Dictionary).get("delegated_today", false))
+	var after_state: String = str((after_view.get("delegation", {}) as Dictionary).get("delegation_state", ""))
 
-	if not before_flag and after_tri == PanelBuilder.TriState.OPEN and after_flag:
-		_ok("委託阿婕前 slot_b delegated_today=false；委託後該槽仍 OPEN 但 delegated_today=true（未被 choice_group 鎖住，純靠此欄位呈現鎖定）")
+	if before_state == "available" and after_tri == PanelBuilder.TriState.OPEN and after_state == "delegated_today":
+		_ok("委託阿婕前 slot_b delegation_state=available；委託後該槽仍 OPEN 但 delegation_state=delegated_today（未被 choice_group 鎖住，純靠此欄位呈現鎖定）")
 	else:
-		failed += _fail("delegated_today 反映不符：before=%s after_tri=%d after_flag=%s" % [str(before_flag), after_tri, str(after_flag)])
+		failed += _fail("delegation_state 反映不符：before=%s after_tri=%d after_state=%s" % [before_state, after_tri, after_state])
 
 	return failed
 
@@ -370,42 +372,87 @@ func _test_ajie_trust_broken_hides_candidate(gs: Node, data_node: Node) -> int:
 	return failed
 
 
-# ─── 7. 阿婕信任修復後重新取得候選 ───
+# ─── 7. 阿婕信任修復後重新取得候選（真實放卡＋D17 on_enter 接線）───
 func _test_ajie_trust_repair_reacquire(gs: Node, data_node: Node) -> int:
-	print("\n--- 7. 阿婕信任修復後重新取得候選 ---")
+	print("\n--- 7. 阿婕信任修復後重新取得候選（真實放卡＋D17 on_enter）---")
 	var failed: int = 0
 	_reset_gs(gs)
-	var loader: DataLoader = data_node.get("loader") as DataLoader
 
-	# (a) 破壞信任：候選隱藏（不變式同 test 6，破壞時人物卡本就不在手）
+	# (a) 破壞信任：D17 下午候選隱藏（破壞時人物卡本就不在手，不變式同 test 6）
 	var flags: Dictionary = gs.get("flags") as Dictionary
 	flags["ajie_trust_broken"] = true
+	gs.set("day", 17)
+	gs.set("phase", "afternoon")
 	var panel_broken: Dictionary = gs.call("build_panel", "sanquan")
 	var hidden_when_broken := _find_slot_view(panel_broken, "d17_19_prescription", "ask_ajie").is_empty()
 
-	# (b) 明示修復事件：套 d16_pm_sanquan 的 repair_ajie_trust 槽 on_place（唯一真值＝把旗標設回 false）
-	var repair_beat: Dictionary = loader.beats_by_id.get("d16_pm_sanquan", {})
-	var repair_slot: Dictionary = {}
-	for s: Variant in repair_beat.get("slots", []) as Array:
-		if str((s as Dictionary).get("id", "")) == "repair_ajie_trust":
-			repair_slot = s as Dictionary
-			break
-	if repair_slot.is_empty():
-		return _fail("找不到 d16_pm_sanquan 的 repair_ajie_trust 槽（資料真值改動？）")
-	EffectApply.apply(repair_slot.get("on_place", {}), gs)
-	var flag_cleared := not bool(flags.get("ajie_trust_broken", true))
+	# (b) 真實修復：D16 下午把主角卡放進 repair_ajie_trust 槽，走 try_place 規則層
+	#     （不直接 EffectApply；驗真實放卡入口清 ajie_trust_broken）
+	gs.set("day", 16)
+	gs.set("phase", "afternoon")
+	gs.set("action_spent", false)
+	var repair_res: Dictionary = gs.call("try_place", "protagonist", "d16_pm_sanquan", "repair_ajie_trust")
+	var repaired := bool(repair_res.get("ok", false)) and not bool(flags.get("ajie_trust_broken", true))
 
-	# (c) 資料真值：修復後她於 D17 早上重新進手牌；候選回到原位且可再委託
-	gs.call("gain_card", "npc_ajie", false)
+	# (c) 真實 D17 on_enter：play_beat 觸發 d17_morning_phone，條件 gain 重新取得 npc_ajie
+	#     （不直接 gain_card；驗 on_enter 接線的 has_card 條件 gain）
+	gs.set("day", 17)
+	gs.set("phase", "morning")
+	gs.call("play_beat", "d17_morning_phone")
+	var reacquired := bool(gs.call("has_card", "npc_ajie"))
+
+	# (d) D17 下午候選回原位且可再委託
+	gs.set("phase", "afternoon")
 	var panel_repaired: Dictionary = gs.call("build_panel", "sanquan")
 	var ajie_view := _find_slot_view(panel_repaired, "d17_19_prescription", "ask_ajie")
 	var reappeared := not ajie_view.is_empty()
-	var delegable := reappeared and bool((ajie_view.get("delegation", {}) as Dictionary).get("delegated_today", true)) == false
+	var delegable := reappeared and str((ajie_view.get("delegation", {}) as Dictionary).get("delegation_state", "")) == "available"
 
-	if hidden_when_broken and flag_cleared and reappeared and delegable:
-		_ok("信任破壞→候選隱藏；明示修復清 ajie_trust_broken＋重新取得人物卡後，ask_ajie 候選回原位且 delegated_today=false 可再委託")
+	if hidden_when_broken and repaired and reacquired and reappeared and delegable:
+		_ok("信任破壞→候選隱藏；D16 真實放卡修復＋D17 on_enter 條件 gain 重取 npc_ajie 後，ask_ajie 候選回原位且 delegation_state=available 可再委託")
 	else:
-		failed += _fail("修復重取不符：hidden=%s cleared=%s reappeared=%s delegable=%s" % [str(hidden_when_broken), str(flag_cleared), str(reappeared), str(delegable)])
+		failed += _fail("修復重取不符：hidden=%s repaired=%s(ok=%s) reacquired=%s reappeared=%s delegable=%s" % [str(hidden_when_broken), str(repaired), str(repair_res.get("ok")), str(reacquired), str(reappeared), str(delegable)])
+
+	return failed
+
+
+# ─── 11. 阿珠只由 D9 揭露路線、阿財只由 D17-19 共事取得 ───
+func _test_azhu_acai_acquisition_gates(gs: Node, data_node: Node) -> int:
+	print("\n--- 11. 阿珠只由 D9 揭露、阿財只由 D17-19 共事取得 ---")
+	var failed: int = 0
+
+	# 阿珠：D17 on_enter 僅在 azhu_shared_abnormal_medicine（D9 揭露路線寫入）成立時 gain npc_azhu
+	_reset_gs(gs)
+	gs.set("day", 17)
+	gs.set("phase", "morning")
+	gs.call("play_beat", "d17_morning_phone")
+	var azhu_without_flag := bool(gs.call("has_card", "npc_azhu"))
+
+	_reset_gs(gs)
+	(gs.get("flags") as Dictionary)["azhu_shared_abnormal_medicine"] = true
+	gs.set("day", 17)
+	gs.set("phase", "morning")
+	gs.call("play_beat", "d17_morning_phone")
+	var azhu_with_flag := bool(gs.call("has_card", "npc_azhu"))
+
+	if not azhu_without_flag and azhu_with_flag:
+		_ok("阿珠：無 azhu_shared_abnormal_medicine（D9 揭露）時 D17 on_enter 不取得；旗標成立才取得")
+	else:
+		failed += _fail("阿珠取得閘門不符：without_flag=%s with_flag=%s" % [str(azhu_without_flag), str(azhu_with_flag)])
+
+	# 阿財：唯有真的在 D17-19「跟阿財做事」放主角卡才取得 npc_acai（條件 gain，走 try_place）
+	_reset_gs(gs)
+	gs.set("day", 17)
+	gs.set("phase", "afternoon")
+	gs.set("action_spent", false)
+	var acai_before := bool(gs.call("has_card", "npc_acai"))
+	var work_res: Dictionary = gs.call("try_place", "protagonist", "d17_pm_acai_intro", "work")
+	var acai_after := bool(gs.call("has_card", "npc_acai"))
+
+	if not acai_before and bool(work_res.get("ok", false)) and acai_after:
+		_ok("阿財：D17-19『跟阿財做事』真實放卡後才取得 npc_acai（條件 gain）")
+	else:
+		failed += _fail("阿財取得閘門不符：before=%s work_ok=%s after=%s" % [str(acai_before), str(work_res.get("ok")), str(acai_after)])
 
 	return failed
 
