@@ -2,13 +2,15 @@
     [string]$Case = "",
     [string]$GodotBin = "C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe",
     [int]$TimeoutSeconds = 180,
-    [switch]$SkipNegative
+    [switch]$SkipNegative,
+    [switch]$Background
 )
 
 $ErrorActionPreference = "Continue"
 
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $projectRoot
+. (Join-Path $PSScriptRoot "bg_guards.ps1")
 
 function Get-OwnedProcessTree {
     param([int]$RootPid)
@@ -40,7 +42,9 @@ function Invoke-GodotProcess {
     param(
         [string]$Binary,
         [string[]]$ArgumentList,
-        [int]$TimeoutSec
+        [int]$TimeoutSec,
+        [switch]$BackgroundMode,
+        [switch]$RequireWindow
     )
     if (-not (Test-Path $Binary)) {
         return @{
@@ -72,33 +76,76 @@ function Invoke-GodotProcess {
     $psi.WorkingDirectory = $projectRoot
 
     $process = $null
+    $nativePi = $null
     $rootPid = 0
     $timeoutOccurred = $false
     $finished = $false
     $exitCode = -1
     $errorMsg = ""
     $cleanupError = ""
+    $backgroundError = ""
+    $engineWindowSeen = $false
+    $backgroundViolations = New-Object System.Collections.Generic.List[string]
 
     try {
-        $process = [System.Diagnostics.Process]::Start($psi)
-        if ($null -eq $process) {
-            return @{
-                Finished = $false
-                ExitCode = 1
-                Timeout = $false
-                Error = "Failed to start Godot process: $Binary"
-                RootPid = 0
-                CleanupError = ""
+        if ($BackgroundMode) {
+            # .NET 的 Process.Start 沒有辦法指定 desktop，只有 CreateProcess 的
+            # STARTUPINFO.lpDesktop 有。開起來之後照樣包成 Process 物件，
+            # 後面的等待與清理邏輯兩種模式共用。
+            $nativePi = Start-UiSimProcessOnDesktop -Desktop $script:UiSimDesktop `
+                -FileName $Binary -Arguments $psi.Arguments -WorkingDirectory $projectRoot
+            $rootPid = $nativePi.dwProcessId
+            $process = [System.Diagnostics.Process]::GetProcessById($rootPid)
+        } else {
+            $process = [System.Diagnostics.Process]::Start($psi)
+            if ($null -eq $process) {
+                return @{
+                    Finished = $false
+                    ExitCode = 1
+                    Timeout = $false
+                    Error = "Failed to start Godot process: $Binary"
+                    RootPid = 0
+                    CleanupError = ""
+                }
+            }
+            $rootPid = $process.Id
+        }
+        $watch = [System.Diagnostics.Stopwatch]::StartNew()
+        while (-not $process.HasExited) {
+            if ($watch.Elapsed.TotalSeconds -ge $TimeoutSec) {
+                $timeoutOccurred = $true
+                $errorMsg = "Timeout ($TimeoutSec s)"
+                break
+            }
+            if ($BackgroundMode) {
+                $patrol = Invoke-UiSimBackgroundPatrol -ProcessId $rootPid -Desktop $script:UiSimDesktop
+                if ($patrol.EngineWindowSeen) { $engineWindowSeen = $true }
+                foreach ($violation in @($patrol.Violations)) {
+                    if (-not $backgroundViolations.Contains($violation)) {
+                        $backgroundViolations.Add($violation)
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 50
+            try { $process.Refresh() } catch {}
+        }
+        $watch.Stop()
+        if (-not $timeoutOccurred) {
+            $process.WaitForExit()
+            $finished = $true
+            if ($null -ne $nativePi) {
+                # 這個 Process 物件是 GetProcessById 拿來的、不是自己 Start 的，
+                # .ExitCode 讀不到；改問 CreateProcess 當初留下來的 handle。
+                $exitCode = [ReturnFareUiSimNative]::TryGetExitCode($nativePi.hProcess)
+            } else {
+                $exitCode = $process.ExitCode
             }
         }
-        $rootPid = $process.Id
-        $finished = $process.WaitForExit($TimeoutSec * 1000)
-        if (-not $finished) {
-            $timeoutOccurred = $true
-            $errorMsg = "Timeout ($TimeoutSec s)"
-        } else {
-            $process.WaitForExit()
-            $exitCode = $process.ExitCode
+        if ($BackgroundMode -and $RequireWindow -and -not $engineWindowSeen) {
+            $backgroundViolations.Add("No Godot 'Engine' window was ever observed; background guards had nothing to verify")
+        }
+        if ($backgroundViolations.Count -gt 0) {
+            $backgroundError = $backgroundViolations -join "; "
         }
     } catch {
         $errorMsg = $_.Exception.Message
@@ -145,6 +192,9 @@ function Invoke-GodotProcess {
         if ($null -ne $process) {
             try { $process.Dispose() } catch {}
         }
+        if ($null -ne $nativePi) {
+            try { [ReturnFareUiSimNative]::ReleaseProcessHandles($nativePi) } catch {}
+        }
     }
 
     if ($timeoutOccurred) {
@@ -169,6 +219,19 @@ function Invoke-GodotProcess {
         }
     }
 
+    if (-not [string]::IsNullOrEmpty($backgroundError)) {
+        return @{
+            Finished = $finished
+            ExitCode = if ($exitCode -ne 0) { $exitCode } else { 1 }
+            Timeout = $false
+            Error = $backgroundError
+            RootPid = $rootPid
+            CleanupError = ""
+            BackgroundError = $backgroundError
+            EngineWindowSeen = $engineWindowSeen
+        }
+    }
+
     return @{
         Finished = $finished
         ExitCode = $exitCode
@@ -176,6 +239,8 @@ function Invoke-GodotProcess {
         Error = $errorMsg
         RootPid = $rootPid
         CleanupError = ""
+        BackgroundError = ""
+        EngineWindowSeen = $engineWindowSeen
     }
 }
 
@@ -190,6 +255,41 @@ function Assert-NoExistingGodotProcesses {
         exit 1
     }
 }
+
+function Assert-NoPhysicalCursorWarp {
+    $hits = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "tests\ui_sim") -Filter "*.gd" -File -Recurse |
+        Select-String -Pattern "DisplayServer\.warp_mouse|SetCursorPos|SendInput" -CaseSensitive)
+    if ($hits.Count -gt 0) {
+        Write-Host "ERROR: UI sim physical cursor API guard failed:" -ForegroundColor Red
+        foreach ($hit in $hits) {
+            Write-Host "  -> $($hit.Path):$($hit.LineNumber): $($hit.Line.Trim())" -ForegroundColor Red
+        }
+        exit 1
+    }
+}
+
+## 背景模式改用 GUI 版執行檔。
+##
+## console 版是啟動器：它會再 spawn 一個 GUI 版子行程，視窗掛在子行程上，啟動器自己
+## 一個視窗都沒有（實測 console 版 pid 的視窗數為 0）。隔離本身不受影響（子行程會
+## 繼承父行程的 desktop），但守衛盯的是 -Binary 開出來的那個 pid：用 console 版時它
+## 永遠看不到 'Engine' 視窗，RequireWindow 會判定「這一輪什麼都沒驗到」而整套紅掉。
+## 直接用 GUI 版就只有一個 process、一個視窗，守衛盯得住。
+##
+## 兩種輸出都不受影響：全部 Godot 輸出走 --log-file，launcher 不讀 stdout。
+##
+## 要做前景／背景逐案例比對時，前景那一輪也用 -GodotBin 指到同一支 GUI 版，
+## 免得比對結果混進「換了執行檔」這個變因。
+function Resolve-UiSimWindowedBinary {
+    param([string]$ConfiguredBinary)
+    if (-not $Background) { return $ConfiguredBinary }
+    $candidate = $ConfiguredBinary -replace '_console\.exe$', '.exe'
+    if ($candidate -eq $ConfiguredBinary -or -not (Test-Path $candidate)) {
+        throw "Background UI sim requires the Godot GUI binary next to the console binary: $candidate"
+    }
+    return $candidate
+}
+
 
 function Read-JsonFile {
     param([string]$Path)
@@ -279,6 +379,7 @@ function Invoke-NegativeTests {
         }
         $logPath = Join-Path $negativeRunDir ($negative.Id + ".log")
         $args = @(
+            "--headless",
             "--path", ".",
             "--script", "res://tests/ui_sim/qa_runner.gd",
             "--log-file", $logPath,
@@ -333,6 +434,8 @@ function Invoke-NegativeTests {
 }
 
 Assert-NoExistingGodotProcesses
+Assert-NoPhysicalCursorWarp
+$windowedGodotBin = Resolve-UiSimWindowedBinary -ConfiguredBinary $GodotBin
 
 $qaDir = Join-Path $projectRoot "_qa"
 $runRoot = Join-Path $qaDir "runs"
@@ -354,10 +457,35 @@ if (-not (Test-Path $gdignore)) {
     Set-Content -Path $gdignore -Value "" -Encoding utf8
 }
 
+$script:UiSimDesktop = $null
+try {
+if ($Background) {
+    # 背景模式的隔離單位：本次執行專用的 Windows desktop（見 bg_guards.ps1）。
+    $script:UiSimDesktop = Enter-UiSimIsolatedDesktop
+
+    # 預檢：先用一個只開視窗、不跑案例的 1 秒探針確認隔離成立，
+    # 再讓後面上百個行程跑下去。探針失敗就不要進全套。
+    $backgroundProbeLog = Join-Path $runDir "background_probe.log"
+    $backgroundProbeArgs = @(
+        "--path", ".",
+        "--script", "res://tests/ui_sim/qa_background_probe.gd",
+        "--log-file", $backgroundProbeLog,
+        "--", "--hold", "1"
+    )
+    $backgroundProbeRes = Invoke-GodotProcess -Binary $windowedGodotBin -ArgumentList $backgroundProbeArgs -TimeoutSec $TimeoutSeconds -BackgroundMode -RequireWindow
+    if ($backgroundProbeRes.ExitCode -ne 0 -or $backgroundProbeRes.Timeout) {
+        Write-Host "FATAL: background startup probe failed: $($backgroundProbeRes.Error)" -ForegroundColor Red
+        Write-Host "  See $backgroundProbeLog" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  Background preflight OK (desktop '$($script:UiSimDesktop.Name)': no window on the interactive desktop, never foreground)" -ForegroundColor Green
+}
+
 Write-Host "=== ReturnFare UI Simulation Runner ===" -ForegroundColor Cyan
 Write-Host "  Run ID:    $runId"
 Write-Host "  Run Dir:   $runDir"
 Write-Host "  Timeout:   $TimeoutSeconds s per process"
+Write-Host "  Mode:      $(if ($Background) { 'background (isolated desktop)' } else { 'foreground' })"
 
 Write-Host ""
 Write-Host "[1/5] Hover regression guard (K-48)..." -ForegroundColor Yellow
@@ -367,9 +495,12 @@ $hoverGuardArgs = @(
     "--script", "res://tests/ui_sim/qa_hover_regression.gd",
     "--log-file", $hoverGuardLog
 )
-$hoverGuardRes = Invoke-GodotProcess -Binary $GodotBin -ArgumentList $hoverGuardArgs -TimeoutSec $TimeoutSeconds
+$hoverGuardRes = Invoke-GodotProcess -Binary $windowedGodotBin -ArgumentList $hoverGuardArgs -TimeoutSec $TimeoutSeconds -BackgroundMode:$Background -RequireWindow:$Background
 if ($hoverGuardRes.ExitCode -ne 0 -or $hoverGuardRes.Timeout) {
     Write-Host "FATAL: hover regression guard failed. See $hoverGuardLog" -ForegroundColor Red
+    if (-not [string]::IsNullOrEmpty([string]$hoverGuardRes.Error)) {
+        Write-Host "  $($hoverGuardRes.Error)" -ForegroundColor Red
+    }
     Write-Host "  The guard pins the K-48 rule: read gui_get_hovered_control() immediately after" -ForegroundColor Red
     Write-Host "  sending the motion, and never yield between press and release." -ForegroundColor Red
     exit 1
@@ -443,6 +574,7 @@ $longNightData | ConvertTo-Json -Depth 30 | Set-Content -Path $longNightLocation
 $manifestPath = Join-Path $runDir "case-manifest.json"
 $manifestLog = Join-Path $runDir "case-manifest.log"
 $manifestArgs = @(
+    "--headless",
     "--path", ".",
     "--script", "res://tests/ui_sim/qa_runner.gd",
     "--log-file", $manifestLog,
@@ -533,7 +665,7 @@ foreach ($caseDef in $caseDefs) {
         $caseArgs += @("--data-root", $variantPath)
     }
 
-    $runResult = Invoke-GodotProcess -Binary $GodotBin -ArgumentList $caseArgs -TimeoutSec $TimeoutSeconds
+    $runResult = Invoke-GodotProcess -Binary $windowedGodotBin -ArgumentList $caseArgs -TimeoutSec $TimeoutSeconds -BackgroundMode:$Background -RequireWindow:$Background
     if (-not [string]::IsNullOrEmpty($runResult.CleanupError)) {
         Write-Host "FATAL: Process cleanup failed for case [$caseId] (PID $($runResult.RootPid)): $($runResult.CleanupError). Halting suite to prevent failure contagion." -ForegroundColor Red
         exit 1
@@ -549,6 +681,9 @@ foreach ($caseDef in $caseDefs) {
     }
     if ($runResult.Timeout) {
         $caseErrors += "Timeout ($TimeoutSeconds s)"
+    }
+    if (-not [string]::IsNullOrEmpty([string]$runResult.BackgroundError)) {
+        $caseErrors += [string]$runResult.BackgroundError
     }
     if ($caseOk) {
         Write-Host "OK" -ForegroundColor Green
@@ -715,6 +850,7 @@ $summary = [ordered]@{
     EvidenceFailures = $normalEvidenceFailures.Count
     ContractFailures = $contractFailureCount
     TotalFailures = $totalFailures
+    BackgroundMode = [bool]$Background
     Results = $results
     ComparisonResults = $comparisonResults
     NegativeTests = $negativeResults
@@ -732,3 +868,6 @@ if ($totalFailures -gt 0) {
     exit 1
 }
 exit 0
+} finally {
+    Exit-UiSimIsolatedDesktop -Desktop $script:UiSimDesktop
+}

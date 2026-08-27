@@ -313,7 +313,6 @@ static func scroll_into_view(tree: SceneTree, scroll_container: ScrollContainer,
 		result["error"] = "ScrollContainer 尺寸為 0，無法定位滾輪事件座標"
 		return result
 	var wheel_pos: Vector2 = scroll_container.get_screen_position() + sc_size * 0.5
-	DisplayServer.warp_mouse(Vector2i(wheel_pos))
 
 	var motion := InputEventMouseMotion.new()
 	motion.position = wheel_pos
