@@ -98,6 +98,7 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p4c_04_next_morning_confirm", "確認委託阿珠後派出當下不劇透，隔日上午既有結算後才播報回報", "p4c_d17_with_person.json", "", "p4c_04_next_morning_confirm", "", "p4c_04"),
 		UiCase.new("p4c_05_tutorial_dialog", "首次真實取得人物卡彈出委託教學，關閉後才寫入 delegation_tutorial_seen", "p4c_d17_no_person.json", "", "p4c_05_tutorial_dialog", "", "p4c_05"),
 		UiCase.new("p4c_06_candidate_order", "持有阿婕＋阿珠時處方候選照資料槽序渲染，順序不因取得狀態跳動", "p4c_d17_with_person.json", "", "p4c_06_candidate_order", "", "p4c_06"),
+		UiCase.new("p4c_07_indulge_hides_candidate", "對阿婕使用發狂卡縱慾即失去委託資格，ask_ajie 委託候選當場消失（P2→P4-C 整合）", "p4c_ajie_indulge_ready.json", "", "p4c_07_indulge_hides_candidate", "", "p4c_07"),
 	]
 
 
@@ -260,6 +261,8 @@ class UiCase extends CaseBaseClass:
 				return await _p4c_05(tree)
 			"p4c_06":
 				return await _p4c_06(tree)
+			"p4c_07":
+				return await _p4c_07(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -1783,4 +1786,25 @@ class UiCase extends CaseBaseClass:
 			"處方候選照資料槽序渲染 [find_self, ask_ajie, ask_azhu]（阿財未取得不出現）")
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["candidate_order_follows_data"] } }
+
+	func _p4c_07(tree: SceneTree) -> Dictionary:
+		# P2→P4-C 整合：D17 下午山泉閣同時有 x_lust_ajie 縱慾出口與 ask_ajie 委託候選。
+		# 對阿婕使用發狂卡縱慾 → ajie_trust_broken＋失去 npc_ajie → ask_ajie 候選當場消失。
+		await _enter(tree, "sanquan")
+		assert_has_qa_id(tree, "slot::d17_19_prescription::ask_ajie", "縱慾前 ask_ajie 委託候選在場")
+		assert_true((_run(tree).get("hand", []) as Array).has("npc_ajie"), "縱慾前持有 npc_ajie")
+		# 發狂卡是多實例卡，實例序號隨 checkpoint 遞增——動態抓手上那張，不寫死 #1
+		var madness_inst := ""
+		for c: Variant in _run(tree).get("hand", []) as Array:
+			if str(c).begins_with("madness#"):
+				madness_inst = str(c)
+				break
+		assert_false(madness_inst.is_empty(), "縱慾前手上應有一張發狂卡")
+		await _click(tree, "place::exit_sanquan::x_lust_ajie::" + madness_inst)
+		var after := _run(tree)
+		assert_true(bool((after.get("flags", {}) as Dictionary).get("ajie_trust_broken", false)), "縱慾設 ajie_trust_broken")
+		assert_false((after.get("hand", []) as Array).has("npc_ajie"), "縱慾移除 npc_ajie")
+		assert_no_qa_id(tree, "slot::d17_19_prescription::ask_ajie", "失去人物卡後 ask_ajie 委託候選當場消失")
+		await _close(tree)
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["indulge_breaks_delegation_eligibility", "candidate_hidden_after_card_lost"] } }
 

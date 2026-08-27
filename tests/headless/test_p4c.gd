@@ -351,51 +351,75 @@ func _test_acai_route_subjective(gs: Node, data_node: Node) -> int:
 	return failed
 
 
-# ─── 6. 阿婕信任破壞後候選隱藏 ───
+## 走真實縱慾入口破壞阿婕信任：需持有 npc_ajie＋一張發狂卡、關係達「疑似」，
+## 在 exit_sanquan 白天以發狂卡對阿婕縱慾（唯一真值 x_lust_ajie）。回傳 indulge() 結果。
+## 破壞的效果（設旗標、移除人物卡）全由該出口的 on_place 產生，測試不直接寫旗標。
+func _break_ajie_via_indulgence(gs: Node) -> Dictionary:
+	var hand: Array = gs.get("hand") as Array
+	if not hand.has("npc_ajie"):
+		hand.append("npc_ajie")
+	(gs.get("relations") as Dictionary)["ajie"] = 1  # 疑似（data/relation_scale.json）
+	gs.call("gain_card", "madness", false)           # 真發狂卡進手＋madness_clock（check_cap=false 不撞上限）
+	var madness_inst := ""
+	for h: String in hand:
+		if str(h).begins_with("madness#"):
+			madness_inst = str(h)
+			break
+	gs.set("day", 15)
+	gs.set("phase", "afternoon")
+	gs.set("action_spent", false)
+	return gs.call("indulge", "exit_sanquan", "x_lust_ajie", madness_inst)
+
+
+# ─── 6. 阿婕縱慾破壞信任後候選隱藏（真實 x_lust_ajie 入口）───
 func _test_ajie_trust_broken_hides_candidate(gs: Node, data_node: Node) -> int:
-	print("\n--- 6. 阿婕信任破壞後候選隱藏 ---")
+	print("\n--- 6. 阿婕縱慾破壞信任後候選隱藏（真實 x_lust_ajie 入口）---")
 	var failed: int = 0
 	_reset_gs(gs)
 
-	# 信任破壞的資料唯一真值是 ajie_trust_broken；破壞時若持有人物卡會同時 lose_card，
-	# 因此手牌本就不會有 npc_ajie。這裡直接模擬該不變式。
-	var flags: Dictionary = gs.get("flags") as Dictionary
-	flags["ajie_trust_broken"] = true
+	var ind_res: Dictionary = _break_ajie_via_indulgence(gs)
+	var flag_set := bool((gs.get("flags") as Dictionary).get("ajie_trust_broken", false))
+	var ajie_lost := not bool(gs.call("has_card", "npc_ajie"))
 
-	var panel: Dictionary = gs.call("build_panel", "sanquan")
-	var ajie_view := _find_slot_view(panel, "d17_19_prescription", "ask_ajie")
-	if ajie_view.is_empty():
-		_ok("ajie_trust_broken=true 且未持有 npc_ajie 時，ask_ajie 候選不出現")
+	# D17 早上 on_enter 不再取得阿婕（旗標為真，阻止條件 gain）
+	gs.set("day", 17)
+	gs.set("phase", "morning")
+	gs.call("play_beat", "d17_morning_phone")
+	var d17_blocked := not bool(gs.call("has_card", "npc_ajie"))
+
+	# D17 下午候選隱藏
+	gs.set("phase", "afternoon")
+	var ajie_view := _find_slot_view(gs.call("build_panel", "sanquan"), "d17_19_prescription", "ask_ajie")
+	var candidate_hidden := ajie_view.is_empty()
+
+	if bool(ind_res.get("ok", false)) and flag_set and ajie_lost and d17_blocked and candidate_hidden:
+		_ok("真實 x_lust_ajie 縱慾同時設 ajie_trust_broken、移除 npc_ajie、阻止 D17 on_enter 取得，D17 下午 ask_ajie 候選隱藏")
 	else:
-		failed += _fail("信任破壞後 ask_ajie 候選仍出現")
+		failed += _fail("縱慾破壞不符：ok=%s flag=%s lost=%s d17_blocked=%s hidden=%s reason=%s" % [str(ind_res.get("ok")), str(flag_set), str(ajie_lost), str(d17_blocked), str(candidate_hidden), str(ind_res.get("reason_code"))])
 
 	return failed
 
 
-# ─── 7. 阿婕信任修復後重新取得候選（真實放卡＋D17 on_enter 接線）───
+# ─── 7. 阿婕縱慾破壞→D16 真實修復槽→D17 on_enter 重取（全程真實入口）───
 func _test_ajie_trust_repair_reacquire(gs: Node, data_node: Node) -> int:
-	print("\n--- 7. 阿婕信任修復後重新取得候選（真實放卡＋D17 on_enter）---")
+	print("\n--- 7. 阿婕縱慾破壞→D16 真實修復槽→D17 on_enter 重取 ---")
 	var failed: int = 0
 	_reset_gs(gs)
 
-	# (a) 破壞信任：D17 下午候選隱藏（破壞時人物卡本就不在手，不變式同 test 6）
-	var flags: Dictionary = gs.get("flags") as Dictionary
-	flags["ajie_trust_broken"] = true
-	gs.set("day", 17)
-	gs.set("phase", "afternoon")
-	var panel_broken: Dictionary = gs.call("build_panel", "sanquan")
-	var hidden_when_broken := _find_slot_view(panel_broken, "d17_19_prescription", "ask_ajie").is_empty()
+	# (a) 真實縱慾破壞：旗標成立、人物卡移除（同 test 6 走 x_lust_ajie 出口）
+	var ind_res: Dictionary = _break_ajie_via_indulgence(gs)
+	var broken := bool(ind_res.get("ok", false)) \
+		and bool((gs.get("flags") as Dictionary).get("ajie_trust_broken", false)) \
+		and not bool(gs.call("has_card", "npc_ajie"))
 
 	# (b) 真實修復：D16 下午把主角卡放進 repair_ajie_trust 槽，走 try_place 規則層
-	#     （不直接 EffectApply；驗真實放卡入口清 ajie_trust_broken）
 	gs.set("day", 16)
 	gs.set("phase", "afternoon")
 	gs.set("action_spent", false)
 	var repair_res: Dictionary = gs.call("try_place", "protagonist", "d16_pm_sanquan", "repair_ajie_trust")
-	var repaired := bool(repair_res.get("ok", false)) and not bool(flags.get("ajie_trust_broken", true))
+	var repaired := bool(repair_res.get("ok", false)) and not bool((gs.get("flags") as Dictionary).get("ajie_trust_broken", true))
 
 	# (c) 真實 D17 on_enter：play_beat 觸發 d17_morning_phone，條件 gain 重新取得 npc_ajie
-	#     （不直接 gain_card；驗 on_enter 接線的 has_card 條件 gain）
 	gs.set("day", 17)
 	gs.set("phase", "morning")
 	gs.call("play_beat", "d17_morning_phone")
@@ -403,15 +427,14 @@ func _test_ajie_trust_repair_reacquire(gs: Node, data_node: Node) -> int:
 
 	# (d) D17 下午候選回原位且可再委託
 	gs.set("phase", "afternoon")
-	var panel_repaired: Dictionary = gs.call("build_panel", "sanquan")
-	var ajie_view := _find_slot_view(panel_repaired, "d17_19_prescription", "ask_ajie")
+	var ajie_view := _find_slot_view(gs.call("build_panel", "sanquan"), "d17_19_prescription", "ask_ajie")
 	var reappeared := not ajie_view.is_empty()
 	var delegable := reappeared and str((ajie_view.get("delegation", {}) as Dictionary).get("delegation_state", "")) == "available"
 
-	if hidden_when_broken and repaired and reacquired and reappeared and delegable:
-		_ok("信任破壞→候選隱藏；D16 真實放卡修復＋D17 on_enter 條件 gain 重取 npc_ajie 後，ask_ajie 候選回原位且 delegation_state=available 可再委託")
+	if broken and repaired and reacquired and reappeared and delegable:
+		_ok("阿婕縱慾破壞→D16 真實放卡修復→D17 on_enter 條件 gain 重取，ask_ajie 候選回原位且 delegation_state=available 可再委託")
 	else:
-		failed += _fail("修復重取不符：hidden=%s repaired=%s(ok=%s) reacquired=%s reappeared=%s delegable=%s" % [str(hidden_when_broken), str(repaired), str(repair_res.get("ok")), str(reacquired), str(reappeared), str(delegable)])
+		failed += _fail("修復重取不符：broken=%s repaired=%s(ok=%s) reacquired=%s reappeared=%s delegable=%s" % [str(broken), str(repaired), str(repair_res.get("ok")), str(reacquired), str(reappeared), str(delegable)])
 
 	return failed
 
@@ -421,24 +444,30 @@ func _test_azhu_acai_acquisition_gates(gs: Node, data_node: Node) -> int:
 	print("\n--- 11. 阿珠只由 D9 揭露、阿財只由 D17-19 共事取得 ---")
 	var failed: int = 0
 
-	# 阿珠：D17 on_enter 僅在 azhu_shared_abnormal_medicine（D9 揭露路線寫入）成立時 gain npc_azhu
+	# 阿珠：D9 診所真實放卡（d9_morning_clinic::ask）寫入 azhu_shared_abnormal_medicine，
+	# 才是 D17 取得的前置——驗 D9 是可正常操作的寫入端，非直接寫旗標。
+	_reset_gs(gs)
+	gs.set("day", 9)
+	gs.set("phase", "morning")
+	gs.set("action_spent", false)
+	var d9_res: Dictionary = gs.call("try_place", "protagonist", "d9_morning_clinic", "ask")
+	var d9_flag_written := bool((gs.get("flags") as Dictionary).get("azhu_shared_abnormal_medicine", false))
+	gs.set("day", 17)
+	gs.set("phase", "morning")
+	gs.call("play_beat", "d17_morning_phone")
+	var azhu_after_d9 := bool(gs.call("has_card", "npc_azhu"))
+
+	# 對照：沒走 D9 → D17 on_enter 不發卡
 	_reset_gs(gs)
 	gs.set("day", 17)
 	gs.set("phase", "morning")
 	gs.call("play_beat", "d17_morning_phone")
-	var azhu_without_flag := bool(gs.call("has_card", "npc_azhu"))
+	var azhu_without_d9 := bool(gs.call("has_card", "npc_azhu"))
 
-	_reset_gs(gs)
-	(gs.get("flags") as Dictionary)["azhu_shared_abnormal_medicine"] = true
-	gs.set("day", 17)
-	gs.set("phase", "morning")
-	gs.call("play_beat", "d17_morning_phone")
-	var azhu_with_flag := bool(gs.call("has_card", "npc_azhu"))
-
-	if not azhu_without_flag and azhu_with_flag:
-		_ok("阿珠：無 azhu_shared_abnormal_medicine（D9 揭露）時 D17 on_enter 不取得；旗標成立才取得")
+	if bool(d9_res.get("ok", false)) and d9_flag_written and azhu_after_d9 and not azhu_without_d9:
+		_ok("阿珠：D9 診所真實放卡寫入 azhu_shared_abnormal_medicine（可操作寫入端），D17 on_enter 才取得；未走 D9 則不取得")
 	else:
-		failed += _fail("阿珠取得閘門不符：without_flag=%s with_flag=%s" % [str(azhu_without_flag), str(azhu_with_flag)])
+		failed += _fail("阿珠取得閘門不符：d9_ok=%s flag=%s after_d9=%s without_d9=%s" % [str(d9_res.get("ok")), str(d9_flag_written), str(azhu_after_d9), str(azhu_without_d9)])
 
 	# 阿財：唯有真的在 D17-19「跟阿財做事」放主角卡才取得 npc_acai（條件 gain，走 try_place）
 	_reset_gs(gs)

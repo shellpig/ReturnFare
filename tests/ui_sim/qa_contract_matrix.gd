@@ -1,7 +1,7 @@
 class_name QAContractMatrix
 extends RefCounted
 
-## 80 條 UI 契約的機器可讀目錄。變體由 runner 展開，但完成判定回到這份矩陣。
+## 81 條 UI 契約的機器可讀目錄。變體由 runner 展開，但完成判定回到這份矩陣。
 
 const CONTRACT_IDS := [
 	"p1g_case_01", "p1g_case_02", "p1g_case_03", "p1g_case_04",
@@ -32,6 +32,7 @@ const CONTRACT_IDS := [
 	"p3e_04_align_confirm_gain_knowledge", "p3e_05_multi_row_auto_align",
 	"p4c_01_candidate_visibility", "p4c_02_confirm_dialog", "p4c_03_immediate_confirm",
 	"p4c_04_next_morning_confirm", "p4c_05_tutorial_dialog", "p4c_06_candidate_order",
+	"p4c_07_indulge_hides_candidate",
 ]
 
 const SPECIAL_EVIDENCE := {
@@ -86,6 +87,7 @@ const SPECIAL_EVIDENCE := {
 	"p4c_04_next_morning_confirm": ["next_morning_no_spoiler", "next_morning_report_after_settlement"],
 	"p4c_05_tutorial_dialog": ["tutorial_fires_on_real_gain", "tutorial_seen_only_after_dismiss"],
 	"p4c_06_candidate_order": ["candidate_order_follows_data"],
+	"p4c_07_indulge_hides_candidate": ["indulge_breaks_delegation_eligibility", "candidate_hidden_after_card_lost"],
 }
 
 ## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。

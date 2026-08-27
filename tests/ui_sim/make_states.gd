@@ -368,6 +368,14 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 	if not _write_p2b_state(output_dir, "p4c_d17_with_person", gs_p4c.serialize(), data_node):
 		return false
 
+	# ③ p4c_ajie_indulge_ready: 在 ② 之上再備一張發狂卡、把阿婕關係設到「疑似」——
+	# D17 下午山泉閣會同時出現 x_lust_ajie 縱慾出口與 ask_ajie 委託候選，
+	# 用於驗「對阿婕縱慾即失去委託資格、候選當場消失」的 P2→P4-C 整合（p4c_07）。
+	gs_p4c.call("gain_card", "madness")                    # madness#1 ＋ madness_clock（縱慾前置）
+	(gs_p4c.get("relations") as Dictionary)["ajie"] = 1    # 疑似（data/relation_scale.json）
+	if not _write_p2b_state(output_dir, "p4c_ajie_indulge_ready", gs_p4c.serialize(), data_node):
+		return false
+
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
 	var d45_coda_decisions: Array[Dictionary] = [
@@ -789,6 +797,13 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			var meta_with_person: Dictionary = _state_meta(snapshot)
 			return day == 17 and phase == "afternoon" and hand.has("npc_ajie") and hand.has("npc_azhu") \
 				and bool(meta_with_person.get("delegation_tutorial_seen", false)) == true
+		"p4c_ajie_indulge_ready":
+			var has_madness := false
+			for c: String in hand:
+				if str(c).begins_with("madness#"):
+					has_madness = true
+					break
+			return day == 17 and phase == "afternoon" and hand.has("npc_ajie") and has_madness
 		"p3a_night_baseline":
 			if day != 14:
 				printerr("p3a_night_baseline 後置條件失敗：預期 day == 14，實際 %d" % day)
