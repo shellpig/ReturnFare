@@ -1505,8 +1505,9 @@ func start_encounter(beat_id: String) -> Dictionary:
 ## 1. inactive:目前無遭遇（no_active_encounter）
 ## 2. wrong stage:目前不是 intro 階段（wrong_stage）
 ## 3. data conflict:第一回合資料異常（data_conflict）
-## 成功進入第一回合，超載時先加一次 penalty，第一回合各加一次 cost；可用格歸零或無合法解直接 failure。
-## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
+## 成功進入第一回合；若超載則確認開場後立即走 failure 出口；非超載時第一回合加一次 cost；可用格歸零或無合法解直接 failure。
+## 成功回傳另含 entered_round：超載立即 failure 為 false；實際進入第一 round（即使隨後 failure）為 true。
+## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray, "entered_round"?: bool }
 func acknowledge_encounter_intro() -> Dictionary:
 	# 1. inactive
 	if active_encounter.is_empty():
@@ -1528,14 +1529,12 @@ func acknowledge_encounter_intro() -> Dictionary:
 	if first_round.is_empty():
 		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇第一回合資料遺失", "lines": PackedStringArray() }
 
-	var cost := int(enc.get("per_round_slot_cost", 1))
-
-	# 超載時先加一次 penalty cost
+	# 超載時確認開場後立即結算 failure 出口（不進入第一回合、不增加佔格、不保留 active encounter）
 	if is_overloaded():
-		active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
-		if _check_encounter_capacity_failure():
-			var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-			return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
+		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()), "entered_round": false }
+
+	var cost := int(enc.get("per_round_slot_cost", 1))
 
 	# 進入第一回合
 	active_encounter["stage"] = "round"
@@ -1548,14 +1547,14 @@ func acknowledge_encounter_intro() -> Dictionary:
 	# 檢查佔格是否已達/超出手牌上限
 	if _check_encounter_capacity_failure():
 		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()), "entered_round": true }
 
 	# 檢查是否有合法動作
 	if not Encounter.has_legal_moves(enc, first_round, active_encounter, self, Data.loader):
 		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()), "entered_round": true }
 
-	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray() }
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "entered_round": true }
 
 
 ## 遭遇 View Model（規格書第十三節、P4-D）。

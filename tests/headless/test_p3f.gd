@@ -624,42 +624,93 @@ func _test_determinism_across_two_runs(gs: Node, data_node: Node) -> int:
 	get_root().add_child(gs_b)
 	gs_b.deserialize(checkpoint_state)
 
+	var last_ind_count_a := int(gs_a.get("indulgence_count"))
+	var last_ind_count_b := int(gs_b.get("indulgence_count"))
+
 	# 兩邊執行完全相同的第二輪操作序列（前 10 天）
 	var timeline_a: Array[Dictionary] = []
 	var timeline_b: Array[Dictionary] = []
 
 	for d in range(1, 11):
 		# Morning
-		PlaythroughGreedy.execute_action_phase(gs_a, data_node, d, "morning", false)
-		gs_a.advance_phase()
-		timeline_a.append({ "day": d, "phase": "morning", "action_spent": bool(gs_a.get("action_spent")) })
+		var cur_ind_a := int(gs_a.get("indulgence_count"))
+		var forced_m_a := (cur_ind_a > last_ind_count_a)
+		last_ind_count_a = cur_ind_a
+		var act_m_a: Dictionary = PlaythroughGreedy.execute_action_phase(gs_a, data_node, d, "morning", forced_m_a)
+		if not bool(act_m_a.get("ok", false)):
+			failed += _fail("gs_a Day %d morning action failed: %s" % [d, str(act_m_a.get("detail", ""))])
+		last_ind_count_a = int(gs_a.get("indulgence_count"))
+		var adv_m_a: Dictionary = gs_a.advance_phase()
+		if not bool(adv_m_a.get("ok", false)) or not bool(adv_m_a.get("phase_advanced", false)):
+			failed += _fail("gs_a Day %d morning advance_phase failed: %s" % [d, str(adv_m_a)])
+		timeline_a.append({ "day": d, "phase": "morning", "action_spent": bool(gs_a.get("action_spent")), "forced": forced_m_a })
 
-		PlaythroughGreedy.execute_action_phase(gs_b, data_node, d, "morning", false)
-		gs_b.advance_phase()
-		timeline_b.append({ "day": d, "phase": "morning", "action_spent": bool(gs_b.get("action_spent")) })
+		var cur_ind_b := int(gs_b.get("indulgence_count"))
+		var forced_m_b := (cur_ind_b > last_ind_count_b)
+		last_ind_count_b = cur_ind_b
+		var act_m_b: Dictionary = PlaythroughGreedy.execute_action_phase(gs_b, data_node, d, "morning", forced_m_b)
+		if not bool(act_m_b.get("ok", false)):
+			failed += _fail("gs_b Day %d morning action failed: %s" % [d, str(act_m_b.get("detail", ""))])
+		last_ind_count_b = int(gs_b.get("indulgence_count"))
+		var adv_m_b: Dictionary = gs_b.advance_phase()
+		if not bool(adv_m_b.get("ok", false)) or not bool(adv_m_b.get("phase_advanced", false)):
+			failed += _fail("gs_b Day %d morning advance_phase failed: %s" % [d, str(adv_m_b)])
+		timeline_b.append({ "day": d, "phase": "morning", "action_spent": bool(gs_b.get("action_spent")), "forced": forced_m_b })
 
 		# Afternoon
-		PlaythroughGreedy.execute_action_phase(gs_a, data_node, d, "afternoon", false)
-		gs_a.advance_phase()
+		cur_ind_a = int(gs_a.get("indulgence_count"))
+		var forced_a_a := (cur_ind_a > last_ind_count_a)
+		last_ind_count_a = cur_ind_a
+		var act_a_a: Dictionary = PlaythroughGreedy.execute_action_phase(gs_a, data_node, d, "afternoon", forced_a_a)
+		if not bool(act_a_a.get("ok", false)):
+			failed += _fail("gs_a Day %d afternoon action failed: %s" % [d, str(act_a_a.get("detail", ""))])
+		last_ind_count_a = int(gs_a.get("indulgence_count"))
+		var adv_a_a: Dictionary = gs_a.advance_phase()
+		if not bool(adv_a_a.get("ok", false)) or not bool(adv_a_a.get("phase_advanced", false)):
+			failed += _fail("gs_a Day %d afternoon advance_phase failed: %s" % [d, str(adv_a_a)])
+		timeline_a.append({ "day": d, "phase": "afternoon", "action_spent": bool(gs_a.get("action_spent")), "forced": forced_a_a })
 
-		PlaythroughGreedy.execute_action_phase(gs_b, data_node, d, "afternoon", false)
-		gs_b.advance_phase()
+		cur_ind_b = int(gs_b.get("indulgence_count"))
+		var forced_a_b := (cur_ind_b > last_ind_count_b)
+		last_ind_count_b = cur_ind_b
+		var act_a_b: Dictionary = PlaythroughGreedy.execute_action_phase(gs_b, data_node, d, "afternoon", forced_a_b)
+		if not bool(act_a_b.get("ok", false)):
+			failed += _fail("gs_b Day %d afternoon action failed: %s" % [d, str(act_a_b.get("detail", ""))])
+		last_ind_count_b = int(gs_b.get("indulgence_count"))
+		var adv_a_b: Dictionary = gs_b.advance_phase()
+		if not bool(adv_a_b.get("ok", false)) or not bool(adv_a_b.get("phase_advanced", false)):
+			failed += _fail("gs_b Day %d afternoon advance_phase failed: %s" % [d, str(adv_a_b)])
+		timeline_b.append({ "day": d, "phase": "afternoon", "action_spent": bool(gs_b.get("action_spent")), "forced": forced_a_b })
 
 		# Evening
 		PlaythroughGreedy.execute_evening_phase(gs_a, data_node, d)
-		gs_a.advance_phase()
+		last_ind_count_a = int(gs_a.get("indulgence_count"))
+		var adv_e_a: Dictionary = gs_a.advance_phase()
+		if not bool(adv_e_a.get("ok", false)) or not bool(adv_e_a.get("phase_advanced", false)):
+			failed += _fail("gs_a Day %d evening advance_phase failed: %s" % [d, str(adv_e_a)])
 
 		PlaythroughGreedy.execute_evening_phase(gs_b, data_node, d)
-		gs_b.advance_phase()
+		last_ind_count_b = int(gs_b.get("indulgence_count"))
+		var adv_e_b: Dictionary = gs_b.advance_phase()
+		if not bool(adv_e_b.get("ok", false)) or not bool(adv_e_b.get("phase_advanced", false)):
+			failed += _fail("gs_b Day %d evening advance_phase failed: %s" % [d, str(adv_e_b)])
 
 		# Night
 		gs_a.play_night_fixed()
+		PlaythroughGreedy.solve_active_encounter_if_any(gs_a)
 		gs_a.sleep_night()
-		gs_a.advance_phase()
+		last_ind_count_a = int(gs_a.get("indulgence_count"))
+		var adv_n_a: Dictionary = gs_a.advance_phase()
+		if not bool(adv_n_a.get("ok", false)) or not bool(adv_n_a.get("phase_advanced", false)):
+			failed += _fail("gs_a Day %d night advance_phase failed: %s" % [d, str(adv_n_a)])
 
 		gs_b.play_night_fixed()
+		PlaythroughGreedy.solve_active_encounter_if_any(gs_b)
 		gs_b.sleep_night()
-		gs_b.advance_phase()
+		last_ind_count_b = int(gs_b.get("indulgence_count"))
+		var adv_n_b: Dictionary = gs_b.advance_phase()
+		if not bool(adv_n_b.get("ok", false)) or not bool(adv_n_b.get("phase_advanced", false)):
+			failed += _fail("gs_b Day %d night advance_phase failed: %s" % [d, str(adv_n_b)])
 
 	var state_a: Dictionary = gs_a.serialize()
 	var state_b: Dictionary = gs_b.serialize()

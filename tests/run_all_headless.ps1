@@ -53,15 +53,15 @@ foreach ($t in $tests) {
         exit 1
     }
 
-    # K-144 Step 4 / K-149: Gatekeep engine-level errors in stderr
-    $hasEngineErr = ($errText.IndexOf("SCRIPT ERROR") -ge 0) -or `
-                    ($errText.IndexOf("Assertion failed") -ge 0) -or `
+    # K-144 Step 4 / K-149 / K-152: Gatekeep engine-level errors and test-level failures in stderr
+    $hasEngineErr = ($errText.IndexOf("SCRIPT ERROR: Assertion failed") -ge 0) -or `
                     ($errText.IndexOf("Invalid access") -ge 0) -or `
                     ($errText.IndexOf("Invalid index") -ge 0) -or `
-                    ($errText.IndexOf("Invalid call") -ge 0)
+                    ($errText.IndexOf("Invalid call") -ge 0) -or `
+                    ($errText -match "ERROR:\s+FAIL")
 
     if ($hasEngineErr) {
-        Write-Host "`nFAILED: $t detected engine error in output despite exit 0" -ForegroundColor Red
+        Write-Host "`nFAILED: $t detected engine or test failure in stderr despite exit 0" -ForegroundColor Red
         exit 1
     }
 }

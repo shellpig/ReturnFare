@@ -7,7 +7,7 @@ extends SceneTree
 ## 4. 15 碼封閉拒絕矩陣（比對 serialize 零狀態變化，K-128）
 ## 5. 5 大遭遇入口固定拒絕順序優先驗證（雙條件交集衝突測試，K-131）
 ## 6. encounter_view 候選完整性、來源標記與答案不洩漏負向斷言（K-129）
-## 7. 超載規則（is_overloaded 查詢、enter_night_location 阻擋、開場 penalty 佔格）
+## 7. 超載規則（is_overloaded 查詢、enter_night_location 阻擋、確認開場後立即結算 failure）
 ## 8. 佔格計算與扣除（進入回合加佔格、正解釋放本回合佔格、錯答保留佔格）
 ## 9. 主動丟棄卡片與逃離遭遇（allow_discard、cannot_escape 阻擋、扣卡結算）
 ## 10. 無合法解自動結算 failure 與容量上限失敗結算（手牌數＋佔格數 >= 容量）
@@ -723,7 +723,9 @@ func _test_overload_and_penalty(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("enter_night_location correctly rejected with code 'overloaded'")
 
-	# 3. 超載進入遭遇時，acknowledge_encounter_intro 先扣一次 penalty cost
+	# 3. 超載進入遭遇時，確認開場後立即走 failure 出口。
+	# entered_round 是可觀測契約：明確超載分支回 false；若拿掉該分支、
+	# 讓後續容量檢查代勞 failure，則會回 true，測試必須轉紅。
 	gs.phase = "morning"
 	var mock_enc: Dictionary = {
 		"repeat_each_run": true,
@@ -739,20 +741,50 @@ func _test_overload_and_penalty(gs: Node, data_node: Node) -> int:
 				"fallback": { "requires_discardable": false, "next_round": null }
 			}
 		],
-		"on_failure": { "flag": { "overload_failed": true } }
+		"on_failure": { "switch_progress": { "overload_fail_count": 1 } }
 	}
 	_create_mock_encounter_beat(data_node, "mock_enc_ov", mock_enc)
-	gs.start_encounter("mock_enc_ov")
-
+	gs.switch_progress["overload_fail_count"] = 0
 	gs.knowledge["k_clue"] = true
-	var res_ack_ov: Dictionary = gs.acknowledge_encounter_intro()
-	if not bool(gs.flags.get("overload_failed", false)):
-		failed += _err("overloaded acknowledge should trigger capacity failure on entry")
-	else:
-		failed += _ok("overloaded encounter start correctly applies penalty and triggers capacity failure")
 
-	_clean_mock_beat(data_node, "mock_enc_ov")
+	# 斷言 1: start_encounter() 後仍停在 intro，尚未套 failure
+	var start_res: Dictionary = gs.start_encounter("mock_enc_ov")
+	if not bool(start_res.get("ok", false)) or str(gs.active_encounter.get("stage", "")) != "intro" or int(gs.switch_progress.get("overload_fail_count", 0)) != 0:
+		failed += _err("start_encounter under overload should remain in intro stage with 0 failure effect")
+	else:
+		failed += _ok("start_encounter under overload stays in intro stage without premature failure")
+
+	# 斷言 2 & 3: acknowledge 回 ok:true，且明示未進第一 round
+	var res_ack_ov: Dictionary = gs.acknowledge_encounter_intro()
+	if not bool(res_ack_ov.get("ok", false)) or bool(res_ack_ov.get("entered_round", true)):
+		failed += _err("overloaded acknowledge should return ok:true and entered_round:false, got %s" % str(res_ack_ov))
+	else:
+		failed += _ok("overloaded acknowledge returns ok:true and entered_round:false")
+
+	# 斷言 4 & 5 & 6: active encounter 已清空、可累加 failure 效果恰好套用一次、無殘留狀態
+	if not gs.active_encounter.is_empty():
+		failed += _err("active_encounter should be cleared immediately after overloaded failure settlement")
+	elif int(gs.switch_progress.get("overload_fail_count", 0)) != 1:
+		failed += _err("overloaded failure effect should apply exactly once (counter expected 1, got %d)" % int(gs.switch_progress.get("overload_fail_count", 0)))
+	else:
+		failed += _ok("overloaded acknowledge cleanly triggers failure effect exactly once without entering round or retaining active encounter")
+
+	# 斷言 7: 非超載 acknowledge 仍只加第一 round 一次
 	_clean_mock_cards(data_node, dummy_cards)
+	while gs.hand.size() > 1:
+		gs.hand.pop_back()
+	if gs.is_overloaded():
+		failed += _err("gs should not be overloaded after clearing dummy cards")
+
+	gs.start_encounter("mock_enc_ov")
+	var normal_ack: Dictionary = gs.acknowledge_encounter_intro()
+	if not bool(normal_ack.get("ok", false)) or not bool(normal_ack.get("entered_round", false)) or str(gs.active_encounter.get("stage", "")) != "round" or int(gs.active_encounter.get("blocked_slots", 0)) != 2:
+		failed += _err("normal non-overloaded acknowledge should return entered_round:true and enter round with exactly 1 round cost (blocked_slots=2, result=%s, state=%s)" % [str(normal_ack), str(gs.active_encounter)])
+	else:
+		failed += _ok("non-overloaded acknowledge enters round with single first-round cost")
+
+	gs.active_encounter.clear()
+	_clean_mock_beat(data_node, "mock_enc_ov")
 	_clean_mock_cards(data_node, ["k_clue"])
 	return failed
 
