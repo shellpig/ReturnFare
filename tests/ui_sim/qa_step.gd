@@ -9,6 +9,14 @@ const QADiagnosticsClass := preload("res://tests/ui_sim/qa_diagnostics.gd")
 ## hover 同步的重試上限。排版與 hover 不保證在同一幀就位，送一次不夠（K-48）。
 const HOVER_SYNC_ATTEMPTS := 5
 
+## drain_beats() 演出途中可能彈出、必須先關閉才能繼續推進的已知 modal 白名單（K-125）。
+## 只處理明示允許的 dialog id；未列在這裡的 modal 擋住 beat_advance 時，drain_beats()
+## 不會替它自動點擊，會照舊在 max_steps 之後回報「疑似無限迴圈」——那是刻意的，
+## 不能把 has_visible_qa_id() 找得到的任何彈窗都靜默關掉。
+const KNOWN_BLOCKING_DIALOGS: Array[String] = [
+	"dialog_confirm::delegation_tutorial",
+]
+
 static var _interim_enabled := false
 static var _interim_tree: SceneTree
 static var _interim_root: Node
@@ -356,19 +364,46 @@ static func scroll_into_view(tree: SceneTree, scroll_container: ScrollContainer,
 	return result
 
 
+## 演出途中彈出的已知 modal（見 KNOWN_BLOCKING_DIALOGS）會蓋住 beat_advance；
+## has_visible_qa_id() 只看 is_visible_in_tree()，不知道底層被 modal 擋住，
+## 送出的點擊全部落空，20 次後才誤報「疑似無限迴圈」（K-125）。回傳目前可見
+## 的已知 dialog qa_id，找不到回空字串。
+static func _find_visible_known_dialog(root: Node) -> String:
+	for qa_id: String in KNOWN_BLOCKING_DIALOGS:
+		if has_visible_qa_id(root, qa_id):
+			return qa_id
+	return ""
+
+
 ## 推進演出佇列直到 beat_advance 消失，遇到第一個點擊失敗立即返回，並設步數上限，
 ## 避免案例在演出卡住時無限迴圈到 launcher timeout 才被發現，只得到「逾時」而非
-## 命中診斷。
-static func drain_beats(tree: SceneTree, max_steps: int = 20) -> Dictionary:
+## 命中診斷。每輪先檢查已知 modal（K-125）：若可見就真的點擊關閉、確認消失後才
+## 繼續看 beat_advance，這段不計入 beat 的 max_steps，改計入獨立的 max_dialog_steps，
+## 避免同一個 dialog 反覆出現時被誤判為推進迴圈。
+static func drain_beats(tree: SceneTree, max_steps: int = 20, max_dialog_steps: int = 5) -> Dictionary:
 	var steps := 0
-	while has_visible_qa_id(tree.get_root(), "beat_advance"):
+	var dialog_steps := 0
+	var dialogs_handled: Array[String] = []
+	while true:
+		var blocking_dialog := _find_visible_known_dialog(tree.get_root())
+		if not blocking_dialog.is_empty():
+			if dialog_steps >= max_dialog_steps:
+				return { "ok": false, "steps": steps, "dialogs_handled": dialogs_handled, "error": "已知 modal (%s) 反覆出現超過上限 (%d)" % [blocking_dialog, max_dialog_steps] }
+			var dialog_res := await click(tree, blocking_dialog)
+			if not dialog_res.get("ok", false):
+				return { "ok": false, "steps": steps, "dialogs_handled": dialogs_handled, "error": "關閉已知 modal %s 失敗: %s" % [blocking_dialog, str(dialog_res.get("error"))] }
+			dialogs_handled.append(blocking_dialog)
+			dialog_steps += 1
+			continue
+		if not has_visible_qa_id(tree.get_root(), "beat_advance"):
+			break
 		if steps >= max_steps:
-			return { "ok": false, "steps": steps, "error": "beat_advance 推進次數超過上限 (%d)，疑似無限迴圈" % max_steps }
+			return { "ok": false, "steps": steps, "dialogs_handled": dialogs_handled, "error": "beat_advance 推進次數超過上限 (%d)，疑似無限迴圈" % max_steps }
 		var click_res := await click(tree, "beat_advance")
 		if not click_res.get("ok", false):
-			return { "ok": false, "steps": steps, "error": "第 %d 次推進失敗: %s" % [steps + 1, str(click_res.get("error"))] }
+			return { "ok": false, "steps": steps, "dialogs_handled": dialogs_handled, "error": "第 %d 次推進失敗: %s" % [steps + 1, str(click_res.get("error"))] }
 		steps += 1
-	return { "ok": true, "steps": steps, "error": "" }
+	return { "ok": true, "steps": steps, "dialogs_handled": dialogs_handled, "error": "" }
 
 
 ## 等待指定次數的 frame_post_draw

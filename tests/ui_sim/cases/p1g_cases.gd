@@ -219,6 +219,12 @@ class Case03ReenterNoDuplicateOnEnter extends CaseBaseClass:
 		var drain1 := await QAStep.drain_beats(tree)
 		assert_true(drain1.get("ok", false), "第一次演出推進失敗: " + str(drain1.get("error", "")))
 
+		# K-125 回歸證據：d17_morning_phone 首次取得人物卡必定彈出委託教學 modal，
+		# drain_beats() 必須真的點開它並確認消失，而不是被 modal 擋住誤判成迴圈。
+		var dialogs_handled: Array = drain1.get("dialogs_handled", [])
+		assert_true(dialogs_handled.has("dialog_confirm::delegation_tutorial"), "第一次進山泉閣必須真的彈出並關閉委託教學 modal")
+		assert_true(bool(gs.get("delegation_tutorial_seen")), "委託教學關閉後必須寫入 delegation_tutorial_seen")
+
 		var dump1 := QADiagnostics.dump_ui_tree(main_node)
 		var state1: Dictionary = gs.call("serialize")
 
