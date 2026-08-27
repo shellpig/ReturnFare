@@ -102,22 +102,11 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 	if not _run_walk_with_checkpoints(tree, data_node, d9_knowledge_decisions, d9_knowledge_cp, output_dir):
 		return false
 
-	var d10_bytes := FileAccess.get_file_as_bytes(output_dir + "d10_night__knowledge.json")
-	var d10_dict: Dictionary = JSON.parse_string(d10_bytes.get_string_from_utf8())
-	var gs_d10_fix: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
-	_reset_state(gs_d10_fix)
-	gs_d10_fix.deserialize(d10_dict)
-	if not gs_d10_fix.has_card("info_husband_version"):
-		gs_d10_fix.gain_card("info_husband_version")
-	if not gs_d10_fix.has_card("info_wife_version"):
-		gs_d10_fix.gain_card("info_wife_version")
-	if not _write_p2b_state(output_dir, "d10_night__knowledge", gs_d10_fix.serialize(), data_node):
-		return false
-	d10_dict = gs_d10_fix.serialize()
-
 	# 產生 P1-H 完整知識清單狀態（從 D10 知識狀態出發，以合法 gain_card() 加入全部 slotless 卡）
 	var gs_full: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
 	_reset_state(gs_full)
+	var d10_bytes := FileAccess.get_file_as_bytes(output_dir + "d10_night__knowledge.json")
+	var d10_dict: Dictionary = JSON.parse_string(d10_bytes.get_string_from_utf8())
 	gs_full.deserialize(d10_dict)
 	for card_id_key: String in data_node.loader.cards.keys():
 		var c_def: Dictionary = data_node.loader.cards[card_id_key] as Dictionary
@@ -501,19 +490,8 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 	if not _write_p2b_state(output_dir, "p4e_d8_night", gs_p4e_d8.serialize(), data_node):
 		return false
 
-	# ② p4e_d45_afternoon & d45_afternoon: D45 下午，遭遇已啟動（intro 階段）。
-	# 修整手牌至 <= 12 張，確保進入第一回合時可用容量 > 0。
-	var d45_dict := _load_state(output_dir, "p4e_d45_afternoon.json")
-	if not d45_dict.is_empty():
-		var gs_p4e_d45: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
-		_reset_state(gs_p4e_d45)
-		gs_p4e_d45.deserialize(d45_dict)
-		var trimmed_hand: Array[String] = ["protagonist", "info_registry", "npc_ajie", "npc_awei", "doc_prescription", "info_uncle_gap"]
-		gs_p4e_d45.set("hand", trimmed_hand)
-		if not _write_p2b_state(output_dir, "p4e_d45_afternoon", gs_p4e_d45.serialize(), data_node):
-			return false
-		if not _write_p2b_state(output_dir, "d45_afternoon", gs_p4e_d45.serialize(), data_node):
-			return false
+	# ② p4e_d45_afternoon: D45 下午，遭遇已啟動（intro 階段）。
+	# 由既有 d45_coda_cp 走查直接自然產生，不需人為修剪手牌（D45 遭遇 per_round_slot_cost: 0）。
 
 	return true
 

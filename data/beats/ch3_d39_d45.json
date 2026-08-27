@@ -698,7 +698,7 @@
       "title": "走廊盡頭",
       "text": "它要一個質性回應。你逃不掉。\n但每一種回答都揭露一個條件。",
       "encounter": {
-        "per_round_slot_cost": 1,
+        "per_round_slot_cost": 0,
         "escape_cost": null,
         "allow_discard": false,
         "after_finish": "advance_phase",

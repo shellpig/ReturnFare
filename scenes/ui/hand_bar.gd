@@ -38,6 +38,12 @@ func refresh() -> void:
 	_refresh()
 
 
+## 供外部（如遭遇面板）請求顯示卡片詳情。
+func show_card_detail(card_id: String) -> void:
+	if _detail_dialog != null and _detail_dialog.has_method("show_card"):
+		_detail_dialog.show_card(card_id)
+
+
 func _refresh() -> void:
 	var limit: int = int(Data.tuning("hand_size"))
 	_slots_label.text = _FMT_SLOTS % [GameState.hand_slots_used(), limit]

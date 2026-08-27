@@ -423,7 +423,7 @@ Copy-Item -Path $dataSource -Destination $longCardNameData -Recurse -Force
 $longCardCardsPath = Join-Path $longCardNameData "cards.json"
 $longCardData = Get-Content -Path $longCardCardsPath -Raw -Encoding utf8 | ConvertFrom-Json
 foreach ($c in @($longCardData.cards)) {
-    if ([string]$c.id -eq "info_husband_version") {
+    if ([string]$c.id -eq "routine_debt") {
         $c.name = "這是一張名字非常非常非常長必定超出七格欄寬的測試情報卡說法"
     }
 }

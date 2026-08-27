@@ -444,29 +444,29 @@ class UiCase extends CaseBaseClass:
 		var before_state := _state(tree)
 		var data_node := _data(tree)
 
-		# 點先生說法
-		await _click(tree, "hand_card::info_husband_version")
-		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "先生說法詳情開啟")
-		var husband_name: String = str(data_node.call("card_display_name", "info_husband_version"))
-		var husband_text: String = str(data_node.loader.cards.get("info_husband_version", {}).get("text", ""))
-		assert_true(_has_text(tree.get_root(), husband_name), "先生說法卡名")
-		assert_true(_has_text(tree.get_root(), husband_text), "先生說法內容")
+		# 點日常欠債
+		await _click(tree, "hand_card::routine_debt")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "日常欠債詳情開啟")
+		var debt_name: String = str(data_node.call("card_display_name", "routine_debt"))
+		var debt_text: String = str(data_node.loader.cards.get("routine_debt", {}).get("text", ""))
+		assert_true(_has_text(tree.get_root(), debt_name), "日常欠債卡名")
+		assert_true(_has_text(tree.get_root(), debt_text), "日常欠債內容")
 		await _click(tree, "dialog_confirm::card_detail")
-		var after_husband := _state(tree)
-		assert_eq(JSON.stringify(before_state), JSON.stringify(after_husband), "先生說法關閉後狀態逐欄不變")
+		var after_debt := _state(tree)
+		assert_eq(JSON.stringify(before_state), JSON.stringify(after_debt), "日常欠債關閉後狀態逐欄不變")
 
-		# 點妻子說法
-		await _click(tree, "hand_card::info_wife_version")
-		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "妻子說法詳情開啟")
-		var wife_name: String = str(data_node.call("card_display_name", "info_wife_version"))
-		var wife_text: String = str(data_node.loader.cards.get("info_wife_version", {}).get("text", ""))
-		assert_true(_has_text(tree.get_root(), wife_name), "妻子說法卡名")
-		assert_true(_has_text(tree.get_root(), wife_text), "妻子說法內容")
+		# 點阿宏私事
+		await _click(tree, "hand_card::info_ahong_private")
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "阿宏私事詳情開啟")
+		var ahong_name: String = str(data_node.call("card_display_name", "info_ahong_private"))
+		var ahong_text: String = str(data_node.loader.cards.get("info_ahong_private", {}).get("text", ""))
+		assert_true(_has_text(tree.get_root(), ahong_name), "阿宏私事卡名")
+		assert_true(_has_text(tree.get_root(), ahong_text), "阿宏私事內容")
 		await _click(tree, "dialog_confirm::card_detail")
-		var after_wife := _state(tree)
-		assert_eq(JSON.stringify(before_state), JSON.stringify(after_wife), "妻子說法關閉後狀態逐欄不變")
+		var after_ahong := _state(tree)
+		assert_eq(JSON.stringify(before_state), JSON.stringify(after_ahong), "阿宏私事關閉後狀態逐欄不變")
 
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["husband_detail_ok", "wife_detail_ok", "state_unchanged"] } }
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["routine_debt_detail_ok", "ahong_private_detail_ok", "state_unchanged"] } }
 
 	func _p1h_03(tree: SceneTree) -> Dictionary:
 		await _click(tree, "hand_card::protagonist")
@@ -515,10 +515,10 @@ class UiCase extends CaseBaseClass:
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["all_knowledge_present", "scroll_last_visible", "state_unchanged"] } }
 
 	func _p1h_05(tree: SceneTree) -> Dictionary:
-		var btn_list := QAStepClass.find_controls_by_qa_id(tree.get_root(), "hand_card::info_husband_version")
-		assert_eq(btn_list.size(), 1, "先生說法卡片按鈕")
+		var btn_list := QAStepClass.find_controls_by_qa_id(tree.get_root(), "hand_card::routine_debt")
+		assert_eq(btn_list.size(), 1, "日常欠債卡片按鈕")
 		var data_node := _data(tree)
-		var long_name: String = str(data_node.call("card_display_name", "info_husband_version"))
+		var long_name: String = str(data_node.call("card_display_name", "routine_debt"))
 		assert_true(long_name.length() > 10, "資料變體超長卡名生效")
 		if btn_list.size() == 1:
 			var btn := btn_list[0] as Button
@@ -529,7 +529,7 @@ class UiCase extends CaseBaseClass:
 			var text_w: float = font.get_string_size(btn.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 			assert_true(text_w > btn.size.x, "超長卡名寬度 (%f) 應大於按鈕寬度 (%f)" % [text_w, btn.size.x])
 
-		await _click(tree, "hand_card::info_husband_version")
+		await _click(tree, "hand_card::routine_debt")
 		assert_true(_has_text(tree.get_root(), long_name), "詳情彈窗內顯示完整未截斷全名")
 		await _click(tree, "dialog_confirm::card_detail")
 
@@ -1862,64 +1862,158 @@ class UiCase extends CaseBaseClass:
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["indulge_breaks_delegation_eligibility", "candidate_hidden_after_card_lost"] } }
 
 	func _p4e_01(tree: SceneTree) -> Dictionary:
-		# D8 遭遇：開場 FlowText 有文字，點確認開場進入 round 階段顯示 demand 與候選
+		# D8 遭遇：開場 FlowText 有文字，推進按鈕被禁用
 		assert_true(_has_text(tree.get_root(), "兩側全是門") or _has_text(tree.get_root(), "名字"), "FlowText 顯示開場文字")
 		assert_has_qa_id(tree, "encounter_intro_ack", "確認開場按鈕在場")
+		
+		# 斷言 1：遭遇 intro 階段推進按鈕禁用守衛
+		var adv_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")
+		assert_true(not adv_btns.is_empty(), "找到推進按鈕")
+		if not adv_btns.is_empty():
+			assert_true((adv_btns[0] as Button).disabled, "遭遇 intro 階段推進按鈕 disabled 守衛")
+
 		await _click(tree, "encounter_intro_ack")
+
+		# 斷言 2：進入 round 階段顯示 demand
 		assert_has_qa_id(tree, "encounter_demand", "進入 round 階段顯示 demand")
 		assert_true(_has_text(tree.get_root(), "那個名字什麼時候開始是你的"), "Demand 文字可見")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["encounter_intro_text_visible", "encounter_ack_to_round", "encounter_demand_visible"] } }
+
+		# 斷言 3：遭遇 round 階段推進按鈕仍然禁用
+		if not adv_btns.is_empty():
+			assert_true((adv_btns[0] as Button).disabled, "遭遇 round 階段推進按鈕 disabled 守衛")
+
+		# 斷言 4：容量標籤與壓力佔位符
+		assert_has_qa_id(tree, "encounter_capacity", "容量標籤在場")
+		var cap_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_capacity")
+		if not cap_nodes.is_empty():
+			var cap_lbl := cap_nodes[0] as Label
+			assert_true(cap_lbl.text.contains("可用格數"), "容量標籤包含『可用格數』")
+			assert_true(cap_lbl.text.contains("壓力佔 1"), "容量標籤包含『壓力佔 1』")
+
+		var blocked_0 := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_blocked::0")
+		assert_eq(blocked_0.size(), 1, "encounter_blocked::0 壓力 placeholder 在場")
+		if not blocked_0.is_empty():
+			assert_eq((blocked_0[0] as Label).text, "■", "壓力 placeholder 為黑色方塊 ■")
+
+		# 斷言 5：卡片詳情按鈕整合與唯讀檢視（重用 HandBar/CardDetail）
+		assert_has_qa_id(tree, "encounter_detail::protagonist", "候選卡詳情按鈕在場")
+		var snap_before := JSON.stringify(_state(tree))
+		await _click(tree, "encounter_detail::protagonist")
+		assert_has_qa_id(tree, "dialog_confirm::card_detail", "卡片詳情彈窗開啟")
+		var pro_name: String = str(_data(tree).call("card_display_name", "protagonist"))
+		assert_true(_has_text(tree.get_root(), pro_name), "詳情彈窗顯示主角卡片內容")
+		await _click(tree, "dialog_confirm::card_detail")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::card_detail"), "詳情彈窗關閉")
+		var snap_after := JSON.stringify(_state(tree))
+		assert_eq(snap_after, snap_before, "檢視卡片詳情關閉後狀態逐字不變")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["encounter_intro_ack", "encounter_demand", "encounter_capacity", "encounter_blocked_placeholder", "encounter_card_detail", "advance_guard_disabled"] } }
 
 	func _p4e_02(tree: SceneTree) -> Dictionary:
-		# D8 遭遇：候選卡確認彈窗取消零變化、disabled 卡顯示原因
 		await _click(tree, "encounter_intro_ack")
-		# 檢查 disabled 卡（例如主角卡不可在首輪 fallback 丟棄）
-		var cand_ctrls := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::protagonist")
-		assert_true(not cand_ctrls.is_empty(), "protagonist 候選卡在場")
-		if not cand_ctrls.is_empty():
-			var btn := cand_ctrls[0] as Button
-			assert_true(btn.disabled, "protagonist 候選卡為 disabled")
-			assert_true(btn.text.contains("無法提交此卡") or btn.tooltip_text.contains("無法提交此卡"), "disabled 卡顯示原因")
-		
-		# 尋找可提交卡（如 equip_polaroid）點擊開彈窗並取消
-		var polaroid_ctrls := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::equip_polaroid")
-		if not polaroid_ctrls.is_empty() and not (polaroid_ctrls[0] as Button).disabled:
-			var snap_before := JSON.stringify(_state(tree))
-			await _click(tree, "encounter_candidate::equip_polaroid")
-			assert_has_qa_id(tree, "dialog_confirm::encounter_respond", "確認提交彈窗出現")
-			await _click(tree, "dialog_cancel::encounter_respond")
-			var snap_after := JSON.stringify(_state(tree))
-			assert_eq(snap_after, snap_before, "取消提交後完整 serialize 狀態逐字不變")
-		else:
-			# 若無 polaroid 則尋找任何可點擊的 candidate 驗證取消
-			var all_cands := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "encounter_candidate::")
-			for cand in all_cands:
-				if cand is Button and not (cand as Button).disabled:
-					var qa_id := str(cand.get_meta("qa_id"))
-					var snap_before := JSON.stringify(_state(tree))
-					await _click(tree, qa_id)
-					assert_has_qa_id(tree, "dialog_confirm::encounter_respond", "確認提交彈窗出現")
-					await _click(tree, "dialog_cancel::encounter_respond")
-					var snap_after := JSON.stringify(_state(tree))
-					assert_eq(snap_after, snap_before, "取消提交後完整 serialize 狀態逐字不變")
-					break
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["respond_confirm_dialog", "respond_cancel_state_unchanged", "disabled_card_shows_reason"] } }
+
+		# 1. 發狂卡 madness_blocked 呈現
+		var madness_cands := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::madness#1")
+		if madness_cands.is_empty():
+			var all_cands := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "encounter_candidate::madness")
+			if not all_cands.is_empty():
+				madness_cands = [all_cands[0]]
+		assert_true(not madness_cands.is_empty(), "發狂卡在遭遇候選清單中")
+		if not madness_cands.is_empty():
+			var m_btn := madness_cands[0] as Button
+			assert_true(m_btn.disabled, "發狂卡候選按鈕 disabled")
+			assert_true(m_btn.text.contains("發狂卡無法使用") or m_btn.tooltip_text.contains("發狂卡無法使用"), "發狂卡呈現 madness_blocked 理由")
+
+		# 2. 主角卡不可在首輪 fallback 丟棄
+		var pro_cands := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::protagonist")
+		assert_true(not pro_cands.is_empty(), "protagonist 候選在場")
+		if not pro_cands.is_empty():
+			var p_btn := pro_cands[0] as Button
+			assert_true(p_btn.disabled, "protagonist 候選按鈕 disabled")
+			assert_true(p_btn.text.contains("無法提交此卡") or p_btn.tooltip_text.contains("無法提交此卡"), "不可提交卡呈現理由")
+
+		# 3. 丟棄按鈕確認彈窗與取消（D8 手上的可丟棄卡為 info_husband_version）
+		assert_has_qa_id(tree, "encounter_discard::info_husband_version", "可丟棄手牌有 discard 按鈕")
+		var snap_disc_before := JSON.stringify(_state(tree))
+		await _click(tree, "encounter_discard::info_husband_version")
+		assert_has_qa_id(tree, "dialog_confirm::encounter_discard", "確認丟棄彈窗開啟")
+		await _click(tree, "dialog_cancel::encounter_discard")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::encounter_discard"), "丟棄彈窗關閉")
+		assert_eq(JSON.stringify(_state(tree)), snap_disc_before, "取消丟棄後狀態逐字不變")
+
+		# 4. 逃離按鈕確認彈窗與取消
+		assert_has_qa_id(tree, "encounter_escape_pay::info_husband_version", "D8 逃離支付按鈕在場")
+		var snap_esc_before := JSON.stringify(_state(tree))
+		await _click(tree, "encounter_escape_pay::info_husband_version")
+		assert_has_qa_id(tree, "dialog_confirm::encounter_escape", "確認逃離彈窗開啟")
+		await _click(tree, "dialog_cancel::encounter_escape")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::encounter_escape"), "逃離彈窗關閉")
+		assert_eq(JSON.stringify(_state(tree)), snap_esc_before, "取消逃離後狀態逐字不變")
+
+		# 5. 回應確認彈窗與取消
+		var snap_resp_before := JSON.stringify(_state(tree))
+		await _click(tree, "encounter_candidate::info_husband_version")
+		assert_has_qa_id(tree, "dialog_confirm::encounter_respond", "確認提交彈窗開啟")
+		await _click(tree, "dialog_cancel::encounter_respond")
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "dialog_confirm::encounter_respond"), "提交彈窗關閉")
+		assert_eq(JSON.stringify(_state(tree)), snap_resp_before, "取消提交後狀態逐字不變")
+
+		# 6. 提交 info_husband_version 進入 Round 2
+		await _click(tree, "encounter_candidate::info_husband_version")
+		await _click(tree, "dialog_confirm::encounter_respond")
+		assert_true(_has_text(tree.get_root(), "誰記得你"), "進入 R2 demand")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["madness_blocked_reason", "discard_cancel_ok", "escape_cancel_ok", "respond_cancel_ok", "advance_to_r2"] } }
 
 	func _p4e_03(tree: SceneTree) -> Dictionary:
-		# D45 遭遇：無逃離按鈕無丟棄按鈕、候選卡可見
+		# D45 下午遭遇：推進按鈕 disabled 守衛
+		var adv_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")
+		if not adv_btns.is_empty():
+			assert_true((adv_btns[0] as Button).disabled, "D45 遭遇中推進按鈕 disabled")
+
 		await _click(tree, "encounter_intro_ack")
+
+		# 容量為 0 壓力，且無 blocked slots
+		var cap_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_capacity")
+		if not cap_nodes.is_empty():
+			assert_true((cap_nodes[0] as Label).text.contains("壓力佔 0"), "D45 遭遇容量不吃壓力佔位符（壓力佔 0）")
+		assert_no_qa_id(tree, "encounter_blocked::0", "D45 遭遇無 blocked slot")
+
+		# 無逃離按鈕、無丟棄按鈕
 		assert_no_qa_id(tree, "encounter_escape", "D45 遭遇無逃離按鈕")
 		assert_no_qa_id(tree, "encounter_discard::protagonist", "D45 遭遇無丟棄按鈕")
-		assert_has_qa_id(tree, "encounter_candidate::protagonist", "D45 遭遇 protagonist 候選按鈕可見")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["d45_no_escape_button", "d45_no_discard_button", "d45_candidates_visible"] } }
+
+		# 候選卡可見且知識卡帶『（知識）』標記
+		assert_has_qa_id(tree, "encounter_candidate::protagonist", "protagonist 候選按鈕可見")
+		var pro_btn := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::protagonist")[0] as Button
+		assert_false(pro_btn.disabled, "D45 protagonist 可提交（submittable: true）")
+
+		# 知識卡候選標記
+		var k_cands := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "encounter_candidate::k_")
+		if not k_cands.is_empty():
+			var k_btn := k_cands[0] as Button
+			assert_true(k_btn.text.contains("（知識）"), "知識候選卡標示（知識）")
+
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["d45_no_escape", "d45_no_discard", "d45_capacity_zero_blocked", "d45_knowledge_marked"] } }
 
 	func _p4e_04(tree: SceneTree) -> Dictionary:
-		# D45 遭遇：提交主角卡後推進至 evening
 		await _click(tree, "encounter_intro_ack")
 		await _click(tree, "encounter_candidate::protagonist")
 		await _click(tree, "dialog_confirm::encounter_respond")
 		var run := _run(tree)
 		assert_eq(str(run.get("phase", "")), "evening", "D45 遭遇結束後時段推進至 evening")
-		assert_true(_has_text(tree.get_root(), "這個名字已經登記") or _has_text(tree.get_root(), "走廊安靜下來") or _has_text(tree.get_root(), "靜和園") or _has_text(tree.get_root(), "後棟"), "畫面呈現遭遇出口文字或 evening 畫面")
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["d45_respond_success", "d45_phase_evening_after"] } }
+
+		# F1 嚴格斷言：遭遇出口文字必須完整呈現在 FlowText 上（不得被清空或覆蓋）
+		var flow_text_nodes := QAStepClass.find_controls_by_name(tree.get_root(), "FlowText")
+		assert_true(not flow_text_nodes.is_empty(), "FlowText 節點在場")
+		if not flow_text_nodes.is_empty():
+			var ft: Control = flow_text_nodes[0] as Control
+			assert_true(ft.is_visible_in_tree(), "FlowText 呈現遭遇出口文字且可見")
+			var ft_lines: PackedStringArray = ft.call("get_lines")
+			var all_lines_text := "".join(ft_lines)
+			assert_true(all_lines_text.contains("你拿出了你自己") or all_lines_text.contains("這個名字已經登記"), "FlowText 包含主角卡回應出口文字")
+
+		# coda 地點面板同時開啟
+		assert_true(_has_text(tree.get_root(), "靜和園") or _has_text(tree.get_root(), "後棟"), "Coda 地點面板開啟")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["d45_respond_success", "d45_phase_evening_after", "flow_text_exit_lines_preserved"] } }
 

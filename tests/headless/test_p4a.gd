@@ -487,7 +487,7 @@ func _test_lint16_negative() -> void:
 
 	# 小數 per_round_slot_cost（1.5 不得被 int() 截斷後接受）
 	var ef1: Dictionary = base_enc.call(); ef1["per_round_slot_cost"] = 1.5
-	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef1), cards, locs)), "per_round_slot_cost 必須為正整數"):
+	if _errs_contain(DataLoader.lint_encounters(_make_loader(make_enc.call(ef1), cards, locs)), "per_round_slot_cost 必須為非負整數"):
 		_ok("小數 per_round_slot_cost 被抓")
 	else:
 		_fail("小數 per_round_slot_cost 未被抓")

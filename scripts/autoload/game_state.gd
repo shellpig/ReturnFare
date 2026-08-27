@@ -1481,7 +1481,7 @@ func start_encounter(beat_id: String) -> Dictionary:
 	var rounds_val: Variant = enc.get("rounds")
 	if not rounds_val is Array or (rounds_val as Array).is_empty():
 		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料缺少回合定義" }
-	if not enc.has("per_round_slot_cost") or int(enc.get("per_round_slot_cost", 0)) <= 0:
+	if not enc.has("per_round_slot_cost") or int(enc.get("per_round_slot_cost", 0)) < 0:
 		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料 slot_cost 錯誤" }
 	if not enc.has("after_finish"):
 		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料缺少 after_finish" }
@@ -1863,9 +1863,12 @@ func _finish_encounter(outcome: String, effect_data: Dictionary) -> Dictionary:
 
 
 ## 檢查可用格數是否歸零或小於 0（容量超載失敗，K-135/K-136）。
+## 當 blocked_slots == 0 時（如 D45），僅在手牌超載（> hand_size）時判定容量失敗。
 func _check_encounter_capacity_failure() -> bool:
 	var hand_size := int(Data.tuning("hand_size", 14)) if Data != null else 14
 	var blocked := int(active_encounter.get("blocked_slots", 0))
+	if blocked <= 0:
+		return is_overloaded()
 	return (hand_size - hand.size() - blocked) <= 0
 
 

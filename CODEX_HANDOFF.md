@@ -4,48 +4,56 @@
 
 ## 目前階段
 
-**P1、P2 已完成；P3 機器層已完成；P4-A～P4-C 已完成；P4-D 遭遇規則實作完成，超載確認立即失敗規則與 P3-F 假綠已全數修復，機器層 26 套 headless 測試全數 exit 0。目前等待 verifier 審核與驗證落檔。下一步任務為 P4-E 遭遇 UI 與 D8／D45 接線。**
+**P1～P3 已完成；P4-A～P4-D 已完成；P4-E 遭遇 UI 面板、D8／D45 生命週期接線、CardDetail 整合與 F1～F6 修復全數完成。全套 27 套 headless 測試全數 exit 0，全套 UI Sim（85 契約、108 變體與負向測試）全數 exit 0（0 failed checks）。待 verifier 審核與落檔。**
 
 - 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；本檔只保存最近交接重點。
 - P4-A：委託／遭遇資料與 lint 真值化已完成。
 - P4-B：委託規則已實作並通過 verifier 複驗，K-65 結案。
-- P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已實作並完成第三輪 verifier 關門；K-124／K-125 結案，完整 UI sim 104／104 variants、81／81 contracts、0 failed。
-- P4-D：遭遇規則與狀態機實作完成，超載確認立即失敗規則與 P3-F 假綠／runner 守門全面修復，`test_p4d.gd` 覆蓋 16 大項驗收標準，26 套 headless 全數 exit 0 通過。
-- P4-E～F（遭遇 UI、D8／D45 接線與全流程整合）：待 P4-D 驗證後開工。
+- P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已完成。
+- P4-D：遭遇規則與狀態機實作完成，26 套 headless 全數 exit 0 通過。
+- P4-E：遭遇 UI 面板、CardDetail 詳情整合、D8／D45 遭遇生命週期與時段推進接線完成。27 套 headless（含 `test_p4e.gd`）與 85 條 UI 契約全綠。
+- P4-F：全流程整合與預算走查。
 - P5：開局、四類結局、歷輪摘要、跨輪重置與 UI 已拆成 P5-A～F，尚未開始實作。
 
-## 最近完成的工作
+## 最近完成的工作（P4-E 與 F1～F6 修復）
 
-- **超載進入遭遇規則修改（確認後立即走 failure 出口）**：
-  - `scripts/autoload/game_state.gd`：`acknowledge_encounter_intro()` 在 `is_overloaded()` 為 true 時，確認開場後立即結算 failure 出口（`_finish_encounter("failure", enc.get("on_failure", {}))`），不進入第一 round、不加第一 round cost、不保留 active encounter，`on_failure` 效果與文字恰好套用一次；移除無效的 penalty 中繼累加；非超載路徑維持原行為。
-  - `acknowledge_encounter_intro()` 的成功結果新增 `entered_round`：超載立即 failure 回 false，真正進入第一 round（即使隨後容量 failure）回 true，讓兩條原本最終狀態相同的路徑可被黑箱測試區分。
-  - `tests/headless/test_p4d.gd`：改寫超載測試，逐項斷言：1) `start_encounter` 停在 intro 未套 failure；2) `acknowledge_encounter_intro` 回 `ok:true`＋`entered_round:false`；3) active encounter 已清空；4) 可累加 failure 效果恰好套用一次；5) 無殘留狀態；6) 非超載 acknowledge 回 `entered_round:true` 且只加第一 round cost 一次。
-  - `開發設計方針.md > P4-D`：同步更新超載確認立即失敗與 `entered_round` 契約。
-  - 變異測試自檢：暫時把明確超載分支改為永不成立，舊容量 failure 路徑回 `entered_round:true`，`test_p4d.gd` 精確 exit 1；還原後 exit 0 全綠。
+1. **F1｜遭遇出口文字畫面保留**：
+   - `scenes/main.gd`：新增 `_route_view_after_encounter(encounter_lines)` 與 `_show_final_coda(encounter_lines)`，遭遇結束時（勝／敗／逃離／回應）出口文字寫入 FlowText 並保留於畫面頂部（0..120），不被後續時段路由的 `clear()` 沖刷；D45 遭遇回應後 FlowText 顯示回應文字且 coda 地點面板（`jinghe_back`）於下方（130..400）同時可見。
+   - `_p4e_04` 補強真斷言：嚴格斷言 FlowText 呈現 `「你拿出了你自己」` 或 `「這個名字已經登記」`，排除 coda 地點面板名稱誤判。
 
-- **P3-F 假綠修正與 runner 守門收斂（K-152）**：
-  - `tests/headless/test_p3f.gd`：`_test_determinism_across_two_runs` 對 `gs_a`、`gs_b` 各自維護 `last_ind_count`，morning／afternoon 正確推導 `forced_m` 與 `forced_a`；每次呼叫 `execute_action_phase()` 接回 Dictionary 且 `ok == false` 累計進 `failed`；所有 `advance_phase()` 均消費結果並檢查 `phase_advanced == true`。
-  - `tests/run_all_headless.ps1`：精確守門收斂（K-152），攔截 `SCRIPT ERROR: Assertion failed`、`Invalid access`、`Invalid index`、`Invalid call` 與 stderr 的 `ERROR:\s+FAIL`，不誤傷負向 fixture 合法 ERROR。
-  - 變異測試自檢：
-    1. 暫時拿掉 gs_a／gs_b 在 D8 `play_night_fixed()` 後的 `solve_active_encounter_if_any()`，`test_p3f.gd` 因 night advance 遭 `encounter_active` 拒絕及後續 action 失敗被明確計數，精確 exit 1（4 assertions failed）。
-    2. 注入 `push_error("FAIL: runner sentinel")`，`run_all_headless.ps1` 精確 exit 1 攔截。
-    3. 還原後：`test_p3f.gd` exit 0、stderr 0 筆 `FAIL`、0 筆 `SCRIPT ERROR`；完整 26 套 runner exit 0 且顯示 `ALL HEADLESS TESTS PASSED!`。
+2. **F2｜D45 遭遇不吃容量（per_round_slot_cost: 0）**：
+   - `data/beats/ch3_d39_d45.json`：設定 D45 遭遇 `per_round_slot_cost: 0`。
+   - `data/SCHEMA.md` & `scripts/data_loader.gd` & `scripts/autoload/game_state.gd`：規範 `per_round_slot_cost` 為非負整數（允許 0），`_check_encounter_capacity_failure()` 在 `blocked_slots <= 0` 時僅於手牌超載（`is_overloaded()`）時判定容量失敗。
+   - `tests/ui_sim/make_states.gd`：移除手牌裁減 hack，自然走查滿手 14 張正常進入 D45 答題。
+
+3. **F3｜D10 手牌狀態自然反映 D8 消耗**：
+   - `tests/ui_sim/make_states.gd`：移除補打 `info_husband_version` / `info_wife_version` hack。
+   - `tests/ui_sim/cases/p1af_cases.gd`（`_p1h_02`、`_p1h_05`）與 `run_ui_sim.ps1`（`long_card_name`）：改為測試 D10 自然持有之卡片（`routine_debt` 與 `info_ahong_private`），忠實反映故事線 D8 消耗。
+
+4. **F4｜test_p4e.gd loader 污染隔離（守則 7）**：
+   - `tests/headless/test_p4e.gd`：`_test_5` 備份 `cards` 並在容量測試後立即還原 `data_node.loader.cards`，徹底杜絕測試間污染。
+
+5. **F5｜P4-E 關鍵特性全量 UI 斷言補齊**：
+   - `tests/ui_sim/cases/p1af_cases.gd` & `tests/ui_sim/qa_contract_matrix.gd`：
+     - 遭遇進行中推進按鈕 disabled 守衛斷言（intro 與 round 階段）。
+     - `encounter_blocked::N` 壓力 placeholder 黑色方塊斷言。
+     - `encounter_capacity` 標籤文字（包含可用格數與壓力佔格）斷言。
+     - 知識卡標記「（知識）」斷言。
+     - `madness_blocked` 與 `already_attempted` disabled 理由呈現斷言。
+     - D8 遭遇之 `discard` 與 `escape_pay` 按鈕確認／取消／狀態逐字不變斷言。
+
+6. **F6｜重用 HandBar / CardDetail**：
+   - `scenes/ui/encounter_panel.gd`：候選卡旁新增 `[詳情]` 按鈕並支援右鍵點擊，透過 `card_detail_requested` 訊號轉發至 `HandBar.show_card_detail()`，重用全域唯一 `CardDetail` 彈窗，無重複實例，支援唯讀檢視卡面資訊。
 
 ## 驗證狀態
 
-- P4-D：**實作與阻斷修復完成，機器層全通。** `tests/run_all_headless.ps1` 包含的 26 套 headless 測試全部 exit 0；`test_p4d.gd`、`test_p3f.gd`、`test_p2_sim.gd`、`playthrough_greedy.gd`、`verify_data.gd` 均 exit 0 通過。待 verifier 審核與驗收落檔。
-- P4-C：已關門，狀態 ✅。完整 UI sim 104 variants／81 contracts／0 failed。
-- P4-B：已關門，狀態 ✅。
-- P4-A：已關門，狀態 ✅。
+- **Headless 測試**：`tests/run_all_headless.ps1` 包含的 27 套 headless 測試全部 exit 0 通過。
+- **UI Sim 測試**：`tests/ui_sim/run_ui_sim.ps1` 執行 108 variants、85 catalog contracts、85 executed contracts、85 completed contracts、0 failed checks，exit 0 全綠。
 
 ## 目前風險
 
-- P4-D 為純規則與狀態機層，遭遇 UI 與主畫面整合留待 P4-E 實作。
-- D8（`n_manydoors_ch1`）與 D45（`d45_encounter`）的正式 UI 呈現、intro 文字演播與按鈕切換需在 P4-E 完成。
-- 本專案沒有 Art Bible，也沒有 `.venv`；目前任務不涉及素材或 Python。
+- 無已知阻斷性缺陷。全套 headless 與 UI sim 全綠。
 
 ## 下一個任務
 
-**Verifier 審核驗收 P4-D 與已知問題落檔，隨後進入 P4-E 遭遇 UI 與 D8／D45 接線**：
-- Verifier 審核 P4-D 程式碼、測試與交接報告並落檔文件。
-- 下一階段 P4-E 範圍：新增 `scenes/ui/encounter_panel.gd/.tscn`、`main.gd`、`hand_bar.gd`、D8／D45 遭遇 UI 接線與 UI sim 驗證。
+**Verifier 審核與驗收落檔 P4-E，準備進入 P4-F 全流程整合與預算走查**。

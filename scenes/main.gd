@@ -63,6 +63,7 @@ func _ready() -> void:
 	_encounter_panel.response_requested.connect(_on_encounter_response_requested)
 	_encounter_panel.discard_requested.connect(_on_encounter_discard_requested)
 	_encounter_panel.escape_requested.connect(_on_encounter_escape_requested)
+	_encounter_panel.card_detail_requested.connect(func(cid): _hand_bar.call("show_card_detail", cid))
 
 	_refresh_status()
 	_route_view()
@@ -371,17 +372,33 @@ func _play_evening() -> void:
 	_flow_text.append_lines(lines)
 
 
-func _show_final_coda() -> void:
+func _show_final_coda(encounter_lines: PackedStringArray = PackedStringArray()) -> void:
 	# d45_then 是 evening 的真 beat；它必須先經過地點面板，才能讓
 	# compare_registry 走正式 UI 放置入口，而不是由 headless 直接 try_place。
 	var placed: Dictionary = GameState.slots_placed as Dictionary
 	var coda_done := placed.has("d45_then::compare_registry")
 	_map_list.visible = false
-	_flow_text.visible = false
 	_advance_btn.visible = true
 	if not coda_done:
 		_location_panel.visible = true
 		_advance_btn.disabled = true
+		if encounter_lines.size() > 0:
+			_flow_text.clear()
+			_flow_text.append_lines(encounter_lines)
+			_flow_text.visible = true
+			_flow_text.offset_top = 0.0
+			_flow_text.offset_bottom = 120.0
+			_location_panel.offset_top = 130.0
+			_location_panel.offset_bottom = 400.0
+		elif _flow_text.visible and not _flow_text.get_lines().is_empty():
+			_flow_text.offset_top = 0.0
+			_flow_text.offset_bottom = 120.0
+			_location_panel.offset_top = 130.0
+			_location_panel.offset_bottom = 400.0
+		else:
+			_flow_text.visible = false
+			_location_panel.offset_top = 0.0
+			_location_panel.offset_bottom = 400.0
 		_location_panel.call("show_location", "jinghe_back")
 		return
 
@@ -484,14 +501,10 @@ func _handle_encounter_result(result: Dictionary) -> void:
 	var lines: PackedStringArray = result.get("lines", PackedStringArray())
 
 	if GameState.active_encounter.is_empty():
-		# 遭遇結束：顯示出口文字 → 關面板 → 重路由
+		# 遭遇結束：關面板 → 重路由，出口文字顯示在 FlowText 上
 		_encounter_panel.visible = false
-		if lines.size() > 0:
-			_flow_text.clear()
-			_flow_text.append_lines(lines)
-			_flow_text.visible = true
 		_hand_bar.call("refresh")
-		_route_view()
+		_route_view_after_encounter(lines)
 	else:
 		# 遭遇繼續：更新 FlowText 與面板
 		if lines.size() > 0:
@@ -514,3 +527,88 @@ func _handle_encounter_result(result: Dictionary) -> void:
 			_show_encounter()
 		_hand_bar.call("refresh")
 		_refresh_advance_hint()
+
+
+## P4-E：遭遇結束後的專用重路由，確保遭遇出口文字（勝/敗/逃離/回應）顯示在 FlowText 上不被沖刷。
+func _route_view_after_encounter(encounter_lines: PackedStringArray) -> void:
+	_advance_btn.disabled = false
+	if _is_showing_ending:
+		_flow_text.visible = true
+		_flow_text.offset_top = 0.0
+		_flow_text.offset_bottom = 400.0
+		_map_list.visible = false
+		_location_panel.visible = false
+		_encounter_panel.visible = false
+		_advance_btn.visible = true
+		return
+
+	var phase: String = GameState.phase
+	match phase:
+		"morning", "afternoon":
+			_location_panel.visible = false
+			_encounter_panel.visible = false
+			_map_list.visible = true
+			if encounter_lines.size() > 0:
+				_flow_text.clear()
+				_flow_text.append_lines(encounter_lines)
+				_flow_text.visible = true
+				_flow_text.offset_top = 0.0
+				_flow_text.offset_bottom = 120.0
+				_map_list.offset_top = 130.0
+				_map_list.offset_bottom = 400.0
+			else:
+				_play_forced_lines()
+				if _flow_text.visible:
+					_flow_text.offset_top = 0.0
+					_flow_text.offset_bottom = 120.0
+					_map_list.offset_top = 130.0
+					_map_list.offset_bottom = 400.0
+				else:
+					_map_list.offset_top = 0.0
+					_map_list.offset_bottom = 400.0
+			_map_list.call("refresh")
+			_advance_btn.visible = true
+		"evening":
+			_encounter_panel.visible = false
+			if GameState.day == GameState.LAST_DAY:
+				_show_final_coda(encounter_lines)
+			else:
+				_map_list.visible = false
+				_location_panel.visible = false
+				if encounter_lines.size() > 0:
+					_flow_text.clear()
+					_flow_text.append_lines(encounter_lines)
+					_flow_text.visible = true
+					_flow_text.offset_top = 0.0
+					_flow_text.offset_bottom = 400.0
+				else:
+					_play_evening()
+					_flow_text.visible = true
+					_flow_text.offset_top = 0.0
+					_flow_text.offset_bottom = 400.0
+				_advance_btn.visible = true
+		"night":
+			_location_panel.visible = false
+			_encounter_panel.visible = false
+			_map_list.visible = true
+			if encounter_lines.size() > 0:
+				_flow_text.clear()
+				_flow_text.append_lines(encounter_lines)
+				_flow_text.visible = true
+				_flow_text.offset_top = 0.0
+				_flow_text.offset_bottom = 120.0
+				_map_list.offset_top = 130.0
+				_map_list.offset_bottom = 400.0
+			else:
+				_play_night_fixed()
+				if _flow_text.visible:
+					_flow_text.offset_top = 0.0
+					_flow_text.offset_bottom = 120.0
+					_map_list.offset_top = 130.0
+					_map_list.offset_bottom = 400.0
+				else:
+					_map_list.offset_top = 0.0
+					_map_list.offset_bottom = 400.0
+			_map_list.call("refresh")
+			_advance_btn.visible = true
+	_refresh_advance_hint()

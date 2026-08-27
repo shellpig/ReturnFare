@@ -965,8 +965,8 @@ static func lint_encounters(loader: DataLoader) -> PackedStringArray:
 		var where := "%s [encounter]" % bid
 
 		var prsc: Variant = enc.get("per_round_slot_cost")
-		if not _is_whole_number(prsc) or int(prsc) <= 0:
-			problems.append("%s：per_round_slot_cost 必須為正整數" % where)
+		if not _is_whole_number(prsc) or int(prsc) < 0:
+			problems.append("%s：per_round_slot_cost 必須為非負整數" % where)
 		if not enc.has("escape_cost"):
 			problems.append("%s：escape_cost 必填（null 或非負整數）" % where)
 		else:

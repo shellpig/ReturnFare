@@ -57,7 +57,7 @@ const SPECIAL_EVIDENCE := {
 	"p1af_32_d45_coda_full": ["run_fields_cleared", "reset_ui_state", "reset_flag_slots_locked"],
 	"p1af_33_full_walk": ["full_walk_d45", "first_round_reset", "second_round_arrival", "second_round_protagonist_exactly_one"],
 	"p1h_01_hand_cards": ["hand_cards_visible", "no_card_id_visible"],
-	"p1h_02_card_detail": ["husband_detail_ok", "wife_detail_ok", "state_unchanged"],
+	"p1h_02_card_detail": ["routine_debt_detail_ok", "ahong_private_detail_ok", "state_unchanged"],
 	"p1h_03_detail_readonly": ["no_placement_controls", "dialog_close_ok"],
 	"p1h_04_knowledge_detail": ["all_knowledge_present", "scroll_last_visible", "state_unchanged"],
 	"p1h_05_name_truncation": ["ellipsis_displayed", "full_name_in_detail"],
@@ -90,10 +90,10 @@ const SPECIAL_EVIDENCE := {
 	"p4c_05_tutorial_dialog": ["tutorial_fires_on_real_gain", "tutorial_seen_only_after_dismiss"],
 	"p4c_06_candidate_order": ["candidate_order_follows_data"],
 	"p4c_07_indulge_hides_candidate": ["indulge_breaks_delegation_eligibility", "candidate_hidden_after_card_lost"],
-	"p4e_01_encounter_intro_ack": ["encounter_intro_text_visible", "encounter_ack_to_round", "encounter_demand_visible"],
-	"p4e_02_respond_confirm_cancel": ["respond_confirm_dialog", "respond_cancel_state_unchanged", "disabled_card_shows_reason"],
-	"p4e_03_d45_no_escape_discard": ["d45_no_escape_button", "d45_no_discard_button", "d45_candidates_visible"],
-	"p4e_04_d45_respond_advance": ["d45_respond_success", "d45_phase_evening_after"],
+	"p4e_01_encounter_intro_ack": ["encounter_intro_ack", "encounter_demand", "encounter_capacity", "encounter_blocked_placeholder", "encounter_card_detail", "advance_guard_disabled"],
+	"p4e_02_respond_confirm_cancel": ["madness_blocked_reason", "discard_cancel_ok", "escape_cancel_ok", "respond_cancel_ok", "advance_to_r2"],
+	"p4e_03_d45_no_escape_discard": ["d45_no_escape", "d45_no_discard", "d45_capacity_zero_blocked", "d45_knowledge_marked"],
+	"p4e_04_d45_respond_advance": ["d45_respond_success", "d45_phase_evening_after", "flow_text_exit_lines_preserved"],
 }
 
 ## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。

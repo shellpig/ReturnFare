@@ -221,6 +221,7 @@ func _test_5_three_round_paths(gs: Node, data_node: Node) -> int:
 		failed += _err("d8_encounter_victory flag should be set")
 		
 	# Failure Path (Capacity limit upon entry into round)
+	var orig_cards: Dictionary = data_node.loader.cards.duplicate(true)
 	_setup_gs_for_d8(gs, false) # hand has protagonist + 1 madness = 2 cards.
 	var max_hand: int = int(data_node.tuning("hand_size", 14))
 	while gs.hand.size() < max_hand - 2:
@@ -232,6 +233,9 @@ func _test_5_three_round_paths(gs: Node, data_node: Node) -> int:
 	gs.hand.append("dummy_disc") # hand.size() = 13 (12 non-discardable + 1 discardable)
 	
 	gs.acknowledge_encounter_intro() # enters R1 (cost 1 slot). hand (13) + blocked (1) = 14 = capacity limit -> failure
+	
+	# Cleanly restore loader cards immediately (實作守則 7)
+	data_node.loader.cards = orig_cards
 	
 	if not gs.active_encounter.is_empty():
 		failed += _err("Encounter should fail due to overload capacity upon entering R1")

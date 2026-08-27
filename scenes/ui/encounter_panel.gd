@@ -2,12 +2,14 @@ extends VBoxContainer
 
 ## 遭遇面板（P4-E）。
 ## 純 View 層：渲染 GameState.encounter_view() 結果，不擁有規則。
+## 重用 HandBar / CardDetail 提供卡片詳情預覽。
 ## mutation 一律經由 signal → main.gd → GameState。
 
 signal intro_acknowledged
 signal response_requested(card_id: String)
 signal discard_requested(card_id: String)
 signal escape_requested(card_ids: Array[String])
+signal card_detail_requested(card_id: String)
 
 const _DISABLED_TEXTS := {
 	"madness_blocked": "發狂卡無法使用",
@@ -147,7 +149,18 @@ func show_round(view: Dictionary) -> void:
 		btn.custom_minimum_size = Vector2(200, 36)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(_on_candidate_pressed.bind(card_id, card_name))
+		btn.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+				_on_card_detail_pressed(card_id)
+		)
 		row.add_child(btn)
+
+		# Detail button (opens CardDetail)
+		var detail_btn := Button.new()
+		detail_btn.text = "詳情"
+		detail_btn.set_meta("qa_id", "encounter_detail::%s" % card_id)
+		detail_btn.pressed.connect(_on_card_detail_pressed.bind(card_id))
+		row.add_child(detail_btn)
 
 		# Discard button (if allowed and card is discardable hand card, not madness)
 		if allow_discard and source == "hand" and discardable and base_id != "madness":
@@ -194,6 +207,10 @@ func show_round(view: Dictionary) -> void:
 				_action_row.add_child(pay_btn)
 
 	_action_row.visible = can_escape and _action_row.get_child_count() > 0
+
+
+func _on_card_detail_pressed(card_id: String) -> void:
+	card_detail_requested.emit(card_id)
 
 
 func _on_candidate_pressed(card_id: String, card_name: String) -> void:
