@@ -94,7 +94,7 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p3e_05_multi_auto_align", "多對一只確認一次，第二個 row 日後到訪自動顯示已對位且無二次確認", "p3e_multi_first_seen.json", "", "p3e_05_multi_row_auto_align", "", "p3e_05"),
 		UiCase.new("p4c_01_no_candidates", "零人物卡時委託候選完全不出現，親自處理槽仍在", "p4c_d17_no_person.json", "", "p4c_01_candidate_visibility", "", "p4c_01"),
 		UiCase.new("p4c_02_confirm_cancel", "委託確認彈窗只顯示任務／回報時機／傾向，取消後狀態零變化", "p4c_d17_with_person.json", "", "p4c_02_confirm_dialog", "", "p4c_02"),
-		UiCase.new("p4c_03_immediate_confirm", "確認委託阿婕後 immediate 效果套用，choice_group 同組其餘槽收起", "p4c_d17_with_person.json", "", "p4c_03_immediate_confirm", "", "p4c_03"),
+		UiCase.new("p4c_03_immediate_confirm", "確認委託阿婕後面板關閉、即時回報落 FlowText，choice_group 同組其餘槽收起", "p4c_d17_with_person.json", "", "p4c_03_immediate_confirm", "", "p4c_03"),
 		UiCase.new("p4c_04_next_morning_confirm", "確認委託阿珠後派出當下不劇透，隔日上午既有結算後才播報回報", "p4c_d17_with_person.json", "", "p4c_04_next_morning_confirm", "", "p4c_04"),
 		UiCase.new("p4c_05_tutorial_dialog", "首次真實取得人物卡彈出委託教學，關閉後才寫入 delegation_tutorial_seen", "p4c_d17_no_person.json", "", "p4c_05_tutorial_dialog", "", "p4c_05"),
 	]
@@ -1714,14 +1714,22 @@ class UiCase extends CaseBaseClass:
 		await _enter(tree, "sanquan")
 		await _click(tree, "delegate::d17_19_prescription::ask_ajie::npc_ajie")
 		await _click(tree, "dialog_confirm::delegation")
+		# 接線 A：確認後面板關閉，即時回報落 FlowText（與隔日回報同一處），不進面板內 status label
+		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"), "委託成功後地點面板已關閉")
+		var flow_nodes := QAStepClass.find_controls_by_name(tree.get_root(), "FlowText")
+		assert_eq(flow_nodes.size(), 1, "FlowText 節點存在")
+		if not flow_nodes.is_empty():
+			assert_true(_has_text(flow_nodes[0], "你爸媽的東西"), "即時委託回報文字出現在 FlowText")
 		var hand: Array = _run(tree).get("hand", []) as Array
 		assert_true(hand.has("doc_prescription"), "確認委託阿婕後取得 doc_prescription")
 		assert_true(hand.has("npc_ajie"), "委託後人物卡仍在手牌")
+		# 重新進山泉閣：choice_group 已結算——其餘路線收起，已委託的阿婕槽以 RESOLVED 留存
+		await _enter(tree, "sanquan")
 		assert_no_qa_id(tree, "slot::d17_19_prescription::find_self", "choice_group 收起：親自處理槽消失")
 		assert_no_qa_id(tree, "slot::d17_19_prescription::ask_azhu", "choice_group 收起：阿珠候選消失")
 		assert_has_qa_id(tree, "slot::d17_19_prescription::ask_ajie", "已委託的阿婕槽仍在（RESOLVED）")
 		await _close(tree)
-		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["immediate_effect_applied", "choice_group_collapsed"] } }
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["immediate_report_in_flowtext", "choice_group_collapsed"] } }
 
 	func _p4c_04(tree: SceneTree) -> Dictionary:
 		await _enter(tree, "sanquan")

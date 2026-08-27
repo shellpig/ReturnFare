@@ -6,6 +6,7 @@ extends VBoxContainer
 signal closed
 signal state_changed
 signal night_entry_requested(id: String)
+signal delegation_requested(beat_id: String, slot_id: String, card_id: String)
 
 const _LABEL_NO_TITLE := "（無標題）"
 const _FMT_BEAT_TITLE := "== %s =="
@@ -404,13 +405,14 @@ func _on_delegation_confirmed() -> void:
 	var slot_id := str(_pending_delegation.get("slot_id", ""))
 	var card_id := str(_pending_delegation.get("card_id", ""))
 	_pending_delegation = {}
-	var result: Dictionary = GameState.try_place(card_id, beat_id, slot_id)
-	if result.get("ok", false):
-		_status_label.text = "\n".join(result.get("lines", PackedStringArray()))
-		_status_label.visible = not _status_label.text.is_empty()
-		state_changed.emit()
-	else:
-		_set_failure_status(result)
+	# P4-C（接線 A）：UI 只送意圖。delegate() 與即時回報文字改由 main.gd 負責，
+	# 即時回報落 FlowText（與隔日回報同一處），成功後由 main.gd 關面板回地圖。
+	delegation_requested.emit(beat_id, slot_id, card_id)
+
+
+## P4-C（接線 A）：delegate() 失敗時由 main.gd 回呼，於面板內顯示原因並保留面板。
+func report_delegation_failure(result: Dictionary) -> void:
+	_set_failure_status(result)
 	_rebuild()
 
 

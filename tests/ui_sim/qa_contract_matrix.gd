@@ -82,7 +82,7 @@ const SPECIAL_EVIDENCE := {
 	"p3e_05_multi_row_auto_align": ["multi_row_first_aligned", "multi_row_second_unseen", "multi_row_second_auto_aligned"],
 	"p4c_01_candidate_visibility": ["no_candidates_hidden", "self_route_visible"],
 	"p4c_02_confirm_dialog": ["delegation_dialog_preview_only", "delegation_cancel_state_unchanged"],
-	"p4c_03_immediate_confirm": ["immediate_effect_applied", "choice_group_collapsed"],
+	"p4c_03_immediate_confirm": ["immediate_report_in_flowtext", "choice_group_collapsed"],
 	"p4c_04_next_morning_confirm": ["next_morning_no_spoiler", "next_morning_report_after_settlement"],
 	"p4c_05_tutorial_dialog": ["tutorial_fires_on_real_gain", "tutorial_seen_only_after_dismiss"],
 }

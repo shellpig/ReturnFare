@@ -15,6 +15,7 @@
 
 ## 最近完成的工作
 
+- **P4-C 接線 A 補強與四條缺口補測（本次，尚待 verifier 複驗與文件關門）。** 委託即時回報改由 `main.gd` 經 `delegate()` 意圖信號寫入 FlowText（`location_panel.gd` 只發 `delegation_requested`，不再自呼 `try_place()`／寫面板內 `_status_label`），與隔日回報同一處呈現，成功後關面板回地圖；失敗經 `report_delegation_failure()` 保留面板顯示原因。補 `test_p4c.gd` 四段：阿婕信任修復重取、D18／D19 完成處方、任一路線結算後跨日回 `already_resolved`、候選永遠照資料槽序。UI sim `p4c_03` 改斷言即時回報落 FlowText＋面板關閉＋choice 收起（evidence 改 `immediate_report_in_flowtext`，`qa_contract_matrix.gd` 同步）。**證據：25 套 headless exit 0（`test_p4c` 10 段全綠）；完整 UI sim 102／102 variants、79／79 contracts、0 failed、11 條負向反證如期失敗。** 這批補的是先前七條打勾中缺直接證據的六項（今日已受託顯示、穩定排序、修復重取、D18／D19、跨日不重複、immediate→FlowText），打勾與文件關門仍由 verifier 落。
 - **K-125 修復經 verifier 複驗結案，P4-C 文件關門（`7a439f6`）。** `drain_beats()` 優先以真實輸入處理已知教學 modal，dialog 與 beat 分開計數；D17 回歸斷言教學曾處理且 meta 已寫入。原 4 個失敗變體全數通過；完整 run `20260827-081934-525-p21024-40718853` 為 102／102 variants、79／79 contracts、0 failed，11 條負向反證如期失敗。P4-C 七條驗收全數打勾並轉 ✅。
 - **K-124 修復經 verifier 複驗結案（`4b0ba1c`）。** 8 組精確 madness fixture 逐案正規化，後置條件改驗精確張數／clock／day／phase，P4-C 零人物卡改按 type 計數；同批結 K-112，P3-A baseline 只在明示旗標時產生。獨立 fixture 生成 exit 0、baseline mtime 不變、25 套 headless 全綠。
 - **P4-C 完整 UI launcher 首次跑到底並定位 K-125。** Run `20260827-074010-986-p50004-a1c03a80`：102 variants、79 contracts 全執行、98 variants 通過、76 contracts 完成、11 條負向反證如期失敗；4 個失敗變體都由 D17 教學 modal 遮住底層 `beat_advance`，而 `drain_beats()` 只看 tree visibility 所致。production 玩家可按 OK 繼續，不是 beat 無限迴圈。
@@ -65,6 +66,7 @@
 ## 目前風險
 
 - P4-C 已無機器關門 blocker。低優先觀察：未列入白名單的未知 modal 仍可能最終被 helper 報成 beat 上限，而非立即回具名 blocking-dialog 錯誤；只影響失敗診斷精度，未證實為 production 缺陷。
+- **命名漂移未動**：view model 欄位實作為 `delegated_today`，方針 P4-C（`開發設計方針.md` line 802）寫的是 `delegation_state`。本次接線 A 未改此欄位名（不在指定範圍，且改名會波及 `panel_builder`／`location_panel`／`card_detail`／`hand_bar`／`delegation_status` 與測試）。留待決定：改碼對齊文件，或改文件對齊碼。
 - P4-D～F、P5 都仍是規格狀態；遭遇 runtime／UI 與 P5 各項系統尚未兌現。
 - 本專案沒有 Art Bible，也沒有 `.venv`；目前任務不涉及素材或 Python。
 

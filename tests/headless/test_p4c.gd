@@ -34,6 +34,10 @@ func _initialize() -> void:
 	failed += _test_azhu_route_next_morning(gs, data_node)
 	failed += _test_acai_route_subjective(gs, data_node)
 	failed += _test_ajie_trust_broken_hides_candidate(gs, data_node)
+	failed += _test_ajie_trust_repair_reacquire(gs, data_node)
+	failed += _test_prescription_d18_d19(gs, data_node)
+	failed += _test_prescription_no_repeat_subsequent_day(gs, data_node)
+	failed += _test_candidate_stable_ordering(gs, data_node)
 
 	if failed > 0:
 		push_error("\nP4-C: %d assertion(s) failed\n" % failed)
@@ -364,3 +368,137 @@ func _test_ajie_trust_broken_hides_candidate(gs: Node, data_node: Node) -> int:
 		failed += _fail("信任破壞後 ask_ajie 候選仍出現")
 
 	return failed
+
+
+# ─── 7. 阿婕信任修復後重新取得候選 ───
+func _test_ajie_trust_repair_reacquire(gs: Node, data_node: Node) -> int:
+	print("\n--- 7. 阿婕信任修復後重新取得候選 ---")
+	var failed: int = 0
+	_reset_gs(gs)
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+
+	# (a) 破壞信任：候選隱藏（不變式同 test 6，破壞時人物卡本就不在手）
+	var flags: Dictionary = gs.get("flags") as Dictionary
+	flags["ajie_trust_broken"] = true
+	var panel_broken: Dictionary = gs.call("build_panel", "sanquan")
+	var hidden_when_broken := _find_slot_view(panel_broken, "d17_19_prescription", "ask_ajie").is_empty()
+
+	# (b) 明示修復事件：套 d16_pm_sanquan 的 repair_ajie_trust 槽 on_place（唯一真值＝把旗標設回 false）
+	var repair_beat: Dictionary = loader.beats_by_id.get("d16_pm_sanquan", {})
+	var repair_slot: Dictionary = {}
+	for s: Variant in repair_beat.get("slots", []) as Array:
+		if str((s as Dictionary).get("id", "")) == "repair_ajie_trust":
+			repair_slot = s as Dictionary
+			break
+	if repair_slot.is_empty():
+		return _fail("找不到 d16_pm_sanquan 的 repair_ajie_trust 槽（資料真值改動？）")
+	EffectApply.apply(repair_slot.get("on_place", {}), gs)
+	var flag_cleared := not bool(flags.get("ajie_trust_broken", true))
+
+	# (c) 資料真值：修復後她於 D17 早上重新進手牌；候選回到原位且可再委託
+	gs.call("gain_card", "npc_ajie", false)
+	var panel_repaired: Dictionary = gs.call("build_panel", "sanquan")
+	var ajie_view := _find_slot_view(panel_repaired, "d17_19_prescription", "ask_ajie")
+	var reappeared := not ajie_view.is_empty()
+	var delegable := reappeared and bool((ajie_view.get("delegation", {}) as Dictionary).get("delegated_today", true)) == false
+
+	if hidden_when_broken and flag_cleared and reappeared and delegable:
+		_ok("信任破壞→候選隱藏；明示修復清 ajie_trust_broken＋重新取得人物卡後，ask_ajie 候選回原位且 delegated_today=false 可再委託")
+	else:
+		failed += _fail("修復重取不符：hidden=%s cleared=%s reappeared=%s delegable=%s" % [str(hidden_when_broken), str(flag_cleared), str(reappeared), str(delegable)])
+
+	return failed
+
+
+# ─── 8. D18、D19 仍能完成處方 ───
+func _test_prescription_d18_d19(gs: Node, data_node: Node) -> int:
+	print("\n--- 8. D18、D19 仍能完成處方 ---")
+	var failed: int = 0
+
+	# 處方 beat 窗口 day_from:17 day_to:19；驗第 18／19 天各仍可委託完成，不只 D17。
+	for d: int in [18, 19]:
+		_reset_gs(gs)
+		gs.set("day", d)
+		var hand: Array = gs.get("hand") as Array
+		hand.append("npc_ajie")
+		var r: Dictionary = gs.call("delegate", "d17_19_prescription", "ask_ajie", "npc_ajie")
+		var got_doc: bool = bool(gs.call("has_card", "doc_prescription"))
+		if bool(r.get("ok", false)) and got_doc:
+			_ok("第 %d 天委託阿婕完成處方，取得 doc_prescription" % d)
+		else:
+			failed += _fail("第 %d 天處方無法完成：ok=%s doc=%s reason=%s" % [d, str(r.get("ok")), str(got_doc), str(r.get("reason_code"))])
+
+	return failed
+
+
+# ─── 9. 任一路線完成後，後續日不再重開 ───
+func _test_prescription_no_repeat_subsequent_day(gs: Node, data_node: Node) -> int:
+	print("\n--- 9. 處方任一路線完成後，後續日不再重開 ---")
+	var failed: int = 0
+	_reset_gs(gs)
+	var hand: Array = gs.get("hand") as Array
+	hand.append("npc_ajie")
+	var r17: Dictionary = gs.call("delegate", "d17_19_prescription", "ask_ajie", "npc_ajie")
+
+	# 進入次日：choices／slots_placed 屬 run 層，不隨換日清；delegates_used_today 每日重置。
+	# 因此若再次嘗試被擋，原因必為 choice_group 已結算（already_resolved），而非今日已受託。
+	gs.set("day", 18)
+	(gs.get("delegates_used_today") as Dictionary).clear()
+
+	var panel_d18: Dictionary = gs.call("build_panel", "sanquan")
+	var self_view := _find_slot_view(panel_d18, "d17_19_prescription", "find_self")
+	var self_not_open := self_view.is_empty() or int(self_view.get("tri", -1)) != PanelBuilder.TriState.OPEN
+	var ajie_view := _find_slot_view(panel_d18, "d17_19_prescription", "ask_ajie")
+	var no_open_ajie_candidate := ajie_view.is_empty() or int(ajie_view.get("tri", -1)) != PanelBuilder.TriState.OPEN
+
+	var retry: Dictionary = gs.call("delegate", "d17_19_prescription", "ask_ajie", "npc_ajie")
+	var rejected_resolved := not bool(retry.get("ok", true)) and str(retry.get("reason_code", "")) == "already_resolved"
+
+	if bool(r17.get("ok", false)) and self_not_open and no_open_ajie_candidate and rejected_resolved:
+		_ok("D17 委託完成後，D18 處方 choice_group 維持結算：find_self 非 OPEN、無 OPEN 委託候選、再委託回 already_resolved")
+	else:
+		failed += _fail("跨日不重複不符：r17=%s self_not_open=%s no_open_ajie=%s retry_ok=%s reason=%s" % [str(r17.get("ok")), str(self_not_open), str(no_open_ajie_candidate), str(retry.get("ok")), str(retry.get("reason_code"))])
+
+	return failed
+
+
+# ─── 10. 候選排序照資料、不因狀態（取得順序）變化跳動 ───
+func _test_candidate_stable_ordering(gs: Node, data_node: Node) -> int:
+	print("\n--- 10. 候選排序照資料、不因狀態變化跳動 ---")
+	var failed: int = 0
+	_reset_gs(gs)
+	var hand: Array = gs.get("hand") as Array
+
+	# 只持有阿財：候選＝[find_self, ask_acai]（阿婕／阿珠靠 has_card 隱藏）
+	hand.append("npc_acai")
+	var order_acai := _prescription_slot_order(gs)
+
+	# 再取得阿婕：新候選 ask_ajie 應插回資料位（find_self 與 ask_acai 之間），非接尾端
+	hand.append("npc_ajie")
+	var order_ajie := _prescription_slot_order(gs)
+
+	# 再取得阿珠：ask_azhu 亦插回資料位
+	hand.append("npc_azhu")
+	var order_all := _prescription_slot_order(gs)
+
+	var ok_acai := order_acai == PackedStringArray(["find_self", "ask_acai"])
+	var ok_ajie := order_ajie == PackedStringArray(["find_self", "ask_ajie", "ask_acai"])
+	var ok_all := order_all == PackedStringArray(["find_self", "ask_ajie", "ask_azhu", "ask_acai"])
+
+	if ok_acai and ok_ajie and ok_all:
+		_ok("候選永遠照資料槽序：新出現的候選插回資料位置，不因取得順序改變排序")
+	else:
+		failed += _fail("排序不穩定：acai=%s ajie=%s all=%s" % [str(order_acai), str(order_ajie), str(order_all)])
+
+	return failed
+
+
+func _prescription_slot_order(gs: Node) -> PackedStringArray:
+	var panel: Dictionary = gs.call("build_panel", "sanquan")
+	var order := PackedStringArray()
+	for beat_view: Dictionary in panel.get("beats", []) as Array:
+		if str((beat_view["beat"] as Dictionary).get("id", "")) != "d17_19_prescription":
+			continue
+		for slot_view: Dictionary in beat_view.get("slots", []) as Array:
+			order.append(str((slot_view["slot"] as Dictionary).get("id", "")))
+	return order

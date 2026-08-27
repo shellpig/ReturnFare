@@ -51,6 +51,7 @@ func _ready() -> void:
 	_location_panel.closed.connect(_on_panel_closed)
 	_location_panel.state_changed.connect(_on_location_panel_state_changed)
 	_location_panel.night_entry_requested.connect(_on_night_entry_requested)
+	_location_panel.delegation_requested.connect(_on_delegation_requested)
 
 	_delegation_tutorial_dialog.confirmed.connect(_on_delegation_tutorial_dismissed)
 	_delegation_tutorial_dialog.close_requested.connect(_on_delegation_tutorial_dismissed)
@@ -192,6 +193,35 @@ func _on_night_entry_requested(loc_id: String) -> void:
 		return
 	var extra_lines: PackedStringArray = entry_res.get("lines", PackedStringArray())
 	_location_panel.call("show_location", loc_id, extra_lines)
+	_refresh_advance_hint()
+
+
+## P4-C（接線 A）：面板只送委託意圖，delegate() 與即時回報由此接手。
+## 即時回報文字落 FlowText（與隔日上午回報同一處呈現）；成功後關面板回地圖。
+## 委託不吃行動格，advance 按鈕恢復可用。失敗則保留面板並於面板內顯示原因。
+func _on_delegation_requested(beat_id: String, slot_id: String, card_id: String) -> void:
+	var result: Dictionary = GameState.delegate(beat_id, slot_id, card_id)
+	if not bool(result.get("ok", false)):
+		_location_panel.call("report_delegation_failure", result)
+		return
+	_location_panel.visible = false
+	_advance_btn.disabled = false
+	_map_list.visible = true
+	_map_list.call("refresh")
+	var lines_delegation: PackedStringArray = result.get("lines", PackedStringArray())
+	_flow_text.clear()
+	if lines_delegation.size() > 0:
+		_flow_text.append_lines(lines_delegation)
+		_flow_text.visible = true
+		_flow_text.offset_top = 0.0
+		_flow_text.offset_bottom = 120.0
+		_map_list.offset_top = 130.0
+		_map_list.offset_bottom = 400.0
+	else:
+		_flow_text.visible = false
+		_map_list.offset_top = 0.0
+		_map_list.offset_bottom = 400.0
+	_hand_bar.call("refresh")
 	_refresh_advance_hint()
 
 
