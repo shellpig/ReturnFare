@@ -16,6 +16,7 @@ extends SceneTree
 ## 13. 回合循環偵測防禦（visited_round_ids 偵測 cycle 自動結算 failure，K-146）
 ## 14. 序列化往返與未存檔對照組逐字比對（K-139）
 ## 15. 故事線真實遭遇路徑驗證（D8 n_manydoors_ch1、D45 d45_encounter，K-138）
+## 16. 夜間 fixed 迴圈於遭遇啟動後停播同夜後續 beat（與白天 hook 對齊）
 
 const DataLoader := preload("res://scripts/data_loader.gd")
 const ConditionEval := preload("res://scripts/core/condition_eval.gd")
@@ -52,6 +53,7 @@ func _initialize() -> void:
 	failed += _test_cycle_detection(gs, data_node)
 	failed += _test_serialization_roundtrip_with_control(gs, data_node)
 	failed += _test_storyline_encounters_contract(gs, data_node)
+	failed += _test_night_fixed_stops_after_encounter(gs, data_node)
 
 	if failed > 0:
 		push_error("\nP4-D: %d assertion(s) failed\n" % failed)
@@ -1273,5 +1275,57 @@ func _test_storyline_encounters_contract(gs: Node, data_node: Node) -> int:
 		failed += _err("d45_encounter should be finished after protagonist response")
 	else:
 		failed += _ok("d45_encounter complete victory path verified on real data (K-138)")
+
+	return failed
+
+
+# ── 16. 夜間 fixed 迴圈於遭遇啟動後停播 ─────────────────────────────────────
+
+## play_night_fixed() 啟動遭遇後必須 break，與 _check_fixed_encounter_for_current_phase()
+## 的白天路徑一致。少了 break 時，同夜排在遭遇之後的 fixed beat 仍會被 play_beat()，
+## 於是遭遇畫面已開、底下還附加下一段旁白。正式資料第 8 天夜間只有 n_manydoors_ch1
+## 一個 fixed beat，所以這條要靠注入第二個 fixed beat 才觀測得到。
+func _test_night_fixed_stops_after_encounter(gs: Node, data_node: Node) -> int:
+	print("--- 16. 夜間遭遇啟動後停播同夜後續 fixed beat ---")
+	var failed: int = 0
+	var mock_id := "mock_night_after_encounter"
+	var mock_text := "MOCK_LINE_AFTER_ENCOUNTER"
+	var mock_beat: Dictionary = {
+		"id": mock_id,
+		"location": "sanquan",
+		"fixed": true,
+		"when": { "day": 8, "phase": "night" },
+		"text": mock_text,
+	}
+
+	# 附加在 beats 陣列尾端，確保迭代順序排在真實的 n_manydoors_ch1 之後
+	var beats_arr: Array = data_node.loader.beats
+	beats_arr.append(mock_beat)
+	data_node.loader.beats_by_id[mock_id] = mock_beat
+
+	_reset_gs(gs)
+	gs.day = 8
+	gs.phase = "evening"
+	gs.advance_phase()
+
+	var night_lines: PackedStringArray = gs.play_night_fixed()
+	var joined := "
+".join(night_lines)
+
+	if str(gs.active_encounter.get("beat_id", "")) != "n_manydoors_ch1":
+		failed += _err("前置條件不成立：D8 入夜未自動啟動 n_manydoors_ch1，實際 '%s'" % str(gs.active_encounter.get("beat_id", "")))
+	elif joined.contains(mock_text):
+		failed += _err("遭遇啟動後仍播出同夜後續 fixed beat 的文字（play_night_fixed 缺 break）")
+	elif bool(gs.beats_entered.get(mock_id, false)):
+		failed += _err("遭遇啟動後仍把同夜後續 fixed beat 寫進 beats_entered（play_night_fixed 缺 break）")
+	else:
+		failed += _ok("play_night_fixed 啟動遭遇後停止播出同夜後續 fixed beat，與白天 hook 對齊")
+
+	# 還原注入（fixture 隔離，守則 7）
+	beats_arr.erase(mock_beat)
+	_clean_mock_beat(data_node, mock_id)
+
+	if data_node.loader.beats_by_id.has(mock_id) or beats_arr.has(mock_beat):
+		failed += _err("mock beat 未完整還原，會污染後續測試")
 
 	return failed

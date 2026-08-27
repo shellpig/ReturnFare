@@ -266,6 +266,9 @@ func play_night_fixed() -> PackedStringArray:
 			lines.append_array(beat_lines)
 			if b.has("encounter") and not (b.get("encounter") as Dictionary).is_empty():
 				start_encounter(bid)
+				# 遭遇啟動後不再播同夜後續 fixed beat：與 _check_fixed_encounter_for_current_phase()
+				# 的白天路徑對齊，避免遭遇畫面已開、底下仍附加下一段旁白。
+				break
 
 	return lines
 

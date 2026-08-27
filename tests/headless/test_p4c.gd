@@ -7,6 +7,7 @@ extends SceneTree
 ## 4. 委託教學信號：零到一張 person card 才發、不寫 meta、mark_ 後才算看過、跨輪保留
 ## 5. D17～19 處方委託三條人物路線 data-driven 結果（阿婕／阿珠／阿財）
 ## 6. 阿婕信任破壞後候選隱藏
+## 7. delegate() 封閉拒絕碼在 location_panel 全數有中文對應（不把英文 code 漏給玩家）
 
 const DataLoader := preload("res://scripts/data_loader.gd")
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
@@ -39,6 +40,7 @@ func _initialize() -> void:
 	failed += _test_prescription_no_repeat_subsequent_day(gs, data_node)
 	failed += _test_candidate_stable_ordering(gs, data_node)
 	failed += _test_azhu_acai_acquisition_gates(gs, data_node)
+	failed += _test_delegation_reject_texts()
 
 	if failed > 0:
 		push_error("\nP4-C: %d assertion(s) failed\n" % failed)
@@ -578,3 +580,52 @@ func _prescription_slot_order(gs: Node) -> PackedStringArray:
 		for slot_view: Dictionary in beat_view.get("slots", []) as Array:
 			order.append(str((slot_view["slot"] as Dictionary).get("id", "")))
 	return order
+
+
+# ─── 7. 委託拒絕碼的玩家可讀文案覆蓋 ───
+
+## location_panel.failure_text() 在 reason_text 為空且查表落空時，會把英文 reason_code
+## 原樣顯示給玩家（K-115 同族）。delegate() 的拒絕碼是封閉集合，這裡逐碼釘住覆蓋率。
+func _test_delegation_reject_texts() -> int:
+	print("--- 7. delegate() 拒絕碼的中文文案覆蓋 ---")
+	var failed := 0
+	var LocationPanelScript: GDScript = load("res://scenes/ui/location_panel.gd") as GDScript
+	if LocationPanelScript == null:
+		return _fail("無法載入 location_panel.gd")
+
+	# delegate() 的封閉拒絕碼集合（game_state.gd > delegate 的 11 步 + encounter_active 前置）
+	var codes: PackedStringArray = [
+		"encounter_active",
+		"not_action_phase",
+		"unknown_beat",
+		"unknown_slot",
+		"not_delegation",
+		"not_held",
+		"not_person",
+		"not_accepted",
+		"already_delegated_today",
+		"locked",
+		"already_resolved",
+		"data_conflict",
+	]
+
+	for code in codes:
+		var text: String = LocationPanelScript.failure_text({ "ok": false, "reason_code": code, "reason_text": "" })
+		if text.is_empty():
+			failed += _fail("拒絕碼 '%s' 的文案為空" % code)
+		elif text == code:
+			failed += _fail("拒絕碼 '%s' 沒有中文對應，會把英文 code 原樣顯示給玩家" % code)
+
+	if failed == 0:
+		failed += _ok("delegate() 全部 %d 個拒絕碼都有中文文案，不會漏英文 code 給玩家" % codes.size())
+
+	# reason_text 仍優先於查表（沿用 K-52 既有優先序，確認本次補表沒有反轉它）
+	var locked_text: String = LocationPanelScript.failure_text({
+		"ok": false, "reason_code": "locked", "reason_text": "需要阿宏的工作筆記"
+	})
+	if locked_text == "需要阿宏的工作筆記":
+		failed += _ok("資料提供的 reason_text 仍優先於 _REASON_CODE_TEXTS 查表")
+	else:
+		failed += _fail("reason_text 優先序被破壞，實際 '%s'" % locked_text)
+
+	return failed

@@ -42,6 +42,15 @@ const _REASON_CODE_TEXTS := {
 	"unknown_beat": "未知的事件",
 	"unknown_slot": "未知的卡槽",
 	"locked": "條件不足",
+	# P4-B／P4-C 委託拒絕碼：failure_text() 找不到對應時會把英文 code 原樣顯示給玩家，
+	# 所以 delegate() 的封閉拒絕碼要在這裡全數有中文對應（K-115 同族）。
+	"not_action_phase": "非白天行動時段",
+	"not_delegation": "此格不是委託格",
+	"not_person": "此卡不是人物卡",
+	"already_delegated_today": _MSG_DELEGATED_TODAY,
+	"already_resolved": "此格已結算完成",
+	"data_conflict": "委託資料異常",
+	"encounter_active": "遭遇進行中",
 }
 
 const _NIGHT_REJECT_TEXTS := {
