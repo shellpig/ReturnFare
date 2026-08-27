@@ -381,13 +381,11 @@ class UiCase extends CaseBaseClass:
 
 	func _coda_jump(tree: SceneTree) -> Dictionary:
 		assert_eq(str(_run(tree).get("phase", "")), "afternoon", "D45 coda 起點")
-		# P4-E: D45 下午有 d45_encounter，需先進行遭遇確認與回應，遭遇結束後自動推進至 evening
-		if QAStepClass.has_visible_qa_id(tree.get_root(), "encounter_intro_ack"):
-			await _click(tree, "encounter_intro_ack")
-			await _click(tree, "encounter_candidate::protagonist")
-			await _click(tree, "dialog_confirm::encounter_respond")
-		else:
-			await _advance(tree)
+		# P4-E: D45 下午有 d45_encounter，遭遇確認與回應，遭遇結束後自動推進至 evening
+		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "encounter_intro_ack"), "D45 下午必須呈現遭遇開場")
+		await _click(tree, "encounter_intro_ack")
+		await _click(tree, "encounter_candidate::protagonist")
+		await _click(tree, "dialog_confirm::encounter_respond")
 		assert_eq(str(_run(tree).get("phase", "")), "evening", "D45 afternoon 後進 evening")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "beat_advance"), "D45 coda 演出入口")
 		var drained := await QAStepClass.drain_beats(tree)
@@ -1990,6 +1988,7 @@ class UiCase extends CaseBaseClass:
 
 		# 知識卡候選標記
 		var k_cands := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "encounter_candidate::k_")
+		assert_true(not k_cands.is_empty(), "D45 遭遇候選清單中必須含有知識卡")
 		if not k_cands.is_empty():
 			var k_btn := k_cands[0] as Button
 			assert_true(k_btn.text.contains("（知識）"), "知識候選卡標示（知識）")

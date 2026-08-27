@@ -4,46 +4,47 @@
 
 ## 目前階段
 
-**P1～P3 已完成；P4-A～P4-D 已完成；P4-E 遭遇 UI 面板、D8／D45 生命週期接線、CardDetail 整合與 F1～F6 修復全數完成。全套 27 套 headless 測試全數 exit 0，全套 UI Sim（85 契約、108 變體與負向測試）全數 exit 0（0 failed checks）。待 verifier 審核與落檔。**
+**P1～P3 已完成；P4-A～P4-D 已完成；P4-E 遭遇 UI 面板、D8／D45 生命週期接線、CardDetail 整合、F1～F6 與 N1～N6 驗收補強全數完成。全套 27 套 headless 測試全數 exit 0（含 test_p4e.gd 15 大項整合測試），全套 UI Sim（85 契約、108 變體與負向測試）全數 exit 0（0 failed checks），變異測試自檢全數通過。待 verifier 審核與落檔。**
 
 - 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；本檔只保存最近交接重點。
 - P4-A：委託／遭遇資料與 lint 真值化已完成。
 - P4-B：委託規則已實作並通過 verifier 複驗，K-65 結案。
 - P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已完成。
 - P4-D：遭遇規則與狀態機實作完成，26 套 headless 全數 exit 0 通過。
-- P4-E：遭遇 UI 面板、CardDetail 詳情整合、D8／D45 遭遇生命週期與時段推進接線完成。27 套 headless（含 `test_p4e.gd`）與 85 條 UI 契約全綠。
+- P4-E：遭遇 UI 面板、CardDetail 詳情整合、D8／D45 遭遇生命週期與時段推進接線完成。27 套 headless（含 `test_p4e.gd` 15 項）與 85 條 UI 契約全綠。
 - P4-F：全流程整合與預算走查。
 - P5：開局、四類結局、歷輪摘要、跨輪重置與 UI 已拆成 P5-A～F，尚未開始實作。
 
-## 最近完成的工作（P4-E 與 F1～F6 修復）
+## 最近完成的工作（N1～N6 驗收補齊與重構）
 
-1. **F1｜遭遇出口文字畫面保留**：
-   - `scenes/main.gd`：新增 `_route_view_after_encounter(encounter_lines)` 與 `_show_final_coda(encounter_lines)`，遭遇結束時（勝／敗／逃離／回應）出口文字寫入 FlowText 並保留於畫面頂部（0..120），不被後續時段路由的 `clear()` 沖刷；D45 遭遇回應後 FlowText 顯示回應文字且 coda 地點面板（`jinghe_back`）於下方（130..400）同時可見。
-   - `_p4e_04` 補強真斷言：嚴格斷言 FlowText 呈現 `「你拿出了你自己」` 或 `「這個名字已經登記」`，排除 coda 地點面板名稱誤判。
+1. **P4-E 規則層驗收補齊（`tests/headless/test_p4e.gd` 擴展至 15 大項）**：
+   - **D8 night 直接睡／延後／地點進場被擋**：intro 與 round 階段呼叫 `sleep_night()`、`enter_night_location()`、`advance_phase()` 與 `resolve_night_advance()` 均被 `encounter_active` 攔截，狀態零變化。
+   - **D8 姓名段不消耗主角卡**：R1 嘗試主角卡被拒絕 `card_not_submittable` 或 fallback 消耗其他合法卡時，主角卡仍在手牌中未被消耗。
+   - **D45 直呼 escape／discard 精確回拒絕碼**：呼叫 `escape_encounter()` 回 `cannot_escape`、呼叫 `discard_in_encounter()` 回 `discard_disabled`，狀態零變化。
+   - **D45 人物卡回應後仍在手**：提交 `protagonist` 後仍在 hand，未永久失去。
+   - **D8 零可丟棄卡直接 failure（非容量失敗）**：手牌僅有 `protagonist`（手牌數 2，遠小於 14 容量）進入 R1 時，因無合法移動立即判定失敗，不進入容量判定。
+   - **D8 後續輪 knowledge 改寫第一題**：持對應知識卡 `k_not_today` 在 R1 直接答對命中 response 進入 R2，完全不消耗手牌可丟棄卡。
+   - **D8 勝／敗都回夜間「結束今晚」**：勝／敗結算後均停在 Day 8 Night，夜間推進狀態正常，呼叫 `resolve_night_advance()` 成功推進至 Day 9 Morning。
+   - **第二輪 D8 不重收費經由真實 `end_run()`**：第一輪走完 D8（扣費 1 瘋狂值，寫入 `night_locations_seen`），呼叫真實 `end_run("truth")` 跨輪，第二輪 D8 `play_night_fixed()` 不再扣費。
 
-2. **F2｜D45 遭遇不吃容量（per_round_slot_cost: 0）**：
-   - `data/beats/ch3_d39_d45.json`：設定 D45 遭遇 `per_round_slot_cost: 0`。
-   - `data/SCHEMA.md` & `scripts/data_loader.gd` & `scripts/autoload/game_state.gd`：規範 `per_round_slot_cost` 為非負整數（允許 0），`_check_encounter_capacity_failure()` 在 `blocked_slots <= 0` 時僅於手牌超載（`is_overloaded()`）時判定容量失敗。
-   - `tests/ui_sim/make_states.gd`：移除手牌裁減 hack，自然走查滿手 14 張正常進入 D45 答題。
+2. **N1｜新增 `.gitattributes` 與全檔 LF 規範化**：
+   - 根目錄新增 `.gitattributes`（`* text=auto eol=lf`），將 `ch3_d39_d45.json`、`make_states.gd` 等所有受影響檔案統一為 LF，徹底消除 1800 行 CRLF 換行噪音。
 
-3. **F3｜D10 手牌狀態自然反映 D8 消耗**：
-   - `tests/ui_sim/make_states.gd`：移除補打 `info_husband_version` / `info_wife_version` hack。
-   - `tests/ui_sim/cases/p1af_cases.gd`（`_p1h_02`、`_p1h_05`）與 `run_ui_sim.ps1`（`long_card_name`）：改為測試 D10 自然持有之卡片（`routine_debt` 與 `info_ahong_private`），忠實反映故事線 D8 消耗。
+3. **N2｜`scenes/main.gd` 路由去重構**：
+   - 將 `_route_view()` 與 `_route_view_after_encounter()` 統一合併為 `_route_view(encounter_lines = PackedStringArray())`，消除 85 行複製貼上代碼；所有時段分支均保留 `active_encounter` 遭遇攔截防護與 FlowText 出口文字保留。
 
-4. **F4｜test_p4e.gd loader 污染隔離（守則 7）**：
-   - `tests/headless/test_p4e.gd`：`_test_5` 備份 `cards` 並在容量測試後立即還原 `data_node.loader.cards`，徹底杜絕測試間污染。
+4. **N3｜`開發設計方針.md` 同步容量分歧規則**：
+   - 明確記錄容量判定兩套語意契約：`blocked_slots > 0`（如 D8）以可用格數判定容量耗盡；`blocked_slots <= 0`（如 D45 `per_round_slot_cost: 0`）僅在手牌超載（`is_overloaded()`，手牌數超過 14 張）時判定失敗。
 
-5. **F5｜P4-E 關鍵特性全量 UI 斷言補齊**：
-   - `tests/ui_sim/cases/p1af_cases.gd` & `tests/ui_sim/qa_contract_matrix.gd`：
-     - 遭遇進行中推進按鈕 disabled 守衛斷言（intro 與 round 階段）。
-     - `encounter_blocked::N` 壓力 placeholder 黑色方塊斷言。
-     - `encounter_capacity` 標籤文字（包含可用格數與壓力佔格）斷言。
-     - 知識卡標記「（知識）」斷言。
-     - `madness_blocked` 與 `already_attempted` disabled 理由呈現斷言。
-     - D8 遭遇之 `discard` 與 `escape_pay` 按鈕確認／取消／狀態逐字不變斷言。
+5. **N4｜`p4e_03` 知識卡斷言強化**：
+   - 移除弱化 `if` 守衛，強制斷言 `assert_true(not k_cands.is_empty())` 並斷言帶有 `（知識）` 標記。
 
-6. **F6｜重用 HandBar / CardDetail**：
-   - `scenes/ui/encounter_panel.gd`：候選卡旁新增 `[詳情]` 按鈕並支援右鍵點擊，透過 `card_detail_requested` 訊號轉發至 `HandBar.show_card_detail()`，重用全域唯一 `CardDetail` 彈窗，無重複實例，支援唯讀檢視卡面資訊。
+6. **N5｜清理 `_coda_jump` 死碼分支**：
+   - 移除無效的 `if/else: _advance(tree)` 分支，直接走遭遇確認與回應路徑。
+
+7. **N6｜變異測試自檢（守則 5）**：
+   - **F2 變異**：暫時移除 `_check_encounter_capacity_failure()` 中的 `is_overloaded()` 分支，D45 滿手 14 張時 `test_p4e.gd` 立即精確轉紅（`[FAIL] D45 with full 14-card hand should NOT fail capacity`，exit 1）；還原後 exit 0 全綠。
+   - **D8 零可丟棄卡直接失敗變異**：暫時繞過 `acknowledge_encounter_intro()` 中的 `has_legal_moves` 檢查，`test_p4e.gd` 立即轉紅（`[FAIL] Encounter should immediately settle as failure due to zero legal moves`，exit 1）；還原後 exit 0 全綠。
 
 ## 驗證狀態
 

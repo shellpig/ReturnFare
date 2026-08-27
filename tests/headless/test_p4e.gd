@@ -14,19 +14,23 @@ func _initialize() -> void:
 		return
 		
 	var failed: int = 0
-	print("\n=== P4-E 遭遇 UI 層次整合測試 ===")
+	print("\n=== P4-E 遭遇 UI 與規則整合測試 ===")
 	
 	failed += _test_1_view_safety_and_non_leakage(gs, data_node)
 	failed += _test_2_d8_lifecycle(gs, data_node)
 	failed += _test_3_candidate_disabled_states(gs, data_node)
-	failed += _test_4_charge_first_visit(gs, data_node)
+	failed += _test_4_charge_first_visit_real_end_run(gs, data_node)
 	failed += _test_5_three_round_paths(gs, data_node)
 	failed += _test_6_d8_escape(gs, data_node)
 	failed += _test_7_d8_discard(gs, data_node)
-	failed += _test_8_d45_no_escape_no_discard(gs, data_node)
-	failed += _test_9_d45_response_paths(gs, data_node)
+	failed += _test_8_d45_no_escape_no_discard_rejection_codes(gs, data_node)
+	failed += _test_9_d45_response_paths_and_cards_retained(gs, data_node)
 	failed += _test_10_d45_after_finish(gs, data_node)
 	failed += _test_11_serialization_roundtrip(gs, data_node)
+	failed += _test_12_d8_night_actions_blocked_and_protagonist_not_consumed(gs, data_node)
+	failed += _test_13_d8_zero_discardable_direct_failure(gs, data_node)
+	failed += _test_14_d8_knowledge_overwrites_round_1(gs, data_node)
+	failed += _test_15_d8_win_lose_return_to_night_end(gs, data_node)
 	
 	if failed > 0:
 		push_error("\nP4-E: %d assertion(s) failed\n" % failed)
@@ -71,7 +75,7 @@ func _setup_gs_for_d45(gs: Node) -> void:
 	gs.flags["final_day"] = true
 	gs.advance_phase() # to afternoon, triggers D45 encounter
 
-func _test_1_view_safety_and_non_leakage(gs: Node, data_node: Node) -> int:
+func _test_1_view_safety_and_non_leakage(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	_setup_gs_for_d8(gs)
 	gs.acknowledge_encounter_intro()
@@ -99,7 +103,7 @@ func _test_1_view_safety_and_non_leakage(gs: Node, data_node: Node) -> int:
 		failed += _ok("View model safety and non-leakage verified")
 	return failed
 
-func _test_2_d8_lifecycle(gs: Node, data_node: Node) -> int:
+func _test_2_d8_lifecycle(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	_reset_gs(gs)
 	gs.day = 8
@@ -124,7 +128,7 @@ func _test_2_d8_lifecycle(gs: Node, data_node: Node) -> int:
 		failed += _ok("D8 intro -> acknowledge -> round lifecycle verified")
 	return failed
 
-func _test_3_candidate_disabled_states(gs: Node, data_node: Node) -> int:
+func _test_3_candidate_disabled_states(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	_setup_gs_for_d8(gs, true)
 	gs.gain_card("madness")
@@ -164,8 +168,9 @@ func _test_3_candidate_disabled_states(gs: Node, data_node: Node) -> int:
 		failed += _ok("Candidate disabled states (madness_blocked, already_attempted) verified")
 	return failed
 
-func _test_4_charge_first_visit(gs: Node, data_node: Node) -> int:
+func _test_4_charge_first_visit_real_end_run(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
+	# 第一輪：走真實流程進 D8，收費 1 點瘋狂值並寫入 night_locations_seen
 	_reset_gs(gs)
 	gs.day = 8
 	gs.phase = "night"
@@ -177,19 +182,23 @@ func _test_4_charge_first_visit(gs: Node, data_node: Node) -> int:
 	if madness_after_first - initial_madness != 1:
 		failed += _err("First visit should charge madness cost")
 		
-	gs.end_run("test_reset")
+	# 走真實 end_run() 跨輪，不手動注入 seen
+	gs.end_run("truth")
+	if not gs.night_locations_seen.has("n_manydoors"):
+		failed += _err("night_locations_seen should persist across end_run in meta")
+		
+	# 第二輪：推進至 D8 夜間，驗證 play_night_fixed() 不再重收費
 	gs.day = 8
 	gs.phase = "night"
-	gs.night_locations_seen["n_manydoors"] = true
 	var madness_before_second = int(gs.get("_madness_counter"))
 	gs.play_night_fixed()
 	var madness_after_second = int(gs.get("_madness_counter"))
 	
 	if madness_after_second != madness_before_second:
-		failed += _err("Second visit should NOT charge madness cost")
+		failed += _err("Second run D8 visit should NOT charge madness cost via real end_run")
 		
 	if failed == 0:
-		failed += _ok("D8 charge_first_visit logic verified")
+		failed += _ok("D8 charge_first_visit via real end_run verified")
 	return failed
 
 func _test_5_three_round_paths(gs: Node, data_node: Node) -> int:
@@ -243,10 +252,10 @@ func _test_5_three_round_paths(gs: Node, data_node: Node) -> int:
 		failed += _err("d8_encounter_failure flag should be set")
 		
 	if failed == 0:
-		failed += _ok("D8 three-round paths (victory and failure) verified")
+		failed += _ok("D8 three-round paths (victory and capacity failure) verified")
 	return failed
 
-func _test_6_d8_escape(gs: Node, data_node: Node) -> int:
+func _test_6_d8_escape(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	_setup_gs_for_d8(gs, true)
 	gs.acknowledge_encounter_intro()
@@ -270,7 +279,7 @@ func _test_6_d8_escape(gs: Node, data_node: Node) -> int:
 		failed += _ok("D8 escape verified")
 	return failed
 
-func _test_7_d8_discard(gs: Node, data_node: Node) -> int:
+func _test_7_d8_discard(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	_setup_gs_for_d8(gs, true)
 	gs.acknowledge_encounter_intro()
@@ -290,24 +299,40 @@ func _test_7_d8_discard(gs: Node, data_node: Node) -> int:
 		failed += _ok("D8 discard verified")
 	return failed
 
-func _test_8_d45_no_escape_no_discard(gs: Node, data_node: Node) -> int:
+func _test_8_d45_no_escape_no_discard_rejection_codes(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	_setup_gs_for_d45(gs)
 	gs.acknowledge_encounter_intro()
 	
 	var view = gs.encounter_view()
 	if view.get("can_escape", true):
-		failed += _err("D45 should NOT allow escape")
+		failed += _err("D45 should NOT allow escape in view")
 	if view.get("allow_discard", true):
-		failed += _err("D45 should NOT allow discard")
+		failed += _err("D45 should NOT allow discard in view")
+		
+	# Direct calls must return exact rejection codes with zero state mutation
+	var snap_before := JSON.stringify(gs.serialize())
+	
+	var empty_esc: Array[String] = []
+	var esc_res = gs.escape_encounter(empty_esc)
+	if bool(esc_res.get("ok", true)) or str(esc_res.get("reason_code", "")) != "cannot_escape":
+		failed += _err("Direct escape_encounter on D45 should return reason_code 'cannot_escape', got '%s'" % esc_res.get("reason_code"))
+		
+	var disc_res = gs.discard_in_encounter("protagonist")
+	if bool(disc_res.get("ok", true)) or str(disc_res.get("reason_code", "")) != "discard_disabled":
+		failed += _err("Direct discard_in_encounter on D45 should return reason_code 'discard_disabled', got '%s'" % disc_res.get("reason_code"))
+		
+	var snap_after := JSON.stringify(gs.serialize())
+	if snap_after != snap_before:
+		failed += _err("State mutated after rejected escape/discard calls on D45")
 		
 	if failed == 0:
-		failed += _ok("D45 no escape and no discard verified")
+		failed += _ok("D45 no escape, no discard, and exact rejection codes verified")
 	return failed
 
-func _test_9_d45_response_paths(gs: Node, data_node: Node) -> int:
+func _test_9_d45_response_paths_and_cards_retained(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
-	# Path 1: Submit protagonist
+	# Path 1: Submit protagonist (protagonist must be retained in hand and not consumed)
 	_setup_gs_for_d45(gs)
 	gs.acknowledge_encounter_intro()
 	var req1 = gs.respond_to_encounter("protagonist")
@@ -315,6 +340,8 @@ func _test_9_d45_response_paths(gs: Node, data_node: Node) -> int:
 		failed += _err("Submitting protagonist should succeed")
 	if not "這個名字已經登記" in "".join(req1.get("lines", [])):
 		failed += _err("Did not get correct resolution text for protagonist")
+	if not gs.has_card("protagonist") or not gs.hand.has("protagonist"):
+		failed += _err("Protagonist card should be retained in hand after D45 encounter")
 	
 	# Path 2: Submit inf_health_disappearance
 	_setup_gs_for_d45(gs)
@@ -328,12 +355,21 @@ func _test_9_d45_response_paths(gs: Node, data_node: Node) -> int:
 		failed += _err("Should lose inf_health_disappearance")
 	if not gs.has_knowledge("k_health_from_disappearance"):
 		failed += _err("Should gain k_health_from_disappearance")
+
+	# Path 3: Full 14-card hand on D45 must succeed and not fail capacity (F2 fix)
+	_setup_gs_for_d45(gs)
+	while gs.hand.size() < 14:
+		gs.hand.append("routine_debt")
+	gs.acknowledge_encounter_intro()
+	var req3 = gs.respond_to_encounter("protagonist")
+	if not bool(req3.get("ok", false)):
+		failed += _err("D45 with full 14-card hand should NOT fail capacity (per_round_slot_cost is 0)")
 		
 	if failed == 0:
-		failed += _ok("D45 response paths verified")
+		failed += _ok("D45 response paths, card retention, and 14-card full hand capacity verified")
 	return failed
 
-func _test_10_d45_after_finish(gs: Node, data_node: Node) -> int:
+func _test_10_d45_after_finish(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	_setup_gs_for_d45(gs)
 	gs.acknowledge_encounter_intro()
@@ -346,7 +382,7 @@ func _test_10_d45_after_finish(gs: Node, data_node: Node) -> int:
 		failed += _ok("D45 after_finish phase advance verified")
 	return failed
 
-func _test_11_serialization_roundtrip(gs: Node, data_node: Node) -> int:
+func _test_11_serialization_roundtrip(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	_setup_gs_for_d8(gs, true)
 	gs.acknowledge_encounter_intro()
@@ -364,4 +400,167 @@ func _test_11_serialization_roundtrip(gs: Node, data_node: Node) -> int:
 		
 	if failed == 0:
 		failed += _ok("Serialization/deserialization roundtrip verified")
+	return failed
+
+func _test_12_d8_night_actions_blocked_and_protagonist_not_consumed(gs: Node, _data_node: Node) -> int:
+	var failed: int = 0
+	_setup_gs_for_d8(gs, true)
+	
+	# 1. During intro: sleep_night(), enter_night_location(), advance_phase() are blocked
+	var snap_before := JSON.stringify(gs.serialize())
+	
+	var sleep_lines: PackedStringArray = gs.sleep_night()
+	if not sleep_lines.is_empty():
+		failed += _err("sleep_night during encounter intro should return empty lines")
+		
+	var enter_res = gs.enter_night_location("sanquan")
+	if bool(enter_res.get("ok", true)) or str(enter_res.get("reason_code", "")) != "encounter_active":
+		failed += _err("enter_night_location during intro should be rejected with 'encounter_active', got '%s'" % enter_res.get("reason_code"))
+		
+	var adv_intro_res = gs.advance_phase()
+	if bool(adv_intro_res.get("ok", true)) or str(adv_intro_res.get("reason_code", "")) != "encounter_active":
+		failed += _err("advance_phase during encounter intro should be rejected with 'encounter_active', got '%s'" % adv_intro_res.get("reason_code"))
+		
+	var rna_intro_res = gs.resolve_night_advance()
+	if bool(rna_intro_res.get("advance", true)) or str(rna_intro_res.get("reason_code", "")) != "encounter_active":
+		failed += _err("resolve_night_advance during intro should return encounter_active")
+		
+	var snap_after := JSON.stringify(gs.serialize())
+	if snap_after != snap_before:
+		failed += _err("State mutated after rejected actions in intro")
+		
+	# 2. Transition to round: sleep_night() and advance_phase() are still blocked
+	gs.acknowledge_encounter_intro()
+	var sleep_lines_r: PackedStringArray = gs.sleep_night()
+	if not sleep_lines_r.is_empty():
+		failed += _err("sleep_night during encounter round should return empty lines")
+		
+	var adv_round_res = gs.advance_phase()
+	if bool(adv_round_res.get("ok", true)) or str(adv_round_res.get("reason_code", "")) != "encounter_active":
+		failed += _err("advance_phase during encounter round should be rejected with 'encounter_active', got '%s'" % adv_round_res.get("reason_code"))
+		
+	# 3. In R1, trying protagonist (not discardable, not in R1 response) is rejected with card_not_submittable
+	var pro_res = gs.respond_to_encounter("protagonist")
+	if bool(pro_res.get("ok", true)) or str(pro_res.get("reason_code", "")) != "card_not_submittable":
+		failed += _err("protagonist submission in D8 R1 should be rejected with 'card_not_submittable', got '%s'" % pro_res.get("reason_code"))
+	if not gs.has_card("protagonist") or not gs.hand.has("protagonist"):
+		failed += _err("protagonist must not be consumed on rejection in R1")
+		
+	# 4. In R1 fallback via equip_polaroid, protagonist remains in hand untouched
+	var disc_res = gs.respond_to_encounter("equip_polaroid")
+	if not bool(disc_res.get("ok", false)):
+		failed += _err("Fallback response with equip_polaroid should succeed")
+	if not gs.has_card("protagonist") or not gs.hand.has("protagonist"):
+		failed += _err("protagonist must not be consumed in R1 fallback")
+		
+	if failed == 0:
+		failed += _ok("D8 night actions blocked and protagonist not consumed verified")
+	return failed
+
+func _test_13_d8_zero_discardable_direct_failure(gs: Node, _data_node: Node) -> int:
+	var failed: int = 0
+	# Setup D8 with 0 discardable cards and 0 response matches:
+	# Hand only has protagonist (discardable: false), hand size = 2 (with 1 madness), capacity is 14
+	_reset_gs(gs)
+	gs.day = 8
+	gs.phase = "night"
+	gs.play_night_fixed() # hand: [protagonist, madness#1]
+	
+	# Hand has 2 cards, available slots = 14 - 2 - 1 = 11 > 0 (NOT capacity overload).
+	# But has_legal_moves is false because madness is blocked and protagonist is not discardable.
+	var ack_res = gs.acknowledge_encounter_intro()
+	if not bool(ack_res.get("ok", false)):
+		failed += _err("acknowledge_encounter_intro should succeed")
+		
+	if not gs.active_encounter.is_empty():
+		failed += _err("Encounter should immediately settle as failure due to zero legal moves")
+	if not gs.flags.get("d8_encounter_failure", false):
+		failed += _err("d8_encounter_failure flag should be set for zero legal moves")
+	if gs.flags.get("d8_encounter_victory", false):
+		failed += _err("d8_encounter_victory should not be set")
+		
+	if failed == 0:
+		failed += _ok("D8 zero discardable cards direct failure (non-capacity failure) verified")
+	return failed
+
+func _test_14_d8_knowledge_overwrites_round_1(gs: Node, _data_node: Node) -> int:
+	var failed: int = 0
+	_setup_gs_for_d8(gs, true) # hand has equip_polaroid, info_chunama_pause, routine_debt
+	# Gain k_not_today (a valid response for R1 name_since_when)
+	gs.gain_card("k_not_today")
+	gs.acknowledge_encounter_intro()
+	
+	var r1_view = gs.encounter_view()
+	var cand_k_found := false
+	for c in r1_view.get("candidates", []):
+		if str(c.get("base_id", "")) == "k_not_today":
+			cand_k_found = true
+			if not bool(c.get("submittable", false)):
+				failed += _err("k_not_today should be submittable in R1")
+	if not cand_k_found:
+		failed += _err("k_not_today not found in R1 candidates")
+		
+	# Submit k_not_today: direct correct answer, releases cost, advances to R2
+	var res = gs.respond_to_encounter("k_not_today")
+	if not bool(res.get("ok", false)):
+		failed += _err("Submitting k_not_today in R1 should succeed")
+		
+	var r2_view = gs.encounter_view()
+	if not "誰記得你" in str(r2_view.get("demand", "")):
+		failed += _err("Submitting k_not_today should advance directly to R2 'who_remembers'")
+		
+	# equip_polaroid should NOT have been consumed (knowledge answer preserved discardable hand card)
+	if not gs.has_card("equip_polaroid"):
+		failed += _err("equip_polaroid should remain in hand when answering with knowledge")
+		
+	if failed == 0:
+		failed += _ok("D8 knowledge overwriting R1 question verified")
+	return failed
+
+func _test_15_d8_win_lose_return_to_night_end(gs: Node, _data_node: Node) -> int:
+	var failed: int = 0
+	# 1. Victory settlement -> remains in Day 8 Night -> advance to Day 9 Morning
+	_setup_gs_for_d8(gs, true)
+	gs.acknowledge_encounter_intro()
+	gs.respond_to_encounter("equip_polaroid")
+	gs.respond_to_encounter("info_chunama_pause")
+	gs.respond_to_encounter("routine_debt")
+	
+	if gs.day != 8 or gs.phase != "night":
+		failed += _err("After victory, game should remain in Day 8 Night")
+	if not gs.active_encounter.is_empty():
+		failed += _err("Active encounter should be empty after victory")
+		
+	var adv_win_res: Dictionary = gs.resolve_night_advance()
+	if not bool(adv_win_res.get("advance", false)):
+		adv_win_res = gs.resolve_night_advance()
+	if not bool(adv_win_res.get("advance", false)):
+		failed += _err("resolve_night_advance after D8 victory should return advance: true")
+	gs.advance_phase()
+	if gs.day != 9 or gs.phase != "morning":
+		failed += _err("Night advance after D8 victory should advance to Day 9 Morning, got D%d %s" % [gs.day, gs.phase])
+		
+	# 2. Failure settlement -> remains in Day 8 Night -> advance to Day 9 Morning
+	_reset_gs(gs)
+	gs.day = 8
+	gs.phase = "night"
+	gs.play_night_fixed()
+	gs.acknowledge_encounter_intro() # zero discardable -> failure
+	
+	if gs.day != 8 or gs.phase != "night":
+		failed += _err("After failure, game should remain in Day 8 Night")
+	if not gs.active_encounter.is_empty():
+		failed += _err("Active encounter should be empty after failure")
+		
+	var adv_fail_res: Dictionary = gs.resolve_night_advance()
+	if not bool(adv_fail_res.get("advance", false)):
+		adv_fail_res = gs.resolve_night_advance()
+	if not bool(adv_fail_res.get("advance", false)):
+		failed += _err("resolve_night_advance after D8 failure should return advance: true")
+	gs.advance_phase()
+	if gs.day != 9 or gs.phase != "morning":
+		failed += _err("Night advance after D8 failure should advance to Day 9 Morning, got D%d %s" % [gs.day, gs.phase])
+		
+	if failed == 0:
+		failed += _ok("D8 victory and failure return to night end advance verified")
 	return failed
