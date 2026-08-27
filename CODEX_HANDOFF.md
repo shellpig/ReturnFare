@@ -16,45 +16,29 @@
 
 ## 最近完成的工作
 
-- **P4-D 遭遇規則實作完成（最新，待 verifier 複驗與打分）。**
-  - **核心模組建立 (`scripts/core/encounter.gd`)**：
-    - 建立 `Encounter` 類別，負責遭遇純判斷、Graph 節點查找、Response 匹配、合法動作求值（`has_legal_moves`）與 View Model 構建（`build_view`）。
-    - 嚴格落實資料封裝與無狀態設計（runtime 狀態皆由 `GameState.active_encounter` 持有）。
-    - `build_view()` 絕不外洩未達到的 round 或正解 `accepts` / `fallback` 結構。
-  - **GameState Autoload 遭遇狀態機與 API 實作 (`scripts/autoload/game_state.gd`)**：
-    - `active_encounter: Dictionary`：追蹤當前遭遇狀態 `{ beat_id, stage, round_id, blocked_slots, attempted_card_ids }`。
-    - `is_overloaded() -> bool`：純查詢 `hand_slots_used() > int(Data.tuning("hand_size", 14))`。
-    - **5 大遭遇操作 API**：
-      - `start_encounter(beat_id) -> Dictionary`：檢查 active → unknown beat → data conflict，成功時 stage 為 `"intro"`，`blocked_slots = 0`。
-      - `acknowledge_encounter_intro() -> Dictionary`：檢查 inactive → wrong stage → data conflict，超載時加收 penalty cost，進入第一 round（`blocked_slots += cost`），若可用格歸零或無合法解自動結算 failure。
-      - `encounter_view() -> Dictionary`：提供給 UI 或走查的安全 View Model。
-      - `respond_to_encounter(card_id) -> Dictionary`：檢查 inactive → wrong stage → unknown card → not held → madness → attempted → card not submittable → data conflict。正解命中釋放本回合 cost、套用 on_resolve；錯答保留 cost、若要求 discardable 則檢查扣卡並轉入 fallback；若為最後回合則走 victory/failure 結算。
-      - `discard_in_encounter(card_id) -> Dictionary`：檢查 inactive → wrong stage → discard disabled → unknown card → not held → not discardable。扣除卡片、不改 blocked_slots、不推進回合。
-      - `escape_encounter(card_ids: Array[String]) -> Dictionary`：檢查 inactive → wrong stage → cannot escape → wrong count → duplicate payment → unknown card → not held → not discardable → data conflict。扣除卡片並套用 on_escape 結算。
-    - **15 碼封閉拒絕代碼與固定優先順序**：
-      - `encounter_active`, `no_active_encounter`, `wrong_stage`, `unknown_beat`, `unknown_card`, `not_held`, `madness_blocked`, `already_attempted`, `card_not_submittable`, `discard_disabled`, `not_discardable`, `cannot_escape`, `wrong_escape_count`, `duplicate_payment`, `data_conflict`。
-    - **既有 API 升級與阻擋接線**：
-      - `advance_phase() -> Dictionary`：遇活躍遭遇時拒絕推進（`{ ok: false, reason_code: "encounter_active", phase_advanced: false }`）；白天時段切換時自動掃描應觸發之定日 fixed encounter（如 D45 afternoon）；夜間 fixed beats 仍走 `play_night_fixed()` 流程。
-      - `try_place()`, `choose()`, `delegate()`, `indulge()`, `confirm_night_alignment()`, `enter_night_location()`, `resolve_night_advance()` 全面加入 `encounter_active` 阻擋。
-      - `enter_night_location()` 加入 `overloaded` 檢查阻擋。
-    - **序列化與健全度**：
-      - `serialize()` 與 `deserialize()` 完整保存／還原 `active_encounter`。
-      - `end_run()` 完整清空 `active_encounter`。
-  - **自動化測試套件 (`tests/headless/test_p4d.gd`)**：
-    - 撰寫 12 大測試組，完整涵蓋 測試指南 P4-D 的 14 項驗收標準：
-      1. 遭遇啟動與開場確認（intro 階段 blocked_slots=0，acknowledge 後進入 round 1 blocked_slots=1）
-      2. 遭遇進行中時段與各類操作阻擋（advance_phase, try_place, choose, delegate, indulge, enter_night_location 等）
-      3. 15 碼封閉拒絕代碼矩陣
-      4. 拒絕優先順序驗證（如 madness_blocked > already_attempted, not_night > encounter_active > overloaded）
-      5. 超載規則（is_overloaded 查詢、enter_night_location 阻擋、開場 penalty 佔格）
-      6. 佔格計算與扣除（正解釋放 cost、錯答保留 cost）
-      7. 主動丟棄與逃離遭遇
-      8. 無合法解自動結算 failure
-      9. 容量上限失敗結算
-      10. 遭遇勝利與結束推進（after_finish: "advance_phase" 推進時段、"stay" 停留原時段）
-      11. 序列化與還原往返
-      12. 故事線遭遇契約驗證（D8 n_manydoors_ch1, D45 d45_encounter）
-    - 全專案 26 套 headless 測試（`tests/run_all_headless.ps1`）全數 exit 0 通過。
+- **P4-D 遭遇規則實作與 18 條待修項目（K-126～K-143）全面修復完成，變異測試全部轉紅驗收。**
+  - **核心規則層與引擎防禦修復**：
+    - **K-126**：`GameState.play_night_fixed()` 正式接上遭遇啟動邏輯，播完 fixed beat 且帶 `encounter` 時自動呼叫 `start_encounter(bid)`。
+    - **K-132**：`respond_to_encounter` 順序調整，`card_not_submittable` 先於 `data_conflict`，嚴格遵從方針。
+    - **K-133**：`_finish_encounter` 加入 `gen_before := run_generation` 世代守衛，若重置則不推進 `advance_phase`。
+    - **K-134**：`active_encounter` 增加 `visited_round_ids: Array[String]`，進入重複 round 時 `push_error` 回 `data_conflict`，防範圖循環重扣，序列化往返保留。
+    - **K-135**：`hand_size` fallback 預設值統一為 `14`。
+    - **K-136**：`_check_encounter_capacity_failure()` 移除死參數 `enc`。
+    - **K-137**：`_card_base_id` 委派給 `DataFacts.card_base_id`。
+    - **K-142**：`playthrough_greedy.gd` 與 `test_p3f.gd` 實作 `solve_active_encounter_if_any` 循環完整結算遭遇（涵蓋 D8 night 與 D45 afternoon）。
+    - **K-143**：走查腳本恢復 afternoon `last_ind_count` 快照，`advance_phase` 嚴格消費結果。
+  - **測試層強化與變異測試驗收（`tests/headless/test_p4d.gd`）**：
+    - **K-127**：覆蓋 D45 afternoon 與 D8 night 自動啟動 hook 測試（拔除即轉紅）。
+    - **K-128**：15 碼拒絕矩陣每例前後 `serialize()` 逐字比對零變化（注入副作用即轉紅）。
+    - **K-129**：`encounter_view()` 正向（`candidates` 來源標籤）與負向嚴格不洩漏答案／圖結構（洩漏即轉紅）。
+    - **K-130**：補 `after_finish: "stay"` 測試，斷言結算後 day/phase 逐字不變。
+    - **K-131**：5 個遭遇 mutation 入口各自覆蓋至少一組雙重失敗優先序測試（反序即轉紅）。
+    - **K-134**：帶 cycle 的惡意遭遇測試，驗證 `visited_round_ids` 阻擋（拔除即轉紅）。
+    - **K-138**：真實故事遭遇走通（D8 `n_manydoors_ch1`、D45 `d45_encounter`），mock fixture 測試後全數乾淨清理。
+    - **K-139**：序列化往返改由真實 `respond_to_encounter` 產生 attempted，並與未存檔對照組逐字比對最終 serialize（遺漏即轉紅）。
+    - **K-140**：出口效果改用可累加數值（`relation` + 數值、`gain` + 卡片）驗證只套用恰好一次（重複套用即轉紅）。
+    - **K-141**：完整遭遇前後斷言 `action_spent`、`indulgence_count`、`forced_pending` 逐字不變（修改即轉紅）。
+  - 全專案 26 套 headless 測試（`tests/run_all_headless.ps1`）全數 exit 0 通過。
 
 ## 驗證狀態
 

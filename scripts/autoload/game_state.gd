@@ -264,6 +264,8 @@ func play_night_fixed() -> PackedStringArray:
 				night_once_beats_seen[bid] = true
 			var beat_lines := play_beat(bid)
 			lines.append_array(beat_lines)
+			if b.has("encounter") and not (b.get("encounter") as Dictionary).is_empty():
+				start_encounter(bid)
 
 	return lines
 
@@ -1443,7 +1445,7 @@ func try_place(card_id: String, beat_id: String, slot_id: String) -> Dictionary:
 
 ## 手牌是否超載（純查詢，不序列化，規格書第十三節、P4-D）。
 func is_overloaded() -> bool:
-	var max_hand: int = int(Data.tuning("hand_size", 7)) if Data != null else 7
+	var max_hand: int = int(Data.tuning("hand_size", 14)) if Data != null else 14
 	return hand_slots_used() > max_hand
 
 
@@ -1482,12 +1484,14 @@ func start_encounter(beat_id: String) -> Dictionary:
 		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料缺少 after_finish" }
 
 	var attempted_ids: Array[String] = []
+	var visited_ids: Array[String] = []
 	active_encounter = {
 		"beat_id": beat_id,
 		"stage": "intro",
 		"round_id": "",
 		"blocked_slots": 0,
-		"attempted_card_ids": attempted_ids
+		"attempted_card_ids": attempted_ids,
+		"visited_round_ids": visited_ids
 	}
 
 	return { "ok": true, "reason_code": "", "reason_text": "" }
@@ -1498,7 +1502,7 @@ func start_encounter(beat_id: String) -> Dictionary:
 ## 1. inactive:目前無遭遇（no_active_encounter）
 ## 2. wrong stage:目前不是 intro 階段（wrong_stage）
 ## 3. data conflict:第一回合資料異常（data_conflict）
-## 成功進入第一回合，超載時加一次 penalty，第一回合各加一次 cost；可用格歸零或無合法解直接 failure。
+## 成功進入第一回合，超載時先加一次 penalty，第一回合各加一次 cost；可用格歸零或無合法解直接 failure。
 ## 回傳：{ "ok": bool, "reason_code": String, "reason_text": String, "lines": PackedStringArray }
 func acknowledge_encounter_intro() -> Dictionary:
 	# 1. inactive
@@ -1526,7 +1530,7 @@ func acknowledge_encounter_intro() -> Dictionary:
 	# 超載時先加一次 penalty cost
 	if is_overloaded():
 		active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
-		if _check_encounter_capacity_failure(enc):
+		if _check_encounter_capacity_failure():
 			var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
 			return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
 
@@ -1534,9 +1538,12 @@ func acknowledge_encounter_intro() -> Dictionary:
 	active_encounter["stage"] = "round"
 	active_encounter["round_id"] = first_round_id
 	active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
+	var visited: Array = active_encounter.get("visited_round_ids", []) as Array
+	if not visited.has(first_round_id):
+		visited.append(first_round_id)
 
 	# 檢查佔格是否已達/超出手牌上限
-	if _check_encounter_capacity_failure(enc):
+	if _check_encounter_capacity_failure():
 		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
 		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
 
@@ -1600,12 +1607,10 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 
 	# 取得當前回合定義
 	var beat_id := str(active_encounter.get("beat_id", ""))
-	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary
+	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary if Data != null and Data.loader != null else {}
 	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
 	var round_id := str(active_encounter.get("round_id", ""))
 	var round_data := Encounter.get_round(enc, round_id)
-	if round_data.is_empty():
-		return { "ok": false, "reason_code": "data_conflict", "reason_text": "當前回合資料遺失", "lines": PackedStringArray() }
 
 	var card_def: Dictionary = Data.loader.cards.get(base_id, {}) as Dictionary
 	var is_discardable := bool(card_def.get("discardable", false))
@@ -1613,9 +1618,13 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 	var fallback: Dictionary = round_data.get("fallback", {}) as Dictionary
 	var req_discardable := bool(fallback.get("requires_discardable", false))
 
-	# 7. card not submittable
+	# 7. card not submittable (K-132: 依方針順序先於 data_conflict)
 	if matching_resp.is_empty() and req_discardable and not is_discardable:
 		return { "ok": false, "reason_code": "card_not_submittable", "reason_text": "該卡無法作為錯答提交", "lines": PackedStringArray() }
+
+	# 8. data conflict
+	if round_data.is_empty():
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "當前回合資料遺失", "lines": PackedStringArray() }
 
 	# 通過所有檢查 → 開始結算
 	attempted.append(base_id)
@@ -1642,10 +1651,18 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 		else:
 			var next_rid := str(next_round_val)
+			var visited: Array = active_encounter.get("visited_round_ids", []) as Array
+			if visited.has(next_rid):
+				push_error("Encounter: cycle detected on round '%s'" % next_rid)
+				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+				lines.append_array(fail_res.get("lines", PackedStringArray()))
+				return { "ok": false, "reason_code": "data_conflict", "reason_text": "回合循環衝突", "lines": lines }
+			visited.append(next_rid)
+
 			active_encounter["round_id"] = next_rid
 			active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
 
-			if _check_encounter_capacity_failure(enc):
+			if _check_encounter_capacity_failure():
 				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
 				lines.append_array(fail_res.get("lines", PackedStringArray()))
 				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
@@ -1674,10 +1691,18 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 		else:
 			var next_rid := str(next_round_val)
+			var visited: Array = active_encounter.get("visited_round_ids", []) as Array
+			if visited.has(next_rid):
+				push_error("Encounter: cycle detected on round '%s'" % next_rid)
+				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
+				lines.append_array(fail_res.get("lines", PackedStringArray()))
+				return { "ok": false, "reason_code": "data_conflict", "reason_text": "回合循環衝突", "lines": lines }
+			visited.append(next_rid)
+
 			active_encounter["round_id"] = next_rid
 			active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
 
-			if _check_encounter_capacity_failure(enc):
+			if _check_encounter_capacity_failure():
 				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
 				lines.append_array(fail_res.get("lines", PackedStringArray()))
 				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
@@ -1820,9 +1845,13 @@ func _finish_encounter(outcome: String, effect_data: Dictionary) -> Dictionary:
 
 	active_encounter.clear()
 
+	var gen_before := run_generation
 	var lines := PackedStringArray()
 	if not effect_data.is_empty():
 		lines.append_array(EffectApply.apply(effect_data, self))
+
+	if run_generation != gen_before:
+		return { "ok": true, "outcome": outcome, "lines": lines }
 
 	if after_finish == "advance_phase":
 		var adv_res := advance_phase()
@@ -1831,9 +1860,9 @@ func _finish_encounter(outcome: String, effect_data: Dictionary) -> Dictionary:
 	return { "ok": true, "outcome": outcome, "lines": lines }
 
 
-## 檢查可用格數是否歸零或小於 0（容量超載失敗）。
-func _check_encounter_capacity_failure(enc: Dictionary) -> bool:
-	var hand_size := int(Data.tuning("hand_size", 7)) if Data != null else 7
+## 檢查可用格數是否歸零或小於 0（容量超載失敗，K-135/K-136）。
+func _check_encounter_capacity_failure() -> bool:
+	var hand_size := int(Data.tuning("hand_size", 14)) if Data != null else 14
 	var blocked := int(active_encounter.get("blocked_slots", 0))
 	return (hand_size - hand.size() - blocked) <= 0
 
@@ -1929,6 +1958,10 @@ func deserialize(d: Dictionary) -> void:
 		for item in enc_raw.get("attempted_card_ids", []):
 			att.append(str(item))
 		active_encounter["attempted_card_ids"] = att
+		var vis: Array[String] = []
+		for item in enc_raw.get("visited_round_ids", []):
+			vis.append(str(item))
+		active_encounter["visited_round_ids"] = vis
 
 	var meta: Dictionary = d.get("meta", {})
 	knowledge = meta.get("knowledge", {}).duplicate()
@@ -1940,7 +1973,5 @@ func deserialize(d: Dictionary) -> void:
 # ── 內部工具 ─────────────────────────────────────────────────────────────────
 
 func _card_base_id(id: String) -> String:
-	var hash_idx := id.rfind("#")
-	if hash_idx >= 0:
-		return id.substr(0, hash_idx)
-	return id
+	return DataFacts.card_base_id(id)
+

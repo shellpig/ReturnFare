@@ -122,7 +122,7 @@ static func build_view(encounter_data: Dictionary, active_state: Dictionary, gs:
 	var stage := str(active_state.get("stage", "intro"))
 	var beat_id := str(active_state.get("beat_id", ""))
 	var blocked_slots := int(active_state.get("blocked_slots", 0))
-	var hand_size := int(tuning.get("hand_size", 7))
+	var hand_size := int(tuning.get("hand_size", 14))
 	var hand: Array = gs.get("hand") as Array if (gs != null and "hand" in gs) else []
 	var available_slots := hand_size - hand.size() - blocked_slots
 
@@ -224,7 +224,4 @@ static func build_view(encounter_data: Dictionary, active_state: Dictionary, gs:
 
 
 static func _extract_base_id(id: String) -> String:
-	var hash_idx := id.rfind("#")
-	if hash_idx >= 0:
-		return id.substr(0, hash_idx)
-	return id
+	return DataFacts.card_base_id(id)

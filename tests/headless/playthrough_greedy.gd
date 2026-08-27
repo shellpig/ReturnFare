@@ -205,8 +205,11 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			illegal_phases += 1
 		if res_a.get("placed", false):
 			actions_taken += 1
+		last_ind_count = int(gs.get("indulgence_count"))
 		if str(gs.get("phase")) == "afternoon":
-			gs.advance_phase()
+			var adv_a: Dictionary = gs.advance_phase()
+			if not adv_a.get("ok", false):
+				illegal_phases += 1
 
 		if verbose:
 			print("  第 %2d 天 | morning: %-32s | afternoon: %-32s" % [
@@ -268,17 +271,69 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 	}
 
 
-static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: String, forced_indulged: bool = false) -> Dictionary:
-	# 遭遇處理（P4-D）：若當前時段已有活躍遭遇（如 D45 afternoon），先進行遭遇結算
-	if not (gs.get("active_encounter") as Dictionary).is_empty():
+## 自動完整結算遭遇（多回合遍歷、正解/錯答/逃離/丟棄，K-142）
+static func solve_active_encounter_if_any(gs: Node) -> void:
+	var safety_cap := 25
+	while not (gs.get("active_encounter") as Dictionary).is_empty() and safety_cap > 0:
+		safety_cap -= 1
 		var enc_state: Dictionary = gs.get("active_encounter") as Dictionary
-		if str(enc_state.get("stage", "")) == "intro":
-			gs.acknowledge_encounter_intro()
-		var hand_cards: Array = gs.get("hand") as Array
-		for hc in hand_cards:
-			var res_resp: Dictionary = gs.respond_to_encounter(str(hc))
-			if res_resp.get("ok", false):
+		var stage := str(enc_state.get("stage", ""))
+		if stage == "intro":
+			var ack_res: Dictionary = gs.acknowledge_encounter_intro()
+			if not ack_res.get("ok", false):
 				break
+			continue
+		elif stage == "round":
+			var view: Dictionary = gs.encounter_view()
+			var candidates: Array = view.get("candidates", []) as Array
+			var responded := false
+			for cand in candidates:
+				if not cand is Dictionary:
+					continue
+				var c_dict := cand as Dictionary
+				if bool(c_dict.get("submittable", false)):
+					var cid := str(c_dict.get("card_id", ""))
+					var res: Dictionary = gs.respond_to_encounter(cid)
+					if res.get("ok", false):
+						responded = true
+						break
+			if responded:
+				continue
+
+			# 無法回應時嘗試逃離
+			if bool(view.get("can_escape", false)):
+				var esc_cost: int = int(view.get("escape_cost", 0))
+				var disc_cards: Array[String] = []
+				for cand in candidates:
+					var c_dict := cand as Dictionary
+					if str(c_dict.get("source", "")) == "hand" and bool(c_dict.get("discardable", false)):
+						disc_cards.append(str(c_dict.get("card_id", "")))
+						if disc_cards.size() == esc_cost:
+							break
+				if disc_cards.size() == esc_cost:
+					var esc_res: Dictionary = gs.escape_encounter(disc_cards)
+					if esc_res.get("ok", false):
+						break
+
+			# 無法逃離時嘗試主動丟棄
+			if bool(view.get("allow_discard", false)):
+				var discarded := false
+				for cand in candidates:
+					var c_dict := cand as Dictionary
+					if str(c_dict.get("source", "")) == "hand" and bool(c_dict.get("discardable", false)):
+						var d_res: Dictionary = gs.discard_in_encounter(str(c_dict.get("card_id", "")))
+						if d_res.get("ok", false):
+							discarded = true
+							break
+				if discarded:
+					continue
+			break
+
+
+static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: String, forced_indulged: bool = false) -> Dictionary:
+	# 遭遇處理（P4-D、K-142）：若當前時段已有活躍遭遇（如 D45 afternoon），先進行遭遇結算
+	if not (gs.get("active_encounter") as Dictionary).is_empty():
+		solve_active_encounter_if_any(gs)
 		return { "ok": true, "placed": false, "category": "all_fixed", "detail": "遭遇結算", "summary": "[all_fixed] 遭遇結算" }
 
 	var locs := PanelBuilder.available_locations(gs, data_node)
@@ -438,8 +493,9 @@ static func execute_evening_phase(gs: Node, _data_node: Node, day: int) -> void:
 
 
 static func execute_night_phase(gs: Node, data_node: Node, _day: int, open_markers: bool = true) -> void:
-	# 1. 統一走 GameState.play_night_fixed() 結算入夜 fixed beat（K-26）
+	# 1. 統一走 GameState.play_night_fixed() 結算入夜 fixed beat（K-26、K-126）
 	gs.play_night_fixed()
+	solve_active_encounter_if_any(gs)
 
 	if not open_markers:
 		gs.sleep_night()

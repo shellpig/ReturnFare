@@ -100,3 +100,10 @@ static func beat_matches_time(beat: Dictionary, day: int, phase: String) -> bool
 
 	return true
 
+
+## 取得卡片 base id（去除實例後綴如 #1、#2，K-137）
+static func card_base_id(id: String) -> String:
+	var hash_idx := id.rfind("#")
+	if hash_idx >= 0:
+		return id.substr(0, hash_idx)
+	return id

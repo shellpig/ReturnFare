@@ -281,6 +281,7 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 		var madness_before_fixed: int = int(gs.get("_madness_counter"))
 		gs.play_night_fixed()
 		paid_entered_count += int(gs.get("_madness_counter")) - madness_before_fixed
+		PlaythroughGreedy.solve_active_encounter_if_any(gs)
 
 		var locs := PanelBuilder.available_locations(gs, data_node)
 		var chosen_loc := ""

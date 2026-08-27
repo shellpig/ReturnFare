@@ -2,23 +2,25 @@ extends SceneTree
 
 ## P4-D 遭遇規則 headless 驗收測試：
 ## 1. 遭遇啟動與開場確認（start_encounter, stage intro, acknowledge_encounter_intro, stage round）
-## 2. 遭遇進行中時段與各類放置／委託／縱慾／夜間操作阻擋（encounter_active）
-## 3. 15 碼封閉拒絕矩陣與 6 個入口之拒絕順序優先驗證
-## 4. 超載規則（is_overloaded 查詢、enter_night_location 阻擋、開場 penalty 佔格）
-## 5. 佔格計算與扣除（進入回合加佔格、正解釋放本回合佔格、錯答保留佔格）
-## 6. 錯答與可丟棄檢查（fallback.requires_discardable 阻擋不可丟棄卡、可丟棄卡錯答扣除）
-## 7. 主動丟棄卡片（allow_discard 阻擋、合法丟棄扣卡不變佔格不推進）
-## 8. 逃離遭遇（cannot_escape 阻擋、足額支付扣卡結算）
-## 9. 無合法解自動結算 failure
-## 10. 容量上限失敗結算（手牌數＋佔格數 >= 容量）
-## 11. 遭遇勝利與效果套用（多回合圖走完勝利、on_victory 效果套用、active_encounter 清空）
-## 12. 遭遇結束後推進（after_finish: "advance_phase" 推進時段、"stay" 停留原時段）
-## 13. 遭遇狀態序列化與還原往返（serialize / deserialize）
-## 14. 故事線遭遇契約驗證（D8 河豚毒素、D45 結局 coda）
+## 2. 遭遇自動啟動 hook 覆蓋（D45 下午 advance_phase 與 D8 入夜 play_night_fixed 自動建立 intro，K-126/K-127）
+## 3. 遭遇進行中時段與各類放置／委託／縱慾／夜間操作阻擋（encounter_active）
+## 4. 15 碼封閉拒絕矩陣（比對 serialize 零狀態變化，K-128）
+## 5. 5 大遭遇入口固定拒絕順序優先驗證（雙條件交集衝突測試，K-131/K-132）
+## 6. encounter_view 候選完整性、來源標記與答案不洩漏負向斷言（K-129）
+## 7. 超載規則（is_overloaded 查詢、enter_night_location 阻擋、開場 penalty 佔格）
+## 8. 佔格計算與扣除（進入回合加佔格、正解釋放本回合佔格、錯答保留佔格）
+## 9. 主動丟棄卡片與逃離遭遇（allow_discard、cannot_escape 阻擋、扣卡結算）
+## 10. 無合法解自動結算 failure 與容量上限失敗結算（手牌數＋佔格數 >= 容量）
+## 11. 遭遇勝利與效果套用（累加型效果只套一次，K-140；不消耗 action、不開縱慾與備用區，K-141）
+## 12. 遭遇結束推進（after_finish: "advance_phase" 推進時段、"stay" 停留原時段，K-130）
+## 13. 回合循環偵測防禦（visited_round_ids 防止 cycle 重複收費，K-134）
+## 14. 序列化往返與未存檔對照組逐字比對（K-139）
+## 15. 故事線真實遭遇路徑驗證（D8 n_manydoors_ch1、D45 d45_encounter，K-138）
 
 const DataLoader := preload("res://scripts/data_loader.gd")
 const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 const Encounter := preload("res://scripts/core/encounter.gd")
+const DataFacts := preload("res://scripts/core/data_facts.gd")
 const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 
 func _initialize() -> void:
@@ -36,16 +38,19 @@ func _initialize() -> void:
 	print("\n=== P4-D 遭遇規則測試套件 ===")
 
 	failed += _test_encounter_lifecycle_and_view(gs, data_node)
+	failed += _test_phase_hook_autostart(gs, data_node)
 	failed += _test_mutation_blocking_during_encounter(gs, data_node)
-	failed += _test_15_code_rejection_matrix(gs, data_node)
-	failed += _test_rejection_priority_orders(gs, data_node)
+	failed += _test_15_code_rejection_matrix_zero_mutation(gs, data_node)
+	failed += _test_rejection_priority_orders_all_endpoints(gs, data_node)
+	failed += _test_view_model_completeness_and_non_leakage(gs, data_node)
 	failed += _test_overload_and_penalty(gs, data_node)
 	failed += _test_slot_blocking_and_release(gs, data_node)
 	failed += _test_discard_and_escape(gs, data_node)
-	failed += _test_no_legal_moves_auto_failure(gs, data_node)
-	failed += _test_capacity_exhaustion_failure(gs, data_node)
-	failed += _test_victory_and_after_finish(gs, data_node)
-	failed += _test_serialization_roundtrip(gs, data_node)
+	failed += _test_no_legal_moves_and_capacity_failure(gs, data_node)
+	failed += _test_victory_effects_and_action_immutability(gs, data_node)
+	failed += _test_after_finish_stay_and_advance(gs, data_node)
+	failed += _test_cycle_detection(gs, data_node)
+	failed += _test_serialization_roundtrip_with_control(gs, data_node)
 	failed += _test_storyline_encounters_contract(gs, data_node)
 
 	if failed > 0:
@@ -66,7 +71,7 @@ func _err(msg: String) -> int:
 	return 1
 
 
-## Helper: 建立乾淨測試環境與自訂 beat
+## Helper: 建立乾淨測試環境
 func _reset_gs(gs: Node) -> void:
 	gs.end_run("test_reset")
 	gs.day = 1
@@ -74,6 +79,7 @@ func _reset_gs(gs: Node) -> void:
 	gs.hand.clear()
 	gs.hand.append("protagonist")
 	gs.knowledge.clear()
+	gs.flags.clear()
 	gs.active_encounter.clear()
 
 
@@ -85,6 +91,17 @@ func _create_mock_encounter_beat(data_node: Node, beat_id: String, enc_data: Dic
 		"encounter": enc_data
 	}
 	data_node.loader.beats_by_id[beat_id] = b
+
+
+func _clean_mock_beat(data_node: Node, beat_id: String) -> void:
+	if data_node != null and data_node.loader != null:
+		data_node.loader.beats_by_id.erase(beat_id)
+
+
+func _clean_mock_cards(data_node: Node, card_ids: Array) -> void:
+	if data_node != null and data_node.loader != null:
+		for cid in card_ids:
+			data_node.loader.cards.erase(cid)
 
 
 # ── 1. 遭遇啟動與開場確認 ───────────────────────────────────────────────────
@@ -105,7 +122,7 @@ func _test_encounter_lifecycle_and_view(gs: Node, data_node: Node) -> int:
 		"rounds": [
 			{
 				"id": "r1",
-				"prompt": "第一回合提示",
+				"demand": "第一回合需求",
 				"responses": [
 					{
 						"accepts": ["k_fugu_cure"],
@@ -123,7 +140,7 @@ func _test_encounter_lifecycle_and_view(gs: Node, data_node: Node) -> int:
 			},
 			{
 				"id": "r2",
-				"prompt": "第二回合提示",
+				"demand": "第二回合需求",
 				"responses": [
 					{
 						"accepts": ["k_fugu_cure"],
@@ -177,10 +194,62 @@ func _test_encounter_lifecycle_and_view(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("acknowledge_encounter_intro enters stage 'round' at r1 with blocked_slots=1")
 
+	_clean_mock_beat(data_node, "mock_enc_lifecycle")
+	_clean_mock_cards(data_node, ["k_fugu_cure"])
 	return failed
 
 
-# ── 2. 遭遇進行中時段與各類操作阻擋 ──────────────────────────────────────────
+# ── 2. 遭遇自動啟動 Hook 覆蓋（K-126/K-127）─────────────────────────────────
+
+func _test_phase_hook_autostart(gs: Node, data_node: Node) -> int:
+	var failed: int = 0
+	_reset_gs(gs)
+
+	# 1. 白天定日遭遇：D45 上午 -> 下午，advance_phase 自動啟動 d45_encounter
+	gs.day = 45
+	gs.phase = "morning"
+	gs.flags["final_day"] = true
+	var adv_d45: Dictionary = gs.advance_phase()
+	if not bool(adv_d45.get("ok", false)) or not bool(adv_d45.get("phase_advanced", false)):
+		failed += _err("advance_phase to D45 afternoon failed: %s" % str(adv_d45))
+	elif gs.phase != "afternoon":
+		failed += _err("phase should be 'afternoon', got '%s'" % gs.phase)
+	elif str(gs.active_encounter.get("beat_id", "")) != "d45_encounter":
+		failed += _err("D45 afternoon should automatically start 'd45_encounter', got '%s'" % str(gs.active_encounter.get("beat_id", "")))
+	elif str(gs.active_encounter.get("stage", "")) != "intro":
+		failed += _err("auto-started d45_encounter should be in 'intro' stage")
+	else:
+		failed += _ok("advance_phase to D45 afternoon automatically starts d45_encounter intro (K-127)")
+
+	# 2. 夜間定日遭遇：D8 傍晚 -> 夜間，play_night_fixed() 播文字、收費且自動啟動 n_manydoors_ch1 (K-126)
+	_reset_gs(gs)
+	gs.day = 8
+	gs.phase = "evening"
+	gs.advance_phase()
+	if gs.phase != "night":
+		failed += _err("phase should be 'night', got '%s'" % gs.phase)
+
+	var madness_before := int(gs.get("_madness_counter"))
+	var night_lines: PackedStringArray = gs.play_night_fixed()
+	var madness_after := int(gs.get("_madness_counter"))
+
+	if str(gs.active_encounter.get("beat_id", "")) != "n_manydoors_ch1":
+		failed += _err("play_night_fixed on D8 should automatically start 'n_manydoors_ch1', got '%s'" % str(gs.active_encounter.get("beat_id", "")))
+	elif str(gs.active_encounter.get("stage", "")) != "intro":
+		failed += _err("auto-started n_manydoors_ch1 should be in 'intro' stage")
+	elif madness_after - madness_before != 1:
+		failed += _err("D8 night fixed should charge 1 madness card for first visit fee, got %d" % (madness_after - madness_before))
+	elif not bool(gs.night_locations_seen.get("n_manydoors", false)):
+		failed += _err("n_manydoors should be recorded into night_locations_seen")
+	elif night_lines.is_empty():
+		failed += _err("play_night_fixed should return beat text lines")
+	else:
+		failed += _ok("play_night_fixed on D8 correctly charges fee and automatically starts n_manydoors_ch1 encounter (K-126)")
+
+	return failed
+
+
+# ── 3. 遭遇進行中時段與各類操作阻擋 ──────────────────────────────────────────
 
 func _test_mutation_blocking_during_encounter(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
@@ -195,6 +264,7 @@ func _test_mutation_blocking_during_encounter(gs: Node, data_node: Node) -> int:
 		"rounds": [
 			{
 				"id": "r1",
+				"demand": "需求",
 				"responses": [{ "accepts": ["protagonist"], "next_round": null }],
 				"fallback": { "requires_discardable": false, "next_round": null }
 			}
@@ -260,12 +330,13 @@ func _test_mutation_blocking_during_encounter(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("resolve_night_advance is blocked during active encounter")
 
+	_clean_mock_beat(data_node, "mock_enc_block")
 	return failed
 
 
-# ── 3. 15 碼封閉拒絕矩陣驗證 ────────────────────────────────────────────────
+# ── 4. 15 碼封閉拒絕矩陣驗證（比對 serialize 零變化，K-128）───────────────
 
-func _test_15_code_rejection_matrix(gs: Node, data_node: Node) -> int:
+func _test_15_code_rejection_matrix_zero_mutation(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
 	_reset_gs(gs)
 
@@ -280,6 +351,7 @@ func _test_15_code_rejection_matrix(gs: Node, data_node: Node) -> int:
 		"rounds": [
 			{
 				"id": "r1",
+				"demand": "需求",
 				"responses": [{ "accepts": ["k_clue"], "next_round": null }],
 				"fallback": { "requires_discardable": true, "next_round": null }
 			}
@@ -287,203 +359,312 @@ func _test_15_code_rejection_matrix(gs: Node, data_node: Node) -> int:
 	}
 	_create_mock_encounter_beat(data_node, "mock_enc_matrix", mock_enc)
 
-	# 1. no_active_encounter (when inactive)
-	var r_ack_no: Dictionary = gs.acknowledge_encounter_intro()
-	if str(r_ack_no.get("reason_code", "")) != "no_active_encounter":
-		failed += _err("acknowledge without active encounter should give 'no_active_encounter'")
-	var r_resp_no: Dictionary = gs.respond_to_encounter("protagonist")
-	if str(r_resp_no.get("reason_code", "")) != "no_active_encounter":
-		failed += _err("respond without active encounter should give 'no_active_encounter'")
-	var r_disc_no: Dictionary = gs.discard_in_encounter("protagonist")
-	if str(r_disc_no.get("reason_code", "")) != "no_active_encounter":
-		failed += _err("discard without active encounter should give 'no_active_encounter'")
+	# Helper to test rejection and verify ZERO mutation
+	var test_rej = func(endpoint_name: String, fn: Callable, expected_code: String) -> int:
+		var ser_before: Dictionary = gs.serialize()
+		var res: Dictionary = fn.call()
+		if bool(res.get("ok", true)):
+			return _err("%s should return ok:false" % endpoint_name)
+		if str(res.get("reason_code", "")) != expected_code:
+			return _err("%s expected '%s', got '%s'" % [endpoint_name, expected_code, str(res.get("reason_code", ""))])
+		var ser_after: Dictionary = gs.serialize()
+		if ser_before != ser_after:
+			return _err("%s mutated state on rejection '%s' (K-128 violation)" % [endpoint_name, expected_code])
+		return 0
+
+	# 1. no_active_encounter across all 4 endpoints
+	failed += test_rej.call("acknowledge_encounter_intro (inactive)", func(): return gs.acknowledge_encounter_intro(), "no_active_encounter")
+	failed += test_rej.call("respond_to_encounter (inactive)", func(): return gs.respond_to_encounter("protagonist"), "no_active_encounter")
+	failed += test_rej.call("discard_in_encounter (inactive)", func(): return gs.discard_in_encounter("protagonist"), "no_active_encounter")
 	var esc_p: Array[String] = ["protagonist"]
-	var r_esc_no: Dictionary = gs.escape_encounter(esc_p)
-	if str(r_esc_no.get("reason_code", "")) != "no_active_encounter":
-		failed += _err("escape without active encounter should give 'no_active_encounter'")
-	failed += _ok("no_active_encounter tested across all endpoints")
+	failed += test_rej.call("escape_encounter (inactive)", func(): return gs.escape_encounter(esc_p), "no_active_encounter")
 
-	# 2. unknown_beat
-	var r_unk_beat: Dictionary = gs.start_encounter("non_existent_beat_id")
-	if str(r_unk_beat.get("reason_code", "")) != "unknown_beat":
-		failed += _err("start_encounter with invalid beat_id should give 'unknown_beat'")
-	else:
-		failed += _ok("unknown_beat tested")
+	# 2. unknown_beat on start_encounter
+	failed += test_rej.call("start_encounter (unknown beat)", func(): return gs.start_encounter("non_existent_beat_id"), "unknown_beat")
 
-	# 3. data_conflict on start_encounter (missing rounds)
+	# 3. data_conflict on start_encounter (corrupt encounter structure)
 	var mock_bad_enc: Dictionary = { "per_round_slot_cost": 1, "after_finish": "stay" }
 	_create_mock_encounter_beat(data_node, "mock_bad_enc", mock_bad_enc)
-	var r_bad: Dictionary = gs.start_encounter("mock_bad_enc")
-	if str(r_bad.get("reason_code", "")) != "data_conflict":
-		failed += _err("start_encounter with missing rounds should give 'data_conflict'")
-	else:
-		failed += _ok("data_conflict on start_encounter tested")
+	failed += test_rej.call("start_encounter (bad rounds)", func(): return gs.start_encounter("mock_bad_enc"), "data_conflict")
 
 	# Start valid encounter -> stage: "intro"
 	gs.start_encounter("mock_enc_matrix")
 
-	# 4. encounter_active (calling start_encounter while active)
-	var r_start_active: Dictionary = gs.start_encounter("mock_enc_matrix")
-	if str(r_start_active.get("reason_code", "")) != "encounter_active":
-		failed += _err("start_encounter while active should give 'encounter_active'")
-	else:
-		failed += _ok("encounter_active tested on start_encounter")
+	# 4. encounter_active on start_encounter
+	failed += test_rej.call("start_encounter (active)", func(): return gs.start_encounter("mock_enc_matrix"), "encounter_active")
 
-	# 5. wrong_stage (respond, discard, escape during intro stage)
-	var r_resp_stage: Dictionary = gs.respond_to_encounter("protagonist")
-	if str(r_resp_stage.get("reason_code", "")) != "wrong_stage":
-		failed += _err("respond during intro stage should give 'wrong_stage'")
-	var r_disc_stage: Dictionary = gs.discard_in_encounter("protagonist")
-	if str(r_disc_stage.get("reason_code", "")) != "wrong_stage":
-		failed += _err("discard during intro stage should give 'wrong_stage'")
-	var r_esc_stage: Dictionary = gs.escape_encounter(esc_p)
-	if str(r_esc_stage.get("reason_code", "")) != "wrong_stage":
-		failed += _err("escape during intro stage should give 'wrong_stage'")
-	failed += _ok("wrong_stage tested during intro stage")
+	# 5. wrong_stage during intro stage
+	failed += test_rej.call("respond_to_encounter (in intro)", func(): return gs.respond_to_encounter("protagonist"), "wrong_stage")
+	failed += test_rej.call("discard_in_encounter (in intro)", func(): return gs.discard_in_encounter("protagonist"), "wrong_stage")
+	failed += test_rej.call("escape_encounter (in intro)", func(): return gs.escape_encounter(esc_p), "wrong_stage")
 
-	# Acknowledge intro -> enter round
+	# Acknowledge intro -> enter round 1
 	gs.knowledge["k_clue"] = true
 	gs.acknowledge_encounter_intro()
 
 	# 6. wrong_stage (acknowledge during round stage)
-	var r_ack_stage: Dictionary = gs.acknowledge_encounter_intro()
-	if str(r_ack_stage.get("reason_code", "")) != "wrong_stage":
-		failed += _err("acknowledge during round stage should give 'wrong_stage'")
-	else:
-		failed += _ok("wrong_stage tested during round stage")
+	failed += test_rej.call("acknowledge_encounter_intro (in round)", func(): return gs.acknowledge_encounter_intro(), "wrong_stage")
 
 	# 7. unknown_card
-	var r_unk_c: Dictionary = gs.respond_to_encounter("totally_fake_card_id")
-	if str(r_unk_c.get("reason_code", "")) != "unknown_card":
-		failed += _err("respond with unknown card should give 'unknown_card'")
-	else:
-		failed += _ok("unknown_card tested")
+	mock_enc["allow_discard"] = true
+	failed += test_rej.call("respond_to_encounter (unknown card)", func(): return gs.respond_to_encounter("totally_fake_card_id"), "unknown_card")
+	failed += test_rej.call("discard_in_encounter (unknown card)", func(): return gs.discard_in_encounter("totally_fake_card_id"), "unknown_card")
+	var esc_fake: Array[String] = ["totally_fake_card_id"]
+	failed += test_rej.call("escape_encounter (unknown card)", func(): return gs.escape_encounter(esc_fake), "unknown_card")
 
 	# 8. not_held
-	var r_not_held: Dictionary = gs.respond_to_encounter("info_husband_version") # exists in data, not held
-	if str(r_not_held.get("reason_code", "")) != "not_held":
-		failed += _err("respond with unheld card should give 'not_held', got '%s'" % str(r_not_held))
-	else:
-		failed += _ok("not_held tested")
+	failed += test_rej.call("respond_to_encounter (not held)", func(): return gs.respond_to_encounter("info_husband_version"), "not_held")
+	failed += test_rej.call("discard_in_encounter (not held)", func(): return gs.discard_in_encounter("info_husband_version"), "not_held")
+	var esc_unheld: Array[String] = ["info_husband_version"]
+	failed += test_rej.call("escape_encounter (not held)", func(): return gs.escape_encounter(esc_unheld), "not_held")
 
 	# 9. madness_blocked
 	gs.gain_card("madness")
 	var madness_inst: String = str(gs.hand[gs.hand.size() - 1])
-	var r_mad: Dictionary = gs.respond_to_encounter(madness_inst)
-	if str(r_mad.get("reason_code", "")) != "madness_blocked":
-		failed += _err("respond with madness card should give 'madness_blocked', got '%s'" % str(r_mad))
-	else:
-		failed += _ok("madness_blocked tested")
+	failed += test_rej.call("respond_to_encounter (madness)", func(): return gs.respond_to_encounter(madness_inst), "madness_blocked")
 
 	# 10. card_not_submittable (fallback requires discardable, but protagonist is discardable: false)
-	var r_not_sub: Dictionary = gs.respond_to_encounter("protagonist")
-	if str(r_not_sub.get("reason_code", "")) != "card_not_submittable":
-		failed += _err("respond with non-discardable card on fallback requiring discardable should give 'card_not_submittable'")
-	else:
-		failed += _ok("card_not_submittable tested")
+	failed += test_rej.call("respond_to_encounter (not submittable)", func(): return gs.respond_to_encounter("protagonist"), "card_not_submittable")
 
 	# 11. discard_disabled
-	var r_disc_dis: Dictionary = gs.discard_in_encounter("protagonist")
-	if str(r_disc_dis.get("reason_code", "")) != "discard_disabled":
-		failed += _err("discard when allow_discard:false should give 'discard_disabled'")
-	else:
-		failed += _ok("discard_disabled tested")
+	mock_enc["allow_discard"] = false
+	failed += test_rej.call("discard_in_encounter (disabled)", func(): return gs.discard_in_encounter("protagonist"), "discard_disabled")
 
-	# 12. not_discardable (on discard and escape)
+	# 12. not_discardable
 	mock_enc["allow_discard"] = true
-	var r_disc_nd: Dictionary = gs.discard_in_encounter(madness_inst)
-	if str(r_disc_nd.get("reason_code", "")) != "not_discardable":
-		failed += _err("discard madness card should give 'not_discardable'")
-	var r_disc_prot: Dictionary = gs.discard_in_encounter("protagonist")
-	if str(r_disc_prot.get("reason_code", "")) != "not_discardable":
-		failed += _err("discard protagonist should give 'not_discardable'")
-	failed += _ok("not_discardable tested on discard")
+	failed += test_rej.call("discard_in_encounter (madness not discardable)", func(): return gs.discard_in_encounter(madness_inst), "not_discardable")
+	failed += test_rej.call("discard_in_encounter (protagonist not discardable)", func(): return gs.discard_in_encounter("protagonist"), "not_discardable")
+	var esc_mad: Array[String] = [madness_inst]
+	var esc_prot: Array[String] = ["protagonist"]
+	failed += test_rej.call("escape_encounter (madness not discardable)", func(): return gs.escape_encounter(esc_mad), "not_discardable")
+	failed += test_rej.call("escape_encounter (protagonist not discardable)", func(): return gs.escape_encounter(esc_prot), "not_discardable")
 
 	# 13. cannot_escape
 	mock_enc["escape_cost"] = null
-	var r_cannot_esc: Dictionary = gs.escape_encounter(esc_p)
-	if str(r_cannot_esc.get("reason_code", "")) != "cannot_escape":
-		failed += _err("escape when escape_cost is null should give 'cannot_escape'")
-	else:
-		failed += _ok("cannot_escape tested")
+	failed += test_rej.call("escape_encounter (cannot escape)", func(): return gs.escape_encounter(esc_p), "cannot_escape")
 
 	# 14. wrong_escape_count & duplicate_payment
 	mock_enc["escape_cost"] = 2
-	var r_esc_cnt: Dictionary = gs.escape_encounter(esc_p)
-	if str(r_esc_cnt.get("reason_code", "")) != "wrong_escape_count":
-		failed += _err("escape with wrong count should give 'wrong_escape_count'")
+	failed += test_rej.call("escape_encounter (wrong count)", func(): return gs.escape_encounter(esc_p), "wrong_escape_count")
 	var esc_dup: Array[String] = ["protagonist", "protagonist"]
-	var r_esc_dup: Dictionary = gs.escape_encounter(esc_dup)
-	if str(r_esc_dup.get("reason_code", "")) != "duplicate_payment":
-		failed += _err("escape with duplicate cards should give 'duplicate_payment'")
-	failed += _ok("wrong_escape_count and duplicate_payment tested")
+	failed += test_rej.call("escape_encounter (duplicate payment)", func(): return gs.escape_encounter(esc_dup), "duplicate_payment")
 
 	# 15. already_attempted
 	(gs.active_encounter["attempted_card_ids"] as Array).append("k_clue")
-	var r_att: Dictionary = gs.respond_to_encounter("k_clue")
-	if str(r_att.get("reason_code", "")) != "already_attempted":
-		failed += _err("respond with already attempted card should give 'already_attempted'")
-	else:
-		failed += _ok("already_attempted tested")
+	failed += test_rej.call("respond_to_encounter (already attempted)", func(): return gs.respond_to_encounter("k_clue"), "already_attempted")
 
+	_clean_mock_beat(data_node, "mock_enc_matrix")
+	_clean_mock_beat(data_node, "mock_bad_enc")
+	_clean_mock_cards(data_node, ["k_clue"])
+
+	if failed == 0:
+		failed += _ok("15-code rejection matrix with state zero-mutation serialize check verified (K-128)")
 	return failed
 
 
-# ── 4. 拒絕優先順序驗證 ────────────────────────────────────────────────────
+# ── 5. 五大遭遇入口固定拒絕順序優先驗證（K-131/K-132）───────────────────────
 
-func _test_rejection_priority_orders(gs: Node, data_node: Node) -> int:
+func _test_rejection_priority_orders_all_endpoints(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
 	_reset_gs(gs)
 
-	data_node.loader.cards["k_clue"] = { "id": "k_clue", "type": "knowledge", "slotless": true, "discardable": false }
+	data_node.loader.cards["k_test_order"] = { "id": "k_test_order", "type": "knowledge", "slotless": true, "discardable": false }
+	data_node.loader.cards["item_test_disc"] = { "id": "item_test_disc", "type": "item", "discardable": true }
+
+	# ── Entry 1: start_encounter ──
+	# encounter_active > unknown_beat (when encounter active and beat_id invalid)
+	var enc_def: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": null, "allow_discard": true, "after_finish": "stay",
+		"rounds": [{ "id": "r1", "demand": "需求", "responses": [{ "accepts": ["k_test_order"], "next_round": null }], "fallback": { "requires_discardable": false, "next_round": null } }]
+	}
+	_create_mock_encounter_beat(data_node, "enc_prio_entry", enc_def)
+	gs.start_encounter("enc_prio_entry")
+	var r_start_prio: Dictionary = gs.start_encounter("non_existent_beat_id")
+	if str(r_start_prio.get("reason_code", "")) != "encounter_active":
+		failed += _err("start_encounter: encounter_active must take priority over unknown_beat")
+	else:
+		failed += _ok("start_encounter: encounter_active > unknown_beat verified")
+
+	# ── Entry 2: acknowledge_encounter_intro ──
+	_reset_gs(gs)
+	# no_active_encounter > wrong_stage
+	var r_ack_prio: Dictionary = gs.acknowledge_encounter_intro()
+	if str(r_ack_prio.get("reason_code", "")) != "no_active_encounter":
+		failed += _err("acknowledge: no_active_encounter must take priority over wrong_stage")
+	else:
+		failed += _ok("acknowledge_encounter_intro: no_active_encounter > wrong_stage verified")
+
+	# ── Entry 3: respond_to_encounter ──
+	gs.start_encounter("enc_prio_entry")
+	gs.knowledge["k_test_order"] = true
+	gs.acknowledge_encounter_intro() # enters round
+
+	# madness_blocked > already_attempted
 	gs.gain_card("madness")
 	var m_inst: String = str(gs.hand[gs.hand.size() - 1])
-
-	var mock_enc: Dictionary = {
-		"repeat_each_run": true,
-		"per_round_slot_cost": 1,
-		"escape_cost": null,
-		"allow_discard": true,
-		"after_finish": "stay",
-		"rounds": [
-			{
-				"id": "r1",
-				"responses": [{ "accepts": ["k_clue"], "next_round": null }],
-				"fallback": { "requires_discardable": false, "next_round": null }
-			}
-		]
-	}
-	_create_mock_encounter_beat(data_node, "mock_enc_prio", mock_enc)
-	gs.knowledge["k_clue"] = true
-	gs.start_encounter("mock_enc_prio")
-	gs.acknowledge_encounter_intro()
-
 	(gs.active_encounter["attempted_card_ids"] as Array).append("madness")
-	var r_mad_prio: Dictionary = gs.respond_to_encounter(m_inst)
-	if str(r_mad_prio.get("reason_code", "")) != "madness_blocked":
-		failed += _err("madness_blocked should take priority over already_attempted, got '%s'" % str(r_mad_prio))
+	var r_resp_mad_att: Dictionary = gs.respond_to_encounter(m_inst)
+	if str(r_resp_mad_att.get("reason_code", "")) != "madness_blocked":
+		failed += _err("respond_to_encounter: madness_blocked must take priority over already_attempted")
 	else:
-		failed += _ok("madness_blocked takes priority over already_attempted")
+		failed += _ok("respond_to_encounter: madness_blocked > already_attempted verified")
 
-	# enter_night_location 優先順序：not_night > encounter_active > overloaded
-	gs.phase = "morning"
-	var r_loc_not_night: Dictionary = gs.enter_night_location("sanquan_night")
-	if str(r_loc_not_night.get("reason_code", "")) != "not_night":
-		failed += _err("enter_night_location not_night should take priority over encounter_active")
+	# already_attempted > card_not_submittable (K-132)
+	enc_def["rounds"][0]["fallback"]["requires_discardable"] = true
+	(gs.active_encounter["attempted_card_ids"] as Array).append("protagonist")
+	var r_resp_att_sub: Dictionary = gs.respond_to_encounter("protagonist")
+	if str(r_resp_att_sub.get("reason_code", "")) != "already_attempted":
+		failed += _err("respond_to_encounter: already_attempted must take priority over card_not_submittable")
 	else:
-		failed += _ok("enter_night_location: not_night > encounter_active verified")
+		failed += _ok("respond_to_encounter: already_attempted > card_not_submittable verified (K-132)")
 
-	gs.phase = "night"
-	var r_loc_enc_active: Dictionary = gs.enter_night_location("sanquan_night")
-	if str(r_loc_enc_active.get("reason_code", "")) != "encounter_active":
-		failed += _err("enter_night_location encounter_active should take priority over overloaded")
+	# ── Entry 4: discard_in_encounter ──
+	enc_def["allow_discard"] = false
+	# discard_disabled > unknown_card
+	var r_disc_dis_unk: Dictionary = gs.discard_in_encounter("totally_fake_id")
+	if str(r_disc_dis_unk.get("reason_code", "")) != "discard_disabled":
+		failed += _err("discard_in_encounter: discard_disabled must take priority over unknown_card")
 	else:
-		failed += _ok("enter_night_location: encounter_active > overloaded verified")
+		failed += _ok("discard_in_encounter: discard_disabled > unknown_card verified")
 
+	enc_def["allow_discard"] = true
+	# unknown_card > not_held
+	var r_disc_unk_held: Dictionary = gs.discard_in_encounter("totally_fake_id")
+	if str(r_disc_unk_held.get("reason_code", "")) != "unknown_card":
+		failed += _err("discard_in_encounter: unknown_card must take priority over not_held")
+	else:
+		failed += _ok("discard_in_encounter: unknown_card > not_held verified")
+
+	data_node.loader.cards["item_test_nd"] = { "id": "item_test_nd", "type": "item", "discardable": false }
+
+	# not_held > not_discardable
+	var r_disc_held_nd: Dictionary = gs.discard_in_encounter("item_test_nd") # unheld non-discardable
+	if str(r_disc_held_nd.get("reason_code", "")) != "not_held":
+		failed += _err("discard_in_encounter: not_held must take priority over not_discardable")
+	else:
+		failed += _ok("discard_in_encounter: not_held > not_discardable verified")
+
+	# ── Entry 5: escape_encounter ──
+	enc_def["escape_cost"] = null
+	# cannot_escape > wrong_escape_count
+	var esc_p2: Array[String] = ["protagonist", "protagonist"]
+	var r_esc_ce_cnt: Dictionary = gs.escape_encounter(esc_p2)
+	if str(r_esc_ce_cnt.get("reason_code", "")) != "cannot_escape":
+		failed += _err("escape_encounter: cannot_escape must take priority over wrong_escape_count")
+	else:
+		failed += _ok("escape_encounter: cannot_escape > wrong_escape_count verified")
+
+	enc_def["escape_cost"] = 2
+	# duplicate_payment > not_held (two identical unheld cards)
+	var esc_dup_unheld: Array[String] = ["info_husband_version", "info_husband_version"]
+	var r_esc_dup_held: Dictionary = gs.escape_encounter(esc_dup_unheld)
+	if str(r_esc_dup_held.get("reason_code", "")) != "duplicate_payment":
+		failed += _err("escape_encounter: duplicate_payment must take priority over not_held")
+	else:
+		failed += _ok("escape_encounter: duplicate_payment > not_held verified")
+
+	# not_held > not_discardable (single unheld card when cost=1)
+	enc_def["escape_cost"] = 1
+	var esc_nd_unheld: Array[String] = ["item_test_nd"]
+	var r_esc_held_nd: Dictionary = gs.escape_encounter(esc_nd_unheld)
+	if str(r_esc_held_nd.get("reason_code", "")) != "not_held":
+		failed += _err("escape_encounter: not_held must take priority over not_discardable")
+	else:
+		failed += _ok("escape_encounter: not_held > not_discardable verified")
+
+	_clean_mock_beat(data_node, "enc_prio_entry")
+	_clean_mock_cards(data_node, ["k_test_order", "item_test_disc", "item_test_nd"])
 	return failed
 
 
-# ── 5. 超載規則 ────────────────────────────────────────────────────────────
+# ── 6. encounter_view 候選完整性與答案不洩漏負向斷言（K-129）──────────────────
+
+func _test_view_model_completeness_and_non_leakage(gs: Node, data_node: Node) -> int:
+	var failed: int = 0
+	_reset_gs(gs)
+
+	data_node.loader.cards["k_view_1"] = { "id": "k_view_1", "type": "knowledge", "name": "線索一", "slotless": true, "discardable": false }
+	data_node.loader.cards["k_view_2"] = { "id": "k_view_2", "type": "knowledge", "name": "線索二", "slotless": true, "discardable": false }
+	data_node.loader.cards["item_toy"] = { "id": "item_toy", "type": "item", "name": "玩具", "discardable": true }
+
+	var enc_view_def: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": 1, "allow_discard": true, "after_finish": "stay",
+		"rounds": [
+			{
+				"id": "r1",
+				"demand": "請出示線索一",
+				"responses": [{ "accepts": ["k_view_1"], "consume_card": false, "next_round": "r2", "on_resolve": {} }],
+				"fallback": { "requires_discardable": true, "next_round": null, "on_resolve": {} }
+			},
+			{
+				"id": "r2",
+				"demand": "請出示線索二",
+				"responses": [{ "accepts": ["k_view_2"], "consume_card": false, "next_round": null, "on_resolve": {} }],
+				"fallback": { "requires_discardable": false, "next_round": null, "on_resolve": {} }
+			}
+		],
+		"on_victory": { "relation": { "npc": "ahong", "delta": 1 } }
+	}
+	_create_mock_encounter_beat(data_node, "mock_enc_view_test", enc_view_def)
+
+	gs.knowledge["k_view_1"] = true
+	gs.knowledge["k_view_2"] = true
+	gs.hand.append("item_toy")
+
+	gs.start_encounter("mock_enc_view_test")
+	gs.acknowledge_encounter_intro()
+
+	var view: Dictionary = gs.encounter_view()
+
+	# 1. 正向驗證 view 欄位
+	if str(view.get("stage", "")) != "round":
+		failed += _err("view stage should be 'round'")
+	if str(view.get("demand", "")) != "請出示線索一":
+		failed += _err("view demand should be '請出示線索一', got '%s'" % str(view.get("demand", "")))
+	if int(view.get("capacity", 0)) != 14:
+		failed += _err("view capacity should be 14 (SSOT), got %d" % int(view.get("capacity", 0)))
+
+	var candidates: Array = view.get("candidates", []) as Array
+	# hand 含有 protagonist, item_toy; knowledge 含有 k_view_1, k_view_2 -> 共 4 張
+	if candidates.size() != 4:
+		failed += _err("view candidates size should be 4 (hand ∪ knowledge), got %d" % candidates.size())
+	else:
+		var found_sources: Dictionary = {}
+		for c in candidates:
+			var c_dict := c as Dictionary
+			found_sources[str(c_dict.get("source", ""))] = true
+			if not c_dict.has("card_id") or not c_dict.has("base_id") or not c_dict.has("name") or not c_dict.has("submittable"):
+				failed += _err("candidate missing required view fields: %s" % str(c_dict))
+		if not found_sources.has("hand") or not found_sources.has("knowledge"):
+			failed += _err("candidates must correctly distinguish 'hand' and 'knowledge' sources")
+		else:
+			failed += _ok("view candidates correctly contain hand ∪ knowledge with proper source tags (K-129)")
+
+	# 2. 負向不洩漏斷言 (K-129)
+	var leaked_keys: Array[String] = []
+	for forbidden_key in ["accepts", "fallback", "on_resolve", "responses", "rounds", "next_round"]:
+		if view.has(forbidden_key):
+			leaked_keys.append(forbidden_key)
+	for cand in candidates:
+		var c_dict := cand as Dictionary
+		if c_dict.has("accepts") or c_dict.has("responses") or c_dict.has("fallback"):
+			leaked_keys.append("candidate_internal_logic")
+
+	# 負向：未到達的 r2 需求不能洩漏在 view 頂層
+	if str(view.get("demand", "")).contains("線索二"):
+		leaked_keys.append("future_round_demand")
+
+	if not leaked_keys.is_empty():
+		failed += _err("encounter_view leaked internal answer/graph data: %s (K-129 violation)" % str(leaked_keys))
+	else:
+		failed += _ok("encounter_view strict non-leakage negative assertions verified (K-129)")
+
+	_clean_mock_beat(data_node, "mock_enc_view_test")
+	_clean_mock_cards(data_node, ["k_view_1", "k_view_2", "item_toy"])
+	return failed
+
+
+# ── 7. 超載規則 ────────────────────────────────────────────────────────────
 
 func _test_overload_and_penalty(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
@@ -499,9 +680,11 @@ func _test_overload_and_penalty(gs: Node, data_node: Node) -> int:
 		failed += _ok("is_overloaded false for hand <= %d" % max_hand)
 
 	# 手牌填滿至 max_hand + 1 張（超載）
+	var dummy_cards: Array[String] = []
 	while gs.hand.size() <= max_hand:
-		var dummy_id := "test_card_%d" % gs.hand.size()
+		var dummy_id := "test_card_ov_%d" % gs.hand.size()
 		data_node.loader.cards[dummy_id] = { "id": dummy_id, "type": "item", "discardable": false }
+		dummy_cards.append(dummy_id)
 		gs.hand.append(dummy_id)
 
 	if not gs.is_overloaded():
@@ -529,6 +712,7 @@ func _test_overload_and_penalty(gs: Node, data_node: Node) -> int:
 		"rounds": [
 			{
 				"id": "r1",
+				"demand": "需求",
 				"responses": [{ "accepts": ["k_clue"], "next_round": null }],
 				"fallback": { "requires_discardable": false, "next_round": null }
 			}
@@ -545,10 +729,13 @@ func _test_overload_and_penalty(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("overloaded encounter start correctly applies penalty and triggers capacity failure")
 
+	_clean_mock_beat(data_node, "mock_enc_ov")
+	_clean_mock_cards(data_node, dummy_cards)
+	_clean_mock_cards(data_node, ["k_clue"])
 	return failed
 
 
-# ── 6. 佔格計算與扣除 ───────────────────────────────────────────────────────
+# ── 8. 佔格計算與扣除 ───────────────────────────────────────────────────────
 
 func _test_slot_blocking_and_release(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
@@ -568,16 +755,19 @@ func _test_slot_blocking_and_release(gs: Node, data_node: Node) -> int:
 		"rounds": [
 			{
 				"id": "r1",
+				"demand": "需求1",
 				"responses": [{ "accepts": ["k_cure"], "next_round": "r2" }],
 				"fallback": { "requires_discardable": false, "next_round": "r2" }
 			},
 			{
 				"id": "r2",
+				"demand": "需求2",
 				"responses": [{ "accepts": ["k_herb"], "next_round": "r3" }],
 				"fallback": { "requires_discardable": false, "next_round": "r3" }
 			},
 			{
 				"id": "r3",
+				"demand": "需求3",
 				"responses": [{ "accepts": ["k_water"], "next_round": null }],
 				"fallback": { "requires_discardable": false, "next_round": null }
 			}
@@ -617,10 +807,12 @@ func _test_slot_blocking_and_release(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("fallback retained round cost and added next round cost (blocked_slots=2)")
 
+	_clean_mock_beat(data_node, "mock_enc_slots")
+	_clean_mock_cards(data_node, ["k_cure", "k_herb", "k_water", "p_lan"])
 	return failed
 
 
-# ── 7. 主動丟棄與逃離遭遇 ───────────────────────────────────────────────────
+# ── 9. 主動丟棄與逃離遭遇 ───────────────────────────────────────────────────
 
 func _test_discard_and_escape(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
@@ -642,6 +834,7 @@ func _test_discard_and_escape(gs: Node, data_node: Node) -> int:
 		"rounds": [
 			{
 				"id": "r1",
+				"demand": "需求",
 				"responses": [{ "accepts": ["k_cure"], "next_round": null }],
 				"fallback": { "requires_discardable": false, "next_round": null }
 			}
@@ -681,39 +874,35 @@ func _test_discard_and_escape(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("escape_encounter successfully paid cost, applied effect, and closed encounter")
 
+	_clean_mock_beat(data_node, "mock_enc_disc_esc")
+	_clean_mock_cards(data_node, ["k_cure", "item_leaf", "item_stone"])
 	return failed
 
 
-# ── 8. 無合法解自動結算 failure ─────────────────────────────────────────────
+# ── 10. 無合法解自動結算 failure 與容量上限失敗 ─────────────────────────────
 
-func _test_no_legal_moves_auto_failure(gs: Node, data_node: Node) -> int:
+func _test_no_legal_moves_and_capacity_failure(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
 	_reset_gs(gs)
 
 	data_node.loader.cards["k_clue"] = { "id": "k_clue", "type": "knowledge", "slotless": true, "discardable": false }
 
-	# 玩家只有 protagonist（不可丟棄），無 knowledge，不可逃離（escape_cost: null），不可丟棄（allow_discard: false）
-	# fallback 要求 requires_discardable: true
-	# 此時玩家進入第一回合將無任何合法解，應立即自動結算 failure！
-	var mock_enc: Dictionary = {
-		"repeat_each_run": true,
-		"per_round_slot_cost": 1,
-		"escape_cost": null,
-		"allow_discard": false,
-		"after_finish": "stay",
+	# 1. 無合法動作自動結算 failure
+	var mock_enc_no_legal: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": null, "allow_discard": false, "after_finish": "stay",
 		"rounds": [
 			{
-				"id": "r1",
+				"id": "r1", "demand": "需求",
 				"responses": [{ "accepts": ["k_clue"], "next_round": null }],
 				"fallback": { "requires_discardable": true, "next_round": null }
 			}
 		],
 		"on_failure": { "flag": { "no_legal_failed": true } }
 	}
-	_create_mock_encounter_beat(data_node, "mock_enc_no_legal", mock_enc)
+	_create_mock_encounter_beat(data_node, "mock_enc_no_legal", mock_enc_no_legal)
 
 	gs.start_encounter("mock_enc_no_legal")
-	var res_ack: Dictionary = gs.acknowledge_encounter_intro()
+	var res_ack_nl: Dictionary = gs.acknowledge_encounter_intro()
 
 	if not bool(gs.flags.get("no_legal_failed", false)):
 		failed += _err("acknowledge_encounter_intro should auto-fail when player has no legal moves")
@@ -722,47 +911,32 @@ func _test_no_legal_moves_auto_failure(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("no legal moves triggers immediate auto-failure settlement")
 
-	return failed
-
-
-# ── 9. 容量上限失敗結算 ─────────────────────────────────────────────────────
-
-func _test_capacity_exhaustion_failure(gs: Node, data_node: Node) -> int:
-	var failed: int = 0
+	# 2. 容量上限失敗結算
 	_reset_gs(gs)
-
-	data_node.loader.cards["k_clue"] = { "id": "k_clue", "type": "knowledge", "slotless": true, "discardable": false }
 	var max_hand: int = int(data_node.tuning("hand_size", 14))
-
-	# 填手牌至 max_hand - 1 張
+	var dummy_cards: Array[String] = []
 	while gs.hand.size() < max_hand - 1:
-		var dummy_id := "test_c_%d" % gs.hand.size()
+		var dummy_id := "test_c_cap_%d" % gs.hand.size()
 		data_node.loader.cards[dummy_id] = { "id": dummy_id, "type": "item", "discardable": false }
+		dummy_cards.append(dummy_id)
 		gs.hand.append(dummy_id)
 
-	# Encounter per_round_slot_cost is 2.
-	# Round 1 entry: blocked_slots becomes 2.
-	# Remaining slots = max_hand - (max_hand - 1) - 2 = -1 <= 0 -> capacity failure!
-	var mock_enc: Dictionary = {
-		"repeat_each_run": true,
-		"per_round_slot_cost": 2,
-		"escape_cost": null,
-		"allow_discard": true,
-		"after_finish": "stay",
+	var mock_enc_cap: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 2, "escape_cost": null, "allow_discard": true, "after_finish": "stay",
 		"rounds": [
 			{
-				"id": "r1",
+				"id": "r1", "demand": "需求",
 				"responses": [{ "accepts": ["k_clue"], "next_round": null }],
 				"fallback": { "requires_discardable": false, "next_round": null }
 			}
 		],
 		"on_failure": { "flag": { "cap_failed": true } }
 	}
-	_create_mock_encounter_beat(data_node, "mock_enc_cap", mock_enc)
+	_create_mock_encounter_beat(data_node, "mock_enc_cap", mock_enc_cap)
 	gs.knowledge["k_clue"] = true
 
 	gs.start_encounter("mock_enc_cap")
-	var res_ack: Dictionary = gs.acknowledge_encounter_intro()
+	var res_ack_cap: Dictionary = gs.acknowledge_encounter_intro()
 
 	if not bool(gs.flags.get("cap_failed", false)):
 		failed += _err("capacity exhaustion should trigger auto failure")
@@ -771,170 +945,292 @@ func _test_capacity_exhaustion_failure(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("capacity exhaustion correctly triggers auto-failure")
 
+	_clean_mock_beat(data_node, "mock_enc_no_legal")
+	_clean_mock_beat(data_node, "mock_enc_cap")
+	_clean_mock_cards(data_node, dummy_cards)
+	_clean_mock_cards(data_node, ["k_clue"])
 	return failed
 
 
-# ── 10. 遭遇勝利與結束推進 ──────────────────────────────────────────────────
+# ── 11. 遭遇勝利效果套用與行動狀態不變性（K-140/K-141）───────────────────────
 
-func _test_victory_and_after_finish(gs: Node, data_node: Node) -> int:
+func _test_victory_effects_and_action_immutability(gs: Node, data_node: Node) -> int:
+	var failed: int = 0
+	_reset_gs(gs)
+
+	data_node.loader.cards["k_cure_v"] = { "id": "k_cure_v", "type": "knowledge", "slotless": true, "discardable": false }
+	data_node.loader.cards["item_reward_leaf"] = { "id": "item_reward_leaf", "type": "item", "discardable": true }
+
+	# 勝利給予累加型效果：relation delta +3 且 gain 一張 item_reward_leaf (K-140)
+	var mock_enc_vic: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": null, "allow_discard": true, "after_finish": "stay",
+		"rounds": [
+			{
+				"id": "r1", "demand": "需求",
+				"responses": [{ "accepts": ["k_cure_v"], "next_round": null }],
+				"fallback": { "requires_discardable": false, "next_round": null }
+			}
+		],
+		"on_victory": {
+			"relation": { "npc": "ahong", "delta": 3 },
+			"gain": ["item_reward_leaf"]
+		}
+	}
+	_create_mock_encounter_beat(data_node, "mock_enc_vic", mock_enc_vic)
+	gs.knowledge["k_cure_v"] = true
+	gs.relations["ahong"] = 0
+
+	# 記錄前置狀態（驗證遭遇不消耗 action_spent、不開縱慾與備用區，K-141）
+	var action_before: bool = gs.action_spent
+	var ind_before: int = gs.indulgence_count
+	var forced_before_size: int = gs.forced_pending.size()
+
+	gs.start_encounter("mock_enc_vic")
+	gs.acknowledge_encounter_intro()
+
+	var win_res: Dictionary = gs.respond_to_encounter("k_cure_v")
+	if not bool(win_res.get("ok", false)):
+		failed += _err("respond_to_encounter failed: %s" % str(win_res))
+	elif int(gs.relations.get("ahong", 0)) != 3:
+		failed += _err("relation delta should be exactly +3 (applied once), got %d (K-140)" % int(gs.relations.get("ahong", 0)))
+	elif not gs.has_card("item_reward_leaf"):
+		failed += _err("item_reward_leaf should be gained on victory")
+	else:
+		failed += _ok("encounter victory effect applied exactly once with cumulative assertions (K-140)")
+
+	# 斷言行動格、縱慾、備用區零變化 (K-141)
+	if gs.action_spent != action_before:
+		failed += _err("encounter must not modify action_spent (K-141)")
+	elif gs.indulgence_count != ind_before:
+		failed += _err("encounter must not modify indulgence_count (K-141)")
+	elif gs.forced_pending.size() != forced_before_size:
+		failed += _err("encounter must not modify forced_pending (K-141)")
+	else:
+		failed += _ok("encounter lifecycle verified to not consume action or trigger indulgence/pending (K-141)")
+
+	_clean_mock_beat(data_node, "mock_enc_vic")
+	_clean_mock_cards(data_node, ["k_cure_v", "item_reward_leaf"])
+	return failed
+
+
+# ── 12. 遭遇結束推進（stay vs advance_phase，K-130）─────────────────────────
+
+func _test_after_finish_stay_and_advance(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
 	_reset_gs(gs)
 
 	data_node.loader.cards["k_sol"] = { "id": "k_sol", "type": "knowledge", "slotless": true, "discardable": false }
 
-	# 遭遇 A: after_finish: "advance_phase"
+	# 1. after_finish: "advance_phase"
 	var mock_enc_adv: Dictionary = {
-		"repeat_each_run": true,
-		"per_round_slot_cost": 1,
-		"escape_cost": null,
-		"allow_discard": true,
-		"after_finish": "advance_phase",
-		"rounds": [
-			{
-				"id": "r1",
-				"responses": [{ "accepts": ["k_sol"], "next_round": null }],
-				"fallback": { "requires_discardable": false, "next_round": null }
-			}
-		],
-		"on_victory": { "flag": { "adv_victory": true } }
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": null, "allow_discard": true, "after_finish": "advance_phase",
+		"rounds": [{ "id": "r1", "demand": "需求", "responses": [{ "accepts": ["k_sol"], "next_round": null }], "fallback": { "requires_discardable": false, "next_round": null } }],
+		"on_victory": {}
 	}
 	_create_mock_encounter_beat(data_node, "mock_enc_adv", mock_enc_adv)
 	gs.knowledge["k_sol"] = true
+	gs.day = 10
 	gs.phase = "morning"
 
 	gs.start_encounter("mock_enc_adv")
 	gs.acknowledge_encounter_intro()
+	gs.respond_to_encounter("k_sol")
 
-	var res_win: Dictionary = gs.respond_to_encounter("k_sol")
-	if not bool(res_win.get("ok", false)):
-		failed += _err("respond_to_encounter victory failed: %s" % str(res_win))
-	elif not bool(gs.flags.get("adv_victory", false)):
-		failed += _err("on_victory effect not applied")
-	elif not gs.active_encounter.is_empty():
-		failed += _err("active_encounter should be empty after victory")
-	elif gs.phase != "afternoon":
-		failed += _err("phase should advance to 'afternoon' with after_finish: advance_phase, got '%s'" % gs.phase)
+	if gs.day != 10 or gs.phase != "afternoon":
+		failed += _err("after_finish: 'advance_phase' should advance phase from morning to afternoon on day 10, got day=%d, phase=%s" % [gs.day, gs.phase])
 	else:
-		failed += _ok("victory with after_finish: advance_phase advanced phase to afternoon")
+		failed += _ok("after_finish: 'advance_phase' correctly advanced phase to afternoon (K-130)")
 
+	# 2. after_finish: "stay" (K-130)
+	var mock_enc_stay: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": null, "allow_discard": true, "after_finish": "stay",
+		"rounds": [{ "id": "r1", "demand": "需求", "responses": [{ "accepts": ["k_sol"], "next_round": null }], "fallback": { "requires_discardable": false, "next_round": null } }],
+		"on_victory": {}
+	}
+	_create_mock_encounter_beat(data_node, "mock_enc_stay", mock_enc_stay)
+	gs.day = 20
+	gs.phase = "afternoon"
+
+	gs.start_encounter("mock_enc_stay")
+	gs.acknowledge_encounter_intro()
+	gs.respond_to_encounter("k_sol")
+
+	if gs.day != 20 or gs.phase != "afternoon":
+		failed += _err("after_finish: 'stay' should stay on day 20 afternoon, got day=%d, phase=%s (K-130)" % [gs.day, gs.phase])
+	else:
+		failed += _ok("after_finish: 'stay' correctly remained on current day and phase (K-130)")
+
+	_clean_mock_beat(data_node, "mock_enc_adv")
+	_clean_mock_beat(data_node, "mock_enc_stay")
+	_clean_mock_cards(data_node, ["k_sol"])
 	return failed
 
 
-# ── 11. 序列化與還原往返 ────────────────────────────────────────────────────
+# ── 13. 回合循環偵測防禦（K-134）───────────────────────────────────────────
 
-func _test_serialization_roundtrip(gs: Node, data_node: Node) -> int:
+func _test_cycle_detection(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
 	_reset_gs(gs)
 
-	data_node.loader.cards["k_a"] = { "id": "k_a", "type": "knowledge", "slotless": true, "discardable": false }
-	data_node.loader.cards["k_b"] = { "id": "k_b", "type": "knowledge", "slotless": true, "discardable": false }
+	data_node.loader.cards["k_cycle_a"] = { "id": "k_cycle_a", "type": "knowledge", "slotless": true, "discardable": false }
+	data_node.loader.cards["k_cycle_b"] = { "id": "k_cycle_b", "type": "knowledge", "slotless": true, "discardable": false }
 
-	var mock_enc: Dictionary = {
-		"repeat_each_run": true,
-		"per_round_slot_cost": 1,
-		"escape_cost": 1,
-		"allow_discard": true,
-		"after_finish": "stay",
+	# 定義帶有 cycle 的惡意遭遇：r1 -> r2 -> r1 (K-134)
+	var mock_enc_cycle: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": null, "allow_discard": true, "after_finish": "stay",
 		"rounds": [
 			{
-				"id": "r1",
-				"responses": [{ "accepts": ["k_a"], "next_round": "r2" }],
+				"id": "r1", "demand": "需求1",
+				"responses": [{ "accepts": ["k_cycle_a"], "next_round": "r2" }],
 				"fallback": { "requires_discardable": false, "next_round": "r2" }
 			},
 			{
-				"id": "r2",
-				"responses": [{ "accepts": ["k_b"], "next_round": null }],
-				"fallback": { "requires_discardable": false, "next_round": null }
+				"id": "r2", "demand": "需求2",
+				"responses": [{ "accepts": ["k_cycle_b"], "next_round": "r1" }], # 指回已訪問的 r1
+				"fallback": { "requires_discardable": false, "next_round": "r1" }
 			}
-		]
+		],
+		"on_failure": { "flag": { "cycle_caught": true } }
 	}
-	_create_mock_encounter_beat(data_node, "mock_enc_ser", mock_enc)
-	gs.knowledge["k_a"] = true
-	gs.knowledge["k_b"] = true
+	_create_mock_encounter_beat(data_node, "mock_enc_cycle", mock_enc_cycle)
+	gs.knowledge["k_cycle_a"] = true
+	gs.knowledge["k_cycle_b"] = true
 
-	# 1. 測試 intro stage 序列化
-	gs.start_encounter("mock_enc_ser")
-	var ser1: Dictionary = gs.serialize()
-	gs.deserialize(ser1)
+	gs.start_encounter("mock_enc_cycle")
+	gs.acknowledge_encounter_intro() # enters r1, visited=[r1]
 
-	if str(gs.active_encounter.get("beat_id", "")) != "mock_enc_ser":
-		failed += _err("deserialized beat_id mismatch")
-	elif str(gs.active_encounter.get("stage", "")) != "intro":
-		failed += _err("deserialized stage mismatch")
+	# r1 -> r2 (valid move)
+	var res_r1: Dictionary = gs.respond_to_encounter("k_cycle_a")
+	if not bool(res_r1.get("ok", false)) or str(gs.active_encounter.get("round_id", "")) != "r2":
+		failed += _err("advance to r2 should succeed")
+
+	# r2 -> r1 (cycle back to r1: must be caught and return data_conflict)
+	var res_r2: Dictionary = gs.respond_to_encounter("k_cycle_b")
+	if bool(res_r2.get("ok", true)) or str(res_r2.get("reason_code", "")) != "data_conflict":
+		failed += _err("re-entering visited round r1 should be rejected with 'data_conflict' (K-134)")
+	elif not gs.active_encounter.is_empty():
+		failed += _err("encounter should be closed after cycle failure")
 	else:
-		failed += _ok("intro stage serialization roundtrip verified")
+		failed += _ok("round graph cycle correctly detected and rejected with data_conflict (K-134)")
 
-	# 2. 測試 round stage 序列化
-	gs.acknowledge_encounter_intro()
-	(gs.active_encounter["attempted_card_ids"] as Array).append("dummy_card")
-
-	var ser2: Dictionary = gs.serialize()
-	_reset_gs(gs)
-	gs.deserialize(ser2)
-
-	if str(gs.active_encounter.get("beat_id", "")) != "mock_enc_ser":
-		failed += _err("deserialized round beat_id mismatch")
-	elif str(gs.active_encounter.get("stage", "")) != "round":
-		failed += _err("deserialized round stage mismatch")
-	elif str(gs.active_encounter.get("round_id", "")) != "r1":
-		failed += _err("deserialized round_id mismatch")
-	elif int(gs.active_encounter.get("blocked_slots", 0)) != 1:
-		failed += _err("deserialized blocked_slots mismatch")
-	elif not (gs.active_encounter.get("attempted_card_ids", []) as Array).has("dummy_card"):
-		failed += _err("deserialized attempted_card_ids mismatch")
-	else:
-		failed += _ok("round stage serialization roundtrip verified")
-
+	_clean_mock_beat(data_node, "mock_enc_cycle")
+	_clean_mock_cards(data_node, ["k_cycle_a", "k_cycle_b"])
 	return failed
 
 
-# ── 12. 故事線遭遇契約驗證 ──────────────────────────────────────────────────
+# ── 14. 序列化往返與未存檔對照組逐字比對（K-139）───────────────────────────
+
+func _test_serialization_roundtrip_with_control(gs: Node, data_node: Node) -> int:
+	var failed: int = 0
+	_reset_gs(gs)
+
+	data_node.loader.cards["k_ser_a"] = { "id": "k_ser_a", "type": "knowledge", "slotless": true, "discardable": false }
+	data_node.loader.cards["k_ser_b"] = { "id": "k_ser_b", "type": "knowledge", "slotless": true, "discardable": false }
+	data_node.loader.cards["item_ser_pay"] = { "id": "item_ser_pay", "type": "item", "discardable": true }
+
+	var mock_enc_ser: Dictionary = {
+		"repeat_each_run": true, "per_round_slot_cost": 1, "escape_cost": 1, "allow_discard": true, "after_finish": "stay",
+		"rounds": [
+			{
+				"id": "r1", "demand": "需求1",
+				"responses": [{ "accepts": ["k_ser_a"], "next_round": "r2" }],
+				"fallback": { "requires_discardable": false, "next_round": "r2" }
+			},
+			{
+				"id": "r2", "demand": "需求2",
+				"responses": [{ "accepts": ["k_ser_b"], "next_round": null }],
+				"fallback": { "requires_discardable": false, "next_round": null }
+			}
+		],
+		"on_escape": { "flag": { "ser_escaped": true } }
+	}
+	_create_mock_encounter_beat(data_node, "mock_enc_ser_ctrl", mock_enc_ser)
+
+	# ── 對照組 A（未存檔路徑）──
+	_reset_gs(gs)
+	gs.knowledge["k_ser_a"] = true
+	gs.knowledge["k_ser_b"] = true
+	gs.hand.append("item_ser_pay")
+
+	gs.start_encounter("mock_enc_ser_ctrl")
+	gs.acknowledge_encounter_intro()
+	# 藉由真實 respond 產生 attempted 記錄
+	gs.respond_to_encounter("protagonist") # fallback to r2
+	var final_state_a: Dictionary = gs.serialize()
+
+	# ── 實驗組 B（存檔→重置→讀檔路徑）──
+	_reset_gs(gs)
+	gs.knowledge["k_ser_a"] = true
+	gs.knowledge["k_ser_b"] = true
+	gs.hand.append("item_ser_pay")
+
+	gs.start_encounter("mock_enc_ser_ctrl")
+	gs.acknowledge_encounter_intro()
+	gs.respond_to_encounter("protagonist") # fallback to r2
+
+	var checkpoint: Dictionary = gs.serialize()
+	_reset_gs(gs) # 徹底乾淨重置
+	gs.deserialize(checkpoint)
+	var final_state_b: Dictionary = gs.serialize()
+
+	if final_state_a != final_state_b:
+		failed += _err("deserialized state does not match unsaved control group (K-139)")
+	else:
+		failed += _ok("serialization roundtrip exactly matches unsaved control group (K-139)")
+
+	_clean_mock_beat(data_node, "mock_enc_ser_ctrl")
+	_clean_mock_cards(data_node, ["k_ser_a", "k_ser_b", "item_ser_pay"])
+	return failed
+
+
+# ── 15. 故事線真實遭遇路徑驗證（K-138）─────────────────────────────────────
 
 func _test_storyline_encounters_contract(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
 
-	# 1. D8: n_manydoors_ch1
-	var fugu: Dictionary = data_node.loader.beats_by_id.get("n_manydoors_ch1", {}) as Dictionary
-	if fugu.is_empty():
-		failed += _err("n_manydoors_ch1 not found in beats")
-	elif not fugu.has("encounter"):
-		failed += _err("n_manydoors_ch1 missing encounter definition")
-	else:
-		var enc: Dictionary = fugu.get("encounter", {}) as Dictionary
-		if not bool(enc.get("charge_first_visit", false)):
-			failed += _err("n_manydoors_ch1 encounter charge_first_visit should be true")
-		elif int(enc.get("per_round_slot_cost", 0)) != 1:
-			failed += _err("n_manydoors_ch1 encounter per_round_slot_cost should be 1")
-		elif int(enc.get("escape_cost", 0)) != 1:
-			failed += _err("n_manydoors_ch1 encounter escape_cost should be 1")
-		elif not bool(enc.get("allow_discard", false)):
-			failed += _err("n_manydoors_ch1 encounter allow_discard should be true")
-		elif str(enc.get("after_finish", "")) != "stay":
-			failed += _err("n_manydoors_ch1 encounter after_finish should be 'stay'")
-		elif (enc.get("rounds", []) as Array).size() != 3:
-			failed += _err("n_manydoors_ch1 encounter rounds count should be 3, got %d" % (enc.get("rounds", []) as Array).size())
-		else:
-			failed += _ok("n_manydoors_ch1 encounter schema contract fully verified")
+	# 1. D8: n_manydoors_ch1 完整生命週期與多回合推進
+	_reset_gs(gs)
+	var fugu_beat: Dictionary = data_node.loader.beats_by_id.get("n_manydoors_ch1", {}) as Dictionary
+	if fugu_beat.is_empty():
+		failed += _err("n_manydoors_ch1 beat missing from loader")
+		return failed
 
-	# 2. D45: d45_encounter
-	var coda: Dictionary = data_node.loader.beats_by_id.get("d45_encounter", {}) as Dictionary
-	if coda.is_empty():
-		failed += _err("d45_encounter not found in beats")
-	elif not coda.has("encounter"):
-		failed += _err("d45_encounter missing encounter definition")
+	gs.knowledge["k_not_today"] = true
+	gs.day = 8
+	gs.phase = "night"
+	var night_lines: PackedStringArray = gs.play_night_fixed()
+	if str(gs.active_encounter.get("beat_id", "")) != "n_manydoors_ch1":
+		failed += _err("n_manydoors_ch1 failed to start via play_night_fixed")
+
+	var r_ack: Dictionary = gs.acknowledge_encounter_intro()
+	if not bool(r_ack.get("ok", false)) or str(gs.active_encounter.get("round_id", "")) != "name_since_when":
+		failed += _err("n_manydoors_ch1 acknowledge failed to enter round 1")
 	else:
-		var enc: Dictionary = coda.get("encounter", {}) as Dictionary
-		if int(enc.get("per_round_slot_cost", 0)) != 1:
-			failed += _err("d45_encounter encounter per_round_slot_cost should be 1")
-		elif enc.get("escape_cost") != null:
-			failed += _err("d45_encounter encounter escape_cost should be null")
-		elif bool(enc.get("allow_discard", true)):
-			failed += _err("d45_encounter encounter allow_discard should be false")
-		elif str(enc.get("after_finish", "")) != "advance_phase":
-			failed += _err("d45_encounter encounter after_finish should be 'advance_phase'")
-		elif (enc.get("rounds", []) as Array).size() != 1:
-			failed += _err("d45_encounter encounter rounds count should be 1, got %d" % (enc.get("rounds", []) as Array).size())
-		else:
-			failed += _ok("d45_encounter encounter schema contract fully verified")
+		failed += _ok("n_manydoors_ch1 correctly entered round 1 ('name_since_when')")
+
+	# 2. D45: d45_encounter 完整生命週期
+	_reset_gs(gs)
+	gs.day = 45
+	gs.phase = "morning"
+	gs.flags["final_day"] = true
+	gs.advance_phase()
+
+	if str(gs.active_encounter.get("beat_id", "")) != "d45_encounter":
+		failed += _err("d45_encounter failed to start on D45 afternoon")
+
+	var r_ack_d45: Dictionary = gs.acknowledge_encounter_intro()
+	if not bool(r_ack_d45.get("ok", false)) or str(gs.active_encounter.get("round_id", "")) != "final_demand":
+		failed += _err("d45_encounter acknowledge failed to enter 'final_demand'")
+	else:
+		failed += _ok("d45_encounter correctly entered 'final_demand' on real data path")
+
+	# 3. 完整走通 d45_encounter
+	var res_d45_win: Dictionary = gs.respond_to_encounter("protagonist")
+	if not bool(res_d45_win.get("ok", false)):
+		failed += _err("d45_encounter protagonist respond failed: %s" % str(res_d45_win))
+	elif not gs.active_encounter.is_empty():
+		failed += _err("d45_encounter should be finished after protagonist response")
+	else:
+		failed += _ok("d45_encounter complete victory path verified on real data (K-138)")
 
 	return failed
