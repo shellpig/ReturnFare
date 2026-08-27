@@ -22,6 +22,7 @@ const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 @onready var _location_panel: Node = $ContentView/LocationPanel
 @onready var _flow_text: FlowText = $ContentView/FlowText
 @onready var _hand_bar: Node = $HandBar
+@onready var _encounter_panel: Node = $ContentView/EncounterPanel
 @onready var _delegation_tutorial_dialog: AcceptDialog = $DelegationTutorialDialog
 
 var _is_showing_ending := false
@@ -56,6 +57,12 @@ func _ready() -> void:
 	_delegation_tutorial_dialog.confirmed.connect(_on_delegation_tutorial_dismissed)
 	_delegation_tutorial_dialog.close_requested.connect(_on_delegation_tutorial_dismissed)
 	_delegation_tutorial_dialog.get_ok_button().set_meta("qa_id", "dialog_confirm::delegation_tutorial")
+
+	# P4-E：遭遇面板訊號。面板只送意圖，mutation 由此處轉發至 GameState。
+	_encounter_panel.intro_acknowledged.connect(_on_encounter_intro_acknowledged)
+	_encounter_panel.response_requested.connect(_on_encounter_response_requested)
+	_encounter_panel.discard_requested.connect(_on_encounter_discard_requested)
+	_encounter_panel.escape_requested.connect(_on_encounter_escape_requested)
 
 	_refresh_status()
 	_route_view()
@@ -168,6 +175,7 @@ func _on_run_ended(ending_id: String) -> void:
 	_flow_text.visible = true
 	_map_list.visible = false
 	_location_panel.visible = false
+	_encounter_panel.visible = false
 	_advance_btn.visible = true
 	_advance_btn.disabled = false
 
@@ -177,6 +185,7 @@ func _on_location_selected(loc_id: String) -> void:
 		return
 	_flow_text.visible = false
 	_map_list.visible = false
+	_encounter_panel.visible = false
 	_location_panel.visible = true
 	_advance_btn.disabled = true
 	if GameState.phase == "night":
@@ -254,6 +263,12 @@ func _refresh_status() -> void:
 
 
 func _refresh_advance_hint() -> void:
+	# P4-E：遭遇進行中推進按鈕 disabled
+	if not GameState.active_encounter.is_empty():
+		_advance_btn.text = _MSG_ADVANCE
+		_advance_btn.disabled = true
+		_advance_btn.modulate = Color.WHITE
+		return
 	if GameState.phase == "morning" or GameState.phase == "afternoon":
 		var has_action: bool = GameState.has_any_legal_action()
 		_advance_btn.text = _MSG_ADVANCE if has_action else _MSG_ADVANCE_HINT
@@ -279,6 +294,7 @@ func _route_view() -> void:
 		_flow_text.offset_bottom = 400.0
 		_map_list.visible = false
 		_location_panel.visible = false
+		_encounter_panel.visible = false
 		_advance_btn.visible = true
 		return
 
@@ -286,7 +302,12 @@ func _route_view() -> void:
 	match phase:
 		"morning", "afternoon":
 			_location_panel.visible = false
+			_encounter_panel.visible = false
 			_play_forced_lines()
+			# P4-E：行動時段（D45 下午）遭遇自動啟動後攔截地圖渲染
+			if not GameState.active_encounter.is_empty():
+				_show_encounter()
+				return
 			_map_list.visible = true
 			if _flow_text.visible:
 				_flow_text.offset_top = 0.0
@@ -299,6 +320,7 @@ func _route_view() -> void:
 			_map_list.call("refresh")
 			_advance_btn.visible = true
 		"evening":
+			_encounter_panel.visible = false
 			if GameState.day == GameState.LAST_DAY:
 				_show_final_coda()
 			else:
@@ -311,7 +333,12 @@ func _route_view() -> void:
 				_advance_btn.visible = true
 		"night":
 			_location_panel.visible = false
+			_encounter_panel.visible = false
 			_play_night_fixed()
+			# P4-E：夜間（D8）遭遇由 play_night_fixed() 自動啟動後攔截地圖渲染
+			if not GameState.active_encounter.is_empty():
+				_show_encounter()
+				return
 			_map_list.visible = true
 			if _flow_text.visible:
 				_flow_text.offset_top = 0.0
@@ -375,3 +402,115 @@ func _play_night_fixed() -> void:
 		_flow_text.visible = true
 	else:
 		_flow_text.visible = false
+
+
+## P4-E：遭遇 UI 顯示入口。根據 stage 切換 intro / round 呈現。
+func _show_encounter() -> void:
+	_map_list.visible = false
+	_location_panel.visible = false
+	_encounter_panel.visible = true
+	_advance_btn.visible = true
+	_advance_btn.disabled = true
+
+	var view: Dictionary = GameState.encounter_view()
+	var stage := str(view.get("stage", "intro"))
+
+	if stage == "intro":
+		# Intro 階段：FlowText 顯示 beat text（D8 已由 play_night_fixed 填入；D45 需從 data 取出）。
+		if not _flow_text.visible or _flow_text.get_lines().is_empty():
+			var beat_id := str(GameState.active_encounter.get("beat_id", ""))
+			if Data != null and Data.loader != null:
+				var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary
+				var text := str(beat.get("text", ""))
+				if not text.is_empty():
+					_flow_text.clear()
+					_flow_text.append_line(text)
+					_flow_text.visible = true
+		_flow_text.offset_top = 0.0
+		_flow_text.offset_bottom = 200.0
+		_encounter_panel.offset_top = 210.0
+		_encounter_panel.offset_bottom = 400.0
+		_encounter_panel.call("show_intro")
+	else:
+		# Round 階段：FlowText 保留先前文字（acknowledge 結果或 response 結果）。
+		if _flow_text.visible and not _flow_text.get_lines().is_empty():
+			_flow_text.offset_top = 0.0
+			_flow_text.offset_bottom = 120.0
+			_encounter_panel.offset_top = 130.0
+			_encounter_panel.offset_bottom = 400.0
+		else:
+			_flow_text.visible = false
+			_encounter_panel.offset_top = 0.0
+			_encounter_panel.offset_bottom = 400.0
+		_encounter_panel.call("show_round", view)
+
+	_refresh_advance_hint()
+
+
+## P4-E：確認開場 → 進入第一回合。
+func _on_encounter_intro_acknowledged() -> void:
+	var result: Dictionary = GameState.acknowledge_encounter_intro()
+	if not bool(result.get("ok", false)):
+		return
+	_handle_encounter_result(result)
+
+
+## P4-E：提交卡片回應。
+func _on_encounter_response_requested(card_id: String) -> void:
+	var result: Dictionary = GameState.respond_to_encounter(card_id)
+	if not bool(result.get("ok", false)):
+		return
+	_handle_encounter_result(result)
+
+
+## P4-E：主動丟棄。
+func _on_encounter_discard_requested(card_id: String) -> void:
+	var result: Dictionary = GameState.discard_in_encounter(card_id)
+	if not bool(result.get("ok", false)):
+		return
+	_handle_encounter_result(result)
+
+
+## P4-E：逃離遭遇。
+func _on_encounter_escape_requested(card_ids: Array[String]) -> void:
+	var result: Dictionary = GameState.escape_encounter(card_ids)
+	if not bool(result.get("ok", false)):
+		return
+	_handle_encounter_result(result)
+
+
+## P4-E：統一處理遭遇 mutation 結果。遭遇結束→關面板重路由；繼續→刷新面板。
+func _handle_encounter_result(result: Dictionary) -> void:
+	var lines: PackedStringArray = result.get("lines", PackedStringArray())
+
+	if GameState.active_encounter.is_empty():
+		# 遭遇結束：顯示出口文字 → 關面板 → 重路由
+		_encounter_panel.visible = false
+		if lines.size() > 0:
+			_flow_text.clear()
+			_flow_text.append_lines(lines)
+			_flow_text.visible = true
+		_hand_bar.call("refresh")
+		_route_view()
+	else:
+		# 遭遇繼續：更新 FlowText 與面板
+		if lines.size() > 0:
+			_flow_text.clear()
+			_flow_text.append_lines(lines)
+			_flow_text.visible = true
+		var view: Dictionary = GameState.encounter_view()
+		var stage := str(view.get("stage", ""))
+		if stage == "round":
+			if _flow_text.visible and not _flow_text.get_lines().is_empty():
+				_flow_text.offset_top = 0.0
+				_flow_text.offset_bottom = 120.0
+				_encounter_panel.offset_top = 130.0
+				_encounter_panel.offset_bottom = 400.0
+			else:
+				_encounter_panel.offset_top = 0.0
+				_encounter_panel.offset_bottom = 400.0
+			_encounter_panel.call("show_round", view)
+		else:
+			_show_encounter()
+		_hand_bar.call("refresh")
+		_refresh_advance_hint()

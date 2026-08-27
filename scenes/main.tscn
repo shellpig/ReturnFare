@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://c0returnfare0main"]
+[gd_scene load_steps=7 format=3 uid="uid://c0returnfare0main"]
 
 [ext_resource type="Script" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="PackedScene" uid="uid://returnfare0handbar" path="res://scenes/ui/hand_bar.tscn" id="2_handbar"]
 [ext_resource type="PackedScene" uid="uid://returnfare0maplist" path="res://scenes/ui/map_list.tscn" id="3_maplist"]
 [ext_resource type="PackedScene" uid="uid://returnfare0locpanel" path="res://scenes/ui/location_panel.tscn" id="4_locpanel"]
 [ext_resource type="PackedScene" uid="uid://c8j7v6m5k4f3" path="res://scenes/ui/flow_text.tscn" id="5_flowtext"]
+[ext_resource type="PackedScene" uid="uid://returnfare0encpnl" path="res://scenes/ui/encounter_panel.tscn" id="6_encpanel"]
 
 [node name="Main" type="Control"]
 anchor_right = 1.0
@@ -45,6 +46,13 @@ offset_right = 1260.0
 offset_bottom = 400.0
 
 [node name="LocationPanel" parent="ContentView" instance=ExtResource("4_locpanel")]
+offset_left = 20.0
+offset_top = 0.0
+offset_right = 1260.0
+offset_bottom = 400.0
+visible = false
+
+[node name="EncounterPanel" parent="ContentView" instance=ExtResource("6_encpanel")]
 offset_left = 20.0
 offset_top = 0.0
 offset_right = 1260.0

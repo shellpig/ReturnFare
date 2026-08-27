@@ -102,11 +102,22 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 	if not _run_walk_with_checkpoints(tree, data_node, d9_knowledge_decisions, d9_knowledge_cp, output_dir):
 		return false
 
+	var d10_bytes := FileAccess.get_file_as_bytes(output_dir + "d10_night__knowledge.json")
+	var d10_dict: Dictionary = JSON.parse_string(d10_bytes.get_string_from_utf8())
+	var gs_d10_fix: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+	_reset_state(gs_d10_fix)
+	gs_d10_fix.deserialize(d10_dict)
+	if not gs_d10_fix.has_card("info_husband_version"):
+		gs_d10_fix.gain_card("info_husband_version")
+	if not gs_d10_fix.has_card("info_wife_version"):
+		gs_d10_fix.gain_card("info_wife_version")
+	if not _write_p2b_state(output_dir, "d10_night__knowledge", gs_d10_fix.serialize(), data_node):
+		return false
+	d10_dict = gs_d10_fix.serialize()
+
 	# 產生 P1-H 完整知識清單狀態（從 D10 知識狀態出發，以合法 gain_card() 加入全部 slotless 卡）
 	var gs_full: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
 	_reset_state(gs_full)
-	var d10_bytes := FileAccess.get_file_as_bytes(output_dir + "d10_night__knowledge.json")
-	var d10_dict: Dictionary = JSON.parse_string(d10_bytes.get_string_from_utf8())
 	gs_full.deserialize(d10_dict)
 	for card_id_key: String in data_node.loader.cards.keys():
 		var c_def: Dictionary = data_node.loader.cards[card_id_key] as Dictionary
@@ -381,7 +392,10 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 	var d45_coda_decisions: Array[Dictionary] = [
 		{ "day": 13, "phase": "afternoon", "beat_id": "d13_pm_registry", "slot_id": "read", "card_id": "protagonist" }
 	]
-	var d45_coda_cp: Dictionary = { "d45_evening": { "day": 45, "phase": "evening" } }
+	var d45_coda_cp: Dictionary = {
+		"d45_evening": { "day": 45, "phase": "evening" },
+		"p4e_d45_afternoon": { "day": 45, "phase": "afternoon" }
+	}
 	if not _run_walk_with_checkpoints(tree, data_node, d45_coda_decisions, d45_coda_cp, output_dir):
 		return false
 
@@ -472,6 +486,35 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 	if not _run_walk_with_checkpoints(tree, data_node, d43_decisions, d43_cp, output_dir):
 		return false
 
+	# 8. P4-E：遭遇 UI 驗收情境
+	# ① p4e_d8_night: D8 夜間，遭遇已啟動（intro 階段）。
+	# 從既有 d8_evening 狀態推進一步至 night，並呼叫 play_night_fixed() 啟動 n_manydoors_ch1。
+	var gs_p4e_d8: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+	_reset_state(gs_p4e_d8)
+	var d8_eve_dict := _load_state(output_dir, "d8_evening.json")
+	if d8_eve_dict.is_empty():
+		printerr("p4e: 缺少前置 d8_evening.json")
+		return false
+	gs_p4e_d8.deserialize(d8_eve_dict)
+	gs_p4e_d8.call("advance_phase") # evening -> night
+	gs_p4e_d8.call("play_night_fixed") # starts n_manydoors_ch1 in intro stage
+	if not _write_p2b_state(output_dir, "p4e_d8_night", gs_p4e_d8.serialize(), data_node):
+		return false
+
+	# ② p4e_d45_afternoon & d45_afternoon: D45 下午，遭遇已啟動（intro 階段）。
+	# 修整手牌至 <= 12 張，確保進入第一回合時可用容量 > 0。
+	var d45_dict := _load_state(output_dir, "p4e_d45_afternoon.json")
+	if not d45_dict.is_empty():
+		var gs_p4e_d45: Node = PlaythroughGreedy.setup_game_state(tree, data_node)
+		_reset_state(gs_p4e_d45)
+		gs_p4e_d45.deserialize(d45_dict)
+		var trimmed_hand: Array[String] = ["protagonist", "info_registry", "npc_ajie", "npc_awei", "doc_prescription", "info_uncle_gap"]
+		gs_p4e_d45.set("hand", trimmed_hand)
+		if not _write_p2b_state(output_dir, "p4e_d45_afternoon", gs_p4e_d45.serialize(), data_node):
+			return false
+		if not _write_p2b_state(output_dir, "d45_afternoon", gs_p4e_d45.serialize(), data_node):
+			return false
+
 	return true
 
 
@@ -560,13 +603,16 @@ static func _run_walk_with_checkpoints(
 							# 不 break：同一時段可依序執行多個自然決策。
 					if not overridden and not skipped:
 						PlaythroughGreedy.execute_action_phase(gs, data_node, d, phase)
-					gs.advance_phase()
+					if gs.phase == phase:
+						gs.advance_phase()
 				"evening":
 					PlaythroughGreedy.execute_evening_phase(gs, data_node, d)
-					gs.advance_phase()
+					if gs.phase == phase:
+						gs.advance_phase()
 				"night":
 					PlaythroughGreedy.execute_night_phase(gs, data_node, d, false)
-					gs.advance_phase()
+					if gs.phase == phase:
+						gs.advance_phase()
 
 	return true
 
@@ -832,6 +878,16 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 				printerr("p3a_night_baseline 後置條件失敗：預期 madness < %d，實際 %d" % [madness_cap, madness_count])
 				return false
 			return true
+		"p4e_d8_night":
+			var enc_d8: Dictionary = snapshot.get("run", {}).get("active_encounter", {}) as Dictionary
+			return day == 8 and phase == "night" \
+				and str(enc_d8.get("beat_id", "")) == "n_manydoors_ch1" \
+				and str(enc_d8.get("stage", "")) == "intro"
+		"p4e_d45_afternoon":
+			var enc_d45: Dictionary = snapshot.get("run", {}).get("active_encounter", {}) as Dictionary
+			return day == 45 and phase == "afternoon" \
+				and str(enc_d45.get("beat_id", "")) == "d45_encounter" \
+				and str(enc_d45.get("stage", "")) == "intro"
 		_:
 			return true
 

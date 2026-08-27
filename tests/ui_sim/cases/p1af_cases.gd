@@ -99,6 +99,10 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p4c_05_tutorial_dialog", "首次真實取得人物卡彈出委託教學，關閉後才寫入 delegation_tutorial_seen", "p4c_d17_no_person.json", "", "p4c_05_tutorial_dialog", "", "p4c_05"),
 		UiCase.new("p4c_06_candidate_order", "持有阿婕＋阿珠時處方候選照資料槽序渲染，順序不因取得狀態跳動", "p4c_d17_with_person.json", "", "p4c_06_candidate_order", "", "p4c_06"),
 		UiCase.new("p4c_07_indulge_hides_candidate", "對阿婕使用發狂卡縱慾即失去委託資格，ask_ajie 委託候選當場消失（P2→P4-C 整合）", "p4c_ajie_indulge_ready.json", "", "p4c_07_indulge_hides_candidate", "", "p4c_07"),
+		UiCase.new("p4e_01_intro_ack", "D8 遭遇開場 FlowText 有文字→確認開場→進 round 顯示 demand 與候選", "p4e_d8_night.json", "", "p4e_01_encounter_intro_ack", "", "p4e_01"),
+		UiCase.new("p4e_02_respond_confirm_cancel", "D8 round 候選卡確認彈窗取消零變化、disabled 卡顯示原因", "p4e_d8_night.json", "", "p4e_02_respond_confirm_cancel", "", "p4e_02"),
+		UiCase.new("p4e_03_d45_no_escape_discard", "D45 遭遇無逃離按鈕無丟棄按鈕、候選卡可見", "p4e_d45_afternoon.json", "", "p4e_03_d45_no_escape_discard", "", "p4e_03"),
+		UiCase.new("p4e_04_d45_respond_advance", "D45 提交 protagonist 後推進到 evening", "p4e_d45_afternoon.json", "", "p4e_04_d45_respond_advance", "", "p4e_04"),
 	]
 
 
@@ -263,6 +267,14 @@ class UiCase extends CaseBaseClass:
 				return await _p4c_06(tree)
 			"p4c_07":
 				return await _p4c_07(tree)
+			"p4e_01":
+				return await _p4e_01(tree)
+			"p4e_02":
+				return await _p4e_02(tree)
+			"p4e_03":
+				return await _p4e_03(tree)
+			"p4e_04":
+				return await _p4e_04(tree)
 			_:
 				assert_true(false, "未知 UI 案例模式: %s" % mode)
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -369,7 +381,13 @@ class UiCase extends CaseBaseClass:
 
 	func _coda_jump(tree: SceneTree) -> Dictionary:
 		assert_eq(str(_run(tree).get("phase", "")), "afternoon", "D45 coda 起點")
-		await _advance(tree)
+		# P4-E: D45 下午有 d45_encounter，需先進行遭遇確認與回應，遭遇結束後自動推進至 evening
+		if QAStepClass.has_visible_qa_id(tree.get_root(), "encounter_intro_ack"):
+			await _click(tree, "encounter_intro_ack")
+			await _click(tree, "encounter_candidate::protagonist")
+			await _click(tree, "dialog_confirm::encounter_respond")
+		else:
+			await _advance(tree)
 		assert_eq(str(_run(tree).get("phase", "")), "evening", "D45 afternoon 後進 evening")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "beat_advance"), "D45 coda 演出入口")
 		var drained := await QAStepClass.drain_beats(tree)
@@ -1339,6 +1357,41 @@ class UiCase extends CaseBaseClass:
 				await _advance(tree)
 				continue
 
+			# P4-E: 遭遇處理（如 D8 夜間、D45 下午）
+			if QAStepClass.has_visible_qa_id(tree.get_root(), "encounter_intro_ack"):
+				await _click(tree, "encounter_intro_ack")
+				var safety_enc := 10
+				while safety_enc > 0 and (QAStepClass.has_visible_qa_id(tree.get_root(), "encounter_demand") or not (_run(tree).get("active_encounter", {}) as Dictionary).is_empty()):
+					safety_enc -= 1
+					var cands := _visible_ids(tree, "encounter_candidate::")
+					var responded := false
+					for cand_qid in cands:
+						var c_ctrls := QAStepClass.find_controls_by_qa_id(tree.get_root(), cand_qid)
+						if not c_ctrls.is_empty() and not (c_ctrls[0] as Button).disabled:
+							await _click(tree, cand_qid)
+							await _click(tree, "dialog_confirm::encounter_respond")
+							responded = true
+							break
+					if not responded:
+						var esc_ctrls := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "encounter_escape")
+						var escaped := false
+						for esc_ctrl in esc_ctrls:
+							if esc_ctrl is Button and not (esc_ctrl as Button).disabled:
+								var eqid := str(esc_ctrl.get_meta("qa_id"))
+								await _click(tree, eqid)
+								await _click(tree, "dialog_confirm::encounter_escape")
+								escaped = true
+								break
+						if not escaped:
+							var disc_ctrls := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "encounter_discard::")
+							for disc_ctrl in disc_ctrls:
+								if disc_ctrl is Button and not (disc_ctrl as Button).disabled:
+									var dqid := str(disc_ctrl.get_meta("qa_id"))
+									await _click(tree, dqid)
+									await _click(tree, "dialog_confirm::encounter_discard")
+									break
+				continue
+
 			if phase == "morning" or phase == "afternoon":
 				if not bool(run.get("action_spent", false)):
 					var locations := _visible_ids(tree, "location::")
@@ -1807,4 +1860,66 @@ class UiCase extends CaseBaseClass:
 		assert_no_qa_id(tree, "slot::d17_19_prescription::ask_ajie", "失去人物卡後 ask_ajie 委託候選當場消失")
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["indulge_breaks_delegation_eligibility", "candidate_hidden_after_card_lost"] } }
+
+	func _p4e_01(tree: SceneTree) -> Dictionary:
+		# D8 遭遇：開場 FlowText 有文字，點確認開場進入 round 階段顯示 demand 與候選
+		assert_true(_has_text(tree.get_root(), "兩側全是門") or _has_text(tree.get_root(), "名字"), "FlowText 顯示開場文字")
+		assert_has_qa_id(tree, "encounter_intro_ack", "確認開場按鈕在場")
+		await _click(tree, "encounter_intro_ack")
+		assert_has_qa_id(tree, "encounter_demand", "進入 round 階段顯示 demand")
+		assert_true(_has_text(tree.get_root(), "那個名字什麼時候開始是你的"), "Demand 文字可見")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["encounter_intro_text_visible", "encounter_ack_to_round", "encounter_demand_visible"] } }
+
+	func _p4e_02(tree: SceneTree) -> Dictionary:
+		# D8 遭遇：候選卡確認彈窗取消零變化、disabled 卡顯示原因
+		await _click(tree, "encounter_intro_ack")
+		# 檢查 disabled 卡（例如主角卡不可在首輪 fallback 丟棄）
+		var cand_ctrls := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::protagonist")
+		assert_true(not cand_ctrls.is_empty(), "protagonist 候選卡在場")
+		if not cand_ctrls.is_empty():
+			var btn := cand_ctrls[0] as Button
+			assert_true(btn.disabled, "protagonist 候選卡為 disabled")
+			assert_true(btn.text.contains("無法提交此卡") or btn.tooltip_text.contains("無法提交此卡"), "disabled 卡顯示原因")
+		
+		# 尋找可提交卡（如 equip_polaroid）點擊開彈窗並取消
+		var polaroid_ctrls := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::equip_polaroid")
+		if not polaroid_ctrls.is_empty() and not (polaroid_ctrls[0] as Button).disabled:
+			var snap_before := JSON.stringify(_state(tree))
+			await _click(tree, "encounter_candidate::equip_polaroid")
+			assert_has_qa_id(tree, "dialog_confirm::encounter_respond", "確認提交彈窗出現")
+			await _click(tree, "dialog_cancel::encounter_respond")
+			var snap_after := JSON.stringify(_state(tree))
+			assert_eq(snap_after, snap_before, "取消提交後完整 serialize 狀態逐字不變")
+		else:
+			# 若無 polaroid 則尋找任何可點擊的 candidate 驗證取消
+			var all_cands := QAStepClass.find_controls_by_qa_id_prefix(tree.get_root(), "encounter_candidate::")
+			for cand in all_cands:
+				if cand is Button and not (cand as Button).disabled:
+					var qa_id := str(cand.get_meta("qa_id"))
+					var snap_before := JSON.stringify(_state(tree))
+					await _click(tree, qa_id)
+					assert_has_qa_id(tree, "dialog_confirm::encounter_respond", "確認提交彈窗出現")
+					await _click(tree, "dialog_cancel::encounter_respond")
+					var snap_after := JSON.stringify(_state(tree))
+					assert_eq(snap_after, snap_before, "取消提交後完整 serialize 狀態逐字不變")
+					break
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["respond_confirm_dialog", "respond_cancel_state_unchanged", "disabled_card_shows_reason"] } }
+
+	func _p4e_03(tree: SceneTree) -> Dictionary:
+		# D45 遭遇：無逃離按鈕無丟棄按鈕、候選卡可見
+		await _click(tree, "encounter_intro_ack")
+		assert_no_qa_id(tree, "encounter_escape", "D45 遭遇無逃離按鈕")
+		assert_no_qa_id(tree, "encounter_discard::protagonist", "D45 遭遇無丟棄按鈕")
+		assert_has_qa_id(tree, "encounter_candidate::protagonist", "D45 遭遇 protagonist 候選按鈕可見")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["d45_no_escape_button", "d45_no_discard_button", "d45_candidates_visible"] } }
+
+	func _p4e_04(tree: SceneTree) -> Dictionary:
+		# D45 遭遇：提交主角卡後推進至 evening
+		await _click(tree, "encounter_intro_ack")
+		await _click(tree, "encounter_candidate::protagonist")
+		await _click(tree, "dialog_confirm::encounter_respond")
+		var run := _run(tree)
+		assert_eq(str(run.get("phase", "")), "evening", "D45 遭遇結束後時段推進至 evening")
+		assert_true(_has_text(tree.get_root(), "這個名字已經登記") or _has_text(tree.get_root(), "走廊安靜下來") or _has_text(tree.get_root(), "靜和園") or _has_text(tree.get_root(), "後棟"), "畫面呈現遭遇出口文字或 evening 畫面")
+		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["d45_respond_success", "d45_phase_evening_after"] } }
 
