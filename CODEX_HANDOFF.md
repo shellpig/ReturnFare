@@ -4,17 +4,18 @@
 
 ## 目前階段
 
-**P1、P2 已完成；P3 機器層已完成，剩既有人工體感項；P4-A／P4-B 已通過 verifier 複驗，K-124／K-125 結案。P4-C 最新完整複驗雖然所有自動測試全綠，但仍有契約漂移與已勾驗收缺少真實路徑證據，重新列為待補缺口，尚不能關門。下一個任務是補齊 P4-C，不得先做 P4-D／P4-E，也不得跳到 P5。**
+**P1、P2 已完成；P3 機器層已完成，剩既有人工體感項；P4-A～P4-C 已通過 verifier 複驗，K-124／K-125 結案，P4-C 維持 ✅。下一個任務是 P4-D 遭遇規則；不得先做 P4-E，也不得跳到 P5。**
 
 - 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；本檔只保存最近交接重點。
 - P4-A：委託／遭遇資料與 lint 真值化已完成。
 - P4-B：委託規則已實作並通過 verifier 複驗，機器層 24 套 headless 測試全數 exit 0；K-65 結案。
-- P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已實作；K-124／K-125 結案，25 套 headless 全綠，完整 UI sim 102／102 variants、79／79 contracts、0 failed。但最新完整複驗發現契約與覆蓋缺口，暫不維持關門判定。
+- P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已實作並完成第三輪 verifier 關門；K-124／K-125 結案，25 套 headless 全綠，完整 UI sim 104／104 variants、81／81 contracts、0 failed；verifier targeted P4-C headless 與必要 UI 7／7 全綠。
 - P4-D～F（遭遇 runtime、UI 與全流程）尚未開始。
 - P5：開局、四類結局、歷輪摘要、跨輪重置與 UI 已拆成 P5-A～F，尚未開始實作。
 
 ## 最近完成的工作
 
+- **P4-C 第三輪缺口經 verifier 複驗通過並完成文件關門（最新）。** `247c716` 的阿婕縱慾破壞→D16 修復→D17 重取、阿珠 D9→D17、阿財 D17～19 共事、`task_title`／`delegation_state` 契約與 `p4c_07` 整合 UI 均核對無矛盾。verifier 自跑 `test_p4c.gd` 12 段 exit 0；只跑必要 UI `p4c_01`～`p4c_07`，7／7、failed 0，catalog 81；完整 launcher 證據為 104／104 variants、81／81 contracts、0 failed、11 條負向反證如期失敗。測試指南 423／424 依使用者已拍板的 (a) 記錄正式內容不可達邊界，以 headless／view-model 認列；428／429 明記代表性 UI＋真實路徑 headless。未發現新 blocker 或非阻擋問題，下一步 P4-D。
 - **P4-C 第三輪：把上一輪的偷懶捷徑改成真實入口（最新，尚待 verifier 複驗）。** verifier 指出前一輪破壞／取得測試仍直接寫旗標、task_title 契約未回填、UI 仍只 D17：
   - **阿婕破壞走真實縱慾**：`test_p4c` 第 6／7 段改以 `indulge("exit_sanquan","x_lust_ajie",<madness_inst>)` 驅動（前置：持 npc_ajie＋一張發狂卡＋關係達「疑似」），由該出口的 on_place 同時設 `ajie_trust_broken`、`lose` npc_ajie、阻止 D17 on_enter 條件 gain；第 7 段續接 D16 `try_place` 修復槽＋D17 `play_beat` 重取，全程真實入口、不直接寫旗標。共用 helper `_break_ajie_via_indulgence()`。
   - **阿珠走真實 D9 寫入端**：第 11 段改 `try_place("protagonist","d9_morning_clinic","ask")` 寫入 `azhu_shared_abnormal_medicine`＋「沒走 D9 則 D17 不發卡」負向對照，證明 D9 是可正常操作的寫入端。
@@ -75,25 +76,20 @@
 ## 驗證狀態
 
 - K-124／K-125：**已修、已複驗**。fixture pipeline 與教學 modal 輸入 blocker 均解除。
-- P4-C：25 套 headless 全綠（`test_p4c` 12 段，破壞／取得全走真實入口）；完整 UI sim **104 variants／81 contracts／0 failed**，11 條負向反證如期失敗。接線 A、契約統一（`delegation_state`＋`task_title`）、阿婕縱慾破壞→修復→重取真實路徑、阿珠 D9／阿財 D17-19 真實寫入端、縱慾→候選消失 UI 整合（`p4c_07`）均已證。**未關門項只剩 verifier 的文件收斂決策（見風險段），無實作 blocker。**
+- P4-C：**已關門，狀態 ✅。** 25 套 headless 全綠（`test_p4c` 12 段，破壞／取得全走真實入口）；完整 UI sim **104 variants／81 contracts／0 failed**，11 條負向反證如期失敗；verifier targeted P4-C headless exit 0、必要 UI 7／7 failed 0。接線 A、契約統一、三人取得與阿婕破壞／修復、D18／D19、跨日不重複及 P2→P4-C UI 整合均已證。
 - P4-B verifier 複驗：**`tests/run_all_headless.ps1` 全部 24 套 exit 0**（含 `test_p4b.gd` 9 大測試段）。`verify_data.gd` 64／48／18／261、引用與 lint 1～16 全 0 錯誤；接點失效保留、嚴格回報順序、強制縱慾先行與 K-65 同筆／跨筆／文字三條均有可辨識斷言。
 
 ## 目前風險
 
-- **P4-C 契約漂移已全解**：view model 欄位統一為封閉語彙 `delegation_state`，`task_title` 亦回填 `開發設計方針.md` P4-C（`{result_timing, preview, tendency, task_title, delegation_state}`）；`location_panel` 確認流程不再直讀 beat JSON。阿婕縱慾破壞→D16 修復→D17 重取、阿珠 D9 寫入端、阿財 D17-19 共事、D18／D19、跨日不重複均走真實入口 headless。
-- **P4-C 428／429 的 UI 主張**：縱慾破壞→委託候選當場消失已由 `p4c_07` 真證（P2→P4-C 動態整合）。其餘 428／429 的 UI 面（阿婕修復→重現、D18／D19 完成、跨日 RESOLVED 留存）re-test 與 D17 相同、day/state 不變的委託 render 管線——規則已由 headless（`test_p4c` 第 6／7／8／9 段）證，UI 由 `p4c_01`～`p4c_07` 代表性覆蓋。**建議 verifier**：428／429 UI 勾項記為「代表性 UI（D17 委託 wiring＋縱慾整合）＋headless 規則」，不另建 D18/D19 冗餘 UI 案（同一 render code、只差資料層日窗，已由 headless test 8 證）。
-- **P4-C 剩餘關門缺口＝內容不可達，決策已定為 (a)**：測試指南 423／424 的「今日已受託仍在原位且 disabled」「隔日上午恢復」「條件不足顯示資料理由」是通用委託規則，但 P4-C 唯一委託 beat `d17_19_prescription` 為 choice_group 且無 requires-gated 持有候選——委託任一路線即永久收起整組，同一人物不會在另一非 choice 委託槽出現，也沒有「持有但 requires 不足」的委託候選，故這三項在 shipped 內容中無法觸發。規則已由 headless 證：狀態翻轉（`test_p4c` 第 3 段獨立合成槽 `delegation_state` 翻 `delegated_today`）、每日重置（`test_p4b`）、排序（`test_p4c` 第 10 段＋UI `p4c_06`）。**使用者 2026-08-27 拍板走 (a)**：不投資合成 data variant，以 headless／view-model 規則證據認列，UI 勾項收斂至 P4-C 內容可達範圍。
+- P4-C 無未結 blocker。已接受邊界：測試指南 423／424 的每日鎖定／隔日恢復與條件不足理由在目前正式委託內容不可達；使用者 2026-08-27 拍板 (a)，以 headless／view-model 規則證據認列，不投資合成 UI data variant。428／429 採代表性 UI＋真實路徑 headless，避免對同一 render 管線只換日窗做重複 UI 案。
 - 低優先觀察：未列入白名單的未知 modal 仍可能最終被 helper 報成 beat 上限，而非立即回具名 blocking-dialog 錯誤；只影響失敗診斷精度，未證實為 production 缺陷。
 - P4-D～F、P5 都仍是規格狀態；遭遇 runtime／UI 與 P5 各項系統尚未兌現。
 - 本專案沒有 Art Bible，也沒有 `.venv`；目前任務不涉及素材或 Python。
 
 ## 下一個任務
 
-**P4-C 收尾——僅剩一個決策，不再是實作缺口**：
+**實作 P4-D 遭遇規則**：
 
-- 已補齊（本輪，真實入口）：`delegation_state`＋`task_title` 契約統一（不讀 JSON）、阿婕縱慾破壞→D16 修復→D17 重取全真實路徑、阿珠 D9／阿財 D17-19 真實寫入端、D18／D19、跨日不重複、UI 排序（`p4c_06`）、縱慾→候選消失 UI 整合（`p4c_07`）。25 套 headless＋**104／81／0** UI sim 全綠。
-- **決策已定 (a)**（使用者 2026-08-27，僅限 423／424）：不補合成 data variant 讓那兩態在 UI 觸發，以 headless／view-model 規則證據認列。
-- **verifier 待辦（doc 收尾，實作端無 blocker）**：
-  - 423／424 收斂為「headless／view-model 規則證據認列，內容不可達」：423 的「今日已受託 in place＋disabled＋隔日恢復」、424 的「條件不足候選顯示資料理由」（P4-C 唯一委託 beat 為 choice_group、無 requires-gated 持有候選）。
-  - 428／429 UI 勾項記為「代表性 UI（`p4c_01`～`p4c_07`，含縱慾整合）＋headless 規則（`test_p4c` 6／7／8／9）」；D18/D19 UI 與跨日 RESOLVED 屬 day/state 不變的同一 render 管線，不另建冗餘 UI 案。
-  - 收斂後校正 `測試指南.md`、`PROJECT_BRIEF.md` 與本交接檔並關門 P4-C；之後才進 P4-D。
+- 開工前依 Phase 查閱規則讀 `實作規格書.md`、`開發設計方針.md`、`測試指南.md` 的 P4-D 段落，並核對 `data/SCHEMA.md` 的 encounter 契約。
+- 實作遭遇狀態機、intro／round 推進、回應／錯答／丟棄／逃離與封閉拒絕矩陣，補專屬 headless 回歸。
+- 保持 P4-D 範圍：先完成規則層與機器驗收，不先做 P4-E 遭遇 UI。
