@@ -75,7 +75,7 @@
 ## 目前風險
 
 - **P4-C 契約漂移已解**：view model 欄位統一為封閉語彙 `delegation_state`；委託確認標題經 `task_title` 由 view model 提供，`location_panel` 不再直讀 beat JSON。阿婕修復、阿珠／阿財取得、D18／D19、跨日不重複均已補真實路徑 headless。
-- **P4-C 剩餘關門缺口＝內容不可達，待決策**：測試指南 423／424 的「今日已受託仍在原位且 disabled」「隔日上午恢復」「條件不足顯示資料理由」是通用委託規則，但 P4-C 唯一委託 beat `d17_19_prescription` 為 choice_group 且無 requires-gated 持有候選——委託任一路線即永久收起整組，同一人物不會在另一非 choice 委託槽出現，也沒有「持有但 requires 不足」的委託候選，故這三項在 shipped 內容中無法觸發。規則已由 headless 證：狀態翻轉（`test_p4c` 第 3 段獨立合成槽 `delegation_state` 翻 `delegated_today`）、每日重置（`test_p4b`）、排序（`test_p4c` 第 10 段＋UI `p4c_06`）。**兩選項**：(a) 收斂測試指南 UI 勾項至 P4-C 內容可達範圍，其餘以 headless／view-model 規則證據認列（建議，proportionate）；或 (b) 投資一份合成委託 data variant（非 choice 的雙委託槽＋requires-gated 候選）讓 UI catalog 能觸發這三態。
+- **P4-C 剩餘關門缺口＝內容不可達，決策已定為 (a)**：測試指南 423／424 的「今日已受託仍在原位且 disabled」「隔日上午恢復」「條件不足顯示資料理由」是通用委託規則，但 P4-C 唯一委託 beat `d17_19_prescription` 為 choice_group 且無 requires-gated 持有候選——委託任一路線即永久收起整組，同一人物不會在另一非 choice 委託槽出現，也沒有「持有但 requires 不足」的委託候選，故這三項在 shipped 內容中無法觸發。規則已由 headless 證：狀態翻轉（`test_p4c` 第 3 段獨立合成槽 `delegation_state` 翻 `delegated_today`）、每日重置（`test_p4b`）、排序（`test_p4c` 第 10 段＋UI `p4c_06`）。**使用者 2026-08-27 拍板走 (a)**：不投資合成 data variant，以 headless／view-model 規則證據認列，UI 勾項收斂至 P4-C 內容可達範圍。
 - 低優先觀察：未列入白名單的未知 modal 仍可能最終被 helper 報成 beat 上限，而非立即回具名 blocking-dialog 錯誤；只影響失敗診斷精度，未證實為 production 缺陷。
 - P4-D～F、P5 都仍是規格狀態；遭遇 runtime／UI 與 P5 各項系統尚未兌現。
 - 本專案沒有 Art Bible，也沒有 `.venv`；目前任務不涉及素材或 Python。
@@ -85,5 +85,8 @@
 **P4-C 收尾——僅剩一個決策，不再是實作缺口**：
 
 - 已補齊（本輪）：契約統一 `delegation_state`＋`task_title`（不讀 JSON）、阿婕修復真實路徑、阿珠／阿財取得閘門、D18／D19、跨日不重複、UI 排序（`p4c_06`）。25 套 headless＋103／80／0 UI sim 全綠。
-- **待 verifier 決策**：測試指南 423／424 的「今日已受託 in place＋disabled＋隔日恢復」「條件不足資料理由」內容不可達（見風險段），二選一——(a) 收斂勾項、以 headless 規則證據認列（建議）；或 (b) 要求 implementer 補一份合成委託 data variant 讓 UI catalog 觸發。
-- 決策後由 verifier 校正 `測試指南.md`、`PROJECT_BRIEF.md` 與本交接檔並關門；之後才進 P4-D。
+- **決策已定 (a)**（使用者 2026-08-27）：不補合成 data variant，實作端不再改碼。
+- **verifier 待辦（doc 收尾）**：依 reachability finding 收斂 `測試指南.md` 的 P4-C UI 勾項——
+  - 保留可達且已證：候選可見／隱藏、確認畫面只顯示任務（`task_title`）／回報／傾向、取消零變化、即時回報進 FlowText、教學生命週期、候選照資料序（`p4c_06`）、D17／D18／D19＋跨日不重複、阿婕修復真實路徑、阿珠 D9／阿財 D17-19 取得閘門。
+  - 收斂（改記為「headless／view-model 規則證據認列，內容不可達」）：423 的「今日已受託 in place＋disabled＋隔日恢復」、424 的「條件不足候選顯示資料理由」。
+  - 收斂後校正 `測試指南.md`、`PROJECT_BRIEF.md` 與本交接檔並關門 P4-C；之後才進 P4-D。
