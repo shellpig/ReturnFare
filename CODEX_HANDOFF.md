@@ -45,6 +45,17 @@
    - 納入 `tests/run_all_headless.ps1`，全套 29 套測試全數 exit 0 通過。
    - UI Sim 85 個契約（108 個變體）全數 exit 0 通過（0 failed checks）。
 
+## verifier 複驗後的收斂（K-178～K-181）
+
+第一次複驗抓到 lint 17～19 有四個「規格明列但檢查沒實作」的洞，同批修畢：
+
+1. **K-178　lint 19 的 `permanent` lose 掃描範圍不足**：`_check_permanent_lose` 原本只掃 `beat.on_enter` 與 `slots[].on_place`，漏掉 `on_place_by_level`、encounter 的 `on_resolve` 與三種出口、`delegation.report`。改為逐層走訪整份 beat。
+2. **K-179　lint 17 的 beat `ending` 效果掃描漏 encounter**：`_check_beat_ending_effects` 同樣改為逐層走訪；`phase_exit` 子樹整棵跳過，因為那是結局接點不是效果，由既有的 ending/source 配對檢查負責。
+3. **K-180　lint 18 沒有強制「D29 invitation 必須具有預設」**：原本只擋同組多個 default，零個不擋。新增 `REQUIRED_DEFAULT_GROUPS`，並一併驗該預設槽不得帶 `condition`／`requires`／`delegation`（SCHEMA `choice_group` 那條的「可由無卡 `choose()` 結算」）。
+4. **K-181　lint 18 沒有強制「D43 兩個工作槽必須要求主角卡」**：新增 `REQUIRED_CARD_GROUPS`，驗 `leaving` 組恰兩槽、各設 `choice_requires_card:true` 且 `accepts` 只收 `protagonist`。
+
+`test_p5a.gd` 新增第 6 大項 8 條負向斷言對應這四條（總數 30 → 38）。**變異驗證**：把四個修法逐一還原後重跑，各自恰好 2 條轉紅（6.1／6.2、6.3／6.4、6.5／6.6、6.7／6.8），既有 4.3 與 5.1 在變異下仍為綠——確認新契約由新斷言承載，不是靠舊斷言順便蓋到。
+
 ## 驗證狀態
 
 - **資料驗證（`verify_data.gd`）**：卡片 66、地點 48、NPC 18、beat 268、ending 4、opening 3；引用檢查 0 錯誤；Lint 1～19 全部 0 錯誤。

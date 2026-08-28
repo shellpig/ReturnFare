@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_test_lint18_negative()
 	_test_lint19_negative()
 	_test_source_pairing_matrix()
+	_test_nested_effects_and_required_shapes()
 
 	if _failed > 0:
 		push_error("test_p5a: %d 個斷言失敗" % _failed)
@@ -401,3 +402,113 @@ func _test_source_pairing_matrix() -> void:
 		_ok("5.2 抓到 phase_exit 錯配 ending/source")
 	else:
 		_fail("5.2 未抓到 phase_exit 錯配: " + str(errs))
+
+
+# ─────────────────── 6. 巢狀效果掃描與 D29／D43 正向形狀 ───────────────────
+## lint 17／19 的效果掃描不能只看 on_enter 與 on_place；lint 18 要正面強制
+## 規格書第十七節 lint 18 的「D29 必須有預設」與「D43 兩槽必須要求主角卡」。
+func _test_nested_effects_and_required_shapes() -> void:
+	print("\n--- 6. 巢狀效果掃描與 D29／D43 正向形狀 ---")
+	var base_loader := DataLoader.new()
+	base_loader.load_all()
+
+	# 6.1 encounter 出口寫非法 ending：lint 17 必須抓到
+	var enc_end_beats = base_loader.beats.duplicate(true)
+	for b in enc_end_beats:
+		if b.get("id") == "n_manydoors_ch1":
+			b["encounter"]["on_victory"]["ending"] = "ending_replaced"
+	var l_enc_end := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, enc_end_beats, base_loader.cards, base_loader.npcs)
+	var errs := DataLoader.lint_endings(l_enc_end)
+	if _errs_contain(errs, "beat ending 效果只能引用 ending_inventory_be"):
+		_ok("6.1 抓到 encounter 出口的非法 ending 效果")
+	else:
+		_fail("6.1 未抓到 encounter 出口的 ending 效果: " + str(errs))
+
+	# 6.2 encounter 的 on_resolve 寫非法 ending：lint 17 必須抓到
+	var enc_res_beats = base_loader.beats.duplicate(true)
+	for b in enc_res_beats:
+		if b.get("id") == "n_manydoors_ch1":
+			b["encounter"]["rounds"][0]["responses"][0]["on_resolve"]["ending"] = "ending_madness_be"
+	var l_enc_res := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, enc_res_beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_endings(l_enc_res)
+	if _errs_contain(errs, "beat ending 效果只能引用 ending_inventory_be"):
+		_ok("6.2 抓到 encounter on_resolve 的非法 ending 效果")
+	else:
+		_fail("6.2 未抓到 encounter on_resolve 的 ending 效果: " + str(errs))
+
+	# 6.3 on_place_by_level 藏 permanent:true 指普通卡：lint 19 必須抓到
+	var lvl_lose_beats = base_loader.beats.duplicate(true)
+	for b in lvl_lose_beats:
+		if b.get("id") == "exit_sanquan":
+			for s in b.get("slots", []):
+				if s.get("id") == "x_smash":
+					s["on_place_by_level"]["light"]["lose"] = [ { "card": "info_husband_version", "permanent": true } ]
+	var l_lvl_lose := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, lvl_lose_beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_loop_and_festival(l_lvl_lose)
+	if _errs_contain(errs, "lose 的 permanent:true 指向非 loop_persistent 卡"):
+		_ok("6.3 抓到 on_place_by_level 內的 permanent:true")
+	else:
+		_fail("6.3 未抓到 on_place_by_level 內的 permanent:true: " + str(errs))
+
+	# 6.4 encounter 出口藏 permanent:true 指普通卡：lint 19 必須抓到
+	var enc_lose_beats = base_loader.beats.duplicate(true)
+	for b in enc_lose_beats:
+		if b.get("id") == "n_manydoors_ch1":
+			b["encounter"]["on_failure"]["lose"] = [ { "card": "info_husband_version", "permanent": true } ]
+	var l_enc_lose := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, enc_lose_beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_loop_and_festival(l_enc_lose)
+	if _errs_contain(errs, "lose 的 permanent:true 指向非 loop_persistent 卡"):
+		_ok("6.4 抓到 encounter 出口內的 permanent:true")
+	else:
+		_fail("6.4 未抓到 encounter 出口內的 permanent:true: " + str(errs))
+
+	# 6.5 D29 邀請組零 default：lint 18 必須抓到
+	var no_def_beats = base_loader.beats.duplicate(true)
+	for b in no_def_beats:
+		if b.get("id") == "d29_pm_invitation":
+			for s in b.get("slots", []):
+				s.erase("default_if_unresolved")
+	var l_no_def := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, no_def_beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_no_def)
+	if _errs_contain(errs, "必須有一個 default_if_unresolved 槽"):
+		_ok("6.5 抓到 D29 邀請組零 default")
+	else:
+		_fail("6.5 未抓到 D29 邀請組零 default: " + str(errs))
+
+	# 6.6 D29 default 槽帶 requires（無卡結算會被門檻擋住）：lint 18 必須抓到
+	var gated_def_beats = base_loader.beats.duplicate(true)
+	for b in gated_def_beats:
+		if b.get("id") == "d29_pm_invitation":
+			for s in b.get("slots", []):
+				if s.get("default_if_unresolved") == true:
+					s["requires"] = { "flag": "no_such_flag" }
+	var l_gated_def := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, gated_def_beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_gated_def)
+	if _errs_contain(errs, "否則無法由無卡 choose() 結算"):
+		_ok("6.6 抓到 D29 default 槽帶門檻")
+	else:
+		_fail("6.6 未抓到 D29 default 槽帶門檻: " + str(errs))
+
+	# 6.7 D43 工作槽拿掉 choice_requires_card：lint 18 必須抓到
+	var free_job_beats = base_loader.beats.duplicate(true)
+	for b in free_job_beats:
+		if b.get("id") == "d43_pm_zhou":
+			b["slots"][0].erase("choice_requires_card")
+	var l_free_job := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, free_job_beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_free_job)
+	if _errs_contain(errs, "的槽必須設 choice_requires_card:true"):
+		_ok("6.7 抓到 D43 工作槽未要求主角卡")
+	else:
+		_fail("6.7 未抓到 D43 工作槽未要求主角卡: " + str(errs))
+
+	# 6.8 D43 工作槽改收別的卡：lint 18 必須抓到
+	var wrong_accepts_beats = base_loader.beats.duplicate(true)
+	for b in wrong_accepts_beats:
+		if b.get("id") == "d43_pm_zhou":
+			b["slots"][1]["accepts"] = ["item_gradphoto"]
+	var l_wrong_accepts := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, wrong_accepts_beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_wrong_accepts)
+	if _errs_contain(errs, "的槽 accepts 只能收 protagonist"):
+		_ok("6.8 抓到 D43 工作槽 accepts 收錯卡")
+	else:
+		_fail("6.8 未抓到 D43 工作槽 accepts 收錯卡: " + str(errs))

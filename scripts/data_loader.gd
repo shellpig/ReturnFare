@@ -1580,24 +1580,34 @@ static func _lint_page_list(pages: Array, eid: String, where: String, page_ids: 
 				problems.append("%s [%s.%s]：玩家文字直接包含內部 ending id → %s" % [eid, where, pid, forbidden])
 
 
+## `ending` 效果可以寫在 beat 的任何巢狀效果位置：on_enter、on_place、on_place_by_level，
+## 以及 encounter 的 responses／fallback `on_resolve` 與三種出口、delegation.report。
+## 逐層走訪整份 beat，只掃固定幾個入口會漏掉巢狀效果。
 static func _check_beat_ending_effects(b: Dictionary, bid: String, problems: PackedStringArray) -> void:
-	_check_single_ending_effect(b.get("on_enter"), bid, "beat.on_enter", problems)
-	for s in b.get("slots", []):
-		var where := "slot:" + str(s.get("id", "?"))
-		_check_single_ending_effect(s.get("on_place"), bid, where + ".on_place", problems)
-		if s.has("on_place_by_level") and s["on_place_by_level"] is Dictionary:
-			for lvl in (s["on_place_by_level"] as Dictionary).values():
-				_check_single_ending_effect(lvl, bid, where + ".on_place_by_level", problems)
+	_check_single_ending_effect(b, bid, "beat", problems)
 
 
+## `phase_exit.ending` 是結局接點不是效果，由上方的 ending/source 配對檢查負責，這裡整棵跳過。
 static func _check_single_ending_effect(node: Variant, bid: String, where: String, problems: PackedStringArray) -> void:
-	if not (node is Dictionary):
-		return
-	var d := node as Dictionary
-	if d.has("ending"):
-		var end_val := str(d["ending"])
-		if end_val != "ending_inventory_be":
-			problems.append("%s [%s]：beat ending 效果只能引用 ending_inventory_be（實際為 %s）" % [bid, where, end_val])
+	if node is Dictionary:
+		var d := node as Dictionary
+		if d.has("ending"):
+			var end_val := str(d["ending"])
+			if end_val != "ending_inventory_be":
+				problems.append("%s [%s]：beat ending 效果只能引用 ending_inventory_be（實際為 %s）" % [bid, where, end_val])
+		for k: Variant in d.keys():
+			if str(k) == "phase_exit":
+				continue
+			_check_single_ending_effect(d[k], bid, where + "." + str(k), problems)
+	elif node is Array:
+		for v: Variant in node as Array:
+			_check_single_ending_effect(v, bid, where, problems)
+
+
+## lint 18 的兩種正式正向形狀（規格書第十七節 lint 18）：
+## D29 邀請組必須具有逾期預設；D43 離開組的兩個工作槽都必須要求主角卡。
+const REQUIRED_DEFAULT_GROUPS := { "d29_pm_invitation": "invitation" }
+const REQUIRED_CARD_GROUPS := { "d43_pm_zhou": "leaving" }
 
 
 ## lint 18：開局與選擇完整性（規格書第十七節 lint 18）。
@@ -1657,6 +1667,7 @@ static func lint_opening_and_defaults(loader: DataLoader) -> PackedStringArray:
 		var bid: String = str(b.get("id", "?"))
 		var is_fixed: bool = b.get("fixed", false) == true
 		var groups_defaults := {}
+		var groups_slots := {}
 
 		for s in b.get("slots", []) as Array:
 			if not (s is Dictionary):
@@ -1664,6 +1675,10 @@ static func lint_opening_and_defaults(loader: DataLoader) -> PackedStringArray:
 			var sd := s as Dictionary
 			var sid := str(sd.get("id", "?"))
 			var cg := str(sd.get("choice_group", ""))
+			if not cg.is_empty():
+				if not groups_slots.has(cg):
+					groups_slots[cg] = []
+				(groups_slots[cg] as Array).append(sd)
 			var has_default: bool = sd.get("default_if_unresolved", false) == true
 			var req_card: Variant = sd.get("choice_requires_card")
 
@@ -1694,6 +1709,38 @@ static func lint_opening_and_defaults(loader: DataLoader) -> PackedStringArray:
 			if groups_defaults[cg_name] > 1:
 				problems.append("%s：choice_group '%s' 包含多個 default_if_unresolved 槽（%d 個）" % [bid, cg_name, groups_defaults[cg_name]])
 
+		# D29 邀請組：必須有逾期預設，而且那一槽要能由規則層無卡結算。
+		var need_default_cg := str(REQUIRED_DEFAULT_GROUPS.get(bid, ""))
+		if not need_default_cg.is_empty():
+			if int(groups_defaults.get(need_default_cg, 0)) == 0:
+				problems.append("%s：choice_group '%s' 必須有一個 default_if_unresolved 槽" % [bid, need_default_cg])
+			else:
+				for dsv: Variant in groups_slots.get(need_default_cg, []) as Array:
+					var dsd := dsv as Dictionary
+					if dsd.get("default_if_unresolved", false) != true:
+						continue
+					for blocker in ["condition", "requires", "delegation"]:
+						if dsd.has(blocker):
+							problems.append("%s [%s]：default 槽不得有 %s，否則無法由無卡 choose() 結算" % [bid, str(dsd.get("id", "?")), blocker])
+
+		# D43 離開組：兩個工作槽都必須提交主角卡才成立。
+		var need_card_cg := str(REQUIRED_CARD_GROUPS.get(bid, ""))
+		if not need_card_cg.is_empty():
+			var card_slots: Array = groups_slots.get(need_card_cg, []) as Array
+			if card_slots.size() != 2:
+				problems.append("%s：choice_group '%s' 必須恰有兩個工作槽（實際 %d 個）" % [bid, need_card_cg, card_slots.size()])
+			for csv: Variant in card_slots:
+				var csd := csv as Dictionary
+				var csid := str(csd.get("id", "?"))
+				if csd.get("choice_requires_card", false) != true:
+					problems.append("%s [%s]：choice_group '%s' 的槽必須設 choice_requires_card:true" % [bid, csid, need_card_cg])
+				var c_accepts: Variant = csd.get("accepts", [])
+				var accepts_only_protagonist: bool = c_accepts is Array \
+					and (c_accepts as Array).size() == 1 \
+					and str((c_accepts as Array)[0]) == "protagonist"
+				if not accepts_only_protagonist:
+					problems.append("%s [%s]：choice_group '%s' 的槽 accepts 只能收 protagonist（實際 %s）" % [bid, csid, need_card_cg, str(c_accepts)])
+
 	return problems
 
 
@@ -1722,13 +1769,10 @@ static func lint_loop_and_festival(loader: DataLoader) -> PackedStringArray:
 	if total_persistent_slots + 1 > hand_size:
 		problems.append("跨輪保留卡片佔格上限超載（%d + 1 > hand_size %d）" % [total_persistent_slots, hand_size])
 
-	# Lose effect permanent check in all beats
+	# Lose effect permanent check in all beats（含 on_place_by_level、encounter 與 delegation 的巢狀效果）
 	for b in loader.beats:
 		var bid: String = str(b.get("id", "?"))
-		_check_permanent_lose(b.get("on_enter"), bid, "beat.on_enter", loader, problems)
-		for s in b.get("slots", []):
-			var where := "slot:" + str(s.get("id", "?"))
-			_check_permanent_lose(s.get("on_place"), bid, where + ".on_place", loader, problems)
+		_check_permanent_lose(b, bid, "beat", loader, problems)
 
 	# NPC festival_proxy_eligible check
 	var eligible_npcs := []
@@ -1808,17 +1852,25 @@ static func lint_loop_and_festival(loader: DataLoader) -> PackedStringArray:
 	return problems
 
 
+## `permanent:true` 的 lose 同樣可以寫在任何巢狀效果位置（on_place_by_level、encounter 的
+## on_resolve 與三種出口、delegation.report），逐層走訪整份 beat。
 static func _check_permanent_lose(node: Variant, bid: String, where: String, loader: DataLoader, problems: PackedStringArray) -> void:
-	if not (node is Dictionary):
-		return
-	var d := node as Dictionary
-	for entry: Variant in d.get("lose", []) as Array:
-		if entry is Dictionary:
-			var ed := entry as Dictionary
-			if ed.get("permanent", false) == true:
-				var cid := str(ed.get("card", ""))
-				if not loader.cards.has(cid) or (loader.cards[cid] as Dictionary).get("loop_persistent", false) != true:
-					problems.append("%s [%s]：lose 的 permanent:true 指向非 loop_persistent 卡 → %s" % [bid, where, cid])
+	if node is Dictionary:
+		var d := node as Dictionary
+		var lose_val: Variant = d.get("lose")
+		if lose_val is Array:
+			for entry: Variant in lose_val as Array:
+				if entry is Dictionary:
+					var ed := entry as Dictionary
+					if ed.get("permanent", false) == true:
+						var cid := str(ed.get("card", ""))
+						if not loader.cards.has(cid) or (loader.cards[cid] as Dictionary).get("loop_persistent", false) != true:
+							problems.append("%s [%s]：lose 的 permanent:true 指向非 loop_persistent 卡 → %s" % [bid, where, cid])
+		for k: Variant in d.keys():
+			_check_permanent_lose(d[k], bid, where + "." + str(k), loader, problems)
+	elif node is Array:
+		for v: Variant in node as Array:
+			_check_permanent_lose(v, bid, where, loader, problems)
 
 
 static func _cond_matches_proxy_is(cond: Variant, npc_id: String) -> bool:
