@@ -1961,11 +1961,22 @@ class UiCase extends CaseBaseClass:
 		await _click(tree, "dialog_confirm::encounter_respond")
 		assert_true(_has_text(tree.get_root(), "誰記得你"), "進入 R2 demand")
 
-		# K-165 ②: 進入 R2 後候選清單更新且不可提交卡呈現 disabled
+		# R2 候選清單更新且不可提交卡呈現 disabled 與理由
 		var r2_pro_cands := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::protagonist")
 		assert_true(not r2_pro_cands.is_empty(), "R2 主角卡候選按鈕在場")
 		if not r2_pro_cands.is_empty():
-			assert_true((r2_pro_cands[0] as Button).disabled, "R2 主角卡按鈕 disabled")
+			var p_btn := r2_pro_cands[0] as Button
+			assert_true(p_btn.disabled, "R2 主角卡按鈕 disabled")
+			assert_true(p_btn.text.contains("無法提交此卡") or p_btn.tooltip_text.contains("無法提交此卡"), "R2 主角卡呈現無法提交理由")
+
+		# K-171: D8 遭遇真正結束後無殘留 placeholder 與遮罩（執行逃離結算）
+		assert_has_qa_id(tree, "encounter_escape_pay::info_wife_version", "D8 R2 逃離支付按鈕在場")
+		await _click(tree, "encounter_escape_pay::info_wife_version")
+		await _click(tree, "dialog_confirm::encounter_escape")
+		assert_no_qa_id(tree, "encounter_blocked::0", "D8 遭遇結束後無殘留 encounter_blocked placeholder")
+		var enc_panels_r2 := QAStepClass.find_controls_by_name(tree.get_root(), "EncounterPanel")
+		if not enc_panels_r2.is_empty():
+			assert_false((enc_panels_r2[0] as Control).is_visible_in_tree(), "D8 遭遇結束後 EncounterPanel 隱藏")
 
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["madness_blocked_reason", "discard_cancel_ok", "escape_cancel_ok", "respond_cancel_ok", "advance_to_r2"] } }
 
@@ -2021,11 +2032,11 @@ class UiCase extends CaseBaseClass:
 		# coda 地點面板同時開啟
 		assert_true(_has_text(tree.get_root(), "靜和園") or _has_text(tree.get_root(), "後棟"), "Coda 地點面板開啟")
 
-		# K-165 ③: 斷言無殘留遮罩、placeholder 或不可操作 hand
+		# K-171: 斷言無殘留遮罩（EncounterPanel 隱藏且有硬斷言防靜默跳過）
 		var enc_panels := QAStepClass.find_controls_by_name(tree.get_root(), "EncounterPanel")
+		assert_true(not enc_panels.is_empty(), "EncounterPanel 節點在場")
 		if not enc_panels.is_empty():
 			assert_false((enc_panels[0] as Control).is_visible_in_tree(), "EncounterPanel 遭遇結束後隱藏")
-		assert_no_qa_id(tree, "encounter_blocked::0", "遭遇結束後無殘留 encounter_blocked placeholder")
 
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["d45_respond_success", "d45_phase_evening_after", "flow_text_exit_lines_preserved"] } }
 

@@ -151,21 +151,41 @@ func _test_3_candidate_disabled_states(gs: Node, _data_node: Node) -> int:
 	# Submit k_not_today in R1 (consume_card: false), advances to R2
 	var _res = gs.respond_to_encounter("k_not_today")
 	
+	# Knowledge candidate attempted test (K-170 knowledge branch)
 	view = gs.encounter_view()
 	var k_found := false
 	for c in view.get("candidates", []):
 		if c.get("base_id", "") == "k_not_today":
 			k_found = true
+			if str(c.get("source", "")) != "knowledge":
+				failed += _err("Knowledge candidate source should be 'knowledge'")
 			if str(c.get("disabled_reason", "")) != "already_attempted":
-				failed += _err("Attempted card disabled_reason should be 'already_attempted', got '%s'" % c.get("disabled_reason"))
+				failed += _err("Attempted knowledge card disabled_reason should be 'already_attempted', got '%s'" % c.get("disabled_reason"))
 			if c.get("submittable", true):
-				failed += _err("Attempted card should not be submittable")
+				failed += _err("Attempted knowledge card should not be submittable")
 				
 	if not k_found:
-		failed += _err("Attempted card not found in candidates")
+		failed += _err("Attempted knowledge card not found in candidates")
+
+	# Hand candidate attempted test (K-170 hand branch)
+	(gs.active_encounter.get("attempted_card_ids") as Array).append("routine_debt")
+	view = gs.encounter_view()
+	var hand_att_found := false
+	for c in view.get("candidates", []):
+		if c.get("base_id", "") == "routine_debt":
+			hand_att_found = true
+			if str(c.get("source", "")) != "hand":
+				failed += _err("Hand candidate source should be 'hand'")
+			if str(c.get("disabled_reason", "")) != "already_attempted":
+				failed += _err("Attempted hand card disabled_reason should be 'already_attempted', got '%s'" % c.get("disabled_reason"))
+			if c.get("submittable", true):
+				failed += _err("Attempted hand card should not be submittable")
+				
+	if not hand_att_found:
+		failed += _err("Attempted hand card routine_debt not found in candidates")
 		
 	if failed == 0:
-		failed += _ok("Candidate disabled states (madness_blocked, already_attempted) verified")
+		failed += _ok("Candidate disabled states (madness_blocked, already_attempted hand & knowledge) verified")
 	return failed
 
 func _test_4_charge_first_visit_real_end_run(gs: Node, _data_node: Node) -> int:

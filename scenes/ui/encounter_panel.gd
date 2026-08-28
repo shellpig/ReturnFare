@@ -67,6 +67,21 @@ func _ready() -> void:
 	_escape_dialog.confirmed.connect(_on_escape_confirmed)
 	_escape_dialog.canceled.connect(func(): _pending_escape_card_ids.clear())
 
+	visibility_changed.connect(_on_visibility_changed)
+
+
+func _on_visibility_changed() -> void:
+	if not visible:
+		for child in _candidate_container.get_children():
+			_candidate_container.remove_child(child)
+			child.queue_free()
+		for child in _blocked_container.get_children():
+			_blocked_container.remove_child(child)
+			child.queue_free()
+		for child in _action_row.get_children():
+			_action_row.remove_child(child)
+			child.queue_free()
+
 
 ## 顯示開場確認（intro 階段）。beat text 由 main.gd 放進 FlowText。
 func show_intro() -> void:
@@ -77,10 +92,13 @@ func show_intro() -> void:
 	_action_row.visible = false
 	_intro_ack_btn.visible = true
 	for child in _candidate_container.get_children():
+		_candidate_container.remove_child(child)
 		child.queue_free()
 	for child in _blocked_container.get_children():
+		_blocked_container.remove_child(child)
 		child.queue_free()
 	for child in _action_row.get_children():
+		_action_row.remove_child(child)
 		child.queue_free()
 
 
@@ -104,6 +122,7 @@ func show_round(view: Dictionary) -> void:
 
 	# Blocked placeholder slots
 	for child in _blocked_container.get_children():
+		_blocked_container.remove_child(child)
 		child.queue_free()
 	for i in range(blocked):
 		var lbl := Label.new()
@@ -114,6 +133,7 @@ func show_round(view: Dictionary) -> void:
 
 	# Candidates
 	for child in _candidate_container.get_children():
+		_candidate_container.remove_child(child)
 		child.queue_free()
 
 	var candidates: Array = view.get("candidates", []) as Array
@@ -162,8 +182,8 @@ func show_round(view: Dictionary) -> void:
 		detail_btn.pressed.connect(_on_card_detail_pressed.bind(card_id))
 		row.add_child(detail_btn)
 
-		# Discard button (if allowed and card is discardable hand card, not madness)
-		if allow_discard and source == "hand" and discardable and base_id != "madness":
+		# Discard button (if allowed and card is discardable hand card)
+		if allow_discard and source == "hand" and discardable:
 			var discard_btn := Button.new()
 			discard_btn.text = _FMT_DISCARD_BTN % card_name
 			discard_btn.set_meta("qa_id", "encounter_discard::%s" % card_id)
@@ -174,6 +194,7 @@ func show_round(view: Dictionary) -> void:
 
 	# Action row — escape
 	for child in _action_row.get_children():
+		_action_row.remove_child(child)
 		child.queue_free()
 
 	var can_escape := bool(view.get("can_escape", false))

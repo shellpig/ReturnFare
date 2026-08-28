@@ -1,9 +1,9 @@
 extends SceneTree
 
 ## P4-F headless 驗收測試：
-## 1. D17～19 處方委託四種人物狀態覆蓋（零人物卡、阿婕、阿珠、阿財，涵蓋親自做、immediate、next_morning 與每日人物限制）
-## 2. D8／D45 遭遇 Response Matrix 動態資料衍生測試（正解、錯答/fallback、逃離、丟棄、不可丟棄卡、推論卡特殊轉化、無合法解直接 failure）
-## 3. 跨輪重置與第二輪持久化驗證（Meta 層保留、Run 層清空、D8 遭遇重演且不重收首次到訪費用、委託重置）
+## 1. D17～19 處方委託四種人物狀態覆蓋（零人物卡、阿婕、阿珠、阿財，涵蓋親自做、immediate、next_morning 與每日人物限制與二次委託拒絕）
+## 2. D8／D45 遭遇 Response Matrix 動態資料衍生測試（從 loader 資料衍生正解、錯答/fallback、逃離、丟棄、推論卡特殊轉化、無合法解直接 failure）
+## 3. 跨輪重置與第二輪持久化驗證（Meta 層保留含 night_once_beats_seen、Run 層清空、D8 遭遇重演且不重收首次到訪費用、委託重置）
 ## 4. 跨輪決定論測試：同存檔重載兩次走相同第二輪操作序列，最終 serialize() 逐字完全相同
 
 const DataLoader := preload("res://scripts/data_loader.gd")
@@ -63,11 +63,36 @@ static func _reset_gs(gs: Node) -> void:
 	gs.set("phase", "morning")
 
 
-# ── 1. D17～19 處方委託四種人物狀態覆蓋 ──────────────────────────────────────
+# ── 1. D17～19 處方委託四種人物狀態覆蓋（動態資料衍生） ──────────────────────
 
 func _test_d17_19_four_character_states(gs: Node, data_node: Node) -> int:
 	print("--- 1. D17-19 Prescription Delegation (4 character states) ---")
 	var failed := 0
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+
+	var pres_beat: Dictionary = loader.beats_by_id.get("d17_19_prescription", {}) as Dictionary
+	if pres_beat.is_empty():
+		return failed + _fail("D17-19 beat d17_19_prescription 不存在於資料中")
+
+	var pres_slots: Array = pres_beat.get("slots", []) as Array
+	var personal_slot_id := ""
+	var ajie_slot_id := ""
+	var azhu_slot_id := ""
+	var acai_slot_id := ""
+
+	for slot_dict: Dictionary in pres_slots:
+		var sid: String = str(slot_dict.get("id", ""))
+		var del_val: Variant = slot_dict.get("delegation")
+		if del_val == null:
+			personal_slot_id = sid
+		elif del_val is Dictionary:
+			var accepts: Array = slot_dict.get("accepts", []) as Array
+			if accepts.has("npc_ajie"):
+				ajie_slot_id = sid
+			elif accepts.has("npc_azhu"):
+				azhu_slot_id = sid
+			elif accepts.has("npc_acai"):
+				acai_slot_id = sid
 
 	# ── 狀態 1: 零人物卡（只有主角卡）──
 	_reset_gs(gs)
@@ -90,13 +115,13 @@ func _test_d17_19_four_character_states(gs: Node, data_node: Node) -> int:
 			if int(sv.get("tri", -1)) == PanelBuilder.TriState.OPEN:
 				open_slots_s1.append(str((sv.get("slot", {}) as Dictionary).get("id", "")))
 
-		if open_slots_s1.size() == 1 and open_slots_s1[0] == "find_self":
-			failed += _ok("狀態 1 (零人物卡): 僅有親自處理槽 find_self 為 OPEN，其餘委託候選隱藏 (condition.has_card)")
+		if open_slots_s1.size() == 1 and open_slots_s1[0] == personal_slot_id:
+			failed += _ok("狀態 1 (零人物卡): 僅有親自處理槽 %s 為 OPEN，其餘委託候選隱藏" % personal_slot_id)
 		else:
 			failed += _fail("狀態 1: OPEN 槽不符合預期: %s" % str(open_slots_s1))
 
-		# 放置 find_self：消耗主角行動格、取得 doc_prescription、choice_group 結算
-		var res_place: Dictionary = gs.try_place("protagonist", "d17_19_prescription", "find_self")
+		# 放置親自處理槽：消耗主角行動格、取得 doc_prescription、choice_group 結算
+		var res_place: Dictionary = gs.try_place("protagonist", "d17_19_prescription", personal_slot_id)
 		if bool(res_place.get("ok", false)) and bool(gs.get("action_spent")) and gs.has_card("doc_prescription"):
 			failed += _ok("狀態 1: 親自處理成功放置，消耗主角行動格且獲得 doc_prescription")
 		else:
@@ -104,7 +129,7 @@ func _test_d17_19_four_character_states(gs: Node, data_node: Node) -> int:
 
 		# choice_group prescription_route 互斥：同組委託槽已結算
 		gs.gain_card("npc_ajie")
-		var del_rej: Dictionary = gs.delegate("d17_19_prescription", "ask_ajie", "npc_ajie")
+		var del_rej: Dictionary = gs.delegate("d17_19_prescription", ajie_slot_id, "npc_ajie")
 		if not bool(del_rej.get("ok", true)) and str(del_rej.get("reason_code", "")) == "already_resolved":
 			failed += _ok("狀態 1: 處方路線互斥生效，已結算後委託回傳 already_resolved")
 		else:
@@ -127,7 +152,7 @@ func _test_d17_19_four_character_states(gs: Node, data_node: Node) -> int:
 		failed += _fail("狀態 2: D17 下午未找到 d17_19_prescription beat")
 	else:
 		# 委託阿婕：immediate 回報
-		var res_ajie: Dictionary = gs.delegate("d17_19_prescription", "ask_ajie", "npc_ajie")
+		var res_ajie: Dictionary = gs.delegate("d17_19_prescription", ajie_slot_id, "npc_ajie")
 		if bool(res_ajie.get("ok", false)):
 			var action_spent_val: bool = bool(gs.get("action_spent"))
 			var has_pres: bool = gs.has_card("doc_prescription")
@@ -147,13 +172,24 @@ func _test_d17_19_four_character_states(gs: Node, data_node: Node) -> int:
 		else:
 			failed += _fail("狀態 2: delegation_status 未記錄今日已受託")
 
+		# K-173: 同一人同日再次受託必須被拒絕，且狀態零變化
+		var snap_before_second := JSON.stringify(gs.serialize())
+		var res_ajie_second: Dictionary = gs.delegate("d17_19_prescription", ajie_slot_id, "npc_ajie")
+		if not bool(res_ajie_second.get("ok", true)) and str(res_ajie_second.get("reason_code", "")) == "already_delegated_today":
+			if JSON.stringify(gs.serialize()) == snap_before_second:
+				failed += _ok("狀態 2: 同日二次委託被拒回傳 already_delegated_today 且狀態零變化")
+			else:
+				failed += _fail("狀態 2: 同日二次委託被拒但狀態發生改變")
+		else:
+			failed += _fail("狀態 2: 同日二次委託未正確回傳 already_delegated_today: %s" % str(res_ajie_second))
+
 	# ── 狀態 3: 持有 npc_azhu（隔日上午回報）──
 	_reset_gs(gs)
 	gs.gain_card("npc_azhu")
 	gs.set("day", 17)
 	gs.set("phase", "afternoon")
 
-	var res_azhu: Dictionary = gs.delegate("d17_19_prescription", "ask_azhu", "npc_azhu")
+	var res_azhu: Dictionary = gs.delegate("d17_19_prescription", azhu_slot_id, "npc_azhu")
 	if bool(res_azhu.get("ok", false)):
 		var has_pres_immediate: bool = gs.has_card("doc_prescription")
 		var pending_reports: Array = gs.get("pending_delegation_reports") as Array
@@ -193,7 +229,7 @@ func _test_d17_19_four_character_states(gs: Node, data_node: Node) -> int:
 	gs.set("day", 17)
 	gs.set("phase", "afternoon")
 
-	var res_acai: Dictionary = gs.delegate("d17_19_prescription", "ask_acai", "npc_acai")
+	var res_acai: Dictionary = gs.delegate("d17_19_prescription", acai_slot_id, "npc_acai")
 	if bool(res_acai.get("ok", false)):
 		var has_acai_box: bool = gs.has_card("info_acai_box")
 		var has_pres_acai: bool = gs.has_card("doc_prescription")
@@ -209,7 +245,7 @@ func _test_d17_19_four_character_states(gs: Node, data_node: Node) -> int:
 	(gs.get("delegates_used_today") as Dictionary).clear()
 	gs.set("day", 18)
 	gs.set("phase", "afternoon")
-	var del_d18_rej: Dictionary = gs.delegate("d17_19_prescription", "ask_acai", "npc_acai")
+	var del_d18_rej: Dictionary = gs.delegate("d17_19_prescription", acai_slot_id, "npc_acai")
 	if not bool(del_d18_rej.get("ok", true)) and str(del_d18_rej.get("reason_code", "")) == "already_resolved":
 		failed += _ok("D18 驗證: 處方 choice_group 保持已結算，不因換日重開 (already_resolved)")
 	else:
@@ -225,50 +261,56 @@ func _test_encounter_matrix_derivation(gs: Node, data_node: Node) -> int:
 	var failed := 0
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
-	# ── A. D8 遭遇（n_manydoors_ch1）──
+	# ── A. D8 遭遇（n_manydoors_ch1，動態衍生回合正解）──
 	var d8_beat: Dictionary = loader.beats_by_id.get("n_manydoors_ch1", {}) as Dictionary
 	if d8_beat.is_empty():
 		return failed + _fail("D8 beat n_manydoors_ch1 不存在於資料中")
 
 	var d8_enc: Dictionary = d8_beat.get("encounter", {}) as Dictionary
 	var d8_rounds: Array = d8_enc.get("rounds", []) as Array
-	if d8_rounds.size() != 3:
-		return failed + _fail("D8 遭遇 rounds 數量不為 3 (實際: %d)" % d8_rounds.size())
+	if d8_rounds.is_empty():
+		return failed + _fail("D8 遭遇 rounds 為空")
 
-	# 測試 D8 正解路徑（持有知識卡 k_not_today, info_chunama_pause, routine_debt）
+	# 動態走查 D8 所有回合的正解路徑（從 round.responses.accepts 取出第一張合法卡）
 	_reset_gs(gs)
-	gs.gain_card("k_not_today")
-	gs.gain_card("info_chunama_pause")
-	gs.gain_card("routine_debt")
+	var d8_correct_cards: Array[String] = []
+	for r_dict: Dictionary in d8_rounds:
+		var r_resps: Array = r_dict.get("responses", []) as Array
+		if not r_resps.is_empty():
+			var first_resp: Dictionary = r_resps[0] as Dictionary
+			var accepts: Array = first_resp.get("accepts", []) as Array
+			if not accepts.is_empty():
+				var cid: String = str(accepts[0])
+				d8_correct_cards.append(cid)
+				gs.gain_card(cid)
+
 	gs.set("day", 8)
 	gs.set("phase", "night")
 	gs.play_night_fixed()
 	gs.acknowledge_encounter_intro()
 
-	# R1 正解
-	var r1_res: Dictionary = gs.respond_to_encounter("k_not_today")
-	if bool(r1_res.get("ok", false)) and str((gs.get("active_encounter") as Dictionary).get("round_id", "")) == "who_remembers":
-		failed += _ok("D8 R1 正解 (k_not_today): 順利前進至 who_remembers，知識卡不被消耗")
-	else:
-		failed += _fail("D8 R1 正解失敗: %s" % str(r1_res))
-
-	# R2 正解
-	var r2_res: Dictionary = gs.respond_to_encounter("info_chunama_pause")
-	if bool(r2_res.get("ok", false)) and str((gs.get("active_encounter") as Dictionary).get("round_id", "")) == "what_remains":
-		failed += _ok("D8 R2 正解 (info_chunama_pause): 順利前進至 what_remains")
-	else:
-		failed += _fail("D8 R2 正解失敗: %s" % str(r2_res))
-
-	# R3 正解 -> 結算勝利
-	var r3_res: Dictionary = gs.respond_to_encounter("routine_debt")
-	if bool(r3_res.get("ok", false)) and (gs.get("active_encounter") as Dictionary).is_empty():
-		var is_victory: bool = bool((gs.get("flags") as Dictionary).get("d8_encounter_victory", false))
-		if is_victory:
-			failed += _ok("D8 R3 正解 (routine_debt): 遭遇順利結算勝利並寫入 d8_encounter_victory")
+	for idx in range(d8_correct_cards.size()):
+		var cid: String = d8_correct_cards[idx]
+		var r_res: Dictionary = gs.respond_to_encounter(cid)
+		if not bool(r_res.get("ok", false)):
+			failed += _fail("D8 第 %d 回合正解 (%s) 失敗: %s" % [idx + 1, cid, str(r_res)])
 		else:
-			failed += _fail("D8 勝利 flag 未正確寫入")
-	else:
-		failed += _fail("D8 R3 正解失敗: %s" % str(r3_res))
+			var r_resps: Array = (d8_rounds[idx] as Dictionary).get("responses", []) as Array
+			var first_resp: Dictionary = r_resps[0] as Dictionary if not r_resps.is_empty() else {}
+			var next_rid_var: Variant = first_resp.get("next_round")
+			if next_rid_var == null:
+				var is_victory: bool = bool((gs.get("flags") as Dictionary).get("d8_encounter_victory", false))
+				if is_victory and (gs.get("active_encounter") as Dictionary).is_empty():
+					failed += _ok("D8 全回合正解順利結算勝利並寫入 d8_encounter_victory")
+				else:
+					failed += _fail("D8 勝利 flag 未正確寫入")
+			else:
+				var next_rid: String = str(next_rid_var)
+				var cur_rid: String = str((gs.get("active_encounter") as Dictionary).get("round_id", ""))
+				if cur_rid == next_rid:
+					failed += _ok("D8 第 %d 回合正解 (%s) -> 順利推進至 %s" % [idx + 1, cid, next_rid])
+				else:
+					failed += _fail("D8 第 %d 回合推進異常: 預期 %s, 實際 %s" % [idx + 1, next_rid, cur_rid])
 
 	# 測試 D8 Fallback 與可丟棄卡消耗
 	_reset_gs(gs)
@@ -313,7 +355,7 @@ func _test_encounter_matrix_derivation(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("D8 零可丟棄卡結算異常: %s" % str(ack_zero))
 
-	# ── B. D45 遭遇（d45_encounter）──
+	# ── B. D45 遭遇（d45_encounter，動態衍生全部 responses 案例）──
 	var d45_beat: Dictionary = loader.beats_by_id.get("d45_encounter", {}) as Dictionary
 	if d45_beat.is_empty():
 		return failed + _fail("D45 beat d45_encounter 不存在於資料中")
@@ -326,54 +368,42 @@ func _test_encounter_matrix_derivation(gs: Node, data_node: Node) -> int:
 	var d45_r1: Dictionary = d45_rounds[0] as Dictionary
 	var d45_responses: Array = d45_r1.get("responses", []) as Array
 
-	# 驗證 D45 推論卡特殊轉化分支
-	var transform_cases := [
-		{ "input": "inf_health_disappearance", "output": "k_health_from_disappearance" },
-		{ "input": "inf_jinghe_does_it", "output": "k_jinghe_not_entrance" },
-		{ "input": "inf_hotspring_kills", "output": "k_not_side_effect" },
-	]
+	# 動態遍歷 D45 所有 response 分支並驗證效果
+	for resp_idx in range(d45_responses.size()):
+		var resp_dict: Dictionary = d45_responses[resp_idx] as Dictionary
+		var accepts: Array = resp_dict.get("accepts", []) as Array
+		var should_consume: bool = bool(resp_dict.get("consume_card", false))
+		var on_resolve: Dictionary = resp_dict.get("on_resolve", {}) as Dictionary
+		var lose_cards: Array = on_resolve.get("lose", []) as Array
+		var gain_cards: Array = on_resolve.get("gain", []) as Array
 
-	for tc in transform_cases:
-		var in_card: String = tc["input"]
-		var out_card: String = tc["output"]
+		for cid_raw in accepts:
+			var cid := str(cid_raw)
+			_reset_gs(gs)
+			gs.gain_card(cid)
+			gs.set("day", 45)
+			gs.set("phase", "morning")
+			gs.set_flag("final_day", true)
+			gs.advance_phase() # triggers d45_encounter intro
+			gs.acknowledge_encounter_intro()
 
-		_reset_gs(gs)
-		gs.gain_card(in_card)
-		gs.set("day", 45)
-		gs.set("phase", "morning")
-		gs.set_flag("final_day", true)
-		gs.advance_phase() # triggers d45_encounter intro
-		gs.acknowledge_encounter_intro()
+			var tc_res: Dictionary = gs.respond_to_encounter(cid)
+			if bool(tc_res.get("ok", false)):
+				var expected_lost: bool = should_consume or lose_cards.has(cid)
+				var card_in_hand: bool = gs.has_card(cid)
+				var lost_ok: bool = (card_in_hand == (not expected_lost))
+				var k_ok: bool = true
+				for g_raw in gain_cards:
+					if not gs.has_knowledge(str(g_raw)):
+						k_ok = false
+				var phase_is_eve: bool = (str(gs.get("phase")) == "evening")
 
-		var tc_res: Dictionary = gs.respond_to_encounter(in_card)
-		if bool(tc_res.get("ok", false)):
-			var lost_in: bool = not gs.has_card(in_card)
-			var gained_out: bool = gs.has_knowledge(out_card)
-			var phase_is_eve: bool = (str(gs.get("phase")) == "evening")
-			if lost_in and gained_out and phase_is_eve:
-				failed += _ok("D45 推論卡轉化 (%s -> %s): 失去推論卡、獲得對位知識且推進至 evening" % [in_card, out_card])
+				if lost_ok and k_ok and phase_is_eve:
+					failed += _ok("D45 動態回應分支 [%s]: 消耗=%s, 轉化獲得=%s, 推進至 evening" % [cid, expected_lost, str(gain_cards)])
+				else:
+					failed += _fail("D45 回應 %s 狀態異常: card_in_hand=%s, lost_ok=%s, k_ok=%s, phase=%s" % [cid, card_in_hand, lost_ok, k_ok, str(gs.get("phase"))])
 			else:
-				failed += _fail("D45 轉化異常: lost_in=%s, gained_out=%s, phase=%s" % [lost_in, gained_out, str(gs.get("phase"))])
-		else:
-			failed += _fail("D45 回應 %s 失敗: %s" % [in_card, str(tc_res)])
-
-	# 驗證 D45 人物卡與主角卡回應後卡片不丟失
-	var retain_cases := ["protagonist", "npc_ajie", "npc_awei"]
-	for rc in retain_cases:
-		_reset_gs(gs)
-		if rc != "protagonist":
-			gs.gain_card(rc)
-		gs.set("day", 45)
-		gs.set("phase", "morning")
-		gs.set_flag("final_day", true)
-		gs.advance_phase()
-		gs.acknowledge_encounter_intro()
-
-		var rc_res: Dictionary = gs.respond_to_encounter(rc)
-		if bool(rc_res.get("ok", false)) and gs.has_card(rc) and str(gs.get("phase")) == "evening":
-			failed += _ok("D45 保留卡回應 (%s): 卡片仍在手牌未失去，且推進至 evening" % rc)
-		else:
-			failed += _fail("D45 保留卡回應 %s 失敗: res=%s, has_card=%s" % [rc, str(rc_res), gs.has_card(rc)])
+				failed += _fail("D45 回應 %s 失敗: %s" % [cid, str(tc_res)])
 
 	return failed
 
@@ -389,6 +419,7 @@ func _test_end_run_cleanup_and_second_run_persistence(gs: Node, data_node: Node)
 	gs.gain_card("k_not_today") # meta knowledge
 	gs.gain_card("npc_ajie")
 	gs.mark_delegation_tutorial_seen() # meta tutorial
+	(gs.get("night_once_beats_seen") as Dictionary)["d1_night_fixed"] = true # meta night_once_beats_seen (K-172)
 	gs.set("day", 8)
 	gs.set("phase", "night")
 	gs.play_night_fixed() # triggers D8, records n_manydoors into seen, charges cost
@@ -404,11 +435,12 @@ func _test_end_run_cleanup_and_second_run_persistence(gs: Node, data_node: Node)
 	var before_meta_seen: Dictionary = (gs.get("night_locations_seen") as Dictionary).duplicate()
 	var before_knowledge: Dictionary = (gs.get("knowledge") as Dictionary).duplicate()
 	var before_tutorial: bool = bool(gs.get("delegation_tutorial_seen"))
+	var before_night_once: Dictionary = (gs.get("night_once_beats_seen") as Dictionary).duplicate()
 
 	# 執行真實 end_run()
 	gs.call("end_run", "ending_default")
 
-	# 2. 斷言 Meta 層完整保留
+	# 2. 斷言 Meta 層完整保留（含 night_once_beats_seen，K-172）
 	if bool(gs.get("delegation_tutorial_seen")) == before_tutorial and before_tutorial == true:
 		failed += _ok("Meta 保留: delegation_tutorial_seen 跨輪重置後保持 true")
 	else:
@@ -425,6 +457,12 @@ func _test_end_run_cleanup_and_second_run_persistence(gs: Node, data_node: Node)
 		failed += _ok("Meta 保留: night_locations_seen 跨輪重置後保持完整 (含 n_manydoors)")
 	else:
 		failed += _fail("Meta 遺失: night_locations_seen 跨輪重置後遺失")
+
+	var after_night_once: Dictionary = gs.get("night_once_beats_seen") as Dictionary
+	if after_night_once.has("d1_night_fixed"):
+		failed += _ok("Meta 保留: night_once_beats_seen 跨輪重置後保持完整 (含 d1_night_fixed, K-172)")
+	else:
+		failed += _fail("Meta 遺失: night_once_beats_seen 跨輪重置後遺失 (K-172)")
 
 	# 3. 斷言 Run 層完整重置
 	var run_clean := true
