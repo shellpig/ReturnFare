@@ -807,8 +807,8 @@ class Case12cAdvanceD43 extends CaseBaseClass:
 		var drain_riv := await QAStep.drain_beats(tree)
 		assert_true(drain_riv.get("ok", false), "河邊演出推進失敗: " + str(drain_riv.get("error", "")))
 
-		var choose_res := await QAStep.click(tree, "choose::d43_pm_zhou::leaving::say_yes")
-		assert_true(choose_res.get("ok", false), "選擇 say_yes 失敗: " + str(choose_res.get("error")))
+		var choose_res := await QAStep.click(tree, "place::d43_pm_zhou::say_yes::protagonist")
+		assert_true(choose_res.get("ok", false), "放置 protagonist 至 say_yes 失敗: " + str(choose_res.get("error")))
 
 		# 3. 退出地點面板回到地圖
 		var back_res := await QAStep.click(tree, "panel_back")

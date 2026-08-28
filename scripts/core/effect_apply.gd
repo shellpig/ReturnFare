@@ -8,13 +8,14 @@ extends RefCounted
 
 const KNOWN_KEYS := [
 	"text", "gain", "lose", "switch", "switch_progress", "relation", "madness", "flag",
+	"festival_proxy", "ending",
 ]
 
 ## gain / lose 的陣列元素有兩種形態：
 ##   "card_id"                                → 無條件執行（既有形態，仍是預設寫法）
-##   { "card": "card_id", "if": <condition> } → `if` 成立才執行；語彙沿用 ConditionEval，不另立
+##   { "card": "card_id", "if": <condition>, "permanent": <bool> } → `if` 成立才執行；語彙沿用 ConditionEval，不另立
 ## 用途見 `data/SCHEMA.md > on_place 效果 > 帶條件的卡片項目`。
-const CARD_ENTRY_KEYS := ["card", "if"]
+const CARD_ENTRY_KEYS := ["card", "if", "permanent"]
 
 static func apply(effect: Variant, gs: Node) -> PackedStringArray:
 	var lines := PackedStringArray()

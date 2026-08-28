@@ -10,6 +10,7 @@ const KNOWN_KEYS := [
 	"day", "day_at_least", "has_card", "has_knowledge", "switch",
 	"switch_progress_at_least", "flag", "relation_at_least", "madness_at_least",
 	"count_at_least", "not", "all", "any", "night_seen",
+	"opening_choice", "ending_seen", "festival_proxy_is",
 ]
 
 static func eval(cond: Variant, gs: Node) -> bool:
@@ -30,6 +31,21 @@ static func eval(cond: Variant, gs: Node) -> bool:
 		return gs.call("has_knowledge", str(d["has_knowledge"]))
 	if d.has("night_seen"):
 		return gs.call("night_location_seen", str(d["night_seen"]))
+	if d.has("opening_choice"):
+		var oc: Variant = gs.get("opening_choice_id") if (gs != null and "opening_choice_id" in gs) else ""
+		return str(oc) == str(d["opening_choice"])
+	if d.has("ending_seen"):
+		if gs != null and gs.has_method("ending_seen"):
+			return gs.call("ending_seen", str(d["ending_seen"]))
+		var hist: Variant = gs.get("ending_history") if (gs != null and "ending_history" in gs) else []
+		if hist is Array:
+			for item in hist:
+				if item is Dictionary and (item as Dictionary).get("ending_id") == str(d["ending_seen"]):
+					return true
+		return false
+	if d.has("festival_proxy_is"):
+		var fp: Variant = gs.get("selected_festival_proxy_npc") if (gs != null and "selected_festival_proxy_npc" in gs) else ""
+		return str(fp) == str(d["festival_proxy_is"])
 	if d.has("madness_at_least"):
 		var mc: Variant = gs.get("madness_clock")
 		var count: int = (mc as Dictionary).size() if mc is Dictionary else 0

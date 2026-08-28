@@ -1,0 +1,35 @@
+[
+  {
+    "id": "take_family_album",
+    "label": "帶上父母留下的舊相簿",
+    "preview": "在抽屜深處翻出這本泛黃的相簿。裡面的老照片記錄著很久以前的事。",
+    "confirm_text": "帶上相簿，準備出門",
+    "on_select": {
+      "gain": [
+        "item_family_album"
+      ]
+    }
+  },
+  {
+    "id": "return_missed_call",
+    "label": "回撥那通未接來電",
+    "preview": "前老闆打來的未接來電。回撥的話，或許還能留住外地工作的機會。",
+    "confirm_text": "回撥電話，確認工作機會",
+    "on_select": {
+      "flag": {
+        "outside_job_waiting": true
+      }
+    }
+  },
+  {
+    "id": "refuse_boarding",
+    "label": "不上車",
+    "preview": "看著眼前的車票與行李。如果這趟路根本不該開始……",
+    "confirm_text": "放下行李，不上車",
+    "requires": {
+      "ending_seen": "ending_replaced"
+    },
+    "reject_reason": "你還沒有理由放棄這趟路。",
+    "ending": "ending_refuse_boarding"
+  }
+]

@@ -538,7 +538,8 @@
             "flag": {
               "jinghe_with_ajie": true
             }
-          }
+          },
+          "attention_npc": "ajie"
         },
         {
           "id": "alone",
@@ -568,15 +569,36 @@
       ]
     },
     {
+      "id": "d7_ambient_rejection_called",
+      "location": "sanquan",
+      "when": {
+        "day": 7,
+        "phase": "evening"
+      },
+      "condition": {
+        "flag": "outside_job_waiting"
+      },
+      "fixed": true,
+      "title": "雜訊",
+      "text": "求職回信來了，是拒絕。但你知道前老闆那邊還願意談，外面的路還沒有完全關死。",
+      "slots": [],
+      "note": "開局回過電話：這份申請仍被拒絕，但他知道前老闆那邊還願意談"
+    },
+    {
       "id": "d7_ambient_rejection",
       "location": "sanquan",
       "when": {
         "day": 7,
         "phase": "evening"
       },
+      "condition": {
+        "not": {
+          "flag": "outside_job_waiting"
+        }
+      },
       "fixed": true,
       "title": "雜訊",
-      "text": "求職回信來了，是拒絕。這一輪只有這一封。",
+      "text": "求職回信來了，是拒絕。這一輪只有這一封，外面的路正在關上。",
       "slots": [],
       "note": "沒回開局那通電話的玩家，這一封更重——家業線的「留下」變成唯一選項"
     },
@@ -766,7 +788,9 @@
           ],
           "on_place": {
             "text": "她無意間提到，叔叔那個藥不是普通的藥。然後她就不講了。",
-            "flag": { "azhu_shared_abnormal_medicine": true }
+            "flag": {
+              "azhu_shared_abnormal_medicine": true
+            }
           },
           "note": "P4-A：阿珠 D9 揭露路線的寫入端。它是 npc_azhu 於 D17 早上取得的唯一前置（見 P4 映射表）"
         }
@@ -1027,7 +1051,8 @@
           ],
           "on_place": {
             "text": "「你們那間也想接慶典的客人？」"
-          }
+          },
+          "attention_npc": "awei"
         }
       ]
     },
@@ -1168,9 +1193,16 @@
             "protagonist"
           ],
           "requires": {
-            "has_card": "item_gradphoto"
+            "any": [
+              {
+                "has_card": "item_gradphoto"
+              },
+              {
+                "has_card": "item_family_album"
+              }
+            ]
           },
-          "reject_reason": "（你手上沒有那張照片。）",
+          "reject_reason": "（你手上沒有能比對的舊照片或相簿。）",
           "on_place": {
             "text": "你看了很久。說不出哪裡不一樣，但你看了很久。"
           }

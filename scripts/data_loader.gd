@@ -23,6 +23,10 @@ var locations: Dictionary = {}      ## id -> location（白天與夜間合在一
 var npcs: Dictionary = {}           ## id -> npc
 var beats: Array[Dictionary] = []
 var beats_by_id: Dictionary = {}
+var endings: Array[Dictionary] = []
+var endings_by_id: Dictionary = {}
+var opening_choices: Array[Dictionary] = []
+var opening_choices_by_id: Dictionary = {}
 
 var errors: PackedStringArray = []
 
@@ -78,6 +82,30 @@ func load_all() -> bool:
 			beats_by_id[bid] = b
 			beats.append(b)
 
+	endings.clear()
+	endings_by_id.clear()
+	var endings_arr := _read_json_array(DATA_DIR + "endings.json")
+	for end: Variant in endings_arr:
+		if end is Dictionary:
+			var end_dict := end as Dictionary
+			var eid: String = str(end_dict.get("id", ""))
+			if endings_by_id.has(eid):
+				errors.append("ending id 重複：%s" % eid)
+			endings_by_id[eid] = end_dict
+			endings.append(end_dict)
+
+	opening_choices.clear()
+	opening_choices_by_id.clear()
+	var opening_arr := _read_json_array(DATA_DIR + "opening_choices.json")
+	for oc: Variant in opening_arr:
+		if oc is Dictionary:
+			var oc_dict := oc as Dictionary
+			var ocid: String = str(oc_dict.get("id", ""))
+			if opening_choices_by_id.has(ocid):
+				errors.append("opening choice id 重複：%s" % ocid)
+			opening_choices_by_id[ocid] = oc_dict
+			opening_choices.append(oc_dict)
+
 	return errors.is_empty()
 
 
@@ -121,6 +149,19 @@ func verify_references() -> PackedStringArray:
 				if not open_phases.has(p):
 					problems.append("NPC %s：%s 沒有 %s 這個時段" % [nid, at_loc, p])
 
+	for oc in opening_choices:
+		var ocid: String = str(oc.get("id", "?"))
+		_check_card_refs(oc.get("on_select"), ocid, "opening_choice.on_select", problems)
+		_check_card_refs(oc.get("requires"), ocid, "opening_choice.requires", problems)
+		if oc.has("ending"):
+			var oc_eid: String = str(oc.get("ending", ""))
+			if not endings_by_id.has(oc_eid):
+				problems.append("%s [opening_choice]：ending 引用不存在的 ending → %s" % [ocid, oc_eid])
+
+	for end in endings:
+		var end_eid: String = str(end.get("id", "?"))
+		_check_card_refs(end, end_eid, "ending", problems)
+
 	for b in beats:
 		var bid: String = b["id"]
 
@@ -132,6 +173,23 @@ func verify_references() -> PackedStringArray:
 
 		# P4-A：encounter 的巢狀效果（response/fallback on_resolve、三種出口）也要走引用檢查。
 		_check_card_refs(b.get("encounter"), bid, "encounter", problems)
+
+		# P5-A：phase_exit 引用檢查
+		var pe: Variant = b.get("phase_exit")
+		if pe is Dictionary:
+			var ped := pe as Dictionary
+			var req_slots: Variant = ped.get("required_slots")
+			if req_slots is Array:
+				var b_slot_ids := {}
+				for s in b.get("slots", []):
+					b_slot_ids[str(s.get("id", ""))] = true
+				for rs in req_slots as Array:
+					if not b_slot_ids.has(str(rs)):
+						problems.append("%s [phase_exit]：required_slots 引用不存在的槽 → %s" % [bid, str(rs)])
+			if ped.has("ending"):
+				var pe_end := str(ped.get("ending", ""))
+				if not endings_by_id.has(pe_end):
+					problems.append("%s [phase_exit]：ending 不存在 → %s" % [bid, pe_end])
 
 		for s in b.get("slots", []):
 			var where := "slot:" + str(s.get("id", "?"))
@@ -197,6 +255,30 @@ func _check_card_refs(node: Variant, bid: String, where: String, problems: Packe
 						problems.append("%s [%s]：%s 引用不存在的地點 → %s" % [bid, where, k, loc_id])
 					elif locations[loc_id].get("layer", "") != "night":
 						problems.append("%s [%s]：%s 引用的地點不是夜間地點 → %s" % [bid, where, k, loc_id])
+				"opening_choice":
+					var oc_key := str(v)
+					if not opening_choices_by_id.has(oc_key):
+						problems.append("%s [%s]：%s 引用不存在的選項 → %s" % [bid, where, k, oc_key])
+				"ending_seen", "ending":
+					var end_key := str(v)
+					if not endings_by_id.has(end_key):
+						problems.append("%s [%s]：%s 引用不存在的 ending → %s" % [bid, where, k, end_key])
+				"festival_proxy_is":
+					var npc_key := str(v)
+					if not npcs.has(npc_key):
+						problems.append("%s [%s]：%s 引用不存在的 NPC → %s" % [bid, where, k, npc_key])
+				"festival_proxy":
+					if v is Dictionary:
+						var fp := v as Dictionary
+						var fp_mode := str(fp.get("mode", ""))
+						if fp_mode == "fixed":
+							var fp_npc := str(fp.get("npc", ""))
+							if not npcs.has(fp_npc):
+								problems.append("%s [%s]：%s fixed 引用不存在的 NPC → %s" % [bid, where, k, fp_npc])
+						elif fp_mode == "highest_eligible":
+							var fp_fb := str(fp.get("fallback", ""))
+							if not npcs.has(fp_fb):
+								problems.append("%s [%s]：%s fallback 引用不存在的 NPC → %s" % [bid, where, k, fp_fb])
 				_:
 					_check_card_refs(v, bid, where, problems)
 	elif node is Array:
@@ -1243,3 +1325,514 @@ func _read_json(path: String) -> Dictionary:
 		errors.append("JSON 解析失敗：%s" % path)
 		return {}
 	return parsed as Dictionary
+
+
+func _read_json_array(path: String) -> Array:
+	var text := FileAccess.get_file_as_string(path)
+	if text.is_empty():
+		errors.append("讀不到或是空的：%s" % path)
+		return []
+	var parsed: Variant = JSON.parse_string(text)
+	if parsed == null:
+		errors.append("JSON 解析失敗：%s" % path)
+		return []
+	if parsed is Array:
+		return parsed as Array
+	if parsed is Dictionary:
+		var d := parsed as Dictionary
+		for key in ["endings", "opening_choices"]:
+			if d.has(key) and d[key] is Array:
+				return d[key] as Array
+	errors.append("JSON 格式錯誤（預期為 Array）：%s" % path)
+	return []
+
+
+## lint 17：結局資料完整性（規格書第十七節 lint 17）。
+## 驗證 4 筆 ending、linear/composite 結構、必填 pages、唯一 fallback、source ↔ ending 配對與 phase_exit。
+static func lint_endings(loader: DataLoader) -> PackedStringArray:
+	var problems: PackedStringArray = []
+	var expected_ids := ["ending_replaced", "ending_madness_be", "ending_inventory_be", "ending_refuse_boarding"]
+	var seen_ids := []
+
+	for end in loader.endings:
+		var eid := str(end.get("id", ""))
+		seen_ids.append(eid)
+		if not expected_ids.has(eid):
+			problems.append("endings.json：非預期的 ending id → %s" % eid)
+
+	for exp_id in expected_ids:
+		if not seen_ids.has(exp_id):
+			problems.append("endings.json：缺少必填 ending id → %s" % exp_id)
+
+	if loader.endings.size() != 4:
+		problems.append("endings.json：預期恰 4 筆 ending，實際為 %d 筆" % loader.endings.size())
+
+	for end in loader.endings:
+		var eid := str(end.get("id", ""))
+		var kind := str(end.get("kind", ""))
+		var page_ids := {}
+
+		if eid == "ending_replaced":
+			if kind != "composite":
+				problems.append("%s：kind 必須為 composite（實際為 %s）" % [eid, kind])
+
+			var fs: Variant = end.get("first_seen")
+			if not (fs is Dictionary):
+				problems.append("%s：缺少 first_seen 字典" % eid)
+			else:
+				var fsd := fs as Dictionary
+				_lint_page_list(fsd.get("prefix_pages", []), eid, "first_seen.prefix_pages", page_ids, problems)
+				_lint_page_list(fsd.get("suffix_pages", []), eid, "first_seen.suffix_pages", page_ids, problems)
+
+			var rep: Variant = end.get("repeat")
+			if not (rep is Dictionary):
+				problems.append("%s：缺少 repeat 字典" % eid)
+			else:
+				var repd := rep as Dictionary
+				_lint_page_list(repd.get("prefix_pages", []), eid, "repeat.prefix_pages", page_ids, problems)
+				_lint_page_list(repd.get("suffix_pages", []), eid, "repeat.suffix_pages", page_ids, problems)
+				var skip_to := str(repd.get("skip_to", ""))
+				if skip_to.is_empty():
+					problems.append("%s：repeat 缺少 skip_to" % eid)
+
+			var vgroups: Variant = end.get("variant_groups")
+			if not (vgroups is Array):
+				problems.append("%s：variant_groups 必須是 Array" % eid)
+			else:
+				var vg_arr := vgroups as Array
+				var expected_vgs := ["partner", "livelihood", "inn_appearance"]
+				var actual_vgs := []
+				var hist_fields := {}
+				for vg in vg_arr:
+					if not (vg is Dictionary):
+						problems.append("%s：variant_group 元素必須是 Dictionary" % eid)
+						continue
+					var vgd := vg as Dictionary
+					var vgid := str(vgd.get("id", ""))
+					actual_vgs.append(vgid)
+					var hf := str(vgd.get("history_field", ""))
+					if hf.is_empty():
+						problems.append("%s [%s]：缺少 history_field" % [eid, vgid])
+					elif hist_fields.has(hf):
+						problems.append("%s [%s]：history_field 重複 → %s" % [eid, vgid, hf])
+					hist_fields[hf] = true
+
+					var rules: Variant = vgd.get("rules")
+					if not (rules is Array) or (rules as Array).is_empty():
+						problems.append("%s [%s]：rules 必須為非空 Array" % [eid, vgid])
+					else:
+						var rule_ids := {}
+						var fallback_count := 0
+						var r_arr := rules as Array
+						for r_idx in range(r_arr.size()):
+							var r: Variant = r_arr[r_idx]
+							if not (r is Dictionary):
+								problems.append("%s [%s]：rule 必須為 Dictionary" % [eid, vgid])
+								continue
+							var rd := r as Dictionary
+							var rid := str(rd.get("id", ""))
+							if rid.is_empty():
+								problems.append("%s [%s]：rule id 不得為空" % [eid, vgid])
+							elif rule_ids.has(rid):
+								problems.append("%s [%s]：rule id 重複 → %s" % [eid, vgid, rid])
+							rule_ids[rid] = true
+
+							var is_fb: bool = rd.get("fallback", false) == true
+							if is_fb:
+								fallback_count += 1
+								if rd.has("when"):
+									problems.append("%s [%s.%s]：fallback rule 不得同時包含 when" % [eid, vgid, rid])
+							else:
+								if not rd.has("when"):
+									problems.append("%s [%s.%s]：非 fallback rule 必須包含 when" % [eid, vgid, rid])
+								else:
+									var cond_probs: PackedStringArray = []
+									_lint_condition(rd.get("when"), eid, "%s.%s.when" % [vgid, rid], cond_probs)
+									problems.append_array(cond_probs)
+
+							_lint_page_list(rd.get("first_seen_pages", []), eid, "%s.%s.first_seen_pages" % [vgid, rid], page_ids, problems)
+							_lint_page_list(rd.get("repeat_pages", []), eid, "%s.%s.repeat_pages" % [vgid, rid], page_ids, problems)
+
+						if fallback_count != 1:
+							problems.append("%s [%s]：rules 必須恰有一個 fallback（實際為 %d 個）" % [eid, vgid, fallback_count])
+
+				if actual_vgs != expected_vgs:
+					problems.append("%s：variant_groups 順序或項目不符預期（預期 %s，實際 %s）" % [eid, str(expected_vgs), str(actual_vgs)])
+
+			var lfrags: Variant = end.get("lookup_fragments")
+			if lfrags is Array:
+				for lf in lfrags as Array:
+					if not (lf is Dictionary):
+						continue
+					var lfd := lf as Dictionary
+					var lfid := str(lfd.get("id", ""))
+					var wg: Variant = lfd.get("when_group")
+					if not (wg is Dictionary):
+						problems.append("%s [%s]：缺少 when_group 字典" % [eid, lfid])
+					var src_field := str(lfd.get("source_field", ""))
+					if src_field != "festival_proxy_npc":
+						problems.append("%s [%s]：未知 source_field → %s" % [eid, lfid, src_field])
+					var entries: Variant = lfd.get("entries")
+					if not (entries is Array):
+						problems.append("%s [%s]：entries 必須為 Array" % [eid, lfid])
+					else:
+						for entry in entries as Array:
+							if entry is Dictionary:
+								var ed := entry as Dictionary
+								var npc_val := str(ed.get("value", ""))
+								if not loader.npcs.has(npc_val):
+									problems.append("%s [%s]：entries.value 引用不存在的 NPC → %s" % [eid, lfid, npc_val])
+								_lint_page_list(ed.get("first_seen_pages", []), eid, "%s.%s.first_seen_pages" % [lfid, npc_val], page_ids, problems)
+								_lint_page_list(ed.get("repeat_pages", []), eid, "%s.%s.repeat_pages" % [lfid, npc_val], page_ids, problems)
+		elif kind == "linear":
+			var fs: Variant = end.get("first_seen")
+			if not (fs is Dictionary):
+				problems.append("%s：缺少 first_seen" % eid)
+			else:
+				var fsd := fs as Dictionary
+				var pages: Variant = fsd.get("pages")
+				if not (pages is Array) or (pages as Array).is_empty():
+					problems.append("%s：first_seen.pages 必須為非空 Array" % eid)
+				else:
+					_lint_page_list(pages as Array, eid, "first_seen.pages", page_ids, problems)
+
+			var rep: Variant = end.get("repeat")
+			if not (rep is Dictionary):
+				problems.append("%s：缺少 repeat" % eid)
+			else:
+				var repd := rep as Dictionary
+				var pages: Variant = repd.get("pages")
+				if not (pages is Array) or (pages as Array).is_empty():
+					problems.append("%s：repeat.pages 必須為非空 Array" % eid)
+				else:
+					_lint_page_list(pages as Array, eid, "repeat.pages", page_ids, problems)
+				var skip_to := str(repd.get("skip_to", ""))
+				if skip_to.is_empty():
+					problems.append("%s：repeat 缺少 skip_to" % eid)
+		else:
+			problems.append("%s：未知 kind → %s" % [eid, kind])
+
+	# Phase_exit 與 Beat ending 效果檢查
+	for b in loader.beats:
+		var bid: String = str(b.get("id", "?"))
+		var pe: Variant = b.get("phase_exit")
+		if pe != null:
+			if not (pe is Dictionary):
+				problems.append("%s：phase_exit 必須為 Dictionary" % bid)
+			else:
+				var ped := pe as Dictionary
+				if b.get("fixed", false) != true:
+					problems.append("%s：phase_exit 只能掛在 fixed:true 的 beat" % bid)
+				var w: Variant = b.get("when")
+				if not (w is Dictionary) or not (w as Dictionary).has("day") or not (w as Dictionary).has("phase"):
+					problems.append("%s：phase_exit 所在的 beat 必須有明確整數 day 與合法 phase" % bid)
+				var req_slots: Variant = ped.get("required_slots")
+				if not (req_slots is Array) or (req_slots as Array).is_empty():
+					problems.append("%s [phase_exit]：required_slots 必須為非空 Array" % bid)
+				else:
+					var b_slot_ids := {}
+					for s in b.get("slots", []):
+						b_slot_ids[str(s.get("id", ""))] = true
+					var seen_rs := {}
+					for rs in req_slots as Array:
+						var rs_str := str(rs)
+						if seen_rs.has(rs_str):
+							problems.append("%s [phase_exit]：required_slots 包含重複 slot id → %s" % [bid, rs_str])
+						seen_rs[rs_str] = true
+						if not b_slot_ids.has(rs_str):
+							problems.append("%s [phase_exit]：required_slots 引用父 beat 不存在的 slot id → %s" % [bid, rs_str])
+
+				var has_ending: bool = ped.has("ending")
+				var has_source: bool = ped.has("source")
+				if has_ending != has_source:
+					problems.append("%s [phase_exit]：ending 與 source 必須同時存在或同時省略" % bid)
+				elif has_ending:
+					var pe_ending := str(ped.get("ending", ""))
+					var pe_source := str(ped.get("source", ""))
+					if pe_ending != "ending_replaced" or pe_source != "d45_coda":
+						problems.append("%s [phase_exit]：不合法的 ending/source 配對 → %s / %s" % [bid, pe_ending, pe_source])
+
+		_check_beat_ending_effects(b, bid, problems)
+
+	return problems
+
+
+static func _lint_page_list(pages: Array, eid: String, where: String, page_ids: Dictionary, problems: PackedStringArray) -> void:
+	for p: Variant in pages:
+		if not (p is Dictionary):
+			problems.append("%s [%s]：page 必須為 Dictionary" % [eid, where])
+			continue
+		var pd := p as Dictionary
+		var pid := str(pd.get("id", ""))
+		var text := str(pd.get("text", ""))
+		if pid.is_empty():
+			problems.append("%s [%s]：page id 不得為空" % [eid, where])
+		elif "/" in pid:
+			problems.append("%s [%s]：page id 不得包含斜線 → %s" % [eid, where, pid])
+		elif page_ids.has(pid):
+			problems.append("%s [%s]：page id 全域重複 → %s" % [eid, where, pid])
+		page_ids[pid] = true
+
+		if text.strip_edges().is_empty():
+			problems.append("%s [%s.%s]：page text 不得為空" % [eid, where, pid])
+		for forbidden in ["ending_replaced", "ending_madness_be", "ending_inventory_be", "ending_refuse_boarding"]:
+			if forbidden in text:
+				problems.append("%s [%s.%s]：玩家文字直接包含內部 ending id → %s" % [eid, where, pid, forbidden])
+
+
+static func _check_beat_ending_effects(b: Dictionary, bid: String, problems: PackedStringArray) -> void:
+	_check_single_ending_effect(b.get("on_enter"), bid, "beat.on_enter", problems)
+	for s in b.get("slots", []):
+		var where := "slot:" + str(s.get("id", "?"))
+		_check_single_ending_effect(s.get("on_place"), bid, where + ".on_place", problems)
+		if s.has("on_place_by_level") and s["on_place_by_level"] is Dictionary:
+			for lvl in (s["on_place_by_level"] as Dictionary).values():
+				_check_single_ending_effect(lvl, bid, where + ".on_place_by_level", problems)
+
+
+static func _check_single_ending_effect(node: Variant, bid: String, where: String, problems: PackedStringArray) -> void:
+	if not (node is Dictionary):
+		return
+	var d := node as Dictionary
+	if d.has("ending"):
+		var end_val := str(d["ending"])
+		if end_val != "ending_inventory_be":
+			problems.append("%s [%s]：beat ending 效果只能引用 ending_inventory_be（實際為 %s）" % [bid, where, end_val])
+
+
+## lint 18：開局與選擇完整性（規格書第十七節 lint 18）。
+## 驗證 opening_choices 3 筆 id／順序／形狀／鎖定理由，以及 choice group 的 default_if_unresolved 與 choice_requires_card。
+static func lint_opening_and_defaults(loader: DataLoader) -> PackedStringArray:
+	var problems: PackedStringArray = []
+	var expected_order := ["take_family_album", "return_missed_call", "refuse_boarding"]
+	var actual_order := []
+
+	for oc in loader.opening_choices:
+		var ocid := str(oc.get("id", ""))
+		actual_order.append(ocid)
+		var label := str(oc.get("label", ""))
+		var preview := str(oc.get("preview", ""))
+		var confirm_text := str(oc.get("confirm_text", ""))
+		if label.strip_edges().is_empty():
+			problems.append("opening_choices [%s]：label 不得為空" % ocid)
+		if preview.strip_edges().is_empty():
+			problems.append("opening_choices [%s]：preview 不得為空" % ocid)
+		if confirm_text.strip_edges().is_empty():
+			problems.append("opening_choices [%s]：confirm_text 不得為空" % ocid)
+
+		var has_on_select: bool = oc.has("on_select")
+		var has_ending: bool = oc.has("ending")
+		if has_on_select and has_ending:
+			problems.append("opening_choices [%s]：不得同時包含 on_select 與 ending" % ocid)
+		elif not has_on_select and not has_ending:
+			problems.append("opening_choices [%s]：必須在 on_select 與 ending 中恰有一個" % ocid)
+
+		if has_on_select:
+			var os: Variant = oc.get("on_select")
+			if not (os is Dictionary):
+				problems.append("opening_choices [%s]：on_select 必須為 Dictionary" % ocid)
+			else:
+				if (os as Dictionary).has("ending"):
+					problems.append("opening_choices [%s]：on_select 不得內藏 ending" % ocid)
+
+		if has_ending:
+			var end_val := str(oc.get("ending", ""))
+			if end_val != "ending_refuse_boarding":
+				problems.append("opening_choices [%s]：ending 只能引用 ending_refuse_boarding（實際為 %s）" % [ocid, end_val])
+			if not oc.has("requires"):
+				problems.append("opening_choices [%s]：不上車必須包含 requires 門檻" % ocid)
+			else:
+				var req: Variant = oc.get("requires")
+				if not (req is Dictionary) or str((req as Dictionary).get("ending_seen", "")) != "ending_replaced":
+					problems.append("opening_choices [%s]：不上車門檻必須為 ending_seen: ending_replaced" % ocid)
+				var rr := str(oc.get("reject_reason", ""))
+				if rr.strip_edges().is_empty():
+					problems.append("opening_choices [%s]：有 requires 時必須提供非空 reject_reason" % ocid)
+
+	if actual_order != expected_order:
+		problems.append("opening_choices.json：順序或項目不符預期（預期 %s，實際 %s）" % [str(expected_order), str(actual_order)])
+
+	# choice_group 規約
+	for b in loader.beats:
+		var bid: String = str(b.get("id", "?"))
+		var is_fixed: bool = b.get("fixed", false) == true
+		var groups_defaults := {}
+
+		for s in b.get("slots", []) as Array:
+			if not (s is Dictionary):
+				continue
+			var sd := s as Dictionary
+			var sid := str(sd.get("id", "?"))
+			var cg := str(sd.get("choice_group", ""))
+			var has_default: bool = sd.get("default_if_unresolved", false) == true
+			var req_card: Variant = sd.get("choice_requires_card")
+
+			if has_default:
+				if cg.is_empty():
+					problems.append("%s [%s]：default_if_unresolved 只能用於 choice_group 槽" % [bid, sid])
+				else:
+					groups_defaults[cg] = groups_defaults.get(cg, 0) + 1
+				if not is_fixed:
+					problems.append("%s [%s]：default_if_unresolved 所在父 beat 必須為 fixed:true" % [bid, sid])
+				var accepts: Variant = sd.get("accepts", [])
+				if accepts is Array and not (accepts as Array).is_empty():
+					problems.append("%s [%s]：default 槽不得收卡（accepts 必須為空）" % [bid, sid])
+				if req_card == true:
+					problems.append("%s [%s]：default 槽不得同時設 choice_requires_card:true" % [bid, sid])
+
+			if req_card != null:
+				if not (req_card is bool):
+					problems.append("%s [%s]：choice_requires_card 必須為 boolean" % [bid, sid])
+				elif req_card == true:
+					if cg.is_empty():
+						problems.append("%s [%s]：choice_requires_card 只能用於 choice_group 槽" % [bid, sid])
+					var accepts: Variant = sd.get("accepts", [])
+					if not (accepts is Array) or (accepts as Array).is_empty():
+						problems.append("%s [%s]：choice_requires_card:true 必須有非空 accepts" % [bid, sid])
+
+		for cg_name in groups_defaults:
+			if groups_defaults[cg_name] > 1:
+				problems.append("%s：choice_group '%s' 包含多個 default_if_unresolved 槽（%d 個）" % [bid, cg_name, groups_defaults[cg_name]])
+
+	return problems
+
+
+## lint 19：跨輪與慶典代付完整性（規格書第十七節 lint 19）。
+## 驗證卡片 loop_persistent、手牌容量、permanent lose 指向、NPC festival_proxy_eligible 與 D31/D39/fragment/fallback 覆蓋。
+static func lint_loop_and_festival(loader: DataLoader) -> PackedStringArray:
+	var problems: PackedStringArray = []
+
+	# Cards loop_persistent check
+	var persistent_cards := []
+	var total_persistent_slots := 0
+	for cid in loader.cards:
+		var card: Dictionary = loader.cards[cid] as Dictionary
+		if not card.has("loop_persistent"):
+			problems.append("卡片 %s：缺少必填欄位 loop_persistent" % cid)
+		elif not (card["loop_persistent"] is bool):
+			problems.append("卡片 %s：loop_persistent 必須是 boolean" % cid)
+		elif card["loop_persistent"] == true:
+			persistent_cards.append(cid)
+			var ctype := str(card.get("type", ""))
+			if card.get("slotless", false) == true or ctype == "protagonist" or ctype == "madness":
+				problems.append("卡片 %s：loop_persistent:true 只能用於 slotless:false、非 protagonist、非 madness 的卡" % cid)
+			total_persistent_slots += 1
+
+	var hand_size: int = int(loader.tuning.get("hand_size", 6))
+	if total_persistent_slots + 1 > hand_size:
+		problems.append("跨輪保留卡片佔格上限超載（%d + 1 > hand_size %d）" % [total_persistent_slots, hand_size])
+
+	# Lose effect permanent check in all beats
+	for b in loader.beats:
+		var bid: String = str(b.get("id", "?"))
+		_check_permanent_lose(b.get("on_enter"), bid, "beat.on_enter", loader, problems)
+		for s in b.get("slots", []):
+			var where := "slot:" + str(s.get("id", "?"))
+			_check_permanent_lose(s.get("on_place"), bid, where + ".on_place", loader, problems)
+
+	# NPC festival_proxy_eligible check
+	var eligible_npcs := []
+	for nid in loader.npcs:
+		var n: Dictionary = loader.npcs[nid] as Dictionary
+		if not n.has("festival_proxy_eligible"):
+			problems.append("NPC %s：缺少必填欄位 festival_proxy_eligible" % nid)
+		elif not (n["festival_proxy_eligible"] is bool):
+			problems.append("NPC %s：festival_proxy_eligible 必須是 boolean" % nid)
+		elif n["festival_proxy_eligible"] == true:
+			eligible_npcs.append(nid)
+
+	# Check each eligible NPC requirements
+	for enpc in eligible_npcs:
+		# 1. attention_npc reverse ref
+		var has_attention := false
+		for b in loader.beats:
+			for s in b.get("slots", []):
+				if str(s.get("attention_npc", "")) == enpc:
+					has_attention = true
+					break
+			if has_attention:
+				break
+		if not has_attention:
+			problems.append("NPC %s (festival_proxy_eligible:true)：未被任何 slot 的 attention_npc 引用" % enpc)
+
+		# 2. endings fragment coverage
+		var end_rep: Variant = loader.endings_by_id.get("ending_replaced")
+		var has_frag_entry := false
+		if end_rep is Dictionary:
+			var lfrags: Variant = (end_rep as Dictionary).get("lookup_fragments", [])
+			if lfrags is Array:
+				for lf in lfrags as Array:
+					if lf is Dictionary and (lf as Dictionary).get("id") == "uninvited_proxy":
+						for entry in (lf as Dictionary).get("entries", []):
+							if entry is Dictionary and str((entry as Dictionary).get("value", "")) == enpc:
+								has_frag_entry = true
+								break
+		if not has_frag_entry:
+			problems.append("NPC %s (festival_proxy_eligible:true)：在 endings.json 的 uninvited_proxy 缺少對應 fragment" % enpc)
+
+		# 3. D31 beat with festival_proxy_is
+		var d31_found := false
+		for b in loader.beats:
+			var w: Variant = b.get("when")
+			if w is Dictionary and int((w as Dictionary).get("day", 0)) == 31:
+				if _cond_matches_proxy_is(b.get("condition"), enpc):
+					d31_found = true
+					break
+		if not d31_found:
+			problems.append("NPC %s (festival_proxy_eligible:true)：缺少第 31 天 festival_proxy_is 內容" % enpc)
+
+		# 4. D39 beat with festival_proxy_is
+		var d39_found := false
+		for b in loader.beats:
+			var w: Variant = b.get("when")
+			if w is Dictionary and int((w as Dictionary).get("day", 0)) == 39:
+				if _cond_matches_proxy_is(b.get("condition"), enpc):
+					d39_found = true
+					break
+		if not d39_found:
+			problems.append("NPC %s (festival_proxy_eligible:true)：缺少第 39 天 festival_proxy_is 內容" % enpc)
+
+	# D29 fallback check
+	var d29_beat: Variant = loader.beats_by_id.get("d29_pm_invitation")
+	if d29_beat is Dictionary:
+		for s in (d29_beat as Dictionary).get("slots", []):
+			if s.get("default_if_unresolved") == true:
+				var on_pl: Variant = s.get("on_place")
+				if on_pl is Dictionary and (on_pl as Dictionary).has("festival_proxy"):
+					var fp: Variant = (on_pl as Dictionary).get("festival_proxy")
+					if fp is Dictionary:
+						var fb := str((fp as Dictionary).get("fallback", ""))
+						if not eligible_npcs.has(fb):
+							problems.append("D29 default 槽的 festival_proxy fallback '%s' 不是合法候選 NPC" % fb)
+
+	return problems
+
+
+static func _check_permanent_lose(node: Variant, bid: String, where: String, loader: DataLoader, problems: PackedStringArray) -> void:
+	if not (node is Dictionary):
+		return
+	var d := node as Dictionary
+	for entry: Variant in d.get("lose", []) as Array:
+		if entry is Dictionary:
+			var ed := entry as Dictionary
+			if ed.get("permanent", false) == true:
+				var cid := str(ed.get("card", ""))
+				if not loader.cards.has(cid) or (loader.cards[cid] as Dictionary).get("loop_persistent", false) != true:
+					problems.append("%s [%s]：lose 的 permanent:true 指向非 loop_persistent 卡 → %s" % [bid, where, cid])
+
+
+static func _cond_matches_proxy_is(cond: Variant, npc_id: String) -> bool:
+	if not (cond is Dictionary):
+		return false
+	var d := cond as Dictionary
+	if d.has("festival_proxy_is") and str(d["festival_proxy_is"]) == npc_id:
+		return true
+	if d.has("all"):
+		for sub in d["all"] as Array:
+			if _cond_matches_proxy_is(sub, npc_id):
+				return true
+	if d.has("any"):
+		for sub in d["any"] as Array:
+			if _cond_matches_proxy_is(sub, npc_id):
+				return true
+	return false

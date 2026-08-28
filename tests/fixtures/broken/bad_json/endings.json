@@ -1,0 +1,375 @@
+[
+  {
+    "id": "ending_replaced",
+    "kind": "composite",
+    "first_seen": {
+      "prefix_pages": [
+        {
+          "id": "replacement",
+          "text": "蒸氣散去。水裡的那個人轉過頭來——那是你，也不是你。你被留在了這裡，而另一個你穿上外套，走出了山泉閣。"
+        }
+      ],
+      "suffix_pages": [
+        {
+          "id": "years_passed",
+          "text": "二十年。日子就這樣一天天過去，錢不再是問題。"
+        },
+        {
+          "id": "long_return",
+          "text": "四十出頭。癌症，走得很快。然後是黑。\n庇佑再次發動。你猛然睜開眼睛——"
+        }
+      ]
+    },
+    "repeat": {
+      "prefix_pages": [
+        {
+          "id": "again_replaced",
+          "text": "替換再次發生。另一個你走出了山泉閣，過完了那段被安排好的人生。"
+        }
+      ],
+      "suffix_pages": [
+        {
+          "id": "short_return",
+          "text": "生命走到終點。庇佑將你再次送回起點。"
+        }
+      ],
+      "skip_to": "short_return"
+    },
+    "variant_groups": [
+      {
+        "id": "partner",
+        "history_field": "partner_variant",
+        "rules": [
+          {
+            "id": "ajie",
+            "when": {
+              "flag": "invited_ajie"
+            },
+            "first_seen_pages": [
+              {
+                "id": "partner_ajie_long",
+                "text": "他跟阿婕結婚了。他們沒有小孩。\n她先走，也是四十出頭，癌症走得很快。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "partner_ajie_short",
+                "text": "他與阿婕成婚，膝下無子。多年後她先一步離世。"
+              }
+            ]
+          },
+          {
+            "id": "awei",
+            "when": {
+              "flag": "invited_awei"
+            },
+            "first_seen_pages": [
+              {
+                "id": "partner_awei_long",
+                "text": "他跟阿薇結婚了。他們沒有小孩。\n她先走，也是四十出頭，癌症走得很快。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "partner_awei_short",
+                "text": "他與阿薇成婚，膝下無子。多年後她先一步離世。"
+              }
+            ]
+          },
+          {
+            "id": "none",
+            "fallback": true,
+            "first_seen_pages": [
+              {
+                "id": "partner_none_long",
+                "text": "他沒有結婚，一個人過完剩下的日子。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "partner_none_short",
+                "text": "他獨身一人過完餘生。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "livelihood",
+        "history_field": "livelihood_variant",
+        "rules": [
+          {
+            "id": "uncle",
+            "when": {
+              "flag": "accepted_inn"
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_uncle_long",
+                "text": "他接下了山泉閣。他留下來了，慢慢變成了叔叔當年的樣子。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_uncle_short",
+                "text": "他接掌山泉閣，成為下一任經營者。"
+              }
+            ]
+          },
+          {
+            "id": "boss",
+            "when": {
+              "flag": "accepted_outside_job"
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_boss_long",
+                "text": "他回到了外地熟悉的工作。他下山了，但每年還是會回來一次。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_boss_short",
+                "text": "他回外地工作，每年仍回鎮上一趟。"
+              }
+            ]
+          },
+          {
+            "id": "zhou",
+            "when": {
+              "flag": "accepted_job"
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_zhou_long",
+                "text": "他去了周先生介紹的公司。他下山了，但每年還是會回來一次。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_zhou_short",
+                "text": "他任職於周先生安排的職位，每年仍定期返鄉。"
+              }
+            ]
+          },
+          {
+            "id": "none",
+            "fallback": true,
+            "first_seen_pages": [
+              {
+                "id": "livelihood_none_long",
+                "text": "他哪裡都沒答應去，只是守著老屋，日子一天天過去。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_none_short",
+                "text": "他未作任何承諾，留在鎮上度過歲月。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "inn_appearance",
+        "history_field": "inn_appearance_variant",
+        "rules": [
+          {
+            "id": "sign",
+            "when": {
+              "flag": "repaired_sign"
+            },
+            "first_seen_pages": [
+              {
+                "id": "inn_sign_long",
+                "text": "門口的招牌修得筆挺。湯屋只開一半，二樓的窗一直空著。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "inn_sign_short",
+                "text": "山泉閣招牌完好，湯屋與二樓維持舊貌。"
+              }
+            ]
+          },
+          {
+            "id": "pipes",
+            "when": {
+              "flag": "repaired_pipes"
+            },
+            "first_seen_pages": [
+              {
+                "id": "inn_pipes_long",
+                "text": "湯屋的熱水蒸氣依舊充足。招牌一直歪著，二樓的窗空著。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "inn_pipes_short",
+                "text": "湯屋管線修復運作，其餘部分未加修繕。"
+              }
+            ]
+          },
+          {
+            "id": "windows",
+            "when": {
+              "flag": "repaired_windows"
+            },
+            "first_seen_pages": [
+              {
+                "id": "inn_windows_long",
+                "text": "二樓的房間窗明几淨。招牌一直歪著，湯屋只開了一半。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "inn_windows_short",
+                "text": "二樓客房修復開放，招牌與湯屋保留殘損。"
+              }
+            ]
+          },
+          {
+            "id": "none",
+            "fallback": true,
+            "first_seen_pages": [
+              {
+                "id": "inn_none_long",
+                "text": "旅館保留著當年的模樣，時間在上面留下了痕跡。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "inn_none_short",
+                "text": "旅館維持風災後的樣貌未變。"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "lookup_fragments": [
+      {
+        "id": "uninvited_proxy",
+        "when_group": {
+          "group": "partner",
+          "variant": "none"
+        },
+        "source_field": "festival_proxy_npc",
+        "entries": [
+          {
+            "value": "ajie",
+            "first_seen_pages": [
+              {
+                "id": "proxy_ajie_long",
+                "text": "很多年後的一張照片裡，阿婕也在鎮上。只是那時她也早就不咬指甲了。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "proxy_ajie_short",
+                "text": "多年後的照片中，阿婕亦在鎮上留有身影。"
+              }
+            ]
+          },
+          {
+            "value": "awei",
+            "first_seen_pages": [
+              {
+                "id": "proxy_awei_long",
+                "text": "很多年後的一張照片裡，阿薇也在靜和園。只是笑起來時不再用手遮嘴。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "proxy_awei_short",
+                "text": "多年後的照片中，阿薇亦在靜和園如常生活。"
+              }
+            ]
+          },
+          {
+            "value": "acai",
+            "first_seen_pages": [
+              {
+                "id": "proxy_acai_long",
+                "text": "很多年後在街角遇見阿財，他走路已經完全不跛了，笑著向你打招呼。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "proxy_acai_short",
+                "text": "多年後的街頭，阿財步履健全地打著招呼。"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ending_madness_be",
+    "kind": "linear",
+    "first_seen": {
+      "pages": [
+        {
+          "id": "madness_lost",
+          "text": "眼前的景象開始扭曲、重疊。你看到太多不該看見的東西——鎮子沉入水底，水底浮現城鎮。\n\n你已經無法再思考，也無法再維持自己的形狀。"
+        }
+      ]
+    },
+    "repeat": {
+      "pages": [
+        {
+          "id": "madness_summary",
+          "text": "發狂吞噬了神智。你在混沌之中倒下，等待下一次甦醒。"
+        }
+      ],
+      "skip_to": "complete"
+    }
+  },
+  {
+    "id": "ending_inventory_be",
+    "kind": "linear",
+    "first_seen": {
+      "pages": [
+        {
+          "id": "inventory_confined",
+          "text": "診所的門在身後關上。\n陳醫師微笑著說：「別擔心，只是常規療養。你很快就會好起來。」\n\n你看著窗外的鐵欄杆。你被送進了庫存，再也沒有出來。"
+        }
+      ]
+    },
+    "repeat": {
+      "pages": [
+        {
+          "id": "inventory_summary",
+          "text": "被送入診所療養。調查在此中斷，進入漫長的沉睡。"
+        }
+      ],
+      "skip_to": "complete"
+    }
+  },
+  {
+    "id": "ending_refuse_boarding",
+    "kind": "linear",
+    "first_seen": {
+      "pages": [
+        {
+          "id": "refuse_outside_life",
+          "text": "你放下了行李，退掉了車票。\n你留在了外面的城市，找了一份平凡的工作，過著再普通不過的生活。"
+        },
+        {
+          "id": "refuse_early_death",
+          "text": "四十出頭。同一個病，癌症來得很急。\n躺在病床上閉上眼睛的那一刻，庇佑再次發動。"
+        }
+      ]
+    },
+    "repeat": {
+      "pages": [
+        {
+          "id": "refuse_summary",
+          "text": "你選擇不上車，在外地度過平凡的一生，直至四十出頭再次回到起點。"
+        }
+      ],
+      "skip_to": "complete"
+    }
+  }
+]

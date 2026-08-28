@@ -1,24 +1,37 @@
 {
   "_comment": "第三章第 39-45 天（他自己）。欄位說明見 data/SCHEMA.md。文字為佔位，取自 subdocs/故事線/故事線_第一輪_第三章.md，未經潤稿。第 45 天之後的結局演出（第六節）不在 beat 層，另行處理。",
-
   "beats": [
     {
       "id": "d39_morning_return",
       "location": "sanquan",
-      "when": { "day": 39, "phase": "morning" },
+      "when": {
+        "day": 39,
+        "phase": "morning"
+      },
       "fixed": true,
-      "condition": { "flag": "she_returns_tomorrow" },
+      "condition": {
+        "flag": "she_returns_tomorrow"
+      },
       "title": "她回來了",
       "text": "她回來上工，精神非常好。\n\n「休息一下差很多。」\n「氣色很好啊。」\n「年輕人恢復得快。」\n\n然後你看見：習慣還在，痕跡沒了。\n阿婕線：她還是咬指甲。指甲卻完整、圓，沒有一處被啃過。而前台那支筆上還有齒痕。\n阿薇線：她笑的時候還是用手遮嘴。那顆缺一角的門牙卻已經完整。",
       "slots": [],
-      "on_enter": { "flag": { "she_returned": true } },
+      "on_enter": {
+        "flag": {
+          "she_returned": true
+        }
+      },
       "note": "不邀路徑沒有這場固定演出，只由某個 NPC 隨口提到本輪投入最多的那個人「感冒好了，氣色真好」——然後就沒有了，真相在結局演出才揭曉"
     },
     {
       "id": "d39_pm_readings",
       "location": "sanquan",
-      "when": { "day": 39, "phase": "afternoon" },
-      "condition": { "flag": "she_returned" },
+      "when": {
+        "day": 39,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "she_returned"
+      },
       "title": "三個入口",
       "text": "你說不出哪裡怪。",
       "slots": [
@@ -26,17 +39,28 @@
           "id": "subjective",
           "occupant": null,
           "label": "跟她待著",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "requires": {
             "any": [
-              { "flag": "went_out_with_her" },
-              { "relation_at_least": { "npc": "awei", "state": "恩人" } }
+              {
+                "flag": "went_out_with_her"
+              },
+              {
+                "relation_at_least": {
+                  "npc": "awei",
+                  "state": "恩人"
+                }
+              }
             ]
           },
           "reject_reason": "（你們還沒有熟到你敢一直看著她。）",
           "on_place": {
             "text": "一整個下午。她跟平常一樣，全部都跟平常一樣。\n就是有一點不對，而你講不出來是哪裡。",
-            "gain": ["info_something_off"]
+            "gain": [
+              "info_something_off"
+            ]
           },
           "note": "主觀路線"
         },
@@ -44,10 +68,16 @@
           "id": "objective",
           "occupant": null,
           "label": "把照片拿出來比",
-          "accepts": ["item_festival_photo", "item_gradphoto", "equip_polaroid"],
+          "accepts": [
+            "item_festival_photo",
+            "item_gradphoto",
+            "equip_polaroid"
+          ],
           "on_place": {
             "text": "照片裡的手、照片裡的那個笑。你把它擺在她旁邊。\n舊痕跡跟現在對不上。",
-            "gain": ["info_something_off"]
+            "gain": [
+              "info_something_off"
+            ]
           },
           "note": "客觀路線。跟第一章阿婕拍的工作照是同一套比對動作"
         },
@@ -55,29 +85,41 @@
           "id": "pattern",
           "occupant": null,
           "label": "去找阿財",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "requires": {
             "any": [
-              { "has_card": "info_acai_scars_gone" },
-              { "has_card": "info_acai_walk" }
+              {
+                "has_card": "info_acai_scars_gone"
+              },
+              {
+                "has_card": "info_acai_walk"
+              }
             ]
           },
           "reject_reason": "（你沒有真的看過阿財哪裡變了。）",
           "on_place": {
             "text": "「你之前去做那個兩天的工作之後，身體也有一些地方變了。」\n「工作？喔，那個臨時工喔。」他說。「就搬東西啊，超累，但錢不錯。」\n你問膝蓋，他說可能那陣子剛好休息到了。你問疤，他說：「有嗎？你記那麼細幹嘛。」",
-            "gain": ["info_something_off"]
+            "gain": [
+              "info_something_off"
+            ]
           },
           "note": "模式路線。不以離開天數作比較——兩個案例才是模式"
         }
       ],
       "note": "三個入口產出同一張卡，差別留到第 43 天推論材料的寬度。\n主角同時會替自己留一個合理出口：阿薇線「我們真正熟起來，其實也才這一個月」／阿婕線「我們中間也有好多年沒有天天見面」。\n第一輪到這裡只能確認「這種物理異常不只一次」，不能得到身份知識"
     },
-
     {
       "id": "d40_tell_someone",
       "location": "sanquan",
-      "when": { "day": 40, "phase": "morning" },
-      "condition": { "has_card": "info_something_off" },
+      "when": {
+        "day": 40,
+        "phase": "morning"
+      },
+      "condition": {
+        "has_card": "info_something_off"
+      },
       "title": "也許是你記錯了",
       "text": "你不是要去告訴大家「她不是她」。你只是想說：\n\n「她回來以後，有些地方跟我記得的不太一樣。」",
       "slots": [
@@ -88,8 +130,13 @@
           "choice_group": "d40_tell",
           "on_place": {
             "text": "她愣一下再笑：「你是不是記錯了？我就感冒好了啊。」\n她開始躲你——因為這句話很傷人，不是因為被拆穿。",
-            "relation": { "npc": "awei", "delta": -1 },
-            "flag": { "told_her": true }
+            "relation": {
+              "npc": "awei",
+              "delta": -1
+            },
+            "flag": {
+              "told_her": true
+            }
           }
         },
         {
@@ -99,7 +146,9 @@
           "choice_group": "d40_tell",
           "on_place": {
             "text": "阿薇線：「你們不是最近才真的熟起來嗎？」\n阿婕線：「你們也好多年沒天天在一起了吧。」\n然後他問：「你最近是不是太累了？」",
-            "flag": { "told_uncle": true }
+            "flag": {
+              "told_uncle": true
+            }
           }
         },
         {
@@ -109,7 +158,9 @@
           "choice_group": "d40_tell",
           "on_place": {
             "text": "他不說你是對的。他只說：「我以前也有一件事……覺得是自己記錯了。」\n然後停住。",
-            "flag": { "told_longstay": true }
+            "flag": {
+              "told_longstay": true
+            }
           }
         },
         {
@@ -119,7 +170,9 @@
           "choice_group": "d40_tell",
           "on_place": {
             "text": "他沉默很久，只問：「慶典那天，你有沒有鬆手？」",
-            "flag": { "told_jinbo": true }
+            "flag": {
+              "told_jinbo": true
+            }
           }
         },
         {
@@ -129,20 +182,28 @@
           "choice_group": "d40_tell",
           "on_place": {
             "text": "他很認真地聽完，記了下來，還問了兩個問題。",
-            "gain": ["mood_watched"],
-            "flag": { "told_laozeng": true }
+            "gain": [
+              "mood_watched"
+            ],
+            "flag": {
+              "told_laozeng": true
+            }
           },
           "note": "⚠️ 曝光陷阱。第一次曝光取得「被盯上」；先前已曝光則翻成「療養通知」，下一個固定時段進 BE。翻面那條 schema 還沒有寫法——mood_watched 的 note 也標了同一件事"
         }
       ],
       "note": "老曾聽到的是「有些地方對不上，而且阿財也發生過」，不是一套已完成的替換指控；只要執行層覺得主角在把案例串起來，就已足以構成曝光。\n每個人的解釋都合理到連主角自己也開始相信——「也許真的是我記錯了。」\n後續輪次持有「我媽媽也說過同樣的話」時，選項最下方多一行不能點的獨白：（二十年前她講給同樣這幾個人聽。）它不新增互動，只把這一格從受挫橋段翻成主題句"
     },
-
     {
       "id": "d40_pm_tell_someone",
       "location": "sanquan",
-      "when": { "day": 40, "phase": "afternoon" },
-      "condition": { "has_card": "info_something_off" },
+      "when": {
+        "day": 40,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "has_card": "info_something_off"
+      },
       "title": "還可以再講給一個人聽",
       "text": "上午那個人的反應你還在想。",
       "slots": [],
@@ -151,8 +212,15 @@
     {
       "id": "d40_pm_fallback",
       "location": "clinic",
-      "when": { "day": 40, "phase": "afternoon" },
-      "condition": { "not": { "has_card": "info_something_off" } },
+      "when": {
+        "day": 40,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "not": {
+          "has_card": "info_something_off"
+        }
+      },
       "title": "沒有什麼要講的",
       "text": "今天跟昨天一樣。",
       "slots": [
@@ -160,10 +228,14 @@
           "id": "uncle",
           "occupant": "npc_uncle",
           "label": "陪叔叔",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "他今天話很少。你坐到探病時間結束。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         }
       ],
@@ -172,8 +244,15 @@
     {
       "id": "d40_pm_inn",
       "location": "sanquan",
-      "when": { "day": 40, "phase": "afternoon" },
-      "condition": { "not": { "has_card": "info_something_off" } },
+      "when": {
+        "day": 40,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "not": {
+          "has_card": "info_something_off"
+        }
+      },
       "title": "顧旅館",
       "text": "帳、房間、明天的料。",
       "slots": [
@@ -181,16 +260,22 @@
           "id": "work",
           "occupant": null,
           "label": "做完今天的",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "你做完了。這一輪剩下五天。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你做完了。這一輪剩下五天。"
+          }
         }
       ]
     },
-
     {
       "id": "d41_morning_clinic",
       "location": "clinic",
-      "when": { "day": 41, "phase": "morning" },
+      "when": {
+        "day": 41,
+        "phase": "morning"
+      },
       "title": "診所",
       "text": "叔叔在等出院的日子。",
       "slots": [
@@ -198,10 +283,14 @@
           "id": "uncle",
           "occupant": "npc_uncle",
           "label": "陪叔叔",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "他問你想好了沒。你講什麼他都說好。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         }
       ]
@@ -209,8 +298,13 @@
     {
       "id": "d41_morning_her",
       "location": "sanquan",
-      "when": { "day": 41, "phase": "morning" },
-      "condition": { "flag": "she_returned" },
+      "when": {
+        "day": 41,
+        "phase": "morning"
+      },
+      "condition": {
+        "flag": "she_returned"
+      },
       "title": "她",
       "text": "她在前台。她今天很好。",
       "slots": [
@@ -218,10 +312,14 @@
           "id": "with_her",
           "occupant": null,
           "label": "跟她待一個上午",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "你一直在看她做那些動作。她做得都對。\n只是你已經開始數了。",
-            "flag": { "watched_her_d41": true }
+            "flag": {
+              "watched_her_d41": true
+            }
           }
         }
       ],
@@ -230,7 +328,10 @@
     {
       "id": "d41_morning_inn",
       "location": "sanquan",
-      "when": { "day": 41, "phase": "morning" },
+      "when": {
+        "day": 41,
+        "phase": "morning"
+      },
       "title": "顧旅館",
       "text": "慶典的帳還沒結完。",
       "slots": [
@@ -238,15 +339,22 @@
           "id": "work",
           "occupant": null,
           "label": "做完今天的",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "數字比你想的好一點。叔叔會高興。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "數字比你想的好一點。叔叔會高興。"
+          }
         }
       ]
     },
     {
       "id": "d41_morning_dig",
       "location": "registry_office",
-      "when": { "day": 41, "phase": "morning" },
+      "when": {
+        "day": 41,
+        "phase": "morning"
+      },
       "title": "查",
       "text": "戶籍室今天有人在。",
       "slots": [
@@ -254,18 +362,26 @@
           "id": "search",
           "occupant": null,
           "label": "再翻一次",
-          "accepts": ["protagonist"],
-          "requires": { "has_card": "info_same_festival" },
+          "accepts": [
+            "protagonist"
+          ],
+          "requires": {
+            "has_card": "info_same_festival"
+          },
           "reject_reason": "（你不知道要對哪幾年。）",
-          "on_place": { "text": "同一場慶典之後那幾格，你這次看得比上次久。名字你都不認得，但格式你認得。" }
+          "on_place": {
+            "text": "同一場慶典之後那幾格，你這次看得比上次久。名字你都不認得，但格式你認得。"
+          }
         }
       ]
     },
-
     {
       "id": "d42_morning_clinic",
       "location": "clinic",
-      "when": { "day": 42, "phase": "morning" },
+      "when": {
+        "day": 42,
+        "phase": "morning"
+      },
       "title": "診所",
       "text": "還有三天他就出院了。",
       "slots": [
@@ -273,10 +389,14 @@
           "id": "uncle",
           "occupant": "npc_uncle",
           "label": "陪叔叔",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "他今天話少。你問他要不要幫忙收東西，他說再等等。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         }
       ]
@@ -284,8 +404,13 @@
     {
       "id": "d42_morning_her",
       "location": "sanquan",
-      "when": { "day": 42, "phase": "morning" },
-      "condition": { "flag": "she_returned" },
+      "when": {
+        "day": 42,
+        "phase": "morning"
+      },
+      "condition": {
+        "flag": "she_returned"
+      },
       "title": "她",
       "text": "她在前台。她今天心情好。",
       "slots": [
@@ -293,8 +418,12 @@
           "id": "with_her",
           "occupant": null,
           "label": "跟她待一個上午",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "你陪了她一個上午。你什麼都沒問，她也什麼都沒說。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你陪了她一個上午。你什麼都沒問，她也什麼都沒說。"
+          }
         }
       ],
       "note": "承第 41 天那一格：玩家不是在陪她，是在檢查她。這一格同樣不給卡"
@@ -302,7 +431,10 @@
     {
       "id": "d42_morning_inn",
       "location": "sanquan",
-      "when": { "day": 42, "phase": "morning" },
+      "when": {
+        "day": 42,
+        "phase": "morning"
+      },
       "title": "顧旅館",
       "text": "叔叔大後天回來。",
       "slots": [
@@ -310,15 +442,22 @@
           "id": "work",
           "occupant": null,
           "label": "做完今天的",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "阿財把重的都先搬完了。你到的時候只剩輕的。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "阿財把重的都先搬完了。你到的時候只剩輕的。"
+          }
         }
       ]
     },
     {
       "id": "d42_morning_dig",
       "location": "registry_office",
-      "when": { "day": 42, "phase": "morning" },
+      "when": {
+        "day": 42,
+        "phase": "morning"
+      },
       "title": "查",
       "text": "戶籍室。你想看的是自己家那幾年。",
       "slots": [
@@ -326,17 +465,23 @@
           "id": "search",
           "occupant": null,
           "label": "翻自己家那幾年",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "你爸媽的資料就在那裡，跟你記得的一樣。\n沒有一個欄位寫他們本來要去哪裡。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你爸媽的資料就在那裡，跟你記得的一樣。\n沒有一個欄位寫他們本來要去哪裡。"
+          }
         }
       ],
       "note": "不給卡，也不設門檻。這一格的作用是把玩家的注意力放到父母身上，讓當天下午那間房的抽屜有落點；真正的東西在下午"
     },
-
     {
       "id": "d43_morning_clinic",
       "location": "clinic",
-      "when": { "day": 43, "phase": "morning" },
+      "when": {
+        "day": 43,
+        "phase": "morning"
+      },
       "title": "診所",
       "text": "再兩天他就出院了。",
       "slots": [
@@ -344,10 +489,14 @@
           "id": "uncle",
           "occupant": "npc_uncle",
           "label": "陪叔叔",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "他在收東西。他說回去要先把湯屋那邊看一遍。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         }
       ]
@@ -355,8 +504,13 @@
     {
       "id": "d43_morning_her",
       "location": "sanquan",
-      "when": { "day": 43, "phase": "morning" },
-      "condition": { "flag": "she_returned" },
+      "when": {
+        "day": 43,
+        "phase": "morning"
+      },
+      "condition": {
+        "flag": "she_returned"
+      },
       "title": "她",
       "text": "她在。她一直都在。",
       "slots": [
@@ -364,15 +518,22 @@
           "id": "with_her",
           "occupant": null,
           "label": "跟她待一個上午",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "你們沒有講第 40 天那件事。兩個人都沒有提。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你們沒有講第 40 天那件事。兩個人都沒有提。"
+          }
         }
       ]
     },
     {
       "id": "d43_morning_inn",
       "location": "sanquan",
-      "when": { "day": 43, "phase": "morning" },
+      "when": {
+        "day": 43,
+        "phase": "morning"
+      },
       "title": "顧旅館",
       "text": "叔叔後天回來。",
       "slots": [
@@ -380,15 +541,22 @@
           "id": "work",
           "occupant": null,
           "label": "把店整理好",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "你把每一個角落都弄乾淨了。你想讓他回來的時候看到。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你把每一個角落都弄乾淨了。你想讓他回來的時候看到。"
+          }
         }
       ]
     },
     {
       "id": "d43_morning_dig",
       "location": "columbarium",
-      "when": { "day": 43, "phase": "morning" },
+      "when": {
+        "day": 43,
+        "phase": "morning"
+      },
       "title": "查",
       "text": "納骨塔。你第 9 天來過。",
       "slots": [
@@ -396,36 +564,55 @@
           "id": "recount",
           "occupant": null,
           "label": "再算一次生卒年",
-          "accepts": ["protagonist"],
-          "requires": { "has_knowledge": "k_forty_something" },
+          "accepts": [
+            "protagonist"
+          ],
+          "requires": {
+            "has_knowledge": "k_forty_something"
+          },
           "reject_reason": "（你沒有抄過那些名字。）",
-          "on_place": { "text": "還是那個區間。只是這一次你知道要拿它跟什麼比。" }
+          "on_place": {
+            "text": "還是那個區間。只是這一次你知道要拿它跟什麼比。"
+          }
         }
       ],
       "note": "不給新卡。第 43 天下午玩家要自己下結論，上午這一格的作用是讓他把手上的東西再看一遍"
     },
-
     {
       "id": "d41_pm_longstay",
       "location": "sanquan",
-      "when": { "day": 41, "phase": "afternoon" },
+      "when": {
+        "day": 41,
+        "phase": "afternoon"
+      },
       "fixed": true,
       "title": "長住的客人",
       "text": "他終於把太太的事講完。\n\n「她回來的那次，她左手的燙疤沒了。」\n「她說是我記錯了。」\n「可是她什麼都記得。連只有我們兩個知道的綽號，她都記得。」\n「我們後來又過了二十年。」\n「所以到最後……連我自己都覺得，大概真的是我記錯了。」",
       "slots": [
-        { "id": "longstay", "occupant": "npc_longstay", "label": "許先生", "accepts": [] }
+        {
+          "id": "longstay",
+          "occupant": "npc_longstay",
+          "label": "許先生",
+          "accepts": []
+        }
       ],
       "on_enter": {
-        "gain": ["k_twenty_years_ago"],
-        "flag": { "longstay_named": true }
+        "gain": [
+          "k_twenty_years_ago"
+        ],
+        "flag": {
+          "longstay_named": true
+        }
       },
       "note": "名字在這一格才出現。在此之前 UI 一直叫他「長住的客人」——主角幫他辦過五次續住，卻從沒記住他姓什麼。他變成一個人的時刻，就是他說出為什麼在這裡的時刻。第 11 天登記時猶豫，是因為他差點寫太太的姓。這跟夜間地點取得知識後改名是同一套語法。\n他是情報來源不是夥伴：不進桌面、不是人物卡、不佔格、不能託付。全輪接觸點只有第 11、12、14、26、41、44 天"
     },
-
     {
       "id": "d42_pm_inn",
       "location": "sanquan",
-      "when": { "day": 42, "phase": "afternoon" },
+      "when": {
+        "day": 42,
+        "phase": "afternoon"
+      },
       "title": "顧旅館",
       "text": "叔叔不在，店還是要開。",
       "slots": [
@@ -433,8 +620,12 @@
           "id": "work",
           "occupant": null,
           "label": "做完今天的",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "帳結完，房間也整理好了。你今天沒有去別的地方。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "帳結完，房間也整理好了。你今天沒有去別的地方。"
+          }
         }
       ],
       "note": "刻意無關痛癢：不給卡、不寫旗標、不推開關。它存在的唯一理由是讓沒有鑰匙的玩家也有地方放主角卡——同時當那間房的機會成本，選了它就等於今天沒去開門"
@@ -442,7 +633,10 @@
     {
       "id": "d42_pm_room",
       "location": "oldhouse_room",
-      "when": { "day": 42, "phase": "afternoon" },
+      "when": {
+        "day": 42,
+        "phase": "afternoon"
+      },
       "title": "那間房",
       "text": "鑰匙轉得動。門後是收拾到一半的行李：紙箱、疊好的衣服、拆下的相框，二十年沒動過。\n你不記得他們要搬家。你當時七八歲。",
       "slots": [
@@ -450,28 +644,46 @@
           "id": "search",
           "occupant": null,
           "label": "進去",
-          "accepts": ["protagonist"],
-          "requires": { "has_card": "item_room_key" },
+          "accepts": [
+            "protagonist"
+          ],
+          "requires": {
+            "has_card": "item_room_key"
+          },
           "reject_reason": "（門鎖著。）",
           "on_place": {
             "text": "抽屜裡有摺起來、蓋著廟印的紙。你看不懂是什麼。",
-            "gain": ["item_old_paper", "info_parents_leaving"],
-            "flag": { "opened_the_room": true }
+            "gain": [
+              "item_old_paper",
+              "info_parents_leaving"
+            ],
+            "flag": {
+              "opened_the_room": true
+            }
           }
         }
       ],
       "echo": {
         "day": 43,
         "text": "叔叔在診所提到那間房該整理了。他講完自己頓了一下。",
-        "condition": { "not": { "flag": "opened_the_room" } }
+        "condition": {
+          "not": {
+            "flag": "opened_the_room"
+          }
+        }
       },
       "note": "契書在行李裡，是因為父母知道那份要帶走；只是主角還沒到十六歲，還不能還願。他們打算走，但沒打算解約。\n第一輪不能燒契書——燒它需要「你還在契約裡」的知識，那要等主角死過一次"
     },
     {
       "id": "d43_morning_ask_paper",
       "location": "temple",
-      "when": { "day": 43, "phase": "morning" },
-      "condition": { "has_card": "item_old_paper" },
+      "when": {
+        "day": 43,
+        "phase": "morning"
+      },
+      "condition": {
+        "has_card": "item_old_paper"
+      },
       "title": "拿那張紙去問",
       "text": "蓋著廟印，總有人看得懂。",
       "slots": [
@@ -479,63 +691,126 @@
           "id": "jinbo",
           "occupant": "npc_jinbo",
           "label": "問金伯",
-          "accepts": ["item_old_paper"],
+          "accepts": [
+            "item_old_paper"
+          ],
           "on_place": {
             "text": "他解釋拜契：一份燒化、一份家長保管。\n然後他說：「你十六歲那年應該辦過了才對。」",
-            "flag": { "asked_jinbo_paper": true }
+            "flag": {
+              "asked_jinbo_paper": true
+            }
           }
         },
         {
           "id": "uncle",
           "occupant": "npc_uncle",
           "label": "問叔叔",
-          "accepts": ["item_old_paper"],
+          "accepts": [
+            "item_old_paper"
+          ],
           "on_place": {
             "text": "他不否認。「嗯……你爸媽那陣子是有在講。」\n然後他就不說了。",
-            "flag": { "asked_uncle_paper": true }
+            "flag": {
+              "asked_uncle_paper": true
+            }
           }
         }
       ]
     },
-
     {
       "id": "d43_pm_zhou",
       "location": "riverside",
-      "when": { "day": 43, "phase": "afternoon" },
+      "when": {
+        "day": 43,
+        "phase": "afternoon"
+      },
       "fixed": true,
-      "title": "周先生說他明後天就下山",
-      "text": "「我等的那個位置，有了。」\n\n他問你履歷寄了沒。",
+      "title": "下山的選擇",
+      "text": "外面的路擺在眼前。\n\n周先生說：「我等的那個位置，有了。」他問你履歷寄了沒。\n若開局回過電話，前老闆也在等你最後的回覆。",
       "slots": [
+        {
+          "id": "say_yes_boss",
+          "occupant": null,
+          "label": "答應前老闆的工作",
+          "choice_group": "leaving",
+          "choice_requires_card": true,
+          "accepts": [
+            "protagonist"
+          ],
+          "condition": {
+            "flag": "outside_job_waiting"
+          },
+          "on_place": {
+            "text": "你回覆了前老闆的訊息，答應下山報到。",
+            "flag": {
+              "accepted_outside_job": true
+            }
+          }
+        },
         {
           "id": "say_yes",
           "occupant": null,
-          "label": "答應他",
+          "label": "答應周先生的推薦",
           "choice_group": "leaving",
+          "choice_requires_card": true,
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "「那我幫你講一聲。」他很高興。",
-            "flag": { "accepted_job": true }
+            "flag": {
+              "accepted_job": true
+            }
           }
         }
       ],
-      "on_enter": { "flag": { "zhou_leaving": true } },
-      "note": "離開線最後節點。周先生等了整整兩章的那個位置就是主角——他不知道，只覺得自己終於排到了"
+      "on_enter": {
+        "flag": {
+          "zhou_leaving": true
+        }
+      },
+      "note": "離開線最後節點。兩份工作共用 choice_group leaving，且都需要提交主角卡才成立。"
     },
     {
       "id": "d43_conclusion",
       "location": "sanquan",
-      "when": { "day": 43, "phase": "afternoon" },
+      "when": {
+        "day": 43,
+        "phase": "afternoon"
+      },
       "condition": {
-        "count_at_least": { "n": 3, "of": [
-          { "has_knowledge": "k_forty_something" },
-          { "has_card": "info_acai_scars_gone" },
-          { "has_card": "info_acai_walk" },
-          { "has_card": "info_something_off" },
-          { "has_knowledge": "k_twenty_years_ago" },
-          { "has_card": "info_jinghe_pool" },
-          { "has_card": "info_stories_dont_match" },
-          { "has_card": "info_same_festival" },
-          { "has_card": "info_zhou_waiting" }
-        ] }
+        "count_at_least": {
+          "n": 3,
+          "of": [
+            {
+              "has_knowledge": "k_forty_something"
+            },
+            {
+              "has_card": "info_acai_scars_gone"
+            },
+            {
+              "has_card": "info_acai_walk"
+            },
+            {
+              "has_card": "info_something_off"
+            },
+            {
+              "has_knowledge": "k_twenty_years_ago"
+            },
+            {
+              "has_card": "info_jinghe_pool"
+            },
+            {
+              "has_card": "info_stories_dont_match"
+            },
+            {
+              "has_card": "info_same_festival"
+            },
+            {
+              "has_card": "info_zhou_waiting"
+            }
+          ]
+        }
       },
       "title": "結論",
       "text": "把手上的東西排在一起看。",
@@ -547,7 +822,9 @@
           "choice_group": "theory",
           "on_place": {
             "text": "你把它寫下來。你還沒有辦法證明。",
-            "gain": ["inf_health_disappearance"]
+            "gain": [
+              "inf_health_disappearance"
+            ]
           },
           "note": "方向正確，尚未驗證"
         },
@@ -558,7 +835,9 @@
           "choice_group": "theory",
           "on_place": {
             "text": "你把它寫下來。那棟建築你親眼看過。",
-            "gain": ["inf_jinghe_does_it"]
+            "gain": [
+              "inf_jinghe_does_it"
+            ]
           },
           "note": "方向接近、位置錯。走後棟的玩家較容易推到這裡——具體證據的代價"
         },
@@ -569,19 +848,25 @@
           "choice_group": "theory",
           "on_place": {
             "text": "你把它寫下來。它解釋得了納骨塔。",
-            "gain": ["inf_hotspring_kills"]
+            "gain": [
+              "inf_hotspring_kills"
+            ]
           },
           "note": "因果倒置"
         }
       ],
       "note": "任三張材料成立才出現這一格——這是 count_at_least 的第一個大用戶。\n三個理論互斥（choice_group），而且不選也可以：沒下結論的玩家第 45 天就沒有拒絕的選項。\n這不是通用比對盤：第一輪仍只用從第 8 夜起就在用的普通桌面拖曳，不新增 UI。第二輪取得比對盤後，同一位置才可反覆換組合。\n⚠️ 待決 9：三個理論的正式措辭仍待拍板。兩張錯誤理論也必須足夠有說服力，一眼看得出哪張錯，這一格就失效"
     },
-
     {
       "id": "d44_morning_busstop",
       "location": "busstop",
-      "when": { "day": 44, "phase": "morning" },
-      "condition": { "flag": "zhou_leaving" },
+      "when": {
+        "day": 44,
+        "phase": "morning"
+      },
+      "condition": {
+        "flag": "zhou_leaving"
+      },
       "title": "送周先生下山",
       "text": "他自己走上車。他上山的時候需要別人扶。\n全鎮說法：「周先生療養得很好。」",
       "slots": [
@@ -589,10 +874,15 @@
           "id": "see_off",
           "occupant": "npc_zhou",
           "label": "送他",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "車要開的時候，司機看了你一眼。\n「……你不是坐過了嗎。」\n然後他自己笑了一下：「認錯人了。」",
-            "flag": { "saw_off_zhou": true, "driver_line": true }
+            "flag": {
+              "saw_off_zhou": true,
+              "driver_line": true
+            }
           }
         }
       ],
@@ -601,8 +891,13 @@
     {
       "id": "d44_pm_reconcile",
       "location": "sanquan",
-      "when": { "day": 44, "phase": "afternoon" },
-      "condition": { "flag": "told_her" },
+      "when": {
+        "day": 44,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "told_her"
+      },
       "title": "她來找你",
       "text": "「你那天講的……我想了很久。」\n「我真的不覺得自己哪裡變了。」\n「可是你那個樣子，害我也一直想。」",
       "slots": [
@@ -610,26 +905,42 @@
           "id": "talk",
           "occupant": null,
           "label": "再問一兩件只有你們知道的事",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "她全部答得出來。颱風停電那夜、小時候的事、她阿嬤、你欠債時說過的話、只有你們兩個知道的細節。\n情緒反應也完全是原本的她。\n\n（我們真正熟起來，也才這一個月。）\n（那顆牙……也許她早就補過，只是我把那晚記得太死。）\n（也許真的只是我記錯了。）\n\n你們和好了。",
-            "relation": { "npc": "awei", "delta": 2 },
-            "flag": { "reconciled": true }
+            "relation": {
+              "npc": "awei",
+              "delta": 2
+            },
+            "flag": {
+              "reconciled": true
+            }
           }
         }
       ],
       "echo": {
         "day": 45,
         "text": "有人提到她昨天下午在前台坐了很久。",
-        "condition": { "not": { "flag": "reconciled" } }
+        "condition": {
+          "not": {
+            "flag": "reconciled"
+          }
+        }
       },
       "note": "這一格必須可錯過。\n他的材料只到「身體細節對不上」，眼前的人卻擁有完整記憶、人格、感情與共同經驗——人會相信每天和自己生活的人，而不是一顆牙或一道疤。真相層裡她確實已被替換，但她不知道，對主角的感情也是真的。**第一輪主角選擇相信關係，不是明知對方是假人仍接受。**\n這是第 40 天後唯一的上揚，也把「後來結婚」變得合理——第 41 天長住客的故事已先演過一次"
     },
     {
       "id": "d44_pm_longstay",
       "location": "sanquan",
-      "when": { "day": 44, "phase": "afternoon" },
-      "condition": { "flag": "longstay_named" },
+      "when": {
+        "day": 44,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "longstay_named"
+      },
       "title": "許先生",
       "text": "「我最近睡不太好。明天去診所給人家看一下。」",
       "slots": [
@@ -637,17 +948,23 @@
           "id": "listen",
           "occupant": "npc_longstay",
           "label": "跟他講話",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "他講完就回房間了。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "他講完就回房間了。"
+          }
         }
       ],
       "note": "第一輪不覺得有什麼。第二輪才知道，小鎮對付他的方法跟二十年前對付主角母親、第 40 天對付主角的方法完全相同：陳醫師只要說一句「他狀況不太好」，就沒有人再聽他說話"
     },
-
     {
       "id": "d45_morning_invitation",
       "location": "sanquan",
-      "when": { "day": 45, "phase": "morning" },
+      "when": {
+        "day": 45,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "輪到他",
       "text": "林姐來旅館，說有位客人指名要謝謝他。\n理由無害到你不會拒絕。",
@@ -657,20 +974,31 @@
           "occupant": null,
           "label": "「周先生等到的位置，是我。」",
           "choice_group": "d45",
-          "requires": { "has_card": "inf_health_disappearance" },
+          "requires": {
+            "has_card": "inf_health_disappearance"
+          },
           "reject_reason": "（你想不到理由拒絕。）",
-          "on_place": { "text": "你沒有去。", "flag": { "refused": true } }
+          "on_place": {
+            "text": "你沒有去。",
+            "flag": {
+              "refused": true
+            }
+          }
         },
         {
           "id": "refuse_jinghe",
           "occupant": null,
           "label": "不去靜和園，留在旅館",
           "choice_group": "d45",
-          "requires": { "has_card": "inf_jinghe_does_it" },
+          "requires": {
+            "has_card": "inf_jinghe_does_it"
+          },
           "reject_reason": "（你想不到理由拒絕。）",
           "on_place": {
             "text": "你留在前台。走出前台，是那條走廊。後門也是那條走廊。\n問題不只在那棟建築。",
-            "flag": { "refused": true }
+            "flag": {
+              "refused": true
+            }
           }
         },
         {
@@ -678,23 +1006,36 @@
           "occupant": null,
           "label": "不碰溫泉，直接去公車站",
           "choice_group": "d45",
-          "requires": { "has_card": "inf_hotspring_kills" },
+          "requires": {
+            "has_card": "inf_hotspring_kills"
+          },
           "reject_reason": "（你想不到理由拒絕。）",
           "on_place": {
             "text": "今天沒有車。你走回鎮上，然後你走進了後棟。\n死亡不是單純泡湯的副作用。",
-            "flag": { "refused": true }
+            "flag": {
+              "refused": true
+            }
           }
         }
       ],
-      "on_enter": { "flag": { "final_day": true } },
+      "on_enter": {
+        "flag": {
+          "final_day": true
+        }
+      },
       "note": "第一輪最後一次讓玩家證明自己學到東西。沒完成第 43 天推論的玩家只能正常過去——三個選項全部不顯示或灰掉。\n拒絕不是假選項：它非常清楚地證明問題不在第 45 天的邀請，而在更早以前。颱風四天已示範夜間層可以外溢到白天。\n⚠️ 待決 10：拒絕之後「小鎮關起來」那段長度未定，傾向三到四個畫面就收"
     },
     {
       "id": "d45_encounter",
       "location": "jinghe_back",
-      "when": { "day": 45, "phase": "afternoon" },
+      "when": {
+        "day": 45,
+        "phase": "afternoon"
+      },
       "fixed": true,
-      "condition": { "flag": "final_day" },
+      "condition": {
+        "flag": "final_day"
+      },
       "title": "走廊盡頭",
       "text": "它要一個質性回應。你逃不掉。\n但每一種回答都揭露一個條件。",
       "encounter": {
@@ -709,82 +1050,129 @@
             "responses": [
               {
                 "id": "self",
-                "accepts": ["protagonist"],
+                "accepts": [
+                  "protagonist"
+                ],
                 "consume_card": false,
                 "next_round": null,
-                "on_resolve": { "text": "「這個名字已經登記。」" }
+                "on_resolve": {
+                  "text": "「這個名字已經登記。」"
+                }
               },
               {
                 "id": "her",
-                "accepts": ["npc_ajie", "npc_awei"],
+                "accepts": [
+                  "npc_ajie",
+                  "npc_awei"
+                ],
                 "consume_card": false,
                 "next_round": null,
-                "on_resolve": { "text": "「她已經付過了。」" }
+                "on_resolve": {
+                  "text": "「她已經付過了。」"
+                }
               },
               {
                 "id": "paper",
-                "accepts": ["item_old_paper"],
+                "accepts": [
+                  "item_old_paper"
+                ],
                 "consume_card": false,
                 "next_round": null,
-                "on_resolve": { "text": "「這不是同一本簿子。」" }
+                "on_resolve": {
+                  "text": "「這不是同一本簿子。」"
+                }
               },
               {
                 "id": "zhou",
-                "accepts": ["info_zhou_waiting"],
+                "accepts": [
+                  "info_zhou_waiting"
+                ],
                 "consume_card": false,
                 "next_round": null,
-                "on_resolve": { "text": "「位置已經配對。」" }
+                "on_resolve": {
+                  "text": "「位置已經配對。」"
+                }
               },
               {
                 "id": "uncle",
-                "accepts": ["info_uncle_gap"],
+                "accepts": [
+                  "info_uncle_gap"
+                ],
                 "consume_card": false,
                 "next_round": null,
-                "on_resolve": { "text": "「他是我們做的。」" }
+                "on_resolve": {
+                  "text": "「他是我們做的。」"
+                }
               },
               {
                 "id": "theory_exchange",
-                "accepts": ["inf_health_disappearance"],
+                "accepts": [
+                  "inf_health_disappearance"
+                ],
                 "consume_card": false,
                 "next_round": null,
                 "on_resolve": {
                   "text": "世界用周先生與你的配對回應了它。\n不是「有關」。是「來自」。",
-                  "lose": ["inf_health_disappearance"],
-                  "gain": ["k_health_from_disappearance"]
+                  "lose": [
+                    "inf_health_disappearance"
+                  ],
+                  "gain": [
+                    "k_health_from_disappearance"
+                  ]
                 }
               },
               {
                 "id": "theory_jinghe",
-                "accepts": ["inf_jinghe_does_it"],
+                "accepts": [
+                  "inf_jinghe_does_it"
+                ],
                 "consume_card": false,
                 "next_round": null,
                 "on_resolve": {
                   "text": "「那棟房子只是我們用的地方之一。」\n你寫下的東西在你手上碎掉了。",
-                  "lose": ["inf_jinghe_does_it"],
-                  "gain": ["k_jinghe_not_entrance"]
+                  "lose": [
+                    "inf_jinghe_does_it"
+                  ],
+                  "gain": [
+                    "k_jinghe_not_entrance"
+                  ]
                 }
               },
               {
                 "id": "theory_hotspring",
-                "accepts": ["inf_hotspring_kills"],
+                "accepts": [
+                  "inf_hotspring_kills"
+                ],
                 "consume_card": false,
                 "next_round": null,
                 "on_resolve": {
                   "text": "「泡湯不會殺死任何人。」\n你寫下的東西在你手上碎掉了。",
-                  "lose": ["inf_hotspring_kills"],
-                  "gain": ["k_not_side_effect"]
+                  "lose": [
+                    "inf_hotspring_kills"
+                  ],
+                  "gain": [
+                    "k_not_side_effect"
+                  ]
                 }
               }
             ],
             "fallback": {
               "next_round": null,
-              "on_resolve": { "text": "它沒有回答你打出的東西。" }
+              "on_resolve": {
+                "text": "它沒有回答你打出的東西。"
+              }
             }
           }
         ],
-        "on_victory": { "text": "走廊安靜下來。" },
-        "on_failure": { "text": "走廊沒有盡頭。" },
-        "on_escape": { "text": "（沒有出口。）" }
+        "on_victory": {
+          "text": "走廊安靜下來。"
+        },
+        "on_failure": {
+          "text": "走廊沒有盡頭。"
+        },
+        "on_escape": {
+          "text": "（沒有出口。）"
+        }
       },
       "slots": [],
       "note": "第一輪正規遭遇共兩次：第 8 夜與第 45 天。一 round、不可逃（escape_cost:null）、不可主動丟棄（allow_discard:false）、after_finish:advance_phase。各正式卡路線各一 response（自己名字／她／舊紙／周先生／叔叔／三張推論）。ending_replaced 由 d45_then 的 phase_exit 觸發（P5），不在本遭遇。這裡驗證的是交換因果，不是「她是不是她」"
@@ -792,9 +1180,14 @@
     {
       "id": "d45_then",
       "location": "jinghe_back",
-      "when": { "day": 45, "phase": "evening" },
+      "when": {
+        "day": 45,
+        "phase": "evening"
+      },
       "fixed": true,
-      "condition": { "flag": "final_day" },
+      "condition": {
+        "flag": "final_day"
+      },
       "title": "然後",
       "text": "蒸氣。水裡有人背對著。這次他走得到。\n那個人轉頭——\n\n是他自己。",
       "slots": [
@@ -802,21 +1195,88 @@
           "id": "compare_registry",
           "occupant": null,
           "label": "名冊上你自己那一格",
-          "accepts": ["info_registry"],
+          "accepts": [
+            "info_registry"
+          ],
           "on_place": {
             "text": "第 13 天你翻過那本名冊。你的名字已經在上面，那一格註記「不在」。\n那時你看不懂。\n\n你不是今天才被寫進去的。你回來之前它就在那裡了。",
-            "lose": ["k_not_today"],
-            "gain": ["k_already_on_list"]
+            "lose": [
+              "k_not_today"
+            ],
+            "gain": [
+              "k_already_on_list"
+            ]
           }
         }
       ],
       "on_enter": {
         "gain": [
-          { "card": "k_not_today", "if": { "not": { "has_knowledge": "k_already_on_list" } } }
+          {
+            "card": "k_not_today",
+            "if": {
+              "not": {
+                "has_knowledge": "k_already_on_list"
+              }
+            }
+          }
         ],
-        "flag": { "loop1_end": true }
+        "flag": {
+          "loop1_end": true
+        }
       },
-      "note": "那是第 2 天泡湯留下的備份。第 7 夜他在源頭看過同一畫面，那時醒了；這次沒有醒。\n一定產出「不是今天才輪到我」。拒絕仍被帶走，只證明第 45 天邀請不是起因。\n升級路徑走比對：把第 13 天的 info_registry 拖進來，換成 k_already_on_list。不吃行動格——你人已經在那裡了（SCHEMA「不收主角卡的槽」那條）。這也是 SCHEMA 第三種比對形態（產出升級版並移除舊的）在資料裡的第一個實例。\n那張升級卡直接生成第二輪的第一個目標：我要找出自己是什麼時候被寫進去的。那條路通向契書、廟與十六歲\n然後：結局演出（第三章故事線第六節）→ 出門前的十分鐘\n\n⚠️ on_enter 的發卡帶條件：已經有 k_already_on_list 就不再發 k_not_today。升級是單向的。知識卡跨輪保留而 beats_entered 每輪清空，所以第二輪這一格會再演一次；沒有這個守衛的話，玩家會同時持有升級前與升級後兩張。flag 不受影響——守衛下在單張卡上，不是整個 on_enter"
+      "note": "那是第 2 天泡湯留下的備份。第 7 夜他在源頭看過同一畫面，那時醒了；這次沒有醒。\n一定產出「不是今天才輪到我」。拒絕仍被帶走，只證明第 45 天邀請不是起因。\n升級路徑走比對：把第 13 天的 info_registry 拖進來，換成 k_already_on_list。不吃行動格——你人已經在那裡了（SCHEMA「不收主角卡的槽」那條）。這也是 SCHEMA 第三種比對形態（產出升級版並移除舊的）在資料裡的第一個實例。\n那張升級卡直接生成第二輪的第一個目標：我要找出自己是什麼時候被寫進去的。那條路通向契書、廟與十六歲\n然後：結局演出（第三章故事線第六節）→ 出門前的十分鐘\n\n⚠️ on_enter 的發卡帶條件：已經有 k_already_on_list 就不再發 k_not_today。升級是單向的。知識卡跨輪保留而 beats_entered 每輪清空，所以第二輪這一格會再演一次；沒有這個守衛的話，玩家會同時持有升級前與升級後兩張。flag 不受影響——守衛下在單張卡上，不是整個 on_enter",
+      "phase_exit": {
+        "required_slots": [
+          "compare_registry"
+        ],
+        "ending": "ending_replaced",
+        "source": "d45_coda"
+      }
+    },
+    {
+      "id": "d39_proxy_ajie",
+      "location": "sanquan",
+      "when": {
+        "day": 39,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "festival_proxy_is": "ajie"
+      },
+      "title": "回來的阿婕",
+      "text": "前台的阿婕精神很好地向你打招呼。她依舊習慣咬指甲，但指甲圓潤完整，齒痕全都不見了。",
+      "slots": [],
+      "note": "D29 代付固定為阿婕時的 D39 結構版內容"
+    },
+    {
+      "id": "d39_proxy_awei",
+      "location": "sanquan",
+      "when": {
+        "day": 39,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "festival_proxy_is": "awei"
+      },
+      "title": "回來的阿薇",
+      "text": "阿薇笑著用手遮住嘴。只是那一顆原本缺角的門牙，不知何時已經完好如初。",
+      "slots": [],
+      "note": "D29 代付固定為阿薇時的 D39 結構版內容"
+    },
+    {
+      "id": "d39_proxy_acai",
+      "location": "sanquan",
+      "when": {
+        "day": 39,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "festival_proxy_is": "acai"
+      },
+      "title": "回來的阿財",
+      "text": "阿財扛著重物走過，步履輕快健步如飛。他腿上的舊傷與手上的老繭都不見了。",
+      "slots": [],
+      "note": "D29 代付固定為阿財時的 D39 結構版內容"
     }
   ]
 }

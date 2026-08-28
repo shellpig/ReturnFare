@@ -1,35 +1,58 @@
 {
   "_comment": "第二章第 27-32 天（餘波與慶典）。欄位說明見 data/SCHEMA.md。文字為佔位，取自 subdocs/故事線/故事線_第一輪_第二章.md，未經潤稿。第 32 天慶典是章末不可逆事件，這裡只寫節點骨架，12-15 節點的連續選項鏈未展開。",
-
   "beats": [
     {
       "id": "d27_morning_school_call",
       "location": "sanquan",
-      "when": { "day": 27, "phase": "morning" },
+      "when": {
+        "day": 27,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "他的學校打電話來",
       "text": "問怎麼處理他的東西。\n他從第 9 天入住就一直續住，所以他的東西全部在山泉閣的房間裡。\n你去整理、打包、寄回去。這是一格家業，也是一格情緒。",
       "slots": [],
-      "on_enter": { "flag": { "packed_student_things": true } },
+      "on_enter": {
+        "flag": {
+          "packed_student_things": true
+        }
+      },
       "note": "第一輪不產出任何卡片。他在收一個死掉的人的東西，而全鎮已經在講慶典了。六張零件移到第二輪——第一輪根本沒有人翻過那個房間"
     },
     {
       "id": "d27_morning_ajie_back",
       "location": "sanquan",
-      "when": { "day": 27, "phase": "morning" },
+      "when": {
+        "day": 27,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "阿婕回來上工",
       "text": "她不知道那四天發生過什麼。她只是覺得旅館裡的空氣不一樣。\n「你們……好像變熟了？」然後她自己岔開。",
       "slots": [
-        { "id": "ajie", "occupant": "npc_ajie", "label": "阿婕", "accepts": [] }
+        {
+          "id": "ajie",
+          "occupant": "npc_ajie",
+          "label": "阿婕",
+          "accepts": []
+        }
       ],
-      "on_enter": { "flag": { "ajie_back": true } }
+      "on_enter": {
+        "flag": {
+          "ajie_back": true
+        }
+      }
     },
     {
       "id": "d27_pm_acai_late",
       "location": "sanquan",
-      "when": { "day": 27, "phase": "afternoon" },
-      "condition": { "flag": "acai_dismissed" },
+      "when": {
+        "day": 27,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "acai_dismissed"
+      },
       "title": "阿財",
       "text": "現在才注意到也還來得及。",
       "slots": [
@@ -37,10 +60,14 @@
           "id": "look_again",
           "occupant": "npc_acai",
           "label": "再看他一次",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "他還是那個他。只是你想不起來他左邊那條疤原本在哪裡。",
-            "gain": ["info_acai_walk"]
+            "gain": [
+              "info_acai_walk"
+            ]
           }
         }
       ],
@@ -49,8 +76,13 @@
     {
       "id": "d27_pm_jinghe",
       "location": "jinghe",
-      "when": { "day": 27, "phase": "afternoon" },
-      "condition": { "flag": "student_dead" },
+      "when": {
+        "day": 27,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "student_dead"
+      },
       "title": "靜和園",
       "text": "研究生的事三天就過去了。全鎮已經在講慶典。",
       "slots": [
@@ -58,21 +90,32 @@
           "id": "awei",
           "occupant": "npc_awei",
           "label": "阿薇",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "「他上禮拜還來問過我阿嬤的事。」\n全鎮只有她記得他。",
-            "relation": { "npc": "awei", "delta": 1 },
-            "flag": { "awei_remembers_student": true }
+            "relation": {
+              "npc": "awei",
+              "delta": 1
+            },
+            "flag": {
+              "awei_remembers_student": true
+            }
           }
         },
         {
           "id": "linjie",
           "occupant": "npc_linjie",
           "label": "林姐",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "她說那晚一直在館裡。\n而你記得她拒收阿薇的時候，人不在櫃檯。",
-            "flag": { "dodger_linjie": true }
+            "flag": {
+              "dodger_linjie": true
+            }
           }
         }
       ],
@@ -81,8 +124,13 @@
     {
       "id": "d27_pm_clinic",
       "location": "clinic",
-      "when": { "day": 27, "phase": "afternoon" },
-      "condition": { "flag": "student_dead" },
+      "when": {
+        "day": 27,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "student_dead"
+      },
       "title": "診所",
       "text": "你本來就要去看叔叔。",
       "slots": [
@@ -90,20 +138,28 @@
           "id": "uncle",
           "occupant": "npc_uncle",
           "label": "陪叔叔",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "他問旅館怎麼樣了。你講了一半。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         },
         {
           "id": "chen",
           "occupant": "npc_chen",
           "label": "問陳醫師那一晚",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "他答得比平常快半拍，然後換話題。",
-            "flag": { "dodger_chen": true }
+            "flag": {
+              "dodger_chen": true
+            }
           }
         }
       ],
@@ -112,38 +168,65 @@
     {
       "id": "d27_evening_awei_confirm",
       "location": "sanquan",
-      "when": { "day": 27, "phase": "evening" },
-      "condition": { "flag": "awei_sheltering" },
+      "when": {
+        "day": 27,
+        "phase": "evening"
+      },
+      "condition": {
+        "flag": "awei_sheltering"
+      },
       "title": "那四天她整晚在二樓",
       "text": "這是你唯一能親眼確認的人。",
       "slots": [],
-      "on_enter": { "flag": { "dodger_awei_cleared": true } },
+      "on_enter": {
+        "flag": {
+          "dodger_awei_cleared": true
+        }
+      },
       "fixed": true,
       "note": "阿薇這一條有雙重作用：第一輪是感情線的材料——她是那四天唯一一個沒有在做別的事的人，而主角在場。第二輪它是排除法的第一塊磚。\n改掛 evening（待決 37① 結案，選項 B）：三個 dodger 原本全部落在第 27 天下午，而下午只有一個行動格——門檻 2 永遠不成立，k_town_covers 第一輪拿不到。這一格移到 evening 之後不吃格也不綁地點，玩家的下午照樣去診所或靜和園拿第二個 flag。主角本來就在場看了四天，不需要花一個下午去確認"
     },
     {
       "id": "d27_evening_cover_knowledge",
       "location": "sanquan",
-      "when": { "day": 27, "phase": "evening" },
+      "when": {
+        "day": 27,
+        "phase": "evening"
+      },
       "fixed": true,
       "condition": {
-        "count_at_least": { "n": 2, "of": [
-          { "flag": "dodger_chen" },
-          { "flag": "dodger_linjie" },
-          { "flag": "dodger_awei_cleared" }
-        ] }
+        "count_at_least": {
+          "n": 2,
+          "of": [
+            {
+              "flag": "dodger_chen"
+            },
+            {
+              "flag": "dodger_linjie"
+            },
+            {
+              "flag": "dodger_awei_cleared"
+            }
+          ]
+        }
       },
       "title": "一種氣味",
       "text": "有幾個人在閃躲，而你說不上來為什麼。",
       "slots": [],
-      "on_enter": { "gain": ["k_town_covers"] },
+      "on_enter": {
+        "gain": [
+          "k_town_covers"
+        ]
+      },
       "note": "碰到任意兩個閃躲的人即成立。它不指控任何人，它描述一座鎮。\n⚠️ 必須排在 d27_evening_awei_confirm 之後：同一個 evening 的 fixed beat 依陣列順序結算（實作規格書第十一節），這一格的 condition 讀的是前一格寫的 dodger_awei_cleared"
     },
-
     {
       "id": "d28_pm_awei_sit",
       "location": "jinghe",
-      "when": { "day": 28, "phase": "afternoon" },
+      "when": {
+        "day": 28,
+        "phase": "afternoon"
+      },
       "title": "阿薇坐下來",
       "text": "今天所有人都有空。",
       "slots": [
@@ -151,11 +234,18 @@
           "id": "sit",
           "occupant": "npc_awei",
           "label": "跟她講久一點",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "全遊戲唯一一次她會坐下來跟你講久一點的話。\n她笑了一次，然後用手遮住嘴。",
-            "relation": { "npc": "awei", "delta": 1 },
-            "flag": { "awei_smiled": true }
+            "relation": {
+              "npc": "awei",
+              "delta": 1
+            },
+            "flag": {
+              "awei_smiled": true
+            }
           }
         }
       ],
@@ -164,8 +254,13 @@
     {
       "id": "d28_pm_ajie",
       "location": "sanquan",
-      "when": { "day": 28, "phase": "afternoon" },
-      "condition": { "flag": "ajie_back" },
+      "when": {
+        "day": 28,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "ajie_back"
+      },
       "title": "阿婕",
       "text": "她回來三天了。",
       "slots": [
@@ -173,10 +268,15 @@
           "id": "talk",
           "occupant": "npc_ajie",
           "label": "跟她講話",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "「颱風那幾天……你一個人喔？」\n她問的時候在擦一個已經很乾淨的杯子。",
-            "relation": { "npc": "ajie", "delta": 1 }
+            "relation": {
+              "npc": "ajie",
+              "delta": 1
+            }
           }
         }
       ],
@@ -185,7 +285,10 @@
     {
       "id": "d28_pm_uncle",
       "location": "clinic",
-      "when": { "day": 28, "phase": "afternoon" },
+      "when": {
+        "day": 28,
+        "phase": "afternoon"
+      },
       "title": "叔叔問旅館怎麼樣了",
       "text": "你怎麼回答，餵繼承線。",
       "slots": [
@@ -193,20 +296,28 @@
           "id": "report",
           "occupant": "npc_uncle",
           "label": "跟他講這幾天",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "你講到修繕那一段的時候他沉默了一下，然後說「你決定就好」。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         },
         {
           "id": "his_bag",
           "occupant": null,
           "label": "他的隨身物品袋",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "換洗衣物、老花眼鏡、一串鑰匙。其中一支你沒看過，比別的舊。\n他睡著了，你沒有問。",
-            "gain": ["item_room_key"]
+            "gain": [
+              "item_room_key"
+            ]
           },
           "note": "⚠️ 第二章故事線第七節把「那間房的鑰匙（若翻了叔叔的袋子）」列為交給第三章的東西，但第二章資料原本沒建這一格。補在第 28 天——那是慶典倒數前最後一個沒有事情逼著你的下午，翻他袋子這種事只有那種下午做得出來"
         }
@@ -215,7 +326,10 @@
     {
       "id": "d28_morning_business",
       "location": "sanquan",
-      "when": { "day": 28, "phase": "morning" },
+      "when": {
+        "day": 28,
+        "phase": "morning"
+      },
       "title": "家業",
       "text": "修繕的後續、慶典的備料、第 17 天進香團留下的帳。",
       "slots": [
@@ -223,15 +337,22 @@
           "id": "work",
           "occupant": null,
           "label": "把帳結一結",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "數字比你以為的難看，但也沒有到撐不住。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "數字比你以為的難看，但也沒有到撐不住。"
+          }
         }
       ]
     },
     {
       "id": "d28_morning_xiaowu",
       "location": "oldstreet",
-      "when": { "day": 28, "phase": "morning" },
+      "when": {
+        "day": 28,
+        "phase": "morning"
+      },
       "title": "小武泡完湯了",
       "text": "他說水好燙，他不喜歡。他媽媽說「以後就習慣了」。",
       "slots": [
@@ -239,18 +360,26 @@
           "id": "listen",
           "occupant": "npc_xiaowu",
           "label": "聽他講",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "他媽媽在旁邊擦乾淨他的頭髮，笑著說「小孩子第一次都這樣」。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "他媽媽在旁邊擦乾淨他的頭髮，笑著說「小孩子第一次都這樣」。"
+          }
         }
       ],
       "note": "雜訊。他還沒到十六歲，所以還沒進簿子——六年後才輪到他。第二輪玩家會意識到那件事不在這 45 天裡"
     },
-
     {
       "id": "d29_morning_ajie",
       "location": "sanquan",
-      "when": { "day": 29, "phase": "morning" },
-      "condition": { "flag": "ajie_back" },
+      "when": {
+        "day": 29,
+        "phase": "morning"
+      },
+      "condition": {
+        "flag": "ajie_back"
+      },
       "title": "阿婕在排明天的班",
       "text": "她把慶典那兩天的人手排好了，包括你不在的時段。",
       "slots": [
@@ -258,10 +387,15 @@
           "id": "talk",
           "occupant": "npc_ajie",
           "label": "跟她待一個上午",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "「你要去吧？」她問得很自然。「那我顧店。」\n她講完就去做別的事了，沒有等你回答。",
-            "relation": { "npc": "ajie", "delta": 1 }
+            "relation": {
+              "npc": "ajie",
+              "delta": 1
+            }
           }
         }
       ],
@@ -270,7 +404,10 @@
     {
       "id": "d29_morning_awei",
       "location": "jinghe",
-      "when": { "day": 29, "phase": "morning" },
+      "when": {
+        "day": 29,
+        "phase": "morning"
+      },
       "title": "阿薇在對面",
       "text": "颱風過後靜和園也在收拾。她在門口刷地。",
       "slots": [
@@ -278,10 +415,15 @@
           "id": "talk",
           "occupant": "npc_awei",
           "label": "跟她待一個上午",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "「你們那邊還好吧。」她問的時候沒有停下手上的事。\n講到後來她說阿嬤這幾天睡得比較好。",
-            "relation": { "npc": "awei", "delta": 1 }
+            "relation": {
+              "npc": "awei",
+              "delta": 1
+            }
           }
         }
       ]
@@ -289,7 +431,10 @@
     {
       "id": "d29_morning_prep",
       "location": "temple",
-      "when": { "day": 29, "phase": "morning" },
+      "when": {
+        "day": 29,
+        "phase": "morning"
+      },
       "title": "廟埕在排明天的事",
       "text": "金伯在點人數。名冊攤在桌上。",
       "slots": [
@@ -297,10 +442,14 @@
           "id": "help",
           "occupant": "npc_jinbo",
           "label": "去幫忙",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "「今年多幾個人。」他一邊寫一邊說。你沒問是哪幾個。",
-            "flag": { "helped_festival_prep": true }
+            "flag": {
+              "helped_festival_prep": true
+            }
           }
         }
       ]
@@ -308,7 +457,10 @@
     {
       "id": "d29_morning_clinic",
       "location": "clinic",
-      "when": { "day": 29, "phase": "morning" },
+      "when": {
+        "day": 29,
+        "phase": "morning"
+      },
       "title": "診所",
       "text": "他今天精神不錯。",
       "slots": [
@@ -316,10 +468,14 @@
           "id": "uncle",
           "occupant": "npc_uncle",
           "label": "陪叔叔",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "他問你明天要不要去慶典。你說要。他說「那就去」。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         }
       ]
@@ -327,7 +483,10 @@
     {
       "id": "d29_pm_invitation",
       "location": "sanquan",
-      "when": { "day": 29, "phase": "afternoon" },
+      "when": {
+        "day": 29,
+        "phase": "afternoon"
+      },
       "fixed": true,
       "title": "邀請",
       "text": "慶典的事定下來了。你可以邀一個人。",
@@ -336,19 +495,46 @@
           "id": "invite_ajie",
           "occupant": null,
           "label": "邀阿婕",
-          "accepts": ["npc_ajie"],
+          "accepts": [
+            "npc_ajie"
+          ],
           "choice_group": "invitation",
-          "on_place": { "text": "她愣了一下，然後說好。", "flag": { "invited_ajie": true } }
+          "on_place": {
+            "text": "她愣了一下，然後說好。",
+            "flag": {
+              "invited_ajie": true
+            },
+            "festival_proxy": {
+              "mode": "fixed",
+              "npc": "ajie"
+            }
+          }
         },
         {
           "id": "invite_awei",
           "occupant": null,
           "label": "邀阿薇",
-          "accepts": ["npc_awei"],
+          "accepts": [
+            "npc_awei"
+          ],
           "choice_group": "invitation",
-          "requires": { "relation_at_least": { "npc": "awei", "state": "恩人" } },
+          "requires": {
+            "relation_at_least": {
+              "npc": "awei",
+              "state": "恩人"
+            }
+          },
           "reject_reason": "（你想不出用什麼身分開這個口。）",
-          "on_place": { "text": "她說「喔」，隔了兩秒才說好。", "flag": { "invited_awei": true } }
+          "on_place": {
+            "text": "她說「喔」，隔了兩秒才說好。",
+            "flag": {
+              "invited_awei": true
+            },
+            "festival_proxy": {
+              "mode": "fixed",
+              "npc": "awei"
+            }
+          }
         },
         {
           "id": "invite_none",
@@ -356,29 +542,53 @@
           "label": "不邀",
           "accepts": [],
           "choice_group": "invitation",
-          "on_place": { "text": "你想了一下，決定誰都不找。", "flag": { "invited_none": true } },
-          "note": "明寫成組員，因為它是三個並列選項之一、而且是最差的那張牌——玩家應該看得到自己正在選它。走開不選結果相同，差別只在他知不知道"
+          "on_place": {
+            "text": "你想了一下，決定誰都不找。",
+            "flag": {
+              "invited_none": true
+            },
+            "festival_proxy": {
+              "mode": "highest_eligible",
+              "fallback": "ajie"
+            }
+          },
+          "note": "明寫成組員，因為它是三個並列選項之一、而且是最差的那張牌——玩家應該看得到自己正在選它。走開不選結果相同，差別只在他知不知道",
+          "default_if_unresolved": true
         }
       ],
       "note": "你邀的那個人，就是被記進今年簿子的那個人。機制載體是企劃書第十二節罰則第 2 型（由最靠近你的人代付）。不邀不是安全牌，是最差的牌——系統一樣會取走這一輪你花最多格子的那一位，而你全程什麼都沒看到。\n三個槽同屬 choice_group「invitation」：最多選一個，走開不選＝不邀。⚠️ relation_at_least 的狀態名取自企劃書第五節的六到七種，「恩人」是暫填"
     },
-
     {
       "id": "d30_morning_rules",
       "location": "temple",
-      "when": { "day": 30, "phase": "morning" },
+      "when": {
+        "day": 30,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "金伯講規矩，講第二次",
       "text": "比第 13 天多講一條。",
       "slots": [
-        { "id": "jinbo", "occupant": "npc_jinbo", "label": "金伯", "accepts": [] }
+        {
+          "id": "jinbo",
+          "occupant": "npc_jinbo",
+          "label": "金伯",
+          "accepts": []
+        }
       ],
-      "on_enter": { "flag": { "rules_second_telling": true } }
+      "on_enter": {
+        "flag": {
+          "rules_second_telling": true
+        }
+      }
     },
     {
       "id": "d30_pm_jinbo",
       "location": "temple",
-      "when": { "day": 30, "phase": "afternoon" },
+      "when": {
+        "day": 30,
+        "phase": "afternoon"
+      },
       "title": "繼續問金伯",
       "text": "他今天有耐心。",
       "slots": [
@@ -386,39 +596,59 @@
           "id": "ask",
           "occupant": "npc_jinbo",
           "label": "問到底",
-          "accepts": ["protagonist"],
-          "requires": { "has_card": "info_festival_rules" },
+          "accepts": [
+            "protagonist"
+          ],
+          "requires": {
+            "has_card": "info_festival_rules"
+          },
           "reject_reason": "（你不知道要問哪一條。）",
-          "on_place": { "text": "他講到應聲那一條的時候特別慢。「有應到就好。」" }
+          "on_place": {
+            "text": "他講到應聲那一條的時候特別慢。「有應到就好。」"
+          }
         },
         {
           "id": "awei_helping",
           "occupant": "npc_awei",
           "label": "阿薇也在幫忙",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "她講規矩的時候是認真的。她信。",
-            "relation": { "npc": "awei", "delta": 1 }
+            "relation": {
+              "npc": "awei",
+              "delta": 1
+            }
           }
         }
       ]
     },
-
     {
       "id": "d31_anchor",
       "location": "sanquan",
-      "when": { "day": 31, "phase": "morning" },
+      "when": {
+        "day": 31,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "前一夜",
       "text": "最後的整理。所有還沒收的線在今天各給一次最後機會。",
       "slots": [],
-      "on_enter": { "flag": { "loop_anchor_d31": true } },
+      "on_enter": {
+        "flag": {
+          "loop_anchor_d31": true
+        }
+      },
       "note": "回溯錨點（企劃書第七節：章節開頭或時鐘事件日）"
     },
     {
       "id": "d31_pm_lastcall",
       "location": "sanquan",
-      "when": { "day": 31, "phase": "afternoon" },
+      "when": {
+        "day": 31,
+        "phase": "afternoon"
+      },
       "title": "還沒收的線",
       "text": "明天之後就不一樣了，雖然你還不知道為什麼會這樣覺得。",
       "slots": [
@@ -426,64 +656,153 @@
           "id": "tidy",
           "occupant": null,
           "label": "把能收的收一收",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "你把慶典要用的東西排好。四樣，照順序。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你把慶典要用的東西排好。四樣，照順序。"
+          }
         }
       ],
       "note": "比對盤第一輪不出現。這一格用普通桌面拖曳就做得到——把唱名、過橋、鬆手、散場四張排成順序即可"
     },
-
     {
       "id": "d32_festival",
       "location": "temple",
-      "when": { "day": 32, "phase": "morning" },
+      "when": {
+        "day": 32,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "巡暗",
       "text": "起鼓（廟埕唱名冊）→ 起行（夜市段）→ 過界 → 換手 → 送出 → 散場。",
       "slots": [],
-      "on_enter": { "flag": { "festival_done": true, "chapter2_end": true } },
+      "on_enter": {
+        "flag": {
+          "festival_done": true,
+          "chapter2_end": true
+        }
+      },
       "note": "章末不可逆事件。連續選項鏈 12-15 節點，流程與規矩見企劃書第十二節。⚠️ 節點鏈未展開，這裡只放章末旗標"
     },
     {
       "id": "d32_festival_ajie",
       "location": "temple",
-      "when": { "day": 32, "phase": "morning" },
+      "when": {
+        "day": 32,
+        "phase": "morning"
+      },
       "fixed": true,
-      "condition": { "flag": "invited_ajie" },
+      "condition": {
+        "flag": "invited_ajie"
+      },
       "title": "分支 A：她沒聽見",
       "text": "唱到她的名字，她沒聽見——她在看夜市那邊的燈。全場安靜看過來。\n三個選項，三個都是應聲。\n\n遊戲全程不提「手」。",
       "slots": [],
-      "on_enter": { "flag": { "ajie_registered": true } },
+      "on_enter": {
+        "flag": {
+          "ajie_registered": true
+        }
+      },
       "note": "她被記進今年的簿子。玩家不知道。她小學畢業就搬走、沒滿十六歲，所以名冊上有她但沒進簿子——這一聲是新登記"
     },
     {
       "id": "d32_festival_awei",
       "location": "temple",
-      "when": { "day": 32, "phase": "morning" },
+      "when": {
+        "day": 32,
+        "phase": "morning"
+      },
       "fixed": true,
-      "condition": { "flag": "invited_awei" },
+      "condition": {
+        "flag": "invited_awei"
+      },
       "title": "分支 B：她應得太快",
       "text": "唱到她的名字，金伯的尾音還沒收，她就已經應了。快到像她早就知道下一個就是自己。\n旁邊有人笑：「妳很熟喔。」她也笑了一下，完全不覺得有什麼。",
       "slots": [],
-      "on_enter": { "flag": { "awei_selected": true } },
+      "on_enter": {
+        "flag": {
+          "awei_selected": true
+        }
+      },
       "note": "這裡不給玩家選項。她本來就一直在庫存裡，這一聲不是新登記的觸發；它只是在跟阿婕相同的秒數留下一個方向相反的異常畫面。A／B 在同一個位置做相反的異常：阿婕是「不在」，阿薇是「太在」"
     },
     {
       "id": "d32_festival_alone",
       "location": "temple",
-      "when": { "day": 32, "phase": "morning" },
+      "when": {
+        "day": 32,
+        "phase": "morning"
+      },
       "fixed": true,
       "condition": {
         "all": [
-          { "not": { "flag": "invited_ajie" } },
-          { "not": { "flag": "invited_awei" } }
+          {
+            "not": {
+              "flag": "invited_ajie"
+            }
+          },
+          {
+            "not": {
+              "flag": "invited_awei"
+            }
+          }
         ]
       },
       "title": "分支 C：你一個人走完全程",
       "text": "兩段都沒有。鬆手的時候你手上牽的是別人遞過來的東西。",
       "slots": [],
-      "on_enter": { "flag": { "silent_selection": true } },
+      "on_enter": {
+        "flag": {
+          "silent_selection": true
+        }
+      },
       "note": "章末什麼都沒發生。而第三章第 37-38 天有一個人會消失兩天，沒有任何固定事件告訴你。⚠️ 系統挑「這一輪你花最多格子的那一位」需要一個時間統計，schema 沒有——待補"
+    },
+    {
+      "id": "d31_proxy_ajie",
+      "location": "sanquan",
+      "when": {
+        "day": 31,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "festival_proxy_is": "ajie"
+      },
+      "title": "前一夜的阿婕",
+      "text": "前台的阿婕正在核對明天的清單。她看起來很平靜，只是前台的筆上留下了很深的齒痕。",
+      "slots": [],
+      "note": "D29 代付固定為阿婕時的 D31 結構版內容"
+    },
+    {
+      "id": "d31_proxy_awei",
+      "location": "sanquan",
+      "when": {
+        "day": 31,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "festival_proxy_is": "awei"
+      },
+      "title": "前一夜的阿薇",
+      "text": "阿薇在前台幫忙整理。她笑著和你說話，用手遮著嘴，說起明天的慶典流程格外清楚。",
+      "slots": [],
+      "note": "D29 代付固定為阿薇時的 D31 結構版內容"
+    },
+    {
+      "id": "d31_proxy_acai",
+      "location": "sanquan",
+      "when": {
+        "day": 31,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "festival_proxy_is": "acai"
+      },
+      "title": "前一夜的阿財",
+      "text": "阿財在一旁搬著重物。他揉了揉膝蓋，笑著說明天慶典過後他就準備再去接新的臨時工了。",
+      "slots": [],
+      "note": "D29 代付固定為阿財時的 D31 結構版內容"
     }
   ]
 }

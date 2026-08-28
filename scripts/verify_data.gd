@@ -15,6 +15,8 @@ func _initialize() -> void:
 	print("地點　%d" % loader.locations.size())
 	print("NPC　%d" % loader.npcs.size())
 	print("beat　%d" % loader.beats.size())
+	print("ending　%d" % loader.endings.size())
+	print("opening　%d" % loader.opening_choices.size())
 
 	if not ok:
 		print("\n讀取錯誤 %d 筆：" % loader.errors.size())
@@ -199,13 +201,42 @@ func _initialize() -> void:
 	# Lint 16: 遭遇資料完整性
 	var enc_errs := DataLoader.lint_encounters(loader)
 	if enc_errs.size() > 0:
-		print("
-遭遇資料完整性錯誤 %d 筆：" % enc_errs.size())
+		print("\n遭遇資料完整性錯誤 %d 筆：" % enc_errs.size())
 		for e in enc_errs:
 			print("  " + e)
 		quit(1)
 		return
 	print("遭遇資料完整性 (Lint 16)　0 錯誤")
+
+	# Lint 17: 結局資料完整性
+	var ending_errs := DataLoader.lint_endings(loader)
+	if ending_errs.size() > 0:
+		print("\n結局資料完整性錯誤 %d 筆：" % ending_errs.size())
+		for e in ending_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("結局資料完整性 (Lint 17)　0 錯誤")
+
+	# Lint 18: 開局與選擇完整性
+	var opening_errs := DataLoader.lint_opening_and_defaults(loader)
+	if opening_errs.size() > 0:
+		print("\n開局與選擇完整性錯誤 %d 筆：" % opening_errs.size())
+		for e in opening_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("開局與選擇完整性 (Lint 18)　0 錯誤")
+
+	# Lint 19: 跨輪與慶典代付完整性
+	var loop_errs := DataLoader.lint_loop_and_festival(loader)
+	if loop_errs.size() > 0:
+		print("\n跨輪與慶典代付完整性錯誤 %d 筆：" % loop_errs.size())
+		for e in loop_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("跨輪與慶典代付完整性 (Lint 19)　0 錯誤")
 
 	print("\ntuning：手牌 %d／發狂上限 %d／倒數 %d 天／視野門檻 %d" % [
 		loader.tuning.get("hand_size", -1),

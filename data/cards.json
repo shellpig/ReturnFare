@@ -1,6 +1,5 @@
 {
   "_comment": "第 1-3 天會用到的卡。欄位說明見 data/SCHEMA.md。完整卡片清單見待決 22。",
-
   "cards": [
     {
       "id": "protagonist",
@@ -9,9 +8,9 @@
       "text": "把我放進一個槽，就是把這個時段花在那裡。",
       "slotless": false,
       "stashable": false,
-      "discardable": false
+      "discardable": false,
+      "loop_persistent": false
     },
-
     {
       "id": "info_husband_version",
       "type": "info",
@@ -19,7 +18,8 @@
       "text": "他說這趟是他提議的。他想把事情講開。",
       "slotless": false,
       "stashable": true,
-      "discardable": true
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_wife_version",
@@ -28,7 +28,8 @@
       "text": "她說這趟是她提議的，而且她已經想清楚了。",
       "slotless": false,
       "stashable": true,
-      "discardable": true
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_ahong_private",
@@ -38,7 +39,8 @@
       "slotless": false,
       "stashable": true,
       "discardable": true,
-      "note": "阿宏線的私人鑰匙。⚠️ 待決 2：它在第一輪目前沒有兌現點"
+      "note": "阿宏線的私人鑰匙。⚠️ 待決 2：它在第一輪目前沒有兌現點",
+      "loop_persistent": false
     },
     {
       "id": "info_ajie_class",
@@ -47,7 +49,8 @@
       "text": "榮譽榜上她的名字只到某一年。那年她搬走了。",
       "slotless": false,
       "stashable": true,
-      "discardable": true
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_chunama_pause",
@@ -56,9 +59,9 @@
       "text": "她講你們小時候講得很順。講到你媽媽的時候停住了。",
       "slotless": false,
       "stashable": true,
-      "discardable": true
+      "discardable": true,
+      "loop_persistent": false
     },
-
     {
       "id": "equip_polaroid",
       "type": "equipment",
@@ -66,9 +69,9 @@
       "text": "他們忘在房裡的。常駐佔一格。把它拖到接受它的事件上使用。",
       "slotless": false,
       "stashable": true,
-      "discardable": true
+      "discardable": true,
+      "loop_persistent": false
     },
-
     {
       "id": "madness",
       "type": "madness",
@@ -77,9 +80,9 @@
       "slotless": false,
       "stashable": false,
       "discardable": false,
-      "countdown": true
+      "countdown": true,
+      "loop_persistent": false
     },
-
     {
       "id": "routine_debt",
       "type": "routine",
@@ -87,102 +90,139 @@
       "text": "學貸和一點卡債。不處理它會往心境卡掉。",
       "slotless": false,
       "stashable": false,
-      "discardable": false
+      "discardable": false,
+      "loop_persistent": false
     },
-
     {
       "id": "item_gradphoto",
       "type": "equipment",
       "name": "畢業照",
       "text": "從舊國小的抽屜底下翻出來的。上面有年輕時的叔叔。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_bath_notice",
       "type": "info",
       "name": "浴場的休館公告",
       "text": "「換水保養」。下面壓著上個月的、上上個月的——越接近慶典越密。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_forty_something",
       "type": "info",
       "name": "納骨塔抄下來的名字",
       "text": "五個人，卒年落在同一個區間。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_zhou_waiting",
       "type": "info",
       "name": "「我在等一個位置」",
       "text": "他說的時候你以為是療養院的床位。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_zhou_job",
       "type": "info",
       "name": "周先生說可以幫你問問",
       "text": "外面還有一條路。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_awei_mother",
       "type": "info",
       "name": "阿薇的媽媽最後那兩年",
       "text": "很辛苦。那孩子一個人扛。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_uncle_gap",
       "type": "info",
       "name": "叔叔記不清的那幾年",
       "text": "他說那幾年他生病。他講不下去。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_registry",
       "type": "info",
       "name": "信徒名冊上的三格",
       "text": "你：已登記，註記「不在」，旁邊另有一筆拜契的紀錄。阿婕：那一欄是空的。阿薇：一直是「在」。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_festival_rules",
       "type": "info",
       "name": "慶典的八條規矩",
       "text": "金伯講得極嚴，每一條都一樣嚴。其中一條是「不管誰叫你，不要應」。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_a_name",
       "type": "info",
       "name": "長住客問的那個名字",
       "text": "你不認得。他說沒關係，只是問問——但他問的時候不是「只是問問」的樣子。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_ahong_traces",
       "type": "info",
       "name": "夜裡有阿宏留下的痕跡",
       "text": "工作鞋的腳印，尺寸對得上。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_ahong_not_normal",
       "type": "info",
       "name": "阿宏沒有正常離開小鎮",
       "text": "第一輪能到的最深處。他跟夜裡有關，僅此而已。",
-      "slotless": false, "stashable": true, "discardable": true
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
     },
-
     {
       "id": "k_forty_something",
       "type": "knowledge",
       "name": "這裡有人四十幾歲就走",
       "text": "不是一兩個。是一小群，而且集中在同一個區間。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
-
     {
       "id": "npc_ajie",
       "type": "person",
@@ -190,7 +230,8 @@
       "text": "旅館的員工。她比你更清楚這間店怎麼運作。",
       "stashable": false,
       "discardable": false,
-      "note": "第 17 天委託登場時進手牌。委託雜訊型＝會知道太多"
+      "note": "第 17 天委託登場時進手牌。委託雜訊型＝會知道太多",
+      "loop_persistent": false
     },
     {
       "id": "npc_azhu",
@@ -199,7 +240,8 @@
       "text": "診所的護士。有些事她知道，有些事她不想知道。",
       "stashable": false,
       "discardable": false,
-      "note": "委託雜訊型＝會出事"
+      "note": "委託雜訊型＝會出事",
+      "loop_persistent": false
     },
     {
       "id": "npc_acai",
@@ -208,7 +250,8 @@
       "text": "在旅館打零工。去年回鄉。做事比你快。",
       "stashable": false,
       "discardable": false,
-      "note": "委託雜訊型＝回報是主觀的"
+      "note": "委託雜訊型＝回報是主觀的",
+      "loop_persistent": false
     },
     {
       "id": "npc_awei",
@@ -217,16 +260,17 @@
       "text": "對面靜和園的櫃檯。她不欠你，你也不欠她。",
       "stashable": false,
       "discardable": false,
-      "note": "⚠️ 她不是委託對象。建這張卡是因為第 29 天的邀請槽收人物卡——邀一個人的動作就是把那個人拖進慶典的位子。要不要因此讓她也能被委託，還沒決定"
+      "note": "⚠️ 她不是委託對象。建這張卡是因為第 29 天的邀請槽收人物卡——邀一個人的動作就是把那個人拖進慶典的位子。要不要因此讓她也能被委託，還沒決定",
+      "loop_persistent": false
     },
-
     {
       "id": "doc_prescription",
       "type": "document",
       "name": "叔叔的舊藥單",
       "text": "一張很舊的藥單。紙已經軟了。",
       "stashable": true,
-      "discardable": true
+      "discardable": true,
+      "loop_persistent": false
     },
     {
       "id": "info_ajie_saw_parents",
@@ -235,7 +279,8 @@
       "text": "「那個箱子裡還有你爸媽的東西欸。你知道嗎？」",
       "stashable": true,
       "discardable": true,
-      "note": "委託阿婕的回報。她會知道太多——這條在第三章繼承線會回來"
+      "note": "委託阿婕的回報。她會知道太多——這條在第三章繼承線會回來",
+      "loop_persistent": false
     },
     {
       "id": "info_uncle_treated_20y",
@@ -244,7 +289,8 @@
       "text": "同一間診所，同一個療程名稱。阿珠講得很含糊，而且她一直看門口。",
       "stashable": true,
       "discardable": true,
-      "note": "委託阿珠的回報。第一章「陳年紙本證據」的延續，而且是用委託換來的"
+      "note": "委託阿珠的回報。第一章「陳年紙本證據」的延續，而且是用委託換來的",
+      "loop_persistent": false
     },
     {
       "id": "info_acai_box",
@@ -253,9 +299,9 @@
       "text": "他把箱子找到了，翻了一下。「裡面沒什麼啊。」",
       "stashable": true,
       "discardable": true,
-      "note": "委託阿財的回報。他漏掉了重要文件，而他不知道——回報是主觀的"
+      "note": "委託阿財的回報。他漏掉了重要文件，而他不知道——回報是主觀的",
+      "loop_persistent": false
     },
-
     {
       "id": "info_acai_scars_gone",
       "type": "info",
@@ -263,7 +309,8 @@
       "text": "虎口的繭、手臂那道疤。兩天前還在。",
       "stashable": true,
       "discardable": false,
-      "note": "第 22 天完整版產出（兩個觀察開關以上，或拍立得拍過他）"
+      "note": "第 22 天完整版產出（兩個觀察開關以上，或拍立得拍過他）",
+      "loop_persistent": false
     },
     {
       "id": "info_acai_walk",
@@ -272,7 +319,8 @@
       "text": "他下樓梯不再先顧左膝。你說不出他少了什麼，但他變了。",
       "stashable": true,
       "discardable": false,
-      "note": "第 22 天薄版產出（只翻到一個觀察開關）。少掉的是第三個確認——他知道阿財變了，但說不出少了什麼。這正是第三章第 40 天沒有人相信他的預演"
+      "note": "第 22 天薄版產出（只翻到一個觀察開關）。少掉的是第三個確認——他知道阿財變了，但說不出少了什麼。這正是第三章第 40 天沒有人相信他的預演",
+      "loop_persistent": false
     },
     {
       "id": "info_same_festival",
@@ -281,39 +329,52 @@
       "text": "研究生把廟的名冊和戶籍室的資料排在一起。走的人集中在同一場慶典之後。",
       "stashable": true,
       "discardable": false,
-      "note": "第 21 天跟研究生一起看資料。第一輪唯一一次能拿到的機會——他四天後會死。沒拿到的玩家第 25 天在他房間有第二次機會（如果筆記還在）"
+      "note": "第 21 天跟研究生一起看資料。第一輪唯一一次能拿到的機會——他四天後會死。沒拿到的玩家第 25 天在他房間有第二次機會（如果筆記還在）",
+      "loop_persistent": false
     },
     {
       "id": "k_town_covers",
       "type": "knowledge",
       "name": "這裡出事的時候，大家會一起把它蓋過去",
       "text": "它不指控任何人。它描述一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "第 26–27 天被動撞到任意兩個閃躲的人即成立。第三章第 40 天沒有人相信他的時候，這張卡在手上"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "第 26–27 天被動撞到任意兩個閃躲的人即成立。第三章第 40 天沒有人相信他的時候，這張卡在手上",
+      "loop_persistent": false
     },
     {
       "id": "k_ahong_point_1",
       "type": "knowledge",
       "name": "聲音停在那裡",
       "text": "夜裡那段搬貨的聲音不是四面八方來的。它有起點，而你站到過那個起點。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "阿宏鏈第四級。三個對位點的第一個"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "阿宏鏈第四級。三個對位點的第一個",
+      "loop_persistent": false
     },
     {
       "id": "k_ahong_point_2",
       "type": "knowledge",
       "name": "東西被留在那裡",
       "text": "那件東西不會自己走到那個位置。有人把它放在那裡，而且是在他失蹤之後。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "阿宏鏈第五級。三個對位點的第二個"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "阿宏鏈第五級。三個對位點的第二個",
+      "loop_persistent": false
     },
     {
       "id": "k_ahong_point_3",
       "type": "knowledge",
       "name": "腳印往那裡去",
       "text": "新的，而且跟前兩個地方在同一條線上。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "阿宏鏈第六級。三個對位點的第三個。三張湊齊，第 43 夜的路才走得出去"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "阿宏鏈第六級。三個對位點的第三個。三張湊齊，第 43 夜的路才走得出去",
+      "loop_persistent": false
     },
     {
       "id": "item_room_key",
@@ -322,7 +383,8 @@
       "text": "在叔叔的隨身物品袋最底下。他沒有提過它。",
       "stashable": true,
       "discardable": false,
-      "note": "⚠️ 這是第二章就該有的東西（第二章故事線第七節「那間房的鑰匙｜若翻了叔叔的袋子」），但第二章資料沒建。補在第 28 天診所——第三章第 42 天要用"
+      "note": "⚠️ 這是第二章就該有的東西（第二章故事線第七節「那間房的鑰匙｜若翻了叔叔的袋子」），但第二章資料沒建。補在第 28 天診所——第三章第 42 天要用",
+      "loop_persistent": false
     },
     {
       "id": "item_festival_photo",
@@ -331,7 +393,8 @@
       "text": "洗出來了。你們兩個都在裡面，笑得很開心。",
       "stashable": true,
       "discardable": true,
-      "note": "第 33 天。第 39 天客觀路線的入口之一——跟第一章阿婕拍的工作照是同一套比對動作"
+      "note": "第 33 天。第 39 天客觀路線的入口之一——跟第一章阿婕拍的工作照是同一套比對動作",
+      "loop_persistent": false
     },
     {
       "id": "info_jinghe_pool",
@@ -340,7 +403,8 @@
       "text": "走廊盡頭有樓梯往下。蒸氣很濃，水面在動，水裡有一個人背對著。",
       "stashable": true,
       "discardable": false,
-      "note": "第 37 或 38 天後棟，只能去一次。空間證據。真相層裡那個人就是她，而主角站在門邊看著她，沒有認出來"
+      "note": "第 37 或 38 天後棟，只能去一次。空間證據。真相層裡那個人就是她，而主角站在門邊看著她，沒有認出來",
+      "loop_persistent": false
     },
     {
       "id": "info_stories_dont_match",
@@ -349,7 +413,8 @@
       "text": "三個人講她這兩天在哪，三個版本兜不成同一條時間線。",
       "stashable": true,
       "discardable": false,
-      "note": "第 37 或 38 天找她。時間／口供證據。它只證明沒有人講得圓，不證明她被換，也不證明她在靜和園"
+      "note": "第 37 或 38 天找她。時間／口供證據。它只證明沒有人講得圓，不證明她被換，也不證明她在靜和園",
+      "loop_persistent": false
     },
     {
       "id": "info_something_off",
@@ -358,15 +423,19 @@
       "text": "阿財去做高薪臨工回來後，身上的舊傷／走路方式變了。\n她這次回來後，也有一個原本存在的身體細節不見了。\n但兩個人的記憶、說話方式與習慣都沒有變。",
       "stashable": true,
       "discardable": false,
-      "note": "第 39 天。三個入口（主觀／客觀／模式）產出同一張。第一輪到這裡只能確認「這種物理異常不只一次」，不能得到身份結論"
+      "note": "第 39 天。三個入口（主觀／客觀／模式）產出同一張。第一輪到這裡只能確認「這種物理異常不只一次」，不能得到身份結論",
+      "loop_persistent": false
     },
     {
       "id": "k_twenty_years_ago",
       "type": "knowledge",
       "name": "這種變化二十年前也發生過",
       "text": "有人回鄉之後舊傷消失，二十年後在四十多歲快速病逝。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "第 41 天長住的客人。只陳述可確認的歷史，不判定她是否仍是同一個人"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "第 41 天長住的客人。只陳述可確認的歷史，不判定她是否仍是同一個人",
+      "loop_persistent": false
     },
     {
       "id": "item_old_paper",
@@ -375,7 +444,8 @@
       "text": "摺起來的，蓋著廟印。你看不懂是什麼。",
       "stashable": true,
       "discardable": false,
-      "note": "第 42 天老家那間房。就是那份契書——拜契一份燒化、一份家長保管，他家那份還在。第一輪不能燒：燒契書需要「你還在契約裡」的知識，那要等主角死過一次"
+      "note": "第 42 天老家那間房。就是那份契書——拜契一份燒化、一份家長保管，他家那份還在。第一輪不能燒：燒契書需要「你還在契約裡」的知識，那要等主角死過一次",
+      "loop_persistent": false
     },
     {
       "id": "info_parents_leaving",
@@ -383,9 +453,9 @@
       "name": "他們本來要搬走",
       "text": "收拾到一半的行李，二十年沒動過。你不記得他們要搬家——你當時七八歲。",
       "stashable": true,
-      "discardable": false
+      "discardable": false,
+      "loop_persistent": false
     },
-
     {
       "id": "inf_health_disappearance",
       "type": "inference",
@@ -393,7 +463,8 @@
       "text": "你自己寫下的。你還沒有辦法證明。",
       "stashable": false,
       "discardable": true,
-      "note": "第 43 天三理論之一：方向正確，尚未驗證。推論卡佔一格、可對可錯、不跨迴圈——它不是知識卡，不破壞「知識永遠可信」的系統語法"
+      "note": "第 43 天三理論之一：方向正確，尚未驗證。推論卡佔一格、可對可錯、不跨迴圈——它不是知識卡，不破壞「知識永遠可信」的系統語法",
+      "loop_persistent": false
     },
     {
       "id": "inf_jinghe_does_it",
@@ -402,7 +473,8 @@
       "text": "你自己寫下的。你還沒有辦法證明。",
       "stashable": false,
       "discardable": true,
-      "note": "第 43 天三理論之一：方向接近、位置錯。走後棟的玩家較容易推到這裡——那是具體證據的代價，不是漏洞"
+      "note": "第 43 天三理論之一：方向接近、位置錯。走後棟的玩家較容易推到這裡——那是具體證據的代價，不是漏洞",
+      "loop_persistent": false
     },
     {
       "id": "inf_hotspring_kills",
@@ -411,117 +483,162 @@
       "text": "你自己寫下的。你還沒有辦法證明。",
       "stashable": false,
       "discardable": true,
-      "note": "第 43 天三理論之一：因果倒置"
+      "note": "第 43 天三理論之一：因果倒置",
+      "loop_persistent": false
     },
-
     {
       "id": "k_health_from_disappearance",
       "type": "knowledge",
       "name": "一個人的健康，來自另一個人的消失",
       "text": "不是有關。是來自。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "第 45 天遭遇驗證正確推論後翻面。驗證的是交換因果，不是「她是不是她」"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "第 45 天遭遇驗證正確推論後翻面。驗證的是交換因果，不是「她是不是她」",
+      "loop_persistent": false
     },
     {
       "id": "k_jinghe_not_entrance",
       "type": "knowledge",
       "name": "靜和園不是入口",
       "text": "那棟建築只是其中一個地方。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "錯誤推論在最後遭遇翻面離場，產出較窄但為真的知識"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "錯誤推論在最後遭遇翻面離場，產出較窄但為真的知識",
+      "loop_persistent": false
     },
     {
       "id": "k_not_side_effect",
       "type": "knowledge",
       "name": "早死不是療效本身的副作用",
       "text": "泡湯不會殺死你。殺死你的是別的東西。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_not_today",
       "type": "knowledge",
       "name": "不是今天才輪到我",
       "text": "第 45 天那個邀請不是起因。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "第 45 天一定產出。拒絕仍被帶走，只證明邀請不是起因"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "第 45 天一定產出。拒絕仍被帶走，只證明邀請不是起因",
+      "loop_persistent": false
     },
     {
       "id": "k_already_on_list",
       "type": "knowledge",
       "name": "我在回來之前，就已經在名單上",
       "text": "那一格早就寫好了。你回來之前它就在那裡。",
-      "slotless": true, "stashable": false, "discardable": false,
-      "note": "升級版，需要第一章看過名冊上自己那一格。它不解釋機制，但直接生成第二輪的第一個目標：我要找出自己是什麼時候被寫進去的"
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "note": "升級版，需要第一章看過名冊上自己那一格。它不解釋機制，但直接生成第二輪的第一個目標：我要找出自己是什麼時候被寫進去的",
+      "loop_persistent": false
     },
     {
       "id": "k_night_sanquan",
       "type": "knowledge",
       "name": "夜裡可以走回山泉閣",
       "text": "夜裡走過的路可以通往白天的山泉閣。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_jinghe",
       "type": "knowledge",
       "name": "夜裡可以走回靜和園",
       "text": "夜裡走過的路可以通往白天的靜和園。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_clinic",
       "type": "knowledge",
       "name": "夜裡可以走回診所",
       "text": "夜裡走過的路可以通往白天的診所。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_riverside",
       "type": "knowledge",
       "name": "夜裡可以走回河邊",
       "text": "夜裡走過的路可以通往白天的河邊。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_temple",
       "type": "knowledge",
       "name": "夜裡可以走回廟＋廟埕",
       "text": "夜裡走過的路可以通往白天的廟＋廟埕。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_upstream",
       "type": "knowledge",
       "name": "夜裡可以走回上游源頭",
       "text": "夜裡走過的路可以通往白天的上游源頭。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_oldhouse_room",
       "type": "knowledge",
       "name": "夜裡可以走回老家那間房",
       "text": "夜裡走過的路可以通往白天的老家那間房。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_jinghe_back",
       "type": "knowledge",
       "name": "夜裡可以走回靜和園後棟",
       "text": "夜裡走過的路可以通往白天的靜和園後棟。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_clinic_back",
       "type": "knowledge",
       "name": "夜裡可以走回診所後棟",
       "text": "夜裡走過的路可以通往白天的診所後棟。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "k_night_temple_back",
       "type": "knowledge",
       "name": "夜裡可以走回廟的後殿／燒金爐",
       "text": "夜裡走過的路可以通往白天的廟的後殿／燒金爐。兩邊是同一座鎮。",
-      "slotless": true, "stashable": false, "discardable": false
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     },
     {
       "id": "mood_watched",
@@ -530,10 +647,30 @@
       "text": "老曾開始出現在你去的地方。診所的人會主動問你睡得好不好。",
       "stashable": false,
       "discardable": false,
-      "note": "曝光兩階段的第一階段，佔一格。第二次曝光時翻面成「療養通知」，下一個固定時段觸發「走進庫存」BE。⚠️ 翻面後的卡還沒建（等第三章）"
+      "note": "曝光兩階段的第一階段，佔一格。第二次曝光時翻面成「療養通知」，下一個固定時段觸發「走進庫存」BE。⚠️ 翻面後的卡還沒建（等第三章）",
+      "loop_persistent": false
+    },
+    {
+      "id": "item_family_album",
+      "type": "equipment",
+      "name": "家庭相簿",
+      "text": "父母留下來的舊相簿。裡面有幾張老照片與泛黃的字跡。",
+      "slotless": false,
+      "stashable": true,
+      "discardable": true,
+      "loop_persistent": false
+    },
+    {
+      "id": "k_i_returned",
+      "type": "knowledge",
+      "name": "我回來過",
+      "text": "即使一切重來，這座小鎮也確實留下過你回來的痕跡。",
+      "slotless": true,
+      "stashable": false,
+      "discardable": false,
+      "loop_persistent": false
     }
   ],
-
   "_pending": {
     "all": "待決 22：物品／情報／知識的完整清單還沒盤點，這裡只有第一章用得到的",
     "person_cards": "第 17 天委託登場，已開三張（阿婕／阿珠／阿財），對應企劃書第六節的三種雜訊。⚠️ 其餘 NPC 仍只以 occupant 形式存在、沒有卡片定義——要不要求所有 occupant id 都在這裡建檔，還沒決定",

@@ -1,58 +1,60 @@
 # ReturnFare 交接狀態
 
-最後更新：2026-08-27
+最後更新：2026-08-28
 
 ## 目前階段
 
-**P1～P3 已完成；P4-A～P4-F 全部實作完成。全套 28 套 headless 測試全數 exit 0（含 test_p4f.gd 4 大項全流程與跨輪整合測試），全套 UI Sim（85 契約、108 變體與負向測試）全數 exit 0（0 failed checks）。** K-148、K-165、K-166、K-167、K-168 全數修復完成。待 verifier 複驗關門 P4-F。**下一步 Phase 5（P5-A 結局、開局與跨輪資料）。**
+**P1～P4 全部完成且關門；P5-A（結局、開局與跨輪資料）實作與驗證全數完成。全套 29 套 headless 測試全數 exit 0（含 test_p5a.gd 5 大項正負向測試與 verify_data.gd Lint 1～19 全綠），全套 UI Sim（85 契約、108 變體與負向測試）全數 exit 0（0 failed checks）。** 待 verifier 複驗關門 P5-A。**下一步 Phase 5-B（頂層流程與結局狀態機）。**
 
 - 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；本檔只保存最近交接重點。
-- **工具變更（2026-08-27）：UI 模擬新增 `-Background`，之後跑一律加。** `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`。每個 Godot 行程開在獨立 Windows desktop 上，不佔畫面、不搶焦點、不碰實體滑鼠；產物與前景模式逐位元組相同（2078 張截圖與 2078 份 dump 全部 SHA256 相同）。機制與已排除的四種做法見 `開發設計方針.md > UI 模擬驗證 > 背景模式`——**那四種都實測失敗過，不要再試一次**。
-- P4-A：委託／遭遇資料與 lint 真值化已完成。
-- P4-B：委託規則已實作並通過 verifier 複驗，K-65 結案。
-- P4-C：委託 UI、首張人物卡教學與 D17～19 處方案例已完成。
-- P4-D：遭遇規則與狀態機實作完成，26 套 headless 全數 exit 0 通過。
-- P4-E：遭遇 UI 面板、CardDetail 詳情整合、D8／D45 遭遇生命週期與時段推進接線完成。
-- P4-F：全流程與跨輪整合實作完成。28 套 headless（含 `test_p4f.gd` 4 大項）與 85 條 UI 契約全綠。
-- P5：開局、四類結局、歷輪摘要、跨輪重置與 UI 已拆成 P5-A～F，待 P4-F 關門後開工。
+- **工具變更（2026-08-27）：UI 模擬新增 `-Background`，之後跑一律加。** `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`。
+- P5-A：結局、開局與跨輪資料已實作完成，Lint 17（結局完整性）、Lint 18（開局與選擇完整性）、Lint 19（跨輪與慶典代付完整性）全數上線且 0 錯誤。嚴格遵守「不接新玩家操作／UI mutation」限制。
+- P5-B：頂層流程與結局狀態機（待 P5-A 關門後開工）。
 
-## 最近完成的工作（P4-F 全流程與跨輪驗收實作）
+## 最近完成的工作（P5-A 結局、開局與跨輪資料實作）
 
-1. **`tests/headless/test_p4f.gd` 實作完成（四大整合測試項，exit 0 全綠）**：
-   - **D17～19 處方委託四狀態覆蓋**：零人物卡親自做（find_self 消耗行動格、獲得處方卡）、阿婕即時回報（不耗格、人物在手、即時獲得處方與情報）、阿珠隔日上午回報（派出當下不發卡、隔日上午依序結算）、阿財主觀回報（獲得箱子情報、不給處方），以及每日一人一次限制與 choice_group prescription_route 互斥。
-   - **D8／D45 遭遇 Response Matrix 動態資料衍生**：D8 正解前進、Fallback 消耗可丟棄卡、逃離、零可丟棄卡 direct failure；D45 推論卡三種特殊轉化（`inf_health_disappearance`、`inf_jinghe_does_it`、`inf_hotspring_kills` 轉為對應知識卡）、主角卡與人物卡保留在手、直呼逃離／丟棄拒絕、選後推進至 evening。
-   - **跨輪重置與第二輪驗證**：第一輪真實 `end_run()` 後，Meta 層（`delegation_tutorial_seen`、`knowledge`、`night_locations_seen`、`night_once_beats_seen`）完整保留；Run 層（`delegates_used_today`、`pending_delegation_reports`、`active_encounter`、`flags` 等）完整清空；第二輪 D8 重演且因 `n_manydoors` 已見不重複收取首次 marker cost。
-   - **跨輪決定論測試**：相同第一輪終態 serialize 載入兩次，執行相同之第二輪操作序列，最終 `serialize()` 產物與時間軸記錄逐字完全相同。
+1. **`data/opening_choices.json` 建立完成**：
+   - 定義 3 筆開局選項（`take_family_album`、`return_missed_call`、`refuse_boarding`）。
+   - 前兩筆提供 `on_select`，最後一筆以 `requires: { ending_seen: "ending_replaced" }` 鎖定並直接引用 `ending: "ending_refuse_boarding"`，兩類形狀互斥。
 
-2. **K-148 修復（`playthrough_greedy.gd` 移除 `assert` 地雷）**：
-   - `run_greedy_walk()` 將 4 處 `assert` 改為將錯誤訊息 append 進 `errors: Array[String]` 並於回傳字典提供，消費端（`test_p1f.gd`、`test_p3f.gd`）檢查並報錯。
+2. **`data/endings.json` 建立完成**：
+   - 定義 4 筆穩定 ending id（`ending_replaced` 為 composite；`ending_madness_be`、`ending_inventory_be`、`ending_refuse_boarding` 為 linear）。
+   - `ending_replaced` 包含 `first_seen`、`repeat`（`skip_to: "partner"`）、3 組有序 `variant_groups`（`partner`、`livelihood`、`inn_appearance` 各恰有 1 筆 fallback），以及 `lookup_fragments`（`uninvited_proxy` 完整覆蓋阿婕、阿薇、阿財）。
 
-3. **K-165 修復（`p1af_cases.gd` UI Sim 斷言補強）**：
-   - `_p4e_02` 進入 R2 後多一次 `find_controls_by_qa_id` 斷言主角卡按鈕 disabled。
-   - `_p4e_04` 出口後斷言 `EncounterPanel` 不可見且 `encounter_blocked::0` 在場景樹中不存在。
+3. **`data/cards.json` 擴充完成**：
+   - 64 張既有卡片全數補齊必填 `loop_persistent: false`。
+   - 新增 2 張卡片：`item_family_album`（裝備、佔格、可暫存、可丟棄、`loop_persistent: false`）與 `k_i_returned`（知識、不佔格、不可暫存、不可丟棄、`loop_persistent: false`）。總卡片數達 66 張。
 
-4. **K-166 修復（`test_p4e.gd` 睡覺阻斷可證偽斷言）**：
-   - 第 12 項補上 round 階段 `sleep_night()` 呼叫前後 serialize 逐字比對。
-   - 增加 D24 颱風夜可播定日 sleep 內容對照組，證明「有內容但被遭遇擋住返回空陣列且狀態零變化」具備可證偽性。
+4. **`data/npcs.json` 擴充完成**：
+   - 18 位 NPC 全數補齊必填 `festival_proxy_eligible: boolean`。正式候選精確為 `ajie`、`awei`、`acai` 3 位（其餘 15 位均為 `false`）。
 
-5. **K-167 修復（`scenes/main.gd` 推進按鈕禁用單一事實來源）**：
-   - `_show_encounter()` 移除手動 `_advance_btn.disabled = true`，統一呼叫 `_refresh_advance_hint()`。
+5. **故事線 Beat 資料檔 P5-A 映射更新**：
+   - `ch1_d04_d15.json`：D7 新增 `outside_job_waiting` 分支殘響；D11 `compare` 槽相容 `item_family_album`；D7 與 D10 分別補齊阿婕與阿薇之 `attention_npc` 反向引用。
+   - `ch2_d23_d26.json`：D26 3 個修復槽正式改用 `choice_group: "repairs"` 與 `choice_requires_card: true`。
+   - `ch2_d27_d32.json`：D29 `d29_pm_invitation` 配置 `festival_proxy`（邀阿婕/阿薇為 fixed，不邀槽兼任 `default_if_unresolved: true` 並配置 highest-eligible + fallback 阿婕）；新增 D31 3 筆 `festival_proxy_is` 結構版內容。
+   - `ch3_d39_d45.json`：新增 D39 3 筆 `festival_proxy_is` 結構版內容；D43 兩條離開工作共用 `choice_group: "leaving"` 與 `choice_requires_card: true`；D45 `d45_then` 配置 `phase_exit`（required_slots: `["compare_registry"]`, ending: `ending_replaced`, source: `d45_coda`）。
 
-6. **K-168 修復（`test_p4e.gd` 滿手容量測試改用合法卡片）**：
-   - 第 9 項 Path 3 填充滿手改用 13 張獨立合法卡片 ID。
+6. **核心語彙與檢查擴充（`ConditionEval` / `EffectApply` / `DataLoader`）**：
+   - `ConditionEval.KNOWN_KEYS` 增加 `opening_choice`、`ending_seen`、`festival_proxy_is`。
+   - `EffectApply.KNOWN_KEYS` 增加 `ending`、`festival_proxy`，`CARD_ENTRY_KEYS` 增加 `permanent`。
+   - `DataLoader` 新增 `endings`、`opening_choices` 載入與跨檔引用檢查；實作 Lint 17（`lint_endings`）、Lint 18（`lint_opening_and_defaults`）、Lint 19（`lint_loop_and_festival`）。
+   - `verify_data.gd` 串接 Lint 17～19 驗證。
 
-7. **工具鏈整合（`tests/run_all_headless.ps1` 擴展至 28 套）**：
-   - 新增 `tests/headless/test_p4f.gd`，全套 28 套 headless 測試全部 exit 0 通過。
+7. **`tests/headless/test_p5a.gd` 測試套件實作（全綠）**：
+   - 涵蓋 1 大項正式資料正向斷言、3 大項共 18 條 Lint 17/18/19 負向 fixture 測試、1 大項 Source ↔ Ending 封閉配對矩陣測試。
+   - 納入 `tests/run_all_headless.ps1`，全套 29 套測試全數 exit 0 通過。
+   - UI Sim 85 個契約（108 個變體）全數 exit 0 通過（0 failed checks）。
 
 ## 驗證狀態
 
-- **Headless 測試**：`tests/run_all_headless.ps1` 包含的 28 套 headless 測試全部 exit 0 通過。
+- **資料驗證（`verify_data.gd`）**：卡片 66、地點 48、NPC 18、beat 268、ending 4、opening 3；引用檢查 0 錯誤；Lint 1～19 全部 0 錯誤。
+- **Headless 測試**：`tests/run_all_headless.ps1` 包含的 29 套 headless 測試全部 exit 0 通過。
 - **UI Sim 測試**：`tests/ui_sim/run_ui_sim.ps1 -Background` 執行 108 variants、85 catalog contracts、85 executed contracts、85 completed contracts、0 failed checks，exit 0 全綠。
 
 ## 目前風險
 
-- 無已知阻斷性缺陷。全套 28 套 headless 與 UI sim 全綠。
+- 無已知阻斷性缺陷。全套 29 套 headless 與 UI sim 全綠。
 
 ## 下一個任務
 
-**P4-F 實作已完成，交由 verifier 進行複驗、4 項體感記錄與文件關門。** 關門後下一步依序進入 Phase 5（P5-A 結局、開局與跨輪資料）。
+**P5-A 實作已完成，交由 verifier 進行複驗與文件關門。** 關門後下一步依序進入 Phase 5-B（頂層流程與結局狀態機）。

@@ -8,10 +8,24 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 1 },
-        { "location": "clinic", "phases": ["morning"], "from_day": 6 }
+        {
+          "location": "sanquan",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 1
+        },
+        {
+          "location": "clinic",
+          "phases": [
+            "morning"
+          ],
+          "from_day": 6
+        }
       ],
-      "note": "旅館與診所並存到最後，不是搬過去——第 43 天他兩邊都出現得到。企劃書第十三節：他第一輪不會死"
+      "note": "旅館與診所並存到最後，不是搬過去——第 43 天他兩邊都出現得到。企劃書第十三節：他第一輪不會死",
+      "festival_proxy_eligible": false
     },
     {
       "id": "ajie",
@@ -20,10 +34,26 @@
       "reveal": null,
       "card": "npc_ajie",
       "at": [
-        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 2, "to_day": 22 },
-        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 27 }
+        {
+          "location": "sanquan",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 2,
+          "to_day": 22
+        },
+        {
+          "location": "sanquan",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 27
+        }
       ],
-      "note": "戀愛對象 A。第 1 天與主角同車上山（busstop，傍晚，不是行動格）。第 23–26 天回阿姨那邊過颱風，所以 at[] 斷成兩段——那四天她不在正是颱風段的設計核心（企劃書第十三節：三件事搶兩格才是真的）。第 22 天傍晚走（d22_evening_ajie_leaves）、第 27 天上午回來上工（d27_morning_ajie_back）"
+      "note": "戀愛對象 A。第 1 天與主角同車上山（busstop，傍晚，不是行動格）。第 23–26 天回阿姨那邊過颱風，所以 at[] 斷成兩段——那四天她不在正是颱風段的設計核心（企劃書第十三節：三件事搶兩格才是真的）。第 22 天傍晚走（d22_evening_ajie_leaves）、第 27 天上午回來上工（d27_morning_ajie_back）",
+      "festival_proxy_eligible": true
     },
     {
       "id": "awei",
@@ -32,10 +62,26 @@
       "reveal": null,
       "card": "npc_awei",
       "at": [
-        { "location": "jinghe", "phases": ["morning", "afternoon"], "from_day": 10 },
-        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 23, "to_day": 26 }
+        {
+          "location": "jinghe",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 10
+        },
+        {
+          "location": "sanquan",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 23,
+          "to_day": 26
+        }
       ],
-      "note": "戀愛對象 B。本業在靜和園櫃檯；颱風四天帶阿嬤來山泉閣避難（企劃書第十三節，第一輪戀愛線重心）"
+      "note": "戀愛對象 B。本業在靜和園櫃檯；颱風四天帶阿嬤來山泉閣避難（企劃書第十三節，第一輪戀愛線重心）",
+      "festival_proxy_eligible": true
     },
     {
       "id": "acai",
@@ -44,9 +90,17 @@
       "reveal": null,
       "card": "npc_acai",
       "at": [
-        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 17 }
+        {
+          "location": "sanquan",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 17
+        }
       ],
-      "note": "叔叔住院後來旅館代班。第 21 夜起 n_emptyspot 是他原本站的位置"
+      "note": "叔叔住院後來旅館代班。第 21 夜起 n_emptyspot 是他原本站的位置",
+      "festival_proxy_eligible": true
     },
     {
       "id": "ahong",
@@ -55,9 +109,18 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 1, "to_day": 5 }
+        {
+          "location": "sanquan",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 1,
+          "to_day": 5
+        }
       ],
-      "note": "第一輪白天只到第 5 天，之後不再回來（阿宏線改版，待決一）。第 6 夜起改由 n_ahong_1..7 承接"
+      "note": "第一輪白天只到第 5 天，之後不再回來（阿宏線改版，待決一）。第 6 夜起改由 n_ahong_1..7 承接",
+      "festival_proxy_eligible": false
     },
     {
       "id": "linjie",
@@ -66,10 +129,26 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "jinghe", "phases": ["morning", "afternoon"], "from_day": 8 },
-        { "location": "jinghe_back", "phases": ["morning", "afternoon"], "from_day": 37, "to_day": 38 }
+        {
+          "location": "jinghe",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 8
+        },
+        {
+          "location": "jinghe_back",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 37,
+          "to_day": 38
+        }
       ],
-      "note": "靜和園經理。⚠️ 待決 6：她是不是阿婕口中的「阿姨」還沒拍板；若成立也只能是背景關係"
+      "note": "靜和園經理。⚠️ 待決 6：她是不是阿婕口中的「阿姨」還沒拍板；若成立也只能是背景關係",
+      "festival_proxy_eligible": false
     },
     {
       "id": "jinbo",
@@ -78,9 +157,17 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "temple", "phases": ["morning", "afternoon"], "from_day": 3 }
+        {
+          "location": "temple",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 3
+        }
       ],
-      "note": "二十年前那三個人之一。唯一在警告主角的人"
+      "note": "二十年前那三個人之一。唯一在警告主角的人",
+      "festival_proxy_eligible": false
     },
     {
       "id": "chun_ama",
@@ -89,9 +176,17 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "oldstreet", "phases": ["morning", "afternoon"], "from_day": 2 }
+        {
+          "location": "oldstreet",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 2
+        }
       ],
-      "note": "二十年前那三個人之一。雜貨店。⚠️ beats 只到第 14 天，第二、三章沒有她——待驗"
+      "note": "二十年前那三個人之一。雜貨店。⚠️ beats 只到第 14 天，第二、三章沒有她——待驗",
+      "festival_proxy_eligible": false
     },
     {
       "id": "drchen",
@@ -100,10 +195,24 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "clinic", "phases": ["morning"], "from_day": 12 },
-        { "location": "clinic_back", "phases": ["morning", "afternoon"], "from_day": 18 }
+        {
+          "location": "clinic",
+          "phases": [
+            "morning"
+          ],
+          "from_day": 12
+        },
+        {
+          "location": "clinic_back",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 18
+        }
       ],
-      "note": "二十年前那三個人之一。第 18–19 天之後他會注意到你往後棟繞（locations.json clinic_back 註）"
+      "note": "二十年前那三個人之一。第 18–19 天之後他會注意到你往後棟繞（locations.json clinic_back 註）",
+      "festival_proxy_eligible": false
     },
     {
       "id": "azhu",
@@ -112,9 +221,16 @@
       "reveal": null,
       "card": "npc_azhu",
       "at": [
-        { "location": "clinic", "phases": ["morning"], "from_day": 17 }
+        {
+          "location": "clinic",
+          "phases": [
+            "morning"
+          ],
+          "from_day": 17
+        }
       ],
-      "note": "委託對象。有些事她知道，有些事她不想知道"
+      "note": "委託對象。有些事她知道，有些事她不想知道",
+      "festival_proxy_eligible": false
     },
     {
       "id": "laozeng",
@@ -123,9 +239,16 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "police", "phases": ["morning"], "from_day": 4 }
+        {
+          "location": "police",
+          "phases": [
+            "morning"
+          ],
+          "from_day": 4
+        }
       ],
-      "note": "⚠️ 待決 29：他聲稱的巡查路線在不在公共浴場那條上，要先畫地圖才驗得了"
+      "note": "⚠️ 待決 29：他聲稱的巡查路線在不在公共浴場那條上，要先畫地圖才驗得了",
+      "festival_proxy_eligible": false
     },
     {
       "id": "zhou",
@@ -134,9 +257,16 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "riverside", "phases": ["afternoon"], "from_day": 8 }
+        {
+          "location": "riverside",
+          "phases": [
+            "afternoon"
+          ],
+          "from_day": 8
+        }
       ],
-      "note": "河邊。父母出事那座橋旁邊"
+      "note": "河邊。父母出事那座橋旁邊",
+      "festival_proxy_eligible": false
     },
     {
       "id": "grad_student",
@@ -145,10 +275,24 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 9 },
-        { "location": "registry_office", "phases": ["morning"], "from_day": 16 }
+        {
+          "location": "sanquan",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 9
+        },
+        {
+          "location": "registry_office",
+          "phases": [
+            "morning"
+          ],
+          "from_day": 16
+        }
       ],
-      "note": "住山泉閣的客人。企劃書第十節第三本簿子的入口——他會帶主角去戶籍室，也可以自己去。⚠️ registry_office 的 from_day 16 是按第二章開章推的，beats 尚無他在該地點的 beat"
+      "note": "住山泉閣的客人。企劃書第十節第三本簿子的入口——他會帶主角去戶籍室，也可以自己去。⚠️ registry_office 的 from_day 16 是按第二章開章推的，beats 尚無他在該地點的 beat",
+      "festival_proxy_eligible": false
     },
     {
       "id": "aqinbo",
@@ -157,9 +301,16 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "upstream", "phases": ["afternoon"], "from_day": 19 }
+        {
+          "location": "upstream",
+          "phases": [
+            "afternoon"
+          ],
+          "from_day": 19
+        }
       ],
-      "note": "取水口與管線房。舊湯屋那條線也可以由他起頭（locations.json old_bathhouse 註）"
+      "note": "取水口與管線房。舊湯屋那條線也可以由他起頭（locations.json old_bathhouse 註）",
+      "festival_proxy_eligible": false
     },
     {
       "id": "wu_chairman",
@@ -168,9 +319,16 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "communitycenter", "phases": ["afternoon"], "from_day": 10 }
+        {
+          "location": "communitycenter",
+          "phases": [
+            "afternoon"
+          ],
+          "from_day": 10
+        }
       ],
-      "note": "慶典籌備。⚠️ 待決 11：他的家人是妻子還是兒子還沒定"
+      "note": "慶典籌備。⚠️ 待決 11：他的家人是妻子還是兒子還沒定",
+      "festival_proxy_eligible": false
     },
     {
       "id": "xiaowu",
@@ -179,20 +337,38 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "oldstreet", "phases": ["morning", "afternoon"], "from_day": 19 }
+        {
+          "location": "oldstreet",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 19
+        }
       ],
-      "note": "⚠️ 待決 15：他的取樣能不能阻止未定，目前建議第一輪不給選項"
+      "note": "⚠️ 待決 15：他的取樣能不能阻止未定，目前建議第一輪不給選項",
+      "festival_proxy_eligible": false
     },
     {
       "id": "mr_xu",
       "name": "許先生",
       "locked_name": "長住的客人",
-      "reveal": { "day_at_least": 41 },
+      "reveal": {
+        "day_at_least": 41
+      },
       "card": null,
       "at": [
-        { "location": "sanquan", "phases": ["morning", "afternoon"], "from_day": 11 }
+        {
+          "location": "sanquan",
+          "phases": [
+            "morning",
+            "afternoon"
+          ],
+          "from_day": 11
+        }
       ],
-      "note": "企劃書第十三節：第 11 天入住、續住到最後、全輪六個接觸點，第 41 天講完太太的事才從「長住的客人」變成他的名字——NPC 版的地圖對位。⚠️ beats 目前只有第 41、44 天兩個接觸點，缺四個；姓氏「許」是暫名（待決 19）"
+      "note": "企劃書第十三節：第 11 天入住、續住到最後、全輪六個接觸點，第 41 天講完太太的事才從「長住的客人」變成他的名字——NPC 版的地圖對位。⚠️ beats 目前只有第 41、44 天兩個接觸點，缺四個；姓氏「許」是暫名（待決 19）",
+      "festival_proxy_eligible": false
     },
     {
       "id": "bus_driver",
@@ -201,9 +377,16 @@
       "reveal": null,
       "card": null,
       "at": [
-        { "location": "busstop", "phases": ["morning"], "from_day": 1 }
+        {
+          "location": "busstop",
+          "phases": [
+            "morning"
+          ],
+          "from_day": 1
+        }
       ],
-      "note": "⚠️ 待決 7：他是不是超脫輪迴者還沒拍板。第一輪只做一件事——讓他存在過（第 44 天那句「你不是坐過了嗎」）"
+      "note": "⚠️ 待決 7：他是不是超脫輪迴者還沒拍板。第一輪只做一件事——讓他存在過（第 44 天那句「你不是坐過了嗎」）",
+      "festival_proxy_eligible": false
     }
   ],
   "_pending": {
