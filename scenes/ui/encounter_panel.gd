@@ -201,31 +201,49 @@ func show_round(view: Dictionary) -> void:
 	if can_escape:
 		var esc_cost_raw: Variant = view.get("escape_cost")
 		var esc_cost := int(esc_cost_raw) if esc_cost_raw != null else 0
+
+		# 可作為逃離代價的手牌（發狂卡與不可丟棄卡不算），保持 view 的資料順序。
+		var payable_ids: Array[String] = []
+		var payable_names: Array[String] = []
+		for c: Variant in candidates:
+			if not c is Dictionary:
+				continue
+			var cand := c as Dictionary
+			if str(cand.get("source", "")) != "hand":
+				continue
+			if str(cand.get("base_id", "")) == "madness":
+				continue
+			if not bool(cand.get("discardable", false)):
+				continue
+			var pid := str(cand.get("card_id", ""))
+			payable_ids.append(pid)
+			payable_names.append(str(cand.get("name", pid)))
+
 		if esc_cost == 0:
 			var escape_btn := Button.new()
 			escape_btn.text = _MSG_ESCAPE_FREE
 			escape_btn.set_meta("qa_id", "encounter_escape")
 			escape_btn.pressed.connect(_on_escape_free_pressed)
 			_action_row.add_child(escape_btn)
-		else:
-			# Per-card escape payment buttons (D8: cost 1)
-			for c: Variant in candidates:
-				if not c is Dictionary:
-					continue
-				var cand := c as Dictionary
-				if str(cand.get("source", "")) != "hand":
-					continue
-				if str(cand.get("base_id", "")) == "madness":
-					continue
-				if not bool(cand.get("discardable", false)):
-					continue
-				var esc_card_id := str(cand.get("card_id", ""))
-				var esc_card_name := str(cand.get("name", esc_card_id))
+		elif esc_cost == 1:
+			# 成本 1（D8）：每張可付的卡各一顆按鈕，玩家直接指定付哪張。
+			for i in range(payable_ids.size()):
 				var pay_btn := Button.new()
-				pay_btn.text = _FMT_ESCAPE_PAY % esc_card_name
-				pay_btn.set_meta("qa_id", "encounter_escape_pay::%s" % esc_card_id)
-				pay_btn.pressed.connect(_on_escape_pay_pressed.bind(esc_card_id, esc_card_name))
+				pay_btn.text = _FMT_ESCAPE_PAY % payable_names[i]
+				pay_btn.set_meta("qa_id", "encounter_escape_pay::%s" % payable_ids[i])
+				pay_btn.pressed.connect(_on_escape_pay_pressed.bind(payable_ids[i], payable_names[i]))
 				_action_row.add_child(pay_btn)
+		elif payable_ids.size() >= esc_cost:
+			# 成本 ≥ 2：規則層要求張數恰等於 escape_cost，逐張付會被 wrong_escape_count
+			# 打回，所以一顆按鈕一次湊足前 esc_cost 張。付不起時不出按鈕。
+			var pay_many := Button.new()
+			pay_many.text = _FMT_ESCAPE_COST % esc_cost
+			pay_many.set_meta("qa_id", "encounter_escape")
+			pay_many.pressed.connect(_on_escape_many_pressed.bind(
+				payable_ids.slice(0, esc_cost),
+				"、".join(payable_names.slice(0, esc_cost))
+			))
+			_action_row.add_child(pay_many)
 
 	_action_row.visible = can_escape and _action_row.get_child_count() > 0
 
@@ -275,6 +293,16 @@ func _on_escape_pay_pressed(card_id: String, card_name: String) -> void:
 	_pending_escape_card_ids = [card_id]
 	_escape_dialog.title = _MSG_ESCAPE_TITLE
 	_escape_dialog.dialog_text = _FMT_ESCAPE_TEXT % card_name
+	_escape_dialog.popup_centered()
+
+
+## escape_cost ≥ 2：一次支付多張。card_ids 已由呼叫端湊到恰等於 escape_cost。
+func _on_escape_many_pressed(card_ids: Array, summary: String) -> void:
+	_pending_escape_card_ids.clear()
+	for cid: Variant in card_ids:
+		_pending_escape_card_ids.append(str(cid))
+	_escape_dialog.title = _MSG_ESCAPE_TITLE
+	_escape_dialog.dialog_text = _FMT_ESCAPE_TEXT % summary
 	_escape_dialog.popup_centered()
 
 

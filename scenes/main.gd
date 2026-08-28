@@ -15,6 +15,13 @@ const _MSG_ADVANCE_NEXT_DAY := "進入隔天"
 const _MSG_ADVANCE_END_NIGHT := "結束今晚"
 const _FMT_STATUS := "第 %d 天  %s  第 %d 章"
 
+# 版面：ContentView 內只有「FlowText 在上、內容面板在下」與「內容面板佔滿」兩種形狀。
+# 兩者都由 _layout_with_flow() 產生，不在各分支重複寫 offset（P4-E 重構）。
+const _LAYOUT_BOTTOM := 400.0
+const _LAYOUT_FLOW_SHORT := 120.0  # 與下方內容共存時的 FlowText 高度
+const _LAYOUT_FLOW_TALL := 200.0   # 遭遇開場：演出文字佔多一點
+const _LAYOUT_GAP := 10.0
+
 @onready var _error_label: Label = $ErrorLabel
 @onready var _status_label: Label = $StatusLabel
 @onready var _advance_btn: Button = $AdvanceButton
@@ -142,10 +149,7 @@ func _on_advance_pressed() -> void:
 				_flow_text.clear()
 				_flow_text.append_lines(lines)
 				_flow_text.visible = true
-				_flow_text.offset_top = 0.0
-				_flow_text.offset_bottom = 120.0
-				_map_list.offset_top = 130.0
-				_map_list.offset_bottom = 400.0
+				_layout_with_flow(_map_list)
 			_refresh_advance_hint()
 			return
 
@@ -223,14 +227,7 @@ func _on_delegation_requested(beat_id: String, slot_id: String, card_id: String)
 	if lines_delegation.size() > 0:
 		_flow_text.append_lines(lines_delegation)
 		_flow_text.visible = true
-		_flow_text.offset_top = 0.0
-		_flow_text.offset_bottom = 120.0
-		_map_list.offset_top = 130.0
-		_map_list.offset_bottom = 400.0
-	else:
-		_flow_text.visible = false
-		_map_list.offset_top = 0.0
-		_map_list.offset_bottom = 400.0
+	_layout_with_flow(_map_list)
 	_hand_bar.call("refresh")
 	_refresh_advance_hint()
 
@@ -291,8 +288,7 @@ func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> vo
 	_advance_btn.disabled = false
 	if _is_showing_ending:
 		_flow_text.visible = true
-		_flow_text.offset_top = 0.0
-		_flow_text.offset_bottom = 400.0
+		_layout_flow_full()
 		_map_list.visible = false
 		_location_panel.visible = false
 		_encounter_panel.visible = false
@@ -315,15 +311,7 @@ func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> vo
 				_show_encounter()
 				return
 			_map_list.visible = true
-			if _flow_text.visible and not _flow_text.get_lines().is_empty():
-				_flow_text.offset_top = 0.0
-				_flow_text.offset_bottom = 120.0
-				_map_list.offset_top = 130.0
-				_map_list.offset_bottom = 400.0
-			else:
-				_flow_text.visible = false
-				_map_list.offset_top = 0.0
-				_map_list.offset_bottom = 400.0
+			_layout_with_flow(_map_list)
 			_map_list.call("refresh")
 			_advance_btn.visible = true
 		"evening":
@@ -340,8 +328,7 @@ func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> vo
 				else:
 					_play_evening()
 					_flow_text.visible = true
-				_flow_text.offset_top = 0.0
-				_flow_text.offset_bottom = 400.0
+				_layout_flow_full()
 				_advance_btn.visible = true
 		"night":
 			_location_panel.visible = false
@@ -357,18 +344,30 @@ func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> vo
 				_show_encounter()
 				return
 			_map_list.visible = true
-			if _flow_text.visible and not _flow_text.get_lines().is_empty():
-				_flow_text.offset_top = 0.0
-				_flow_text.offset_bottom = 120.0
-				_map_list.offset_top = 130.0
-				_map_list.offset_bottom = 400.0
-			else:
-				_flow_text.visible = false
-				_map_list.offset_top = 0.0
-				_map_list.offset_bottom = 400.0
+			_layout_with_flow(_map_list)
 			_map_list.call("refresh")
 			_advance_btn.visible = true
 	_refresh_advance_hint()
+
+
+## 依 FlowText 當下是否真的有內容，決定它與下方內容面板的版面（P4-E 重構）。
+## 有內容：FlowText 佔上方 flow_height，content 接在下面；沒內容：收起 FlowText，content 佔滿。
+func _layout_with_flow(content: Node, flow_height: float = _LAYOUT_FLOW_SHORT) -> void:
+	if _flow_text.visible and not _flow_text.get_lines().is_empty():
+		_flow_text.offset_top = 0.0
+		_flow_text.offset_bottom = flow_height
+		content.offset_top = flow_height + _LAYOUT_GAP
+		content.offset_bottom = _LAYOUT_BOTTOM
+	else:
+		_flow_text.visible = false
+		content.offset_top = 0.0
+		content.offset_bottom = _LAYOUT_BOTTOM
+
+
+## FlowText 獨佔整個 ContentView（結局、晚間演出、coda 完成）。
+func _layout_flow_full() -> void:
+	_flow_text.offset_top = 0.0
+	_flow_text.offset_bottom = _LAYOUT_BOTTOM
 
 
 func _play_forced_lines() -> void:
@@ -404,19 +403,7 @@ func _show_final_coda(encounter_lines: PackedStringArray = PackedStringArray()) 
 			_flow_text.clear()
 			_flow_text.append_lines(encounter_lines)
 			_flow_text.visible = true
-			_flow_text.offset_top = 0.0
-			_flow_text.offset_bottom = 120.0
-			_location_panel.offset_top = 130.0
-			_location_panel.offset_bottom = 400.0
-		elif _flow_text.visible and not _flow_text.get_lines().is_empty():
-			_flow_text.offset_top = 0.0
-			_flow_text.offset_bottom = 120.0
-			_location_panel.offset_top = 130.0
-			_location_panel.offset_bottom = 400.0
-		else:
-			_flow_text.visible = false
-			_location_panel.offset_top = 0.0
-			_location_panel.offset_bottom = 400.0
+		_layout_with_flow(_location_panel)
 		_location_panel.call("show_location", "jinghe_back")
 		return
 
@@ -424,8 +411,7 @@ func _show_final_coda(encounter_lines: PackedStringArray = PackedStringArray()) 
 	_flow_text.clear()
 	_flow_text.append_line("[結局 coda 已完成]")
 	_flow_text.visible = true
-	_flow_text.offset_top = 0.0
-	_flow_text.offset_bottom = 400.0
+	_layout_flow_full()
 	_advance_btn.disabled = false
 
 
@@ -461,22 +447,11 @@ func _show_encounter() -> void:
 					_flow_text.clear()
 					_flow_text.append_line(text)
 					_flow_text.visible = true
-		_flow_text.offset_top = 0.0
-		_flow_text.offset_bottom = 200.0
-		_encounter_panel.offset_top = 210.0
-		_encounter_panel.offset_bottom = 400.0
+		_layout_with_flow(_encounter_panel, _LAYOUT_FLOW_TALL)
 		_encounter_panel.call("show_intro")
 	else:
 		# Round 階段：FlowText 保留先前文字（acknowledge 結果或 response 結果）。
-		if _flow_text.visible and not _flow_text.get_lines().is_empty():
-			_flow_text.offset_top = 0.0
-			_flow_text.offset_bottom = 120.0
-			_encounter_panel.offset_top = 130.0
-			_encounter_panel.offset_bottom = 400.0
-		else:
-			_flow_text.visible = false
-			_encounter_panel.offset_top = 0.0
-			_encounter_panel.offset_bottom = 400.0
+		_layout_with_flow(_encounter_panel)
 		_encounter_panel.call("show_round", view)
 
 	_refresh_advance_hint()
@@ -524,24 +499,12 @@ func _handle_encounter_result(result: Dictionary) -> void:
 		_hand_bar.call("refresh")
 		_route_view(lines)
 	else:
-		# 遭遇繼續：更新 FlowText 與面板
+		# 遭遇繼續：更新 FlowText，版面與面板渲染一律交給 _show_encounter()，
+		# 不再另寫一份 round 分支（原本的複本已與本尊分歧，少了 FlowText 收起那行）。
 		if lines.size() > 0:
 			_flow_text.clear()
 			_flow_text.append_lines(lines)
 			_flow_text.visible = true
-		var view: Dictionary = GameState.encounter_view()
-		var stage := str(view.get("stage", ""))
-		if stage == "round":
-			if _flow_text.visible and not _flow_text.get_lines().is_empty():
-				_flow_text.offset_top = 0.0
-				_flow_text.offset_bottom = 120.0
-				_encounter_panel.offset_top = 130.0
-				_encounter_panel.offset_bottom = 400.0
-			else:
-				_encounter_panel.offset_top = 0.0
-				_encounter_panel.offset_bottom = 400.0
-			_encounter_panel.call("show_round", view)
-		else:
-			_show_encounter()
+		_show_encounter()
 		_hand_bar.call("refresh")
 	_refresh_advance_hint()
