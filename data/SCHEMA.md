@@ -226,6 +226,11 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 頂層是有序陣列，正式資料恰四筆：`ending_replaced`、`ending_madness_be`、`ending_inventory_be`、`ending_refuse_boarding`。ending id 是內部穩定鍵，不直接顯示給玩家。
 
+| 欄位 | 規約 |
+|---|---|
+| `draft` | 選填 boolean；標記該 ending 文字為結構版氣氛草稿。文案定稿後移除 |
+| `draft_note` | 選填 string；草稿備註說明。文案定稿後移除 |
+
 ### 共用 page
 
 ```json
