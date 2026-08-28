@@ -576,7 +576,7 @@
         "phase": "evening"
       },
       "condition": {
-        "flag": "outside_job_waiting"
+        "opening_choice": "return_missed_call"
       },
       "fixed": true,
       "title": "雜訊",
@@ -592,9 +592,7 @@
         "phase": "evening"
       },
       "condition": {
-        "not": {
-          "flag": "outside_job_waiting"
-        }
+        "opening_choice": "take_family_album"
       },
       "fixed": true,
       "title": "雜訊",

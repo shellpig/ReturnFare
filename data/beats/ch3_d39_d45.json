@@ -756,6 +756,9 @@
           "accepts": [
             "protagonist"
           ],
+          "condition": {
+            "has_card": "info_zhou_job"
+          },
           "on_place": {
             "text": "「那我幫你講一聲。」他很高興。",
             "flag": {

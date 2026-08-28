@@ -161,6 +161,35 @@ func _test_positive_real_data() -> void:
 	else:
 		_fail("缺少 d45_then beat")
 
+	# D7 opening_choice 條件檢查 (P2)
+	var d7_called: Variant = loader.beats_by_id.get("d7_ambient_rejection_called")
+	if d7_called is Dictionary and (d7_called as Dictionary).get("condition") == { "opening_choice": "return_missed_call" }:
+		_ok("d7_ambient_rejection_called 依 opening_choice 判定符合單一真值契約")
+	else:
+		_fail("d7_ambient_rejection_called 條件不符契約: " + str((d7_called as Dictionary).get("condition") if d7_called is Dictionary else null))
+
+	var d7_album: Variant = loader.beats_by_id.get("d7_ambient_rejection")
+	if d7_album is Dictionary and (d7_album as Dictionary).get("condition") == { "opening_choice": "take_family_album" }:
+		_ok("d7_ambient_rejection 依 opening_choice 判定符合單一真值契約")
+	else:
+		_fail("d7_ambient_rejection 條件不符契約: " + str((d7_album as Dictionary).get("condition") if d7_album is Dictionary else null))
+
+	# D43 周先生工作門檻檢查 (P1)
+	var d43_beat: Variant = loader.beats_by_id.get("d43_pm_zhou")
+	if d43_beat is Dictionary:
+		var say_yes_found := false
+		for s in (d43_beat as Dictionary).get("slots", []):
+			if s.get("id") == "say_yes":
+				if s.get("condition") == { "has_card": "info_zhou_job" }:
+					say_yes_found = true
+					_ok("d43_pm_zhou.say_yes 具有 has_card: info_zhou_job 履歷門檻")
+				else:
+					_fail("d43_pm_zhou.say_yes 條件不符契約: " + str(s.get("condition")))
+		if not say_yes_found:
+			_fail("d43_pm_zhou 缺少 say_yes 槽")
+	else:
+		_fail("缺少 d43_pm_zhou beat")
+
 
 # ─────────────────────────── 2. Lint 17 負向 Fixtures ───────────────────────────
 func _test_lint17_negative() -> void:
@@ -282,15 +311,25 @@ func _test_lint17_negative() -> void:
 	else:
 		_fail("17.11 未抓到缺少 repeat.pages: " + str(errs))
 
-	# 12 (K-187). 壞 condition 引用在 rule when
+	# 12 (K-187). 壞 condition 運算子在 rule when
 	var bad_rule_when = base_loader.endings.duplicate(true)
 	bad_rule_when[0]["variant_groups"][0]["rules"][0]["when"] = { "unknown_condition_key": true }
 	var l_bad_when := _make_loader_for_p5(bad_rule_when, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_endings(l_bad_when)
-	if _errs_contain(errs, "未知 condition"):
-		_ok("17.12 抓到 rule when 引用未知 condition 鍵")
+	if _errs_contain(errs, "未知 condition 運算子"):
+		_ok("17.12 抓到 rule when 包含未知 condition 運算子")
 	else:
-		_fail("17.12 未抓到未知 condition: " + str(errs))
+		_fail("17.12 未抓到未知 condition 運算子: " + str(errs))
+
+	# 12b (K-187). 壞 condition 引用在 rule when (ending_seen 引用不存在 ending)
+	var bad_rule_ref = base_loader.endings.duplicate(true)
+	bad_rule_ref[0]["variant_groups"][0]["rules"][0]["when"] = { "ending_seen": "non_existent_ending_id" }
+	var l_bad_ref := _make_loader_for_p5(bad_rule_ref, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs, base_loader.locations)
+	var ref_probs := l_bad_ref.verify_references()
+	if _errs_contain(ref_probs, "ending_seen 引用不存在的 ending"):
+		_ok("17.12b 抓到 rule when 引用不存在的 ending")
+	else:
+		_fail("17.12b 未抓到壞 ending_seen 引用: " + str(ref_probs))
 
 	# 13 (K-186 Item 3). ending: ending_replaced 藏在 encounter 出口
 	var enc_exit_rep = base_loader.beats.duplicate(true)
@@ -950,3 +989,33 @@ func _test_references_negative() -> void:
 		_ok("Ref-4 (K-186.14) 抓到 festival_proxy 未知 mode")
 	else:
 		_fail("Ref-4 未抓到未知 mode: " + str(probs))
+
+	# Ref-5 (K-187). opening_choice 指向不存在的 opening_choice id
+	var bad_oc_ref = base_loader.beats.duplicate(true)
+	bad_oc_ref[0]["condition"] = { "opening_choice": "non_existent_opening_choice" }
+	var l_oc_ref := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_oc_ref, base_loader.cards, base_loader.npcs, base_loader.locations)
+	probs = l_oc_ref.verify_references()
+	if _errs_contain(probs, "opening_choice 引用不存在的選項"):
+		_ok("Ref-5 (K-187) 抓到 opening_choice 引用不存在的選項")
+	else:
+		_fail("Ref-5 未抓到壞 opening_choice 引用: " + str(probs))
+
+	# Ref-6 (K-187). ending_seen 指向不存在的 ending id
+	var bad_end_seen = base_loader.beats.duplicate(true)
+	bad_end_seen[0]["condition"] = { "ending_seen": "non_existent_ending_id" }
+	var l_end_seen := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_end_seen, base_loader.cards, base_loader.npcs, base_loader.locations)
+	probs = l_end_seen.verify_references()
+	if _errs_contain(probs, "ending_seen 引用不存在的 ending"):
+		_ok("Ref-6 (K-187) 抓到 ending_seen 引用不存在的 ending")
+	else:
+		_fail("Ref-6 未抓到壞 ending_seen 引用: " + str(probs))
+
+	# Ref-7 (K-187). ending effect 引用不存在的 ending id
+	var bad_end_eff = base_loader.beats.duplicate(true)
+	bad_end_eff[0]["on_enter"] = { "ending": "non_existent_ending_id" }
+	var l_end_eff := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_end_eff, base_loader.cards, base_loader.npcs, base_loader.locations)
+	probs = l_end_eff.verify_references()
+	if _errs_contain(probs, "ending 引用不存在的 ending"):
+		_ok("Ref-7 (K-187) 抓到 ending 效果引用不存在的 ending")
+	else:
+		_fail("Ref-7 未抓到壞 ending 效果引用: " + str(probs))

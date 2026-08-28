@@ -469,6 +469,8 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 	# 7. 產生 D43 afternoon 同時開放 riverside (d43_pm_zhou) 與 sanquan (d43_conclusion)
 	var d43_decisions: Array[Dictionary] = [
 		{ "day": 3, "phase": "afternoon", "beat_id": "d3_pm_sanquan", "slot_id": "handle_couple", "card_id": "protagonist" },
+		{ "day": 11, "phase": "afternoon", "beat_id": "d11_pm_river", "slot_id": "tell_debt", "card_id": "protagonist" },
+		{ "day": 12, "phase": "afternoon", "beat_id": "d12_pm_zhou_job", "slot_id": "accept", "card_id": "protagonist" },
 		{ "day": 22, "phase": "afternoon", "beat_id": "d22_pm_sandbags", "slot_id": "obs_walk", "card_id": "equip_polaroid", "group_id": "acai_read" }
 	]
 	var d43_cp: Dictionary = { "d43_afternoon": { "day": 43, "phase": "afternoon" } }
