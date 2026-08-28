@@ -303,7 +303,9 @@
           }
         ]
       }
-    ]
+    ],
+    "draft": true,
+    "draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"
   },
   {
     "id": "ending_madness_be",
@@ -324,7 +326,9 @@
         }
       ],
       "skip_to": "complete"
-    }
+    },
+    "draft": true,
+    "draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"
   },
   {
     "id": "ending_inventory_be",
@@ -345,7 +349,9 @@
         }
       ],
       "skip_to": "complete"
-    }
+    },
+    "draft": true,
+    "draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"
   },
   {
     "id": "ending_refuse_boarding",
@@ -370,6 +376,8 @@
         }
       ],
       "skip_to": "complete"
-    }
+    },
+    "draft": true,
+    "draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"
   }
 ]

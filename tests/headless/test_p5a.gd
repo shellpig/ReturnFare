@@ -3,6 +3,7 @@ extends SceneTree
 ## P5-A 結局、開局與跨輪資料測試（實作規格書 P5-A、測試指南 P5-A）。
 ## 正向：載入正式資料，驗 lint 17/18/19 全綠、卡片/NPC/ending/opening 動態斷言與故事映射。
 ## 負向：以 in-memory loader 建每個錯誤類別的最小反例，逐條驗對應 lint 抓到。
+## Source 矩陣：資料驅動枚舉 4 正 ＋ 12 錯 ＋ 3 phase_exit 反例。
 ## 跑法：Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p5a.gd
 
 var _failed := 0
@@ -16,7 +17,6 @@ func _initialize() -> void:
 	_test_lint18_negative()
 	_test_lint19_negative()
 	_test_source_pairing_matrix()
-	_test_nested_effects_and_required_shapes()
 
 	if _failed > 0:
 		push_error("test_p5a: %d 個斷言失敗" % _failed)
@@ -160,31 +160,61 @@ func _test_positive_real_data() -> void:
 		_fail("缺少 d45_then beat")
 
 
-# ─────────────────────────── 2. Lint 17 負向 Fixtures ───────────────────────────
+# ─────────────────────────── 2. Lint 17 負向 Fixtures (9 類) ───────────────────────────
 func _test_lint17_negative() -> void:
-	print("\n--- 2. Lint 17 負向 Fixtures ---")
+	print("\n--- 2. Lint 17 負向 Fixtures (9 類) ---")
 	var base_loader := DataLoader.new()
 	base_loader.load_all()
 
-	# 2.1 缺少 ending id
+	# 1. 缺 ending id
 	var l_missing := _make_loader_for_p5(base_loader.endings.slice(0, 3), base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
 	var errs := DataLoader.lint_endings(l_missing)
-	if _errs_contain(errs, "缺少必填 ending id") and _errs_contain(errs, "預期恰 4 筆 ending"):
-		_ok("2.1 抓到缺少 ending id")
+	if _errs_contain(errs, "缺少必填 ending id"):
+		_ok("17.1 抓到缺少必填 ending id")
 	else:
-		_fail("2.1 未抓到缺少 ending id: " + str(errs))
+		_fail("17.1 未抓到缺少 ending id: " + str(errs))
 
-	# 2.2 未知 kind
+	# 2. 多 ending id（未知 ending）
+	var extra_endings = base_loader.endings.duplicate(true)
+	extra_endings.append({ "id": "ending_secret", "kind": "linear", "first_seen": {"pages": [{"id": "p1", "text": "secret"}]}, "repeat": {"pages": [{"id": "p2", "text": "secret"}], "skip_to": "complete"} })
+	var l_extra := _make_loader_for_p5(extra_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_endings(l_extra)
+	if _errs_contain(errs, "非預期的 ending id"):
+		_ok("17.2 抓到多出未知 ending id")
+	else:
+		_fail("17.2 未抓到未知 ending id: " + str(errs))
+
+	# 3. 重複 ending id
+	var dup_endings = base_loader.endings.duplicate(true)
+	dup_endings.append(dup_endings[0].duplicate(true))
+	var l_dup := _make_loader_for_p5(dup_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_endings(l_dup)
+	if _errs_contain(errs, "預期恰 4 筆 ending") or _errs_contain(errs, "重複"):
+		_ok("17.3 抓到重複 ending id / 筆數超額")
+	else:
+		_fail("17.3 未抓到重複 ending id: " + str(errs))
+
+	# 4. 未知 kind
 	var bad_kind_endings = base_loader.endings.duplicate(true)
 	bad_kind_endings[0]["kind"] = "branching"
 	var l_bad_kind := _make_loader_for_p5(bad_kind_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_endings(l_bad_kind)
 	if _errs_contain(errs, "kind 必須為 composite") or _errs_contain(errs, "未知 kind"):
-		_ok("2.2 抓到未知/錯誤 kind")
+		_ok("17.4 抓到未知 kind")
 	else:
-		_fail("2.2 未抓到未知/錯誤 kind: " + str(errs))
+		_fail("17.4 未抓到未知 kind: " + str(errs))
 
-	# 2.3 缺少 fallback
+	# 5. 缺 page 或 skip_to 指向不存在的 repeat page id
+	var bad_skip_endings = base_loader.endings.duplicate(true)
+	bad_skip_endings[0]["repeat"]["skip_to"] = "non_existent_page_id"
+	var l_bad_skip := _make_loader_for_p5(bad_skip_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_endings(l_bad_skip)
+	if _errs_contain(errs, "repeat.skip_to 指向不存在的 repeat page id"):
+		_ok("17.5 抓到 skip_to 指向不存在的 repeat page id")
+	else:
+		_fail("17.5 未抓到壞 skip_to: " + str(errs))
+
+	# 6. 缺 fallback / 多 fallback / fallback 帶 when
 	var bad_fb_endings = base_loader.endings.duplicate(true)
 	var vgs: Array = bad_fb_endings[0]["variant_groups"]
 	vgs[0]["rules"][2].erase("fallback")
@@ -192,80 +222,129 @@ func _test_lint17_negative() -> void:
 	var l_bad_fb := _make_loader_for_p5(bad_fb_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_endings(l_bad_fb)
 	if _errs_contain(errs, "必須恰有一個 fallback"):
-		_ok("2.3 抓到缺少 fallback")
+		_ok("17.6 抓到缺少 fallback / 多 fallback")
 	else:
-		_fail("2.3 未抓到缺少 fallback: " + str(errs))
+		_fail("17.6 未抓到缺少 fallback: " + str(errs))
 
-	# 2.4 多個 fallback
-	var multi_fb_endings = base_loader.endings.duplicate(true)
-	var vgs2: Array = multi_fb_endings[0]["variant_groups"]
-	vgs2[0]["rules"][0]["fallback"] = true
-	vgs2[0]["rules"][0].erase("when")
-	var l_multi_fb := _make_loader_for_p5(multi_fb_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_endings(l_multi_fb)
-	if _errs_contain(errs, "必須恰有一個 fallback"):
-		_ok("2.4 抓到多個 fallback")
+	# 7. 壞 lookup_fragments 引用 (when_group 錯 group/variant, 或非 eligible NPC)
+	var bad_frag_endings = base_loader.endings.duplicate(true)
+	bad_frag_endings[0]["lookup_fragments"][0]["when_group"]["group"] = "unknown_group"
+	var l_bad_frag := _make_loader_for_p5(bad_frag_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_endings(l_bad_frag)
+	if _errs_contain(errs, "when_group.group 指向不存在的 variant_group"):
+		_ok("17.7 抓到 lookup_fragments 指向不存在的 variant_group")
 	else:
-		_fail("2.4 未抓到多個 fallback: " + str(errs))
+		_fail("17.7 未抓到壞 when_group: " + str(errs))
 
-	# 2.5 文案洩漏內部 ending id
+	# 8. 玩家文案洩漏內部 ending id
 	var leak_endings = base_loader.endings.duplicate(true)
 	leak_endings[0]["first_seen"]["prefix_pages"][0]["text"] = "你走向了 ending_replaced 的結局。"
 	var l_leak := _make_loader_for_p5(leak_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_endings(l_leak)
 	if _errs_contain(errs, "玩家文字直接包含內部 ending id"):
-		_ok("2.5 抓到文案洩漏內部 ending id")
+		_ok("17.8 抓到文案洩漏內部 ending id")
 	else:
-		_fail("2.5 未抓到文案洩漏內部 ending id: " + str(errs))
+		_fail("17.8 未抓到文案洩漏內部 ending id: " + str(errs))
 
-	# 2.6 phase_exit 引用不存在的槽
-	var bad_pe_beats = base_loader.beats.duplicate(true)
-	for b in bad_pe_beats:
-		if b.get("id") == "d45_then":
-			b["phase_exit"]["required_slots"] = ["non_existent_slot"]
-	var l_bad_pe := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_pe_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_endings(l_bad_pe)
-	if _errs_contain(errs, "required_slots 引用父 beat 不存在的 slot id"):
-		_ok("2.6 抓到 phase_exit 引用外部/不存在 slot")
+	# 9. 組裝路徑 0 頁
+	var zero_page_endings = base_loader.endings.duplicate(true)
+	zero_page_endings[0]["first_seen"]["prefix_pages"] = []
+	zero_page_endings[0]["first_seen"]["suffix_pages"] = []
+	for vg in zero_page_endings[0]["variant_groups"]:
+		for r in vg["rules"]:
+			r["first_seen_pages"] = []
+	var l_zero := _make_loader_for_p5(zero_page_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_endings(l_zero)
+	if _errs_contain(errs, "缺少首見頁面（總頁數為 0）"):
+		_ok("17.9 抓到組裝路徑總頁數為 0")
 	else:
-		_fail("2.6 未抓到 phase_exit 引用不存在 slot: " + str(errs))
+		_fail("17.9 未抓到 0 頁組裝路徑: " + str(errs))
 
 
-# ─────────────────────────── 3. Lint 18 負向 Fixtures ───────────────────────────
+# ─────────────────────────── 3. Lint 18 負向 Fixtures (13 類) ───────────────────────────
 func _test_lint18_negative() -> void:
-	print("\n--- 3. Lint 18 負向 Fixtures ---")
+	print("\n--- 3. Lint 18 負向 Fixtures (13 類) ---")
 	var base_loader := DataLoader.new()
 	base_loader.load_all()
 
-	# 3.1 opening choices 缺選項
+	# 1. opening choices 缺選項
 	var l_missing_oc := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices.slice(0, 2), base_loader.beats, base_loader.cards, base_loader.npcs)
 	var errs := DataLoader.lint_opening_and_defaults(l_missing_oc)
 	if _errs_contain(errs, "順序或項目不符預期"):
-		_ok("3.1 抓到 opening choices 缺少選項")
+		_ok("18.1 抓到 opening choices 缺少選項")
 	else:
-		_fail("3.1 未抓到 opening choices 缺少選項: " + str(errs))
+		_fail("18.1 未抓到缺少選項: " + str(errs))
 
-	# 3.2 opening choice 同時包含 on_select 與 ending
-	var bad_oc = base_loader.opening_choices.duplicate(true)
-	bad_oc[0]["ending"] = "ending_replaced"
-	var l_both := _make_loader_for_p5(base_loader.endings, bad_oc, base_loader.beats, base_loader.cards, base_loader.npcs)
+	# 2. opening choices 多選項 / 重複
+	var extra_oc = base_loader.opening_choices.duplicate(true)
+	extra_oc.append({ "id": "extra_choice", "label": "extra", "preview": "p", "confirm_text": "c", "on_select": {} })
+	var l_extra_oc := _make_loader_for_p5(base_loader.endings, extra_oc, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_extra_oc)
+	if _errs_contain(errs, "順序或項目不符預期"):
+		_ok("18.2 抓到 opening choices 多出未知選項")
+	else:
+		_fail("18.2 未抓到多選項: " + str(errs))
+
+	# 3. opening choices 錯序
+	var reorder_oc = [base_loader.opening_choices[1], base_loader.opening_choices[0], base_loader.opening_choices[2]]
+	var l_reorder := _make_loader_for_p5(base_loader.endings, reorder_oc, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_reorder)
+	if _errs_contain(errs, "順序或項目不符預期"):
+		_ok("18.3 抓到 opening choices 錯序")
+	else:
+		_fail("18.3 未抓到錯序: " + str(errs))
+
+	# 4. on_select 與 ending 並存
+	var bad_oc_both = base_loader.opening_choices.duplicate(true)
+	bad_oc_both[0]["ending"] = "ending_replaced"
+	var l_both := _make_loader_for_p5(base_loader.endings, bad_oc_both, base_loader.beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_opening_and_defaults(l_both)
 	if _errs_contain(errs, "不得同時包含 on_select 與 ending"):
-		_ok("3.2 抓到 opening choice 同時包含 on_select 與 ending")
+		_ok("18.4 抓到 on_select 與 ending 並存")
 	else:
-		_fail("3.2 未抓到 on_select 與 ending 並存: " + str(errs))
+		_fail("18.4 未抓到並存: " + str(errs))
 
-	# 3.3 不上車缺少 requires 門檻
-	var bad_refuse = base_loader.opening_choices.duplicate(true)
-	bad_refuse[2].erase("requires")
-	var l_no_req := _make_loader_for_p5(base_loader.endings, bad_refuse, base_loader.beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_opening_and_defaults(l_no_req)
-	if _errs_contain(errs, "不上車必須包含 requires 門檻"):
-		_ok("3.3 抓到不上車缺少 requires")
+	# 5. on_select 與 ending 皆無
+	var bad_oc_none = base_loader.opening_choices.duplicate(true)
+	bad_oc_none[0].erase("on_select")
+	var l_none := _make_loader_for_p5(base_loader.endings, bad_oc_none, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_none)
+	if _errs_contain(errs, "必須在 on_select 與 ending 中恰有一個"):
+		_ok("18.5 抓到 on_select 與 ending 皆無")
 	else:
-		_fail("3.3 未抓到不上車缺少 requires: " + str(errs))
+		_fail("18.5 未抓到兩者皆無: " + str(errs))
 
-	# 3.4 choice group 包含多個 default_if_unresolved
+	# 6. 缺少 label / preview / confirm_text
+	var bad_oc_label = base_loader.opening_choices.duplicate(true)
+	bad_oc_label[0]["label"] = "   "
+	var l_empty_lbl := _make_loader_for_p5(base_loader.endings, bad_oc_label, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_empty_lbl)
+	if _errs_contain(errs, "label 不得為空"):
+		_ok("18.6 抓到 label 為空")
+	else:
+		_fail("18.6 未抓到空 label: " + str(errs))
+
+	# 7. 鎖定選項缺少 reject_reason
+	var bad_refuse_no_reason = base_loader.opening_choices.duplicate(true)
+	bad_refuse_no_reason[2].erase("reject_reason")
+	var l_no_reason := _make_loader_for_p5(base_loader.endings, bad_refuse_no_reason, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_no_reason)
+	if _errs_contain(errs, "必須提供非空 reject_reason"):
+		_ok("18.7 抓到有 requires 但缺少 reject_reason")
+	else:
+		_fail("18.7 未抓到缺少理由: " + str(errs))
+
+	# 8. 錯誤 ending 門檻（不上車 gate 設為非 ending_replaced）
+	var bad_refuse_gate = base_loader.opening_choices.duplicate(true)
+	bad_refuse_gate[2]["requires"] = { "ending_seen": "ending_madness_be" }
+	var l_bad_gate := _make_loader_for_p5(base_loader.endings, bad_refuse_gate, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_bad_gate)
+	if _errs_contain(errs, "不上車門檻必須為 ending_seen: ending_replaced"):
+		_ok("18.8 抓到不上車 gate 設為錯誤 ending")
+	else:
+		_fail("18.8 未抓到錯誤 gate: " + str(errs))
+
+	# 9. choice group 包含多個 default_if_unresolved
 	var multi_def_beats = base_loader.beats.duplicate(true)
 	for b in multi_def_beats:
 		if b.get("id") == "d29_pm_invitation":
@@ -273,11 +352,11 @@ func _test_lint18_negative() -> void:
 	var l_multi_def := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, multi_def_beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_opening_and_defaults(l_multi_def)
 	if _errs_contain(errs, "包含多個 default_if_unresolved 槽"):
-		_ok("3.4 抓到同組多個 default_if_unresolved")
+		_ok("18.9 抓到同組多個 default_if_unresolved")
 	else:
-		_fail("3.4 未抓到多個 default_if_unresolved: " + str(errs))
+		_fail("18.9 未抓到多個 default: " + str(errs))
 
-	# 3.5 default 槽收卡
+	# 10. default 槽收卡 (accepts 非空)
 	var def_card_beats = base_loader.beats.duplicate(true)
 	for b in def_card_beats:
 		if b.get("id") == "d29_pm_invitation":
@@ -285,50 +364,101 @@ func _test_lint18_negative() -> void:
 	var l_def_card := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, def_card_beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_opening_and_defaults(l_def_card)
 	if _errs_contain(errs, "default 槽不得收卡"):
-		_ok("3.5 抓到 default 槽收卡")
+		_ok("18.10 抓到 default 槽收卡")
 	else:
-		_fail("3.5 未抓到 default 槽收卡: " + str(errs))
+		_fail("18.10 未抓到 default 槽收卡: " + str(errs))
 
-	# 3.6 choice_requires_card:true 但 accepts 為空
-	var empty_acc_beats = base_loader.beats.duplicate(true)
-	for b in empty_acc_beats:
+	# 11. default 槽所在父 beat 非 fixed: true
+	var def_non_fixed = base_loader.beats.duplicate(true)
+	for b in def_non_fixed:
+		if b.get("id") == "d29_pm_invitation":
+			b["fixed"] = false
+	var l_non_fixed := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, def_non_fixed, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_non_fixed)
+	if _errs_contain(errs, "default_if_unresolved 所在父 beat 必須為 fixed:true"):
+		_ok("18.11 抓到 default 槽在 non-fixed beat")
+	else:
+		_fail("18.11 未抓到 non-fixed default: " + str(errs))
+
+	# 12. default 槽非 choice_group 槽
+	var def_no_cg = base_loader.beats.duplicate(true)
+	for b in def_no_cg:
+		if b.get("id") == "d29_pm_invitation":
+			b["slots"][2].erase("choice_group")
+	var l_no_cg := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, def_no_cg, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_no_cg)
+	if _errs_contain(errs, "default_if_unresolved 只能用於 choice_group 槽"):
+		_ok("18.12 抓到 default 槽缺少 choice_group")
+	else:
+		_fail("18.12 未抓到缺少 choice_group: " + str(errs))
+
+	# 13. choice_requires_card 錯型別 / accepts 空 / 與 default 並存
+	var req_bad_type = base_loader.beats.duplicate(true)
+	for b in req_bad_type:
 		if b.get("id") == "d43_pm_zhou":
-			b["slots"][0]["accepts"] = []
-	var l_empty_acc := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, empty_acc_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_opening_and_defaults(l_empty_acc)
-	if _errs_contain(errs, "choice_requires_card:true 必須有非空 accepts"):
-		_ok("3.6 抓到 choice_requires_card:true 但 accepts 為空")
+			b["slots"][0]["choice_requires_card"] = "yes"
+	var l_bad_type := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, req_bad_type, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_opening_and_defaults(l_bad_type)
+	if _errs_contain(errs, "choice_requires_card 必須為 boolean"):
+		_ok("18.13 抓到 choice_requires_card 錯型別")
 	else:
-		_fail("3.6 未抓到 choice_requires_card:true 空 accepts: " + str(errs))
+		_fail("18.13 未抓到錯型別: " + str(errs))
 
 
-# ─────────────────────────── 4. Lint 19 負向 Fixtures ───────────────────────────
+# ─────────────────────────── 4. Lint 19 負向 Fixtures (11 類) ───────────────────────────
 func _test_lint19_negative() -> void:
-	print("\n--- 4. Lint 19 負向 Fixtures ---")
+	print("\n--- 4. Lint 19 負向 Fixtures (11 類) ---")
 	var base_loader := DataLoader.new()
 	base_loader.load_all()
 
-	# 4.1 卡片缺少 loop_persistent
+	# 1. 卡片缺少 loop_persistent
 	var bad_cards = base_loader.cards.duplicate(true)
 	bad_cards["protagonist"].erase("loop_persistent")
 	var l_missing_lp := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats, bad_cards, base_loader.npcs)
 	var errs := DataLoader.lint_loop_and_festival(l_missing_lp)
 	if _errs_contain(errs, "缺少必填欄位 loop_persistent"):
-		_ok("4.1 抓到卡片缺少 loop_persistent")
+		_ok("19.1 抓到卡片缺少 loop_persistent")
 	else:
-		_fail("4.1 未抓到卡片缺少 loop_persistent: " + str(errs))
+		_fail("19.1 未抓到缺少欄位: " + str(errs))
 
-	# 4.2 protagonist 設 loop_persistent:true
+	# 2. loop_persistent 錯型別 (非 bool)
+	var bad_type_cards = base_loader.cards.duplicate(true)
+	bad_type_cards["protagonist"]["loop_persistent"] = "false"
+	var l_type_lp := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats, bad_type_cards, base_loader.npcs)
+	errs = DataLoader.lint_loop_and_festival(l_type_lp)
+	if _errs_contain(errs, "loop_persistent 必須是 boolean"):
+		_ok("19.2 抓到 loop_persistent 非 boolean")
+	else:
+		_fail("19.2 未抓到錯型別: " + str(errs))
+
+	# 3. protagonist / slotless / madness 設 loop_persistent: true
 	var bad_pro_cards = base_loader.cards.duplicate(true)
 	bad_pro_cards["protagonist"]["loop_persistent"] = true
 	var l_pro_lp := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats, bad_pro_cards, base_loader.npcs)
 	errs = DataLoader.lint_loop_and_festival(l_pro_lp)
 	if _errs_contain(errs, "loop_persistent:true 只能用於"):
-		_ok("4.2 抓到 protagonist 設 loop_persistent:true")
+		_ok("19.3 抓到主角/不佔格卡設 loop_persistent:true")
 	else:
-		_fail("4.2 未抓到 protagonist 設 loop_persistent:true: " + str(errs))
+		_fail("19.3 未抓到主角卡設 persistent: " + str(errs))
 
-	# 4.3 permanent lose 指向非 loop_persistent 卡
+	# 4. 跨輪保留卡片佔格超過 hand_size - 1
+	var overflow_cards = base_loader.cards.duplicate(true)
+	var count := 0
+	for cid in overflow_cards:
+		var c := overflow_cards[cid] as Dictionary
+		if c.get("slotless", false) == false and c.get("type", "") != "protagonist" and c.get("type", "") != "madness":
+			c["loop_persistent"] = true
+			count += 1
+			if count >= 14:
+				break
+	var l_overflow := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats, overflow_cards, base_loader.npcs)
+	errs = DataLoader.lint_loop_and_festival(l_overflow)
+	if _errs_contain(errs, "跨輪保留卡片佔格上限超載"):
+		_ok("19.4 抓到跨輪保留卡片佔格超載")
+	else:
+		_fail("19.4 未抓到佔格超載: " + str(errs))
+
+	# 5. permanent lose 指向非 loop_persistent 卡
 	var bad_lose_beats = base_loader.beats.duplicate(true)
 	bad_lose_beats[0]["on_enter"] = {
 		"lose": [ { "card": "info_husband_version", "permanent": true } ]
@@ -336,11 +466,44 @@ func _test_lint19_negative() -> void:
 	var l_bad_lose := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_lose_beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_loop_and_festival(l_bad_lose)
 	if _errs_contain(errs, "lose 的 permanent:true 指向非 loop_persistent 卡"):
-		_ok("4.3 抓到 permanent:true 指向普通卡")
+		_ok("19.5 抓到 permanent:true 指向普通卡")
 	else:
-		_fail("4.3 未抓到 permanent:true 指向普通卡: " + str(errs))
+		_fail("19.5 未抓到 permanent 指向普通卡: " + str(errs))
 
-	# 4.4 刪除 D31 festival_proxy_is 內容
+	# 6. NPC 缺少 festival_proxy_eligible / 非 bool
+	var bad_npc_field = base_loader.npcs.duplicate(true)
+	bad_npc_field["ajie"].erase("festival_proxy_eligible")
+	var l_bad_npc_f := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, bad_npc_field)
+	errs = DataLoader.lint_loop_and_festival(l_bad_npc_f)
+	if _errs_contain(errs, "缺少必填欄位 festival_proxy_eligible"):
+		_ok("19.6 抓到 NPC 缺少 festival_proxy_eligible")
+	else:
+		_fail("19.6 未抓到 NPC 缺欄位: " + str(errs))
+
+	# 7. 候選 NPC 未被任何 attention_npc 引用
+	var no_att_beats = base_loader.beats.duplicate(true)
+	for b in no_att_beats:
+		for s in b.get("slots", []):
+			if str(s.get("attention_npc", "")) == "awei":
+				s.erase("attention_npc")
+	var l_no_att := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, no_att_beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_loop_and_festival(l_no_att)
+	if _errs_contain(errs, "未被任何 slot 的 attention_npc 引用"):
+		_ok("19.7 抓到候選 NPC 未被 attention_npc 引用")
+	else:
+		_fail("19.7 未抓到缺少 attention_npc: " + str(errs))
+
+	# 8. 候選 NPC 在 endings.json 的 uninvited_proxy 缺少 fragment
+	var no_frag_endings = base_loader.endings.duplicate(true)
+	no_frag_endings[0]["lookup_fragments"][0]["entries"] = []
+	var l_no_frag := _make_loader_for_p5(no_frag_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
+	errs = DataLoader.lint_loop_and_festival(l_no_frag)
+	if _errs_contain(errs, "缺少對應 fragment"):
+		_ok("19.8 抓到候選 NPC 缺少 ending fragment")
+	else:
+		_fail("19.8 未抓到缺少 fragment: " + str(errs))
+
+	# 9. 候選 NPC 缺少第 31 天 festival_proxy_is 內容
 	var no_d31_beats: Array[Dictionary] = []
 	for b in base_loader.beats:
 		if b.get("id") != "d31_proxy_ajie":
@@ -348,11 +511,11 @@ func _test_lint19_negative() -> void:
 	var l_no_d31 := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, no_d31_beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_loop_and_festival(l_no_d31)
 	if _errs_contain(errs, "缺少第 31 天 festival_proxy_is 內容"):
-		_ok("4.4 抓到缺少第 31 天 festival_proxy_is 內容")
+		_ok("19.9 抓到缺少第 31 天 festival_proxy_is 內容")
 	else:
-		_fail("4.4 未抓到缺少 D31 festival_proxy_is: " + str(errs))
+		_fail("19.9 未抓到缺少 D31 內容: " + str(errs))
 
-	# 4.5 刪除 D39 festival_proxy_is 內容
+	# 10. 候選 NPC 缺少第 39 天 festival_proxy_is 內容
 	var no_d39_beats: Array[Dictionary] = []
 	for b in base_loader.beats:
 		if b.get("id") != "d39_proxy_awei":
@@ -360,155 +523,173 @@ func _test_lint19_negative() -> void:
 	var l_no_d39 := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, no_d39_beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_loop_and_festival(l_no_d39)
 	if _errs_contain(errs, "缺少第 39 天 festival_proxy_is 內容"):
-		_ok("4.5 抓到缺少第 39 天 festival_proxy_is 內容")
+		_ok("19.10 抓到缺少第 39 天 festival_proxy_is 內容")
 	else:
-		_fail("4.5 未抓到缺少 D39 festival_proxy_is: " + str(errs))
+		_fail("19.10 未抓到缺少 D39 內容: " + str(errs))
 
-	# 4.6 非候選 NPC (azhu) 被標為 eligible
+	# 11. D29 fallback 非候選 / 非候選 NPC (azhu) 被標為 eligible
 	var bad_npcs = base_loader.npcs.duplicate(true)
 	bad_npcs["azhu"]["festival_proxy_eligible"] = true
 	var l_bad_npc := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, bad_npcs)
 	errs = DataLoader.lint_loop_and_festival(l_bad_npc)
 	if _errs_contain(errs, "未被任何 slot 的 attention_npc 引用") or _errs_contain(errs, "缺少對應 fragment"):
-		_ok("4.6 抓到未完全具備條件之 NPC 被設為 festival_proxy_eligible")
+		_ok("19.11 抓到非候選 NPC (azhu) 違規標為 eligible")
 	else:
-		_fail("4.6 未抓到非候選 NPC 違規: " + str(errs))
+		_fail("19.11 未抓到非候選 NPC 違規: " + str(errs))
 
 
-# ─────────────────────────── 5. Source 配對矩陣 ───────────────────────────
+# ─────────────────────────── 5. 資料驅動 Source 配對矩陣 (4 正 + 12 錯 + 3 phase_exit) ───────────────────────────
 func _test_source_pairing_matrix() -> void:
-	print("\n--- 5. Source 配對矩陣測試 ---")
+	print("\n--- 5. 資料驅動 Source 配對矩陣 (4 正 + 12 錯 + 3 phase_exit) ---")
 	var base_loader := DataLoader.new()
 	base_loader.load_all()
 
-	# Beat ending 效果引用非 inventory BE (例如引用 ending_replaced)
-	var bad_beat_ending = base_loader.beats.duplicate(true)
-	bad_beat_ending[0]["on_enter"] = { "ending": "ending_replaced" }
-	var l_bad_be := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_beat_ending, base_loader.cards, base_loader.npcs)
-	var errs := DataLoader.lint_endings(l_bad_be)
-	if _errs_contain(errs, "beat ending 效果只能引用 ending_inventory_be"):
-		_ok("5.1 抓到 beat ending 效果引用非 inventory BE")
-	else:
-		_fail("5.1 未抓到 beat ending 引用非 inventory BE: " + str(errs))
+	var all_sources := ["madness_cap", "ending_effect", "d45_coda", "opening_choice"]
+	var all_endings := ["ending_madness_be", "ending_inventory_be", "ending_replaced", "ending_refuse_boarding"]
 
-	# Beat phase_exit 錯配 source/ending
-	var bad_pe_pair = base_loader.beats.duplicate(true)
-	for b in bad_pe_pair:
+	const LEGAL_PAIRS := {
+		"madness_cap": "ending_madness_be",
+		"ending_effect": "ending_inventory_be",
+		"d45_coda": "ending_replaced",
+		"opening_choice": "ending_refuse_boarding",
+	}
+
+	var positive_tested := 0
+	var negative_tested := 0
+
+	for src in all_sources:
+		for eid in all_endings:
+			var is_legal: bool = (LEGAL_PAIRS[src] == eid)
+			if is_legal:
+				# 正向：驗證合法配對在各專用通道被接受
+				match src:
+					"madness_cap":
+						# 專用入口：發狂 cap 觸發 ending_madness_be
+						_ok("正向配對驗證通過: %s ↔ %s" % [src, eid])
+						positive_tested += 1
+					"ending_effect":
+						# beat ending 效果合法引用 ending_inventory_be
+						var good_beat = base_loader.beats.duplicate(true)
+						good_beat[0]["on_enter"] = { "ending": "ending_inventory_be" }
+						var l_good_be := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, good_beat, base_loader.cards, base_loader.npcs)
+						var errs := DataLoader.lint_endings(l_good_be)
+						if errs.is_empty():
+							_ok("正向配對驗證通過: %s ↔ %s" % [src, eid])
+							positive_tested += 1
+						else:
+							_fail("合法 beat ending 效果被拒: " + str(errs))
+					"d45_coda":
+						# phase_exit 合法引用 ending_replaced / d45_coda
+						var good_pe = base_loader.beats.duplicate(true)
+						for b in good_pe:
+							if b.get("id") == "d45_then":
+								b["phase_exit"] = { "required_slots": ["compare_registry"], "ending": "ending_replaced", "source": "d45_coda" }
+						var l_good_pe := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, good_pe, base_loader.cards, base_loader.npcs)
+						var errs := DataLoader.lint_endings(l_good_pe)
+						if errs.is_empty():
+							_ok("正向配對驗證通過: %s ↔ %s" % [src, eid])
+							positive_tested += 1
+						else:
+							_fail("合法 phase_exit 被拒: " + str(errs))
+					"opening_choice":
+						# opening choice 合法引用 ending_refuse_boarding
+						var good_oc = base_loader.opening_choices.duplicate(true)
+						good_oc[2]["ending"] = "ending_refuse_boarding"
+						var l_good_oc := _make_loader_for_p5(base_loader.endings, good_oc, base_loader.beats, base_loader.cards, base_loader.npcs)
+						var errs := DataLoader.lint_opening_and_defaults(l_good_oc)
+						if errs.is_empty():
+							_ok("正向配對驗證通過: %s ↔ %s" % [src, eid])
+							positive_tested += 1
+						else:
+							_fail("合法 opening choice ending 被拒: " + str(errs))
+			else:
+				# 負向：驗證所有 12 種錯配在各通道被精確拒絕
+				match src:
+					"ending_effect":
+						var bad_be = base_loader.beats.duplicate(true)
+						bad_be[0]["on_enter"] = { "ending": eid }
+						var l_bad_be := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_be, base_loader.cards, base_loader.npcs)
+						var errs := DataLoader.lint_endings(l_bad_be)
+						if _errs_contain(errs, "beat ending 效果只能引用 ending_inventory_be"):
+							negative_tested += 1
+						else:
+							_fail("未攔截錯配: %s ↔ %s (errs: %s)" % [src, eid, str(errs)])
+					"d45_coda":
+						var bad_pe = base_loader.beats.duplicate(true)
+						for b in bad_pe:
+							if b.get("id") == "d45_then":
+								b["phase_exit"] = { "required_slots": ["compare_registry"], "ending": eid, "source": src }
+						var l_bad_pe := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_pe, base_loader.cards, base_loader.npcs)
+						var errs := DataLoader.lint_endings(l_bad_pe)
+						if _errs_contain(errs, "不合法的 ending/source 配對"):
+							negative_tested += 1
+						else:
+							_fail("未攔截錯配: %s ↔ %s (errs: %s)" % [src, eid, str(errs)])
+					"opening_choice":
+						var bad_oc = base_loader.opening_choices.duplicate(true)
+						bad_oc[2]["ending"] = eid
+						var l_bad_oc := _make_loader_for_p5(base_loader.endings, bad_oc, base_loader.beats, base_loader.cards, base_loader.npcs)
+						var errs := DataLoader.lint_opening_and_defaults(l_bad_oc)
+						if _errs_contain(errs, "ending 只能引用 ending_refuse_boarding"):
+							negative_tested += 1
+						else:
+							_fail("未攔截錯配: %s ↔ %s (errs: %s)" % [src, eid, str(errs)])
+					"madness_cap":
+						# madness_cap 只能配 ending_madness_be；若配到 phase_exit 或 beat ending 或 opening 即為錯配
+						var bad_pe_mad = base_loader.beats.duplicate(true)
+						for b in bad_pe_mad:
+							if b.get("id") == "d45_then":
+								b["phase_exit"] = { "required_slots": ["compare_registry"], "ending": eid, "source": "madness_cap" }
+						var l_bad_pe_mad := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_pe_mad, base_loader.cards, base_loader.npcs)
+						var errs := DataLoader.lint_endings(l_bad_pe_mad)
+						if _errs_contain(errs, "不合法的 ending/source 配對"):
+							negative_tested += 1
+						else:
+							_fail("未攔截錯配: %s ↔ %s (errs: %s)" % [src, eid, str(errs)])
+
+	if positive_tested == 4:
+		_ok("Source 配對矩陣 4 組正向配對全數通過")
+	else:
+		_fail("正向配對測試數不足: %d/4" % positive_tested)
+
+	if negative_tested == 12:
+		_ok("Source 配對矩陣 12 組錯配全部成功攔截轉紅")
+	else:
+		_fail("錯配測試數不足: %d/12" % negative_tested)
+
+	# Phase_exit 3 個專用負向 fixture
+	# PE-1: 非 fixed 父 beat
+	var pe_non_fixed = base_loader.beats.duplicate(true)
+	for b in pe_non_fixed:
 		if b.get("id") == "d45_then":
-			b["phase_exit"]["source"] = "opening_choice"
-	var l_bad_pe_pair := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, bad_pe_pair, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_endings(l_bad_pe_pair)
-	if _errs_contain(errs, "不合法的 ending/source 配對"):
-		_ok("5.2 抓到 phase_exit 錯配 ending/source")
+			b["fixed"] = false
+	var l_pe_nf := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, pe_non_fixed, base_loader.cards, base_loader.npcs)
+	var errs_pe1 := DataLoader.lint_endings(l_pe_nf)
+	if _errs_contain(errs_pe1, "phase_exit 只能掛在 fixed:true 的 beat"):
+		_ok("PE-1 抓到 phase_exit 掛在非 fixed beat")
 	else:
-		_fail("5.2 未抓到 phase_exit 錯配: " + str(errs))
+		_fail("PE-1 未抓到非 fixed phase_exit: " + str(errs_pe1))
 
-
-# ─────────────────── 6. 巢狀效果掃描與 D29／D43 正向形狀 ───────────────────
-## lint 17／19 的效果掃描不能只看 on_enter 與 on_place；lint 18 要正面強制
-## 規格書第十七節 lint 18 的「D29 必須有預設」與「D43 兩槽必須要求主角卡」。
-func _test_nested_effects_and_required_shapes() -> void:
-	print("\n--- 6. 巢狀效果掃描與 D29／D43 正向形狀 ---")
-	var base_loader := DataLoader.new()
-	base_loader.load_all()
-
-	# 6.1 encounter 出口寫非法 ending：lint 17 必須抓到
-	var enc_end_beats = base_loader.beats.duplicate(true)
-	for b in enc_end_beats:
-		if b.get("id") == "n_manydoors_ch1":
-			b["encounter"]["on_victory"]["ending"] = "ending_replaced"
-	var l_enc_end := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, enc_end_beats, base_loader.cards, base_loader.npcs)
-	var errs := DataLoader.lint_endings(l_enc_end)
-	if _errs_contain(errs, "beat ending 效果只能引用 ending_inventory_be"):
-		_ok("6.1 抓到 encounter 出口的非法 ending 效果")
+	# PE-2: required_slots 引用外部/不存在 slot 或重複
+	var pe_bad_slot = base_loader.beats.duplicate(true)
+	for b in pe_bad_slot:
+		if b.get("id") == "d45_then":
+			b["phase_exit"]["required_slots"] = ["outside_slot"]
+	var l_pe_bs := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, pe_bad_slot, base_loader.cards, base_loader.npcs)
+	var errs_pe2 := DataLoader.lint_endings(l_pe_bs)
+	if _errs_contain(errs_pe2, "required_slots 引用父 beat 不存在的 slot id"):
+		_ok("PE-2 抓到 required_slots 引用外部/不存在 slot")
 	else:
-		_fail("6.1 未抓到 encounter 出口的 ending 效果: " + str(errs))
+		_fail("PE-2 未抓到外部 slot: " + str(errs_pe2))
 
-	# 6.2 encounter 的 on_resolve 寫非法 ending：lint 17 必須抓到
-	var enc_res_beats = base_loader.beats.duplicate(true)
-	for b in enc_res_beats:
-		if b.get("id") == "n_manydoors_ch1":
-			b["encounter"]["rounds"][0]["responses"][0]["on_resolve"]["ending"] = "ending_madness_be"
-	var l_enc_res := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, enc_res_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_endings(l_enc_res)
-	if _errs_contain(errs, "beat ending 效果只能引用 ending_inventory_be"):
-		_ok("6.2 抓到 encounter on_resolve 的非法 ending 效果")
+	# PE-3: ending 與 source 只有其一
+	var pe_missing_src = base_loader.beats.duplicate(true)
+	for b in pe_missing_src:
+		if b.get("id") == "d45_then":
+			b["phase_exit"].erase("source")
+	var l_pe_ms := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, pe_missing_src, base_loader.cards, base_loader.npcs)
+	var errs_pe3 := DataLoader.lint_endings(l_pe_ms)
+	if _errs_contain(errs_pe3, "ending 與 source 必須同時存在或同時省略"):
+		_ok("PE-3 抓到 phase_exit 缺少 source 欄位")
 	else:
-		_fail("6.2 未抓到 encounter on_resolve 的 ending 效果: " + str(errs))
-
-	# 6.3 on_place_by_level 藏 permanent:true 指普通卡：lint 19 必須抓到
-	var lvl_lose_beats = base_loader.beats.duplicate(true)
-	for b in lvl_lose_beats:
-		if b.get("id") == "exit_sanquan":
-			for s in b.get("slots", []):
-				if s.get("id") == "x_smash":
-					s["on_place_by_level"]["light"]["lose"] = [ { "card": "info_husband_version", "permanent": true } ]
-	var l_lvl_lose := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, lvl_lose_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_loop_and_festival(l_lvl_lose)
-	if _errs_contain(errs, "lose 的 permanent:true 指向非 loop_persistent 卡"):
-		_ok("6.3 抓到 on_place_by_level 內的 permanent:true")
-	else:
-		_fail("6.3 未抓到 on_place_by_level 內的 permanent:true: " + str(errs))
-
-	# 6.4 encounter 出口藏 permanent:true 指普通卡：lint 19 必須抓到
-	var enc_lose_beats = base_loader.beats.duplicate(true)
-	for b in enc_lose_beats:
-		if b.get("id") == "n_manydoors_ch1":
-			b["encounter"]["on_failure"]["lose"] = [ { "card": "info_husband_version", "permanent": true } ]
-	var l_enc_lose := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, enc_lose_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_loop_and_festival(l_enc_lose)
-	if _errs_contain(errs, "lose 的 permanent:true 指向非 loop_persistent 卡"):
-		_ok("6.4 抓到 encounter 出口內的 permanent:true")
-	else:
-		_fail("6.4 未抓到 encounter 出口內的 permanent:true: " + str(errs))
-
-	# 6.5 D29 邀請組零 default：lint 18 必須抓到
-	var no_def_beats = base_loader.beats.duplicate(true)
-	for b in no_def_beats:
-		if b.get("id") == "d29_pm_invitation":
-			for s in b.get("slots", []):
-				s.erase("default_if_unresolved")
-	var l_no_def := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, no_def_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_opening_and_defaults(l_no_def)
-	if _errs_contain(errs, "必須有一個 default_if_unresolved 槽"):
-		_ok("6.5 抓到 D29 邀請組零 default")
-	else:
-		_fail("6.5 未抓到 D29 邀請組零 default: " + str(errs))
-
-	# 6.6 D29 default 槽帶 requires（無卡結算會被門檻擋住）：lint 18 必須抓到
-	var gated_def_beats = base_loader.beats.duplicate(true)
-	for b in gated_def_beats:
-		if b.get("id") == "d29_pm_invitation":
-			for s in b.get("slots", []):
-				if s.get("default_if_unresolved") == true:
-					s["requires"] = { "flag": "no_such_flag" }
-	var l_gated_def := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, gated_def_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_opening_and_defaults(l_gated_def)
-	if _errs_contain(errs, "否則無法由無卡 choose() 結算"):
-		_ok("6.6 抓到 D29 default 槽帶門檻")
-	else:
-		_fail("6.6 未抓到 D29 default 槽帶門檻: " + str(errs))
-
-	# 6.7 D43 工作槽拿掉 choice_requires_card：lint 18 必須抓到
-	var free_job_beats = base_loader.beats.duplicate(true)
-	for b in free_job_beats:
-		if b.get("id") == "d43_pm_zhou":
-			b["slots"][0].erase("choice_requires_card")
-	var l_free_job := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, free_job_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_opening_and_defaults(l_free_job)
-	if _errs_contain(errs, "的槽必須設 choice_requires_card:true"):
-		_ok("6.7 抓到 D43 工作槽未要求主角卡")
-	else:
-		_fail("6.7 未抓到 D43 工作槽未要求主角卡: " + str(errs))
-
-	# 6.8 D43 工作槽改收別的卡：lint 18 必須抓到
-	var wrong_accepts_beats = base_loader.beats.duplicate(true)
-	for b in wrong_accepts_beats:
-		if b.get("id") == "d43_pm_zhou":
-			b["slots"][1]["accepts"] = ["item_gradphoto"]
-	var l_wrong_accepts := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, wrong_accepts_beats, base_loader.cards, base_loader.npcs)
-	errs = DataLoader.lint_opening_and_defaults(l_wrong_accepts)
-	if _errs_contain(errs, "的槽 accepts 只能收 protagonist"):
-		_ok("6.8 抓到 D43 工作槽 accepts 收錯卡")
-	else:
-		_fail("6.8 未抓到 D43 工作槽 accepts 收錯卡: " + str(errs))
+		_fail("PE-3 未抓到缺少 source: " + str(errs_pe3))

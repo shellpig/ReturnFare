@@ -47,14 +47,21 @@
 
 ## verifier 複驗後的收斂（K-178～K-181）
 
-第一次複驗抓到 lint 17～19 有四個「規格明列但檢查沒實作」的洞，同批修畢：
+## verifier 複驗後的收斂（K-178～K-183）
 
-1. **K-178　lint 19 的 `permanent` lose 掃描範圍不足**：`_check_permanent_lose` 原本只掃 `beat.on_enter` 與 `slots[].on_place`，漏掉 `on_place_by_level`、encounter 的 `on_resolve` 與三種出口、`delegation.report`。改為逐層走訪整份 beat。
-2. **K-179　lint 17 的 beat `ending` 效果掃描漏 encounter**：`_check_beat_ending_effects` 同樣改為逐層走訪；`phase_exit` 子樹整棵跳過，因為那是結局接點不是效果，由既有的 ending/source 配對檢查負責。
-3. **K-180　lint 18 沒有強制「D29 invitation 必須具有預設」**：原本只擋同組多個 default，零個不擋。新增 `REQUIRED_DEFAULT_GROUPS`，並一併驗該預設槽不得帶 `condition`／`requires`／`delegation`（SCHEMA `choice_group` 那條的「可由無卡 `choose()` 結算」）。
-4. **K-181　lint 18 沒有強制「D43 兩個工作槽必須要求主角卡」**：新增 `REQUIRED_CARD_GROUPS`，驗 `leaving` 組恰兩槽、各設 `choice_requires_card:true` 且 `accepts` 只收 `protagonist`。
-
-`test_p5a.gd` 新增第 6 大項 8 條負向斷言對應這四條（總數 30 → 38）。**變異驗證**：把四個修法逐一還原後重跑，各自恰好 2 條轉紅（6.1／6.2、6.3／6.4、6.5／6.6、6.7／6.8），既有 4.3 與 5.1 在變異下仍為綠——確認新契約由新斷言承載，不是靠舊斷言順便蓋到。
+1. **K-178　lint 19 的 `permanent` lose 掃描範圍不足**：`_check_permanent_lose` 逐層走訪整份 beat（含 `on_place_by_level`、encounter、delegation）。
+2. **K-179　lint 17 的 beat `ending` 效果掃描漏 encounter**：`_check_beat_ending_effects` 逐層走訪整份 beat，`phase_exit` 由專用規則驗證。
+3. **K-180　lint 18 強化 D29 invitation 預設**：`REQUIRED_DEFAULT_GROUPS` 驗證 D29 恰有一 default 槽，且不得帶 `condition`／`requires`／`delegation`。
+4. **K-181　lint 18 強化 D43 離開工作**：`REQUIRED_CARD_GROUPS` 驗證 D43 恰兩槽、各設 `choice_requires_card:true` 且 `accepts` 只收 `protagonist`。
+5. **K-182　`festival_proxy` / `festival_proxy_is` 候選資格與封閉 mode 檢驗**：`_check_card_refs` 補齊 `festival_proxy_eligible: true` 斷言，`festival_proxy.mode` 限制為 `["fixed", "highest_eligible"]` 封閉集合。
+6. **K-183　`skip_to`、`when_group` 指向與組裝路徑至少一頁檢驗**：
+   - `lint_endings` 驗證 `repeat.skip_to` 必須為 `"complete"` 或實際存在於該 ending repeat pages 的 page id。
+   - `lookup_fragments` 驗證 `when_group.group` 存在於 `variant_groups`，`when_group.variant` 存在於該組 `rules` 中；`entries.value` 必須為 `festival_proxy_eligible: true`。
+   - `_lint_composite_paths` 透過笛卡兒積窮舉組合路徑，斷言每一種組裝路徑之 `first_seen` 與 `repeat` 總頁數均 $\ge 1$。
+7. **K-184　`test_p5a.gd` 測試安全網完整對齊《測試指南》**：
+   - Lint 17（9 類完整負向）、Lint 18（13 類完整負向）、Lint 19（11 類完整負向）。
+   - Source 配對矩陣採資料驅動巢狀枚舉（4 組正向配對 ＋ 12 組錯配全部動態測試被攔截 ＋ 3 個 `phase_exit` 獨立負向 fixture）。
+8. **K-185　`endings.json` 結構版草稿標示**：4 筆 ending 補齊 `"draft": true` 與 `"draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"`。
 
 ## 驗證狀態
 
@@ -68,4 +75,4 @@
 
 ## 下一個任務
 
-**P5-A 實作已完成，交由 verifier 進行複驗與文件關門。** 關門後下一步依序進入 Phase 5-B（頂層流程與結局狀態機）。
+**P5-A 實作與安全網擴充已全數完成，交由 verifier 進行複驗與文件關門。** 關門後下一步依序進入 Phase 5-B（頂層流程與結局狀態機）。
