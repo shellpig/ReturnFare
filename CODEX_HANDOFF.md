@@ -2,77 +2,116 @@
 
 最後更新：2026-08-28
 
-## 目前階段
+## 目前狀態
 
-**P1～P4 全部完成且關門；P5-A（結局、開局與跨輪資料）實作與驗證全數完成。全套 29 套 headless 測試全數 exit 0（含 test_p5a.gd 5 大項正負向測試與 verify_data.gd Lint 1～19 全綠），全套 UI Sim（85 契約、108 變體與負向測試）全數 exit 0（0 failed checks）。** 待 verifier 複驗關門 P5-A。**下一步 Phase 5-B（頂層流程與結局狀態機）。**
+**P1～P4 全部關門。P5-A（結局、開局與跨輪資料）的功能已經做完，但關門被擋住——測試覆蓋有洞，不是程式有錯。**
 
-- 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；本檔只保存最近交接重點。
-- **工具變更（2026-08-27）：UI 模擬新增 `-Background`，之後跑一律加。** `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`。
-- P5-A：結局、開局與跨輪資料已實作完成，Lint 17（結局完整性）、Lint 18（開局與選擇完整性）、Lint 19（跨輪與慶典代付完整性）全數上線且 0 錯誤。嚴格遵守「不接新玩家操作／UI mutation」限制。
-- P5-B：頂層流程與結局狀態機（待 P5-A 關門後開工）。
+機器層目前全綠：
 
-## 最近完成的工作（P5-A 結局、開局與跨輪資料實作）
+- `verify_data`：卡片 66／地點 48／NPC 18／beat 268／ending 4／opening 3；引用檢查 0 錯誤；Lint 1～19 全部 0 錯誤
+- 全套 29 套 headless exit 0（`test_p5a` 52 條斷言全綠）
+- UI sim 108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks
 
-1. **`data/opening_choices.json` 建立完成**：
-   - 定義 3 筆開局選項（`take_family_album`、`return_missed_call`、`refuse_boarding`）。
-   - 前兩筆提供 `on_select`，最後一筆以 `requires: { ending_seen: "ending_replaced" }` 鎖定並直接引用 `ending: "ending_refuse_boarding"`，兩類形狀互斥。
+**下一步：先做完下面「你要做的事」，P5-A 才能關門，然後才進 P5-B。**
 
-2. **`data/endings.json` 建立完成**：
-   - 定義 4 筆穩定 ending id（`ending_replaced` 為 composite；`ending_madness_be`、`ending_inventory_be`、`ending_refuse_boarding` 為 linear）。
-   - `ending_replaced` 包含 `first_seen`、`repeat`（`skip_to: "partner"`）、3 組有序 `variant_groups`（`partner`、`livelihood`、`inn_appearance` 各恰有 1 筆 fallback），以及 `lookup_fragments`（`uninvited_proxy` 完整覆蓋阿婕、阿薇、阿財）。
+> 跑 UI 模擬一律加 `-Background`：
+> `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`
+>
+> 進度與測試數字的單一事實來源是 `PROJECT_BRIEF.md`；問題清單的單一事實來源是 `驗證後已知問題.md`。本檔只放「現在手上這件事」。
 
-3. **`data/cards.json` 擴充完成**：
-   - 64 張既有卡片全數補齊必填 `loop_persistent: false`。
-   - 新增 2 張卡片：`item_family_album`（裝備、佔格、可暫存、可丟棄、`loop_persistent: false`）與 `k_i_returned`（知識、不佔格、不可暫存、不可丟棄、`loop_persistent: false`）。總卡片數達 66 張。
+---
 
-4. **`data/npcs.json` 擴充完成**：
-   - 18 位 NPC 全數補齊必填 `festival_proxy_eligible: boolean`。正式候選精確為 `ajie`、`awei`、`acai` 3 位（其餘 15 位均為 `false`）。
+## 你要做的事
 
-5. **故事線 Beat 資料檔 P5-A 映射更新**：
-   - `ch1_d04_d15.json`：D7 新增 `outside_job_waiting` 分支殘響；D11 `compare` 槽相容 `item_family_album`；D7 與 D10 分別補齊阿婕與阿薇之 `attention_npc` 反向引用。
-   - `ch2_d23_d26.json`：D26 3 個修復槽正式改用 `choice_group: "repairs"` 與 `choice_requires_card: true`。
-   - `ch2_d27_d32.json`：D29 `d29_pm_invitation` 配置 `festival_proxy`（邀阿婕/阿薇為 fixed，不邀槽兼任 `default_if_unresolved: true` 並配置 highest-eligible + fallback 阿婕）；新增 D31 3 筆 `festival_proxy_is` 結構版內容。
-   - `ch3_d39_d45.json`：新增 D39 3 筆 `festival_proxy_is` 結構版內容；D43 兩條離開工作共用 `choice_group: "leaving"` 與 `choice_requires_card: true`；D45 `d45_then` 配置 `phase_exit`（required_slots: `["compare_registry"]`, ending: `ending_replaced`, source: `d45_coda`）。
+**任務：補回被刪掉的回歸覆蓋，收尾 K-186～K-192。只動測試與文件，不要改任何 lint 行為。**
 
-6. **核心語彙與檢查擴充（`ConditionEval` / `EffectApply` / `DataLoader`）**：
-   - `ConditionEval.KNOWN_KEYS` 增加 `opening_choice`、`ending_seen`、`festival_proxy_is`。
-   - `EffectApply.KNOWN_KEYS` 增加 `ending`、`festival_proxy`，`CARD_ENTRY_KEYS` 增加 `permanent`。
-   - `DataLoader` 新增 `endings`、`opening_choices` 載入與跨檔引用檢查；實作 Lint 17（`lint_endings`）、Lint 18（`lint_opening_and_defaults`）、Lint 19（`lint_loop_and_festival`）。
-   - `verify_data.gd` 串接 Lint 17～19 驗證。
+背景：`f5cdc77` 修了 K-178～K-181 並附了 8 條回歸斷言；`2f332c7` 重寫 `test_p5a.gd` 時把那 8 條連同 `_initialize()` 的呼叫整段刪掉了，舊的第 3.6 條也一起消失，而且同一次新增的 K-182 六個檢查從頭到尾沒有測試。lint 程式碼本身完好，功能沒退化——**沒有的是守它的網**。
 
-7. **`tests/headless/test_p5a.gd` 測試套件實作（全綠）**：
-   - 涵蓋 1 大項正式資料正向斷言、3 大項共 18 條 Lint 17/18/19 負向 fixture 測試、1 大項 Source ↔ Ending 封閉配對矩陣測試。
-   - 納入 `tests/run_all_headless.ps1`，全套 29 套測試全數 exit 0 通過。
-   - UI Sim 85 個契約（108 個變體）全數 exit 0 通過（0 failed checks）。
+verifier 逐一還原修法後重跑 `test_p5a`，下列 **15 個檢查拿掉都不會有任何斷言轉紅**。這就是你要補的清單。
 
-## verifier 複驗後的收斂（K-178～K-181）
+### 1（必做，這是關門阻斷）K-186：補回 15 條負向反例到 `tests/headless/test_p5a.gd`
 
-## verifier 複驗後的收斂（K-178～K-183）
+被刪掉的 9 條：
 
-1. **K-178　lint 19 的 `permanent` lose 掃描範圍不足**：`_check_permanent_lose` 逐層走訪整份 beat（含 `on_place_by_level`、encounter、delegation）。
-2. **K-179　lint 17 的 beat `ending` 效果掃描漏 encounter**：`_check_beat_ending_effects` 逐層走訪整份 beat，`phase_exit` 由專用規則驗證。
-3. **K-180　lint 18 強化 D29 invitation 預設**：`REQUIRED_DEFAULT_GROUPS` 驗證 D29 恰有一 default 槽，且不得帶 `condition`／`requires`／`delegation`。
-4. **K-181　lint 18 強化 D43 離開工作**：`REQUIRED_CARD_GROUPS` 驗證 D43 恰兩槽、各設 `choice_requires_card:true` 且 `accepts` 只收 `protagonist`。
-5. **K-182　`festival_proxy` / `festival_proxy_is` 候選資格與封閉 mode 檢驗**：`_check_card_refs` 補齊 `festival_proxy_eligible: true` 斷言，`festival_proxy.mode` 限制為 `["fixed", "highest_eligible"]` 封閉集合。
-6. **K-183　`skip_to`、`when_group` 指向與組裝路徑至少一頁檢驗**：
-   - `lint_endings` 驗證 `repeat.skip_to` 必須為 `"complete"` 或實際存在於該 ending repeat pages 的 page id。
-   - `lookup_fragments` 驗證 `when_group.group` 存在於 `variant_groups`，`when_group.variant` 存在於該組 `rules` 中；`entries.value` 必須為 `festival_proxy_eligible: true`。
-   - `_lint_composite_paths` 透過笛卡兒積窮舉組合路徑，斷言每一種組裝路徑之 `first_seen` 與 `repeat` 總頁數均 $\ge 1$。
-7. **K-184　`test_p5a.gd` 測試安全網完整對齊《測試指南》**：
-   - Lint 17（9 類完整負向）、Lint 18（13 類完整負向）、Lint 19（11 類完整負向）。
-   - Source 配對矩陣採資料驅動巢狀枚舉（4 組正向配對 ＋ 12 組錯配全部動態測試被攔截 ＋ 3 個 `phase_exit` 獨立負向 fixture）。
-8. **K-185　`endings.json` 結構版草稿標示**：4 筆 ending 補齊 `"draft": true` 與 `"draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"`。
+| # | 反例 | 應該由誰抓到 |
+|---|---|---|
+| 1 | `permanent:true` 指普通卡藏在 `slots[].on_place_by_level` | lint 19 |
+| 2 | `permanent:true` 指普通卡藏在 `encounter` 出口（`on_victory`／`on_failure`／`on_escape`） | lint 19 |
+| 3 | `ending: ending_replaced` 藏在 `encounter` 出口 | lint 17 |
+| 4 | `ending: ending_madness_be` 藏在 `encounter.rounds[].responses[].on_resolve` | lint 17 |
+| 5 | `d29_pm_invitation` 三個槽都拿掉 `default_if_unresolved` | lint 18 |
+| 6 | `d29_pm_invitation` 的 default 槽加上 `requires` | lint 18 |
+| 7 | `d43_pm_zhou` 任一槽拿掉 `choice_requires_card` | lint 18 |
+| 8 | `d43_pm_zhou` 任一槽 `accepts` 改成非 protagonist | lint 18 |
+| 9 | `choice_requires_card:true` 但 `accepts` 為空（原第 3.6 條） | lint 18 |
 
-## 驗證狀態
+從來沒有過的 6 條：
 
-- **資料驗證（`verify_data.gd`）**：卡片 66、地點 48、NPC 18、beat 268、ending 4、opening 3；引用檢查 0 錯誤；Lint 1～19 全部 0 錯誤。
-- **Headless 測試**：`tests/run_all_headless.ps1` 包含的 29 套 headless 測試全部 exit 0 通過。
-- **UI Sim 測試**：`tests/ui_sim/run_ui_sim.ps1 -Background` 執行 108 variants、85 catalog contracts、85 executed contracts、85 completed contracts、0 failed checks，exit 0 全綠。
+| # | 反例 | 應該由誰抓到 |
+|---|---|---|
+| 10 | `festival_proxy.mode:"fixed"` 的 `npc` 指向 `festival_proxy_eligible:false` 的 NPC | 引用檢查 |
+| 11 | `festival_proxy.mode:"highest_eligible"` 的 `fallback` 指向非候選 NPC | 引用檢查 |
+| 12 | `festival_proxy_is` 指向非候選 NPC | 引用檢查 |
+| 13 | `endings.json` 的 `lookup_fragments.entries[].value` 指向非候選 NPC | lint 17 |
+| 14 | `festival_proxy.mode` 給未知值 | 引用檢查 |
+| 15 | `lookup_fragments.when_group.variant` 指向不存在的 rule id | lint 17 |
+
+### 2（必做）補完後跑變異驗證，逐條記錄
+
+把上面 15 個檢查逐一在 `data_loader.gd` 還原成修法前的樣子，重跑 `test_p5a`，確認**各自都有對應斷言轉紅**。
+
+- 本次量到的基準是這 15 個全部「仍全綠」，所以任何一條沒轉紅就是還沒補到。
+- `repeat.skip_to`（17.5）與組裝路徑至少一頁（17.9）已確認有覆蓋，不用重做。
+- **不要只回報「測試全綠」——沒有變異記錄一樣退回。**
+
+### 3 K-187：補齊測試指南列的剩餘負向類別
+
+`2f332c7` 的段落標題寫「(9 類)／(13 類)／(11 類)」，那是自己的分類數，不是 `測試指南.md > P5-A` 那份清單。對照後仍缺：
+
+- lint 17：linear ending 缺 `first_seen.pages`、缺 `repeat.pages`、壞 condition 引用、壞 effect 引用
+- lint 18：opening choice 重複 id、`choice_requires_card` 與 `default_if_unresolved` 同槽並存（「accepts 空」與上面第 9 條是同一件，不重複做）
+- lint 19：D29 的 `festival_proxy.fallback` 指向非候選
+
+### 4 K-188：`data/SCHEMA.md` 補 `draft` / `draft_note`
+
+`endings.json` 四筆 ending 已加這兩個欄位，SCHEMA 的欄位表沒有。補兩列定義，並寫明「文案定稿後移除」的退場條件。
+
+### 5 K-192：補 `.uid`
+
+`tests/headless/test_p5a.gd` 與 `test_p4f.gd` 都沒有配對的 `.gd.uid` 進版控（K-23／K-38 之後第三次）。跑一次 `--import` 產生後補進版控。
+
+### 6 K-190（低，可延後）fixture 必填欄位
+
+14 個 `tests/fixtures/broken/*/` 的 `cards.json` 缺 `loop_persistent`、`npcs.json` 缺 `festival_proxy_eligible`。目前不炸只因為用它們的測試不跑 lint 19。建議做法與取捨見 `驗證後已知問題.md > K-190`；不做也不擋 P5-A 關門，做的話請一併處理 14 份 `endings.json` 複本的同步問題。
+
+### 完成標準
+
+- 29 套 headless exit 0、UI sim 0 failed、`verify_data` Lint 1～19 全 0 錯誤
+- **加上第 2 點那份 15 條逐條轉紅的變異驗證記錄**
+
+---
 
 ## 目前風險
 
-- 無已知阻斷性缺陷。全套 29 套 headless 與 UI sim 全綠。
+- **K-186 是 P5-A 關門阻斷。** K-178～K-182 共 9 個 lint 檢查現在零覆蓋，拿掉都不會有測試轉紅。
+- 功能面沒有已知阻斷性缺陷；lint 程式碼與正式資料都正確。
 
-## 下一個任務
+## 已知的殘留（不擋關門，別忘了）
 
-**P5-A 實作與安全網擴充已全數完成，交由 verifier 進行複驗與文件關門。** 關門後下一步依序進入 Phase 5-B（頂層流程與結局狀態機）。
+- **K-182 殘留**：`festival_proxy` 不是 Dictionary 時仍靜默跳過（`if v is Dictionary:` 沒有 else）。
+- **K-183 殘留**：`repeat_page_ids` 沒有收 `lookup_fragments.entries[].repeat_pages`，若 `skip_to` 哪天指向 fragment 的重播頁會誤報。目前 `skip_to` 指的是 suffix page，踩不到。
+- **K-191**：`d9cda37` 把四個 beat JSON 大面積重排，1,494 行 diff 裡實際內容改動占少數。不回頭改；之後動資料檔保持既有排版，要重排就獨立成純格式 commit。
+- **P4-E／P4-F 低度殘留**：K-165 ①、K-175、K-176、K-177 四條。
+- **人工體感**：P3-F 與 P4-F 合計 8 項待真人玩過落檔。
+
+---
+
+## P5-A 已完成的內容（供查閱）
+
+資料層：`data/opening_choices.json`（3 筆）、`data/endings.json`（4 筆，含 `draft` 標示）、`cards.json` 補 `loop_persistent` 並新增 `item_family_album`／`k_i_returned`（66 張）、`npcs.json` 補 `festival_proxy_eligible`（候選精確為阿婕／阿薇／阿財）。
+
+Beat 映射：D7 拒信雙分支、D11 相容家庭相簿、D26 修繕三選一、D29 邀請組與 `festival_proxy`（不邀槽兼任 `default_if_unresolved`，fallback 阿婕）、D31／D39 各三筆 `festival_proxy_is` 內容、D43 `leaving` 兩槽要求主角卡、D45 `d45_then` 的 `phase_exit`。
+
+引擎層：`ConditionEval.KNOWN_KEYS` 加 `opening_choice`／`ending_seen`／`festival_proxy_is`；`EffectApply.KNOWN_KEYS` 加 `ending`／`festival_proxy`，`CARD_ENTRY_KEYS` 加 `permanent`；`DataLoader` 新增 `endings`／`opening_choices` 載入與 Lint 17～19；`verify_data.gd` 串接。
+
+> ⚠️ `EffectApply` 只是把 `ending` 與 `festival_proxy` 收進 `KNOWN_KEYS`，`apply()` **沒有實作它們**。這符合 P5-A「不接流程」的邊界，但代表 D29 三個槽的 proxy 寫入目前是 no-op，P5-B／P5-D 必須補上。別把 lint 綠當成機制已通。
