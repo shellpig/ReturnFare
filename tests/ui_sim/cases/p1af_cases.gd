@@ -1285,6 +1285,11 @@ class UiCase extends CaseBaseClass:
 		await _close(tree)
 		await _advance(tree)
 		assert_true(_has_text(tree.get_root(), "[結局 stub]"), "D45 結束後先顯示結局 stub")
+		# P5-B：coda 門檻完成後由規則層啟動結局，day／phase 不動、run 不清。
+		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "ending", "D45 coda 完成後進入 ending mode")
+		assert_eq(int(_run(tree).get("day", 0)), 45, "結局啟動後 day 不動")
+		# 正式的 complete_ending() 與跨輪重置在 P5-D 落地；這裡先以 legacy end_run() 銜接。
+		CaseBaseClass.get_game_state(tree).call("end_run", "ending_replaced")
 		await _advance(tree)
 		var after := _run(tree)
 		assert_eq(int(after.get("day", 0)), 1, "D45 結束回到第一天")
@@ -1353,6 +1358,11 @@ class UiCase extends CaseBaseClass:
 				await _click(tree, coda_places[0])
 				await _close(tree)
 				await _advance(tree)
+				# P5-B：coda 門檻完成後進 ending mode，run 不清；正式結算在 P5-D 的
+				# complete_ending()，這裡先以 legacy end_run() 銜接第二輪。
+				if str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")) == "ending":
+					CaseBaseClass.get_game_state(tree).call("end_run", "ending_replaced")
+					await _advance(tree)
 				continue
 
 			# P4-E: 遭遇處理（如 D8 夜間、D45 下午）
@@ -1424,6 +1434,11 @@ class UiCase extends CaseBaseClass:
 							break
 						if QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"):
 							await _close(tree)
+				# P5-B：D29 邀請組的逾期預設要到 P5-D 才由規則層自動結算。走查先呼叫同一個
+				# 原子入口凍結慶典代付者，否則第 45 天啟動正常結局會 data_conflict。
+				if day == 29 and phase == "afternoon" \
+						and not (_run(tree).get("choices", {}) as Dictionary).has("d29_pm_invitation::invitation"):
+					CaseBaseClass.get_game_state(tree).call("choose", "d29_pm_invitation", "invitation", "invite_none")
 				await _advance(tree)
 				continue
 

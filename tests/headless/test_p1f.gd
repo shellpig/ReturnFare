@@ -391,12 +391,26 @@ func _test_day45_ending_coda_and_loop_reset(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("比對槽放置失敗: %s" % str(compare_res))
 
-	# 3. advance_phase 推進觸發 end_run
-	gs.advance_phase()
-	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
-		failed += _ok("coda 推進後回到第 1 天 morning")
+	# 3. advance_phase 推進：P5-B 起由 phase_exit 門檻啟動 ending_replaced，
+	#    day／phase 不動、run 不清；正式的跨輪結算在 P5-D 的 complete_ending()。
+	gs.set("selected_festival_proxy_npc", "ajie")
+	var coda_adv: Dictionary = gs.advance_phase()
+	if bool(coda_adv.get("ok", false)) and not bool(coda_adv.get("phase_advanced", true)):
+		failed += _ok("coda 門檻完成後推進成功且不換時段")
 	else:
-		failed += _fail("coda 推進後未回到第 1 天 morning")
+		failed += _fail("coda 推進結果異常: %s" % str(coda_adv))
+
+	if str(gs.get("flow_mode")) == "ending" and int(gs.get("day")) == 45 and str(gs.get("phase")) == "evening":
+		failed += _ok("coda 推進後進入 ending mode 且停在第 45 天 evening")
+	else:
+		failed += _fail("coda 推進後狀態異常: mode=%s day=%d phase=%s" % [str(gs.get("flow_mode")), int(gs.get("day")), str(gs.get("phase"))])
+
+	# 走查層的跨輪重置沿用 legacy end_run()（P5-D 換成正式結算）
+	gs.call("end_run", "ending_replaced")
+	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
+		failed += _ok("legacy end_run 後回到第 1 天 morning")
+	else:
+		failed += _fail("legacy end_run 後未回到第 1 天 morning")
 
 	if gs.has_knowledge("k_already_on_list"):
 		failed += _ok("重置後 meta 層知識卡完整保留")
@@ -450,35 +464,46 @@ func _test_run_ended_emitted_exactly_once(gs: Node, data_node: Node) -> int:
 	_reset_gs(gs)
 	gs.set("day", 45)
 	gs.set("phase", "evening")
+	gs.set_flag("final_day", true)
+	(gs.get("slots_placed") as Dictionary)["d45_then::compare_registry"] = true
+	gs.set("selected_festival_proxy_npc", "ajie")
 
 	var emit_box := [0]
 	var cb := func(_eid: String): emit_box[0] += 1
 	gs.run_ended.connect(cb)
 
-	# 第一次推進：觸發 end_run
+	# 第一次推進：coda 門檻已完成 → 啟動結局（P5-B 仍相容發 run_ended）
 	gs.advance_phase()
 	if emit_box[0] == 1:
 		failed += _ok("第 45 天 evening 推進：run_ended 成功發射 1 次")
 	else:
 		failed += _fail("第一次推進 run_ended 發射次數不為 1 (實際: %d)" % emit_box[0])
 
-	# 連按幾次推進：天數由第 1 天往下走，不重發 run_ended
-	gs.advance_phase() # day 1 afternoon
-	gs.advance_phase() # day 1 evening
-	gs.advance_phase() # day 1 night
-	gs.advance_phase() # day 2 morning
+	# 連按幾次推進：ending mode 一律回 not_run，不重發訊號、不推進時間
+	gs.advance_phase()
+	gs.advance_phase()
+	gs.advance_phase()
 
 	if emit_box[0] == 1:
-		failed += _ok("連續推進 4 次後 run_ended 計數仍為 1（無無窮迴圈）")
+		failed += _ok("ending mode 連續推進 3 次後 run_ended 計數仍為 1（無無窮迴圈）")
 	else:
 		failed += _fail("連續推進後 run_ended 被重複發射 (實際: %d 次)" % emit_box[0])
 
-	if int(gs.get("day")) == 2 and str(gs.get("phase")) == "morning":
-		failed += _ok("時間推進正常進行至第 2 天 morning")
+	if int(gs.get("day")) == 45 and str(gs.get("phase")) == "evening":
+		failed += _ok("ending mode 期間時間完全不動")
 	else:
 		failed += _fail("時間推進異常: 第 %d 天 %s" % [int(gs.get("day")), str(gs.get("phase"))])
 
+	# 回到 run 才能繼續下一輪（P5-D 由 complete_ending() 取代）。
+	# 先斷開計數器：legacy end_run 也會發相容用的 run_ended。
 	gs.run_ended.disconnect(cb)
+	gs.call("end_run", "ending_replaced")
+	gs.advance_phase()
+	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "afternoon":
+		failed += _ok("legacy end_run 後時間推進正常進行")
+	else:
+		failed += _fail("legacy end_run 後推進異常: 第 %d 天 %s" % [int(gs.get("day")), str(gs.get("phase"))])
+
 	return failed
 
 

@@ -81,6 +81,9 @@ func _reset_gs(gs: Node) -> void:
 	gs.hand.clear()
 	gs.hand.append("protagonist")
 	gs.knowledge.clear()
+	# P5-B：knowledge_at_start 是 end_run 當下的 knowledge 副本；這裡手動清 knowledge
+	# 之後也要一起清，否則兩條對照路徑的開輪基準會不同（K-139 逐字比對）。
+	(gs.get("knowledge_at_start") as Dictionary).clear()
 	gs.flags.clear()
 	gs.active_encounter.clear()
 
@@ -1127,10 +1130,13 @@ func _test_after_finish_stay_and_advance(gs: Node, data_node: Node) -> int:
 	gs.acknowledge_encounter_intro()
 	gs.respond_to_encounter("k_sol")
 
-	if gs.day != 1 or gs.phase != "morning":
-		failed += _err("K-133 regression: BE reset must result in day 1 morning without extra advance, got day=%d, phase=%s" % [gs.day, gs.phase])
+	# P5-B：撞 cap 改為啟動 ending_madness_be，出口守衛必須擋掉 after_finish 的額外推進，
+	# day／phase 停在原地（不再有 end_run 的重置）。
+	if gs.day != 15 or gs.phase != "afternoon" or str(gs.get("flow_mode")) != "ending":
+		failed += _err("K-133 regression: BE 啟動後不得再推進時段，got day=%d, phase=%s, mode=%s" % [gs.day, gs.phase, str(gs.get("flow_mode"))])
 	else:
-		failed += _ok("K-133 regression: generation guard correctly prevented advance_phase after run reset (K-133)")
+		failed += _ok("K-133 regression: 結局啟動後守衛正確阻止 after_finish 的 advance_phase (K-133)")
+	gs.call("end_run", "ending_madness_be")
 
 	_clean_mock_beat(data_node, "mock_enc_adv")
 	_clean_mock_beat(data_node, "mock_enc_stay")

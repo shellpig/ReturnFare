@@ -86,6 +86,8 @@ func _reset_gs(gs: Node) -> void:
 	(gs.get("switch_progress") as Dictionary).clear()
 	(gs.get("relations") as Dictionary).clear()
 	(gs.get("npc_action_counts") as Dictionary).clear()
+	# P5-B：慶典代付者是 run 層欄位且一輪只能凍結一次；不清的話下一個 D29 案例會 data_conflict。
+	gs.set("selected_festival_proxy_npc", "")
 	if gs.get("choices") is Dictionary:
 		(gs.get("choices") as Dictionary).clear()
 

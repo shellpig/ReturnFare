@@ -1102,13 +1102,16 @@ func _test_data_conflict_and_k65_pending_resilience(gs: Node, data_node: Node) -
 	var new_flags: Dictionary = gs.get("flags")
 	var new_rep_lines: PackedStringArray = gs.get("last_delegation_report_lines")
 
-	var intra_stopped := not bool(new_flags.get("k65_intra_leaked_flag", false))
+	# P5-B：效果塊改為整塊 preflight／commit，同一筆 report 的 flag 與 madness 屬於同一個動作，
+	# 因此撞 cap 時 flag 仍留在「結局快照所描述的這一輪」；跨筆 report 的迴圈中斷不變。
+	var intra_applied := bool(new_flags.get("k65_intra_leaked_flag", false))
 	var inter_stopped := not bool(new_flags.get("k65_inter_leaked_flag", false))
 	var lines_clean := new_rep_lines.is_empty()
+	var in_ending := str(gs.get("flow_mode")) == "ending"
 
-	if new_day == 1 and new_phase == "morning" and intra_stopped and inter_stopped and lines_clean:
-		_ok("K-65 防呆：同筆 report 觸發 BE 後立即終止後置效果，後續 report 迴圈中斷，新輪文字維持乾淨")
+	if in_ending and intra_applied and inter_stopped and lines_clean:
+		_ok("K-65 防呆：同筆 report 的效果整塊落地後啟動 BE，後續 report 迴圈中斷，回報文字維持乾淨")
 	else:
-		failed += _fail("K-65 防呆失敗：day=%d phase=%s intra_stopped=%s inter_stopped=%s lines_clean=%s lines=%s" % [new_day, new_phase, str(intra_stopped), str(inter_stopped), str(lines_clean), str(new_rep_lines)])
+		failed += _fail("K-65 防呆失敗：day=%d phase=%s in_ending=%s intra_applied=%s inter_stopped=%s lines_clean=%s lines=%s" % [new_day, new_phase, str(in_ending), str(intra_applied), str(inter_stopped), str(lines_clean), str(new_rep_lines)])
 
 	return failed

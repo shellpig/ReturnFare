@@ -1689,6 +1689,10 @@ static func _check_single_ending_effect(node: Variant, bid: String, where: Strin
 			var end_val := str(d["ending"])
 			if end_val != "ending_inventory_be":
 				problems.append("%s [%s]：beat ending 效果只能引用 ending_inventory_be（實際為 %s）" % [bid, where, end_val])
+			# P5-B：同一個效果塊同時有 madness 時，撞上限會與明示 ending 形成兩個不同的
+			# ending request，整個動作只能原子拒絕。正式資料不得寫成這種形狀。
+			if d.has("madness"):
+				problems.append("%s [%s]：同一效果塊不得同時有 madness 與 ending（會形成雙 ending request）" % [bid, where])
 		for k: Variant in d.keys():
 			if str(k) == "phase_exit":
 				continue

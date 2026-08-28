@@ -377,25 +377,55 @@ func _test_state_reset_after_be(gs: Node, data_node: Node) -> int:
 	var relations: Dictionary = gs.get("relations")
 	var clock: Dictionary = gs.get("madness_clock")
 
-	if cur_day == 1 and cur_phase == "morning":
-		failed += _ok("BE 後回到第 1 天 morning")
+	# P5-B：撞 cap 改為啟動 ending_madness_be，run 當下不清空；正式結算在 P5-D。
+	if cur_day == 15 and cur_phase == "afternoon":
+		failed += _ok("BE 啟動後 day／phase 不動")
 	else:
-		failed += _fail("BE 後時間未重置為 D1 morning (day=%d, phase=%s)" % [cur_day, cur_phase])
+		failed += _fail("BE 啟動後時間不應改變 (day=%d, phase=%s)" % [cur_day, cur_phase])
 
-	if hand == ["protagonist"]:
-		failed += _ok("BE 後手牌只剩主角卡")
+	if str(gs.get("flow_mode")) == "ending" and str((gs.get("active_ending") as Dictionary).get("ending_id", "")) == "ending_madness_be":
+		failed += _ok("BE 啟動後進入 ending mode 且 ending_id 為 ending_madness_be")
 	else:
-		failed += _fail("BE 後手牌未正確重置 (hand=%s)" % str(hand))
+		failed += _fail("BE 啟動後 flow 狀態異常 (mode=%s)" % str(gs.get("flow_mode")))
 
-	if knowledge.has("k_forty_something"):
-		failed += _ok("BE 後知識卡跨輪完整保留")
+	if hand.size() == 3 and not clock.is_empty():
+		failed += _ok("BE 啟動後 run 尚未清空（手牌與發狂錶保留給結局快照）")
 	else:
-		failed += _fail("BE 後知識卡丟失 (knowledge=%s)" % str(knowledge))
+		failed += _fail("BE 啟動後 run 不應被清空 (hand=%s)" % str(hand))
 
-	if flags.is_empty() and switches.is_empty() and relations.is_empty() and clock.is_empty():
-		failed += _ok("BE 後 flags / switches / relations / madness_clock 等 run 層狀態已清空")
+	# legacy end_run 收尾（P5-D 由 complete_ending() 取代）後才做跨輪重置驗收
+	gs.call("end_run", "ending_madness_be")
+	var hand_reset: Array = gs.get("hand")
+	var knowledge_reset: Dictionary = gs.get("knowledge")
+	var flags_reset: Dictionary = gs.get("flags")
+	var switches_reset: Dictionary = gs.get("switches")
+	var relations_reset: Dictionary = gs.get("relations")
+	var clock_reset: Dictionary = gs.get("madness_clock")
+
+	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
+		failed += _ok("legacy end_run 後回到第 1 天 morning")
 	else:
-		failed += _fail("BE 後 run 層狀態未完全清空")
+		failed += _fail("legacy end_run 後時間未重置為 D1 morning (day=%d, phase=%s)" % [int(gs.get("day")), str(gs.get("phase"))])
+
+	if hand_reset == ["protagonist"]:
+		failed += _ok("重置後手牌只剩主角卡")
+	else:
+		failed += _fail("重置後手牌未正確重置 (hand=%s)" % str(hand_reset))
+
+	if knowledge_reset.has("k_forty_something"):
+		failed += _ok("重置後知識卡跨輪完整保留")
+	else:
+		failed += _fail("重置後知識卡丟失 (knowledge=%s)" % str(knowledge_reset))
+
+	if flags_reset.is_empty() and switches_reset.is_empty() and relations_reset.is_empty() and clock_reset.is_empty():
+		failed += _ok("重置後 flags / switches / relations / madness_clock 等 run 層狀態已清空")
+	else:
+		failed += _fail("重置後 run 層狀態未完全清空")
+
+	if str(gs.get("flow_mode")) == "run" and (gs.get("active_ending") as Dictionary).is_empty():
+		failed += _ok("重置後 flow 回到 run 且 active_ending 為 null")
+	else:
+		failed += _fail("重置後 flow 層未歸位 (mode=%s)" % str(gs.get("flow_mode")))
 
 	loader.tuning["madness_cap"] = orig_cap
 	return failed
@@ -441,12 +471,20 @@ func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) ->
 	else:
 		failed += _fail("run_ended 發射次數不符 (count=%d, endings=%s)" % [emitted_endings.size(), str(emitted_endings)])
 
+	# P5-B：批次發卡衝破 cap 只啟動一次結局，四張卡都留在快照所描述的這一輪。
 	var hand_after: Array = gs.get("hand")
 	var clock_after: Dictionary = gs.get("madness_clock")
-	if hand_after == ["protagonist"] and clock_after.is_empty():
-		failed += _ok("重置後手牌為乾淨的 ['protagonist']，後續發卡未污染新一輪")
+	if hand_after.size() == 5 and clock_after.size() == 4 and str(gs.get("flow_mode")) == "ending":
+		failed += _ok("批次發卡後四張發狂卡都留在本輪，且只啟動一次結局")
 	else:
-		failed += _fail("重置後手牌受後續發卡污染 (hand=%s, clock=%s)" % [str(hand_after), str(clock_after)])
+		failed += _fail("批次發卡後狀態異常 (hand=%s, clock=%s, mode=%s)" % [str(hand_after), str(clock_after), str(gs.get("flow_mode"))])
+
+	gs.call("end_run", "ending_madness_be")
+	var hand_reset: Array = gs.get("hand")
+	if hand_reset == ["protagonist"] and (gs.get("madness_clock") as Dictionary).is_empty():
+		failed += _ok("legacy end_run 後手牌為乾淨的 ['protagonist']，後續發卡未污染新一輪")
+	else:
+		failed += _fail("重置後手牌受後續發卡污染 (hand=%s)" % str(hand_reset))
 
 	gs.disconnect("run_ended", on_run_ended)
 	loader.locations.erase(test_loc_id)
@@ -468,8 +506,9 @@ func _test_real_data_cap_unreached_in_run1(gs: Node, data_node: Node) -> int:
 		failed += _ok("45 天貪心走查在正式資料上成功走完")
 
 	var last_ending: String = str(res.get("last_ending_id", ""))
-	if last_ending == "ending_default" and last_ending != "ending_madness_be":
-		failed += _ok("45 天走查結局為 ending_default，未觸發 ending_madness_be (K-63)")
+	# P5-B：D45 coda 門檻完成後啟動的是正常替換結局，不再是 P1 的 ending_default stub。
+	if last_ending == "ending_replaced" and last_ending != "ending_madness_be":
+		failed += _ok("45 天走查結局為 ending_replaced，未觸發 ending_madness_be (K-63)")
 	else:
 		failed += _fail("走查結局異常 (last_ending_id=%s)" % last_ending)
 

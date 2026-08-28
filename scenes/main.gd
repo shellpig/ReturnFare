@@ -316,7 +316,8 @@ func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> vo
 			_advance_btn.visible = true
 		"evening":
 			_encounter_panel.visible = false
-			if GameState.day == GameState.LAST_DAY:
+			# 通用門檻：本時段有 phase_exit 的 fixed beat 就走內容面板，不特判日期或 beat id。
+			if bool(GameState.phase_exit_status().get("has_gate", false)):
 				_show_final_coda(encounter_lines)
 			else:
 				_map_list.visible = false
@@ -390,10 +391,12 @@ func _play_evening() -> void:
 
 
 func _show_final_coda(encounter_lines: PackedStringArray = PackedStringArray()) -> void:
-	# d45_then 是 evening 的真 beat；它必須先經過地點面板，才能讓
-	# compare_registry 走正式 UI 放置入口，而不是由 headless 直接 try_place。
-	var placed: Dictionary = GameState.slots_placed as Dictionary
-	var coda_done := placed.has("d45_then::compare_registry")
+	# coda 是 evening 的真 beat；它必須先經過地點面板，才能讓 required slot
+	# 走正式 UI 放置入口，而不是由 headless 直接 try_place。
+	# 門檻與地點都由規則層的 phase_exit 給，UI 不含 beat id 或槽 id 特判（P5-B）。
+	var gate: Dictionary = GameState.phase_exit_status()
+	var coda_location := str(gate.get("location", ""))
+	var coda_done: bool = bool(gate.get("satisfied", false)) or coda_location.is_empty()
 	_map_list.visible = false
 	_advance_btn.visible = true
 	if not coda_done:
@@ -404,7 +407,7 @@ func _show_final_coda(encounter_lines: PackedStringArray = PackedStringArray()) 
 			_flow_text.append_lines(encounter_lines)
 			_flow_text.visible = true
 		_layout_with_flow(_location_panel)
-		_location_panel.call("show_location", "jinghe_back")
+		_location_panel.call("show_location", coda_location)
 		return
 
 	_location_panel.visible = false

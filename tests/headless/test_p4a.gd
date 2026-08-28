@@ -733,10 +733,12 @@ func _test_nb1_d8_be_regression() -> void:
 	gs.call("play_night_fixed")
 	gs.disconnect("run_ended", cb)
 
+	# P5-B：撞上限改為啟動 ending_madness_be（不再重置本輪），
+	# 但「不得把 D8 beat 寫進已結束的輪」這條規約不變。
 	var be_fired: bool = ended[0] == 1
-	var was_reset: bool = int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning"
+	var in_ending: bool = str(gs.get("flow_mode")) == "ending"
 	var d8_not_written: bool = not (gs.get("beats_entered") as Dictionary).has("n_manydoors_ch1")
-	if be_fired and was_reset and d8_not_written:
-		_ok("D8 首次收費撞上限 → 恰觸發一次 BE、重置回第 1 天、且未把 n_manydoors_ch1 寫進新輪 beats_entered")
+	if be_fired and in_ending and d8_not_written:
+		_ok("D8 首次收費撞上限 → 恰觸發一次 BE、進入 ending mode，且未把 n_manydoors_ch1 寫進 beats_entered")
 	else:
-		_fail("NB1 regression：be_fired=%s reset=%s d8_not_written=%s" % [str(be_fired), str(was_reset), str(d8_not_written)])
+		_fail("NB1 regression：be_fired=%s in_ending=%s d8_not_written=%s" % [str(be_fired), str(in_ending), str(d8_not_written)])

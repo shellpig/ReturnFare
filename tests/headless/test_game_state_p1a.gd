@@ -208,6 +208,17 @@ func _test_advance_day45() -> int:
 	else:
 		failed += _ok("day45: day stays 45")
 
+	# P5-B：D45 evening 改由 d45_then 的 phase_exit 門檻接結局。
+	# 門檻未完成時不得離場，且不再有 end_run 的跨輪重置（正式結算在 P5-D）。
+	(gs.get("flags") as Dictionary)["final_day"] = true
+	var gate_res: Dictionary = gs.call("advance_phase")
+	if str(gate_res.get("reason_code", "")) != "phase_requirements_incomplete":
+		failed += _fail("day45 evening: 門檻未完成應回 phase_requirements_incomplete，實際 '%s'" % str(gate_res.get("reason_code", "")))
+	else:
+		failed += _ok("day45 evening: coda 門檻未完成時拒絕離場")
+
+	(gs.get("slots_placed") as Dictionary)["d45_then::compare_registry"] = true
+	gs.set("selected_festival_proxy_npc", "ajie")
 	gs.call("advance_phase")
 
 	if fired.is_empty():
@@ -217,10 +228,10 @@ func _test_advance_day45() -> int:
 
 	var phase_final: String = gs.get("phase")
 	var day_final: int = int(gs.get("day"))
-	if phase_final != "morning" or day_final != 1:
-		failed += _fail("day45 after run_ended: state should reset to Day 1 morning, got Day %d %s" % [day_final, phase_final])
+	if phase_final != "evening" or day_final != 45 or str(gs.get("flow_mode")) != "ending":
+		failed += _fail("day45 進結局後應停在 Day 45 evening 且 mode 為 ending，實際 Day %d %s / %s" % [day_final, phase_final, str(gs.get("flow_mode"))])
 	else:
-		failed += _ok("day45 after run_ended: resets to Day 1 morning (P1-F B-02)")
+		failed += _ok("day45 coda 門檻完成後進入 ending mode，day／phase 不動（P5-B）")
 
 	(gs as Node).queue_free()
 	return failed

@@ -152,7 +152,7 @@ func _test_effect_apply(gs: Node) -> int:
 		"madness": 2,
 		"flag": { "fx_flag_a": true, "fx_flag_b": false },
 	}
-	var lines: PackedStringArray = EffectApply.apply(effect, gs)
+	var lines: PackedStringArray = _apply_effect(effect, gs)
 
 	if not lines.has("測試效果文字"):
 		failed += _fail("effect_apply: text line missing")
@@ -190,7 +190,7 @@ func _test_effect_apply(gs: Node) -> int:
 
 	# lose：作用於知識集合
 	gs.call("gain_card", "k_forty_something")
-	EffectApply.apply({ "lose": ["k_forty_something"] }, gs)
+	_apply_effect({ "lose": ["k_forty_something"] }, gs)
 	if (gs.get("knowledge") as Dictionary).has("k_forty_something"):
 		failed += _fail("effect_apply: lose did not remove knowledge card")
 	else:
@@ -208,7 +208,7 @@ func _test_effect_apply_card_guard(gs: Node) -> int:
 	var failed := 0
 
 	# gain：條件成立 → 發卡
-	EffectApply.apply({ "gain": [
+	_apply_effect({ "gain": [
 		{ "card": "k_forty_something", "if": { "not": { "has_knowledge": "k_already_on_list" } } }
 	] }, gs)
 	if (gs.get("knowledge") as Dictionary).has("k_forty_something"):
@@ -218,7 +218,7 @@ func _test_effect_apply_card_guard(gs: Node) -> int:
 
 	# gain：條件不成立 → 跳過，且同一塊的其他鍵仍生效
 	gs.call("gain_card", "k_already_on_list")
-	var lines_guard: PackedStringArray = EffectApply.apply({
+	var lines_guard: PackedStringArray = _apply_effect({
 		"text": "守衛測試",
 		"gain": [
 			{ "card": "k_town_covers", "if": { "not": { "has_knowledge": "k_already_on_list" } } },
@@ -245,14 +245,14 @@ func _test_effect_apply_card_guard(gs: Node) -> int:
 		failed += _fail("card guard: text 被誤擋")
 
 	# 缺 if 的物件形態 = 恆成立（同 ConditionEval 契約）
-	EffectApply.apply({ "gain": [{ "card": "k_not_today" }] }, gs)
+	_apply_effect({ "gain": [{ "card": "k_not_today" }] }, gs)
 	if (gs.get("knowledge") as Dictionary).has("k_not_today"):
 		failed += _ok("card guard: 缺 if 的物件項目視為恆成立")
 	else:
 		failed += _fail("card guard: 缺 if 的物件項目未執行")
 
 	# lose 同樣支援守衛
-	EffectApply.apply({ "lose": [
+	_apply_effect({ "lose": [
 		{ "card": "k_not_today", "if": { "has_knowledge": "k_already_on_list" } }
 	] }, gs)
 	if not (gs.get("knowledge") as Dictionary).has("k_not_today"):
@@ -260,7 +260,7 @@ func _test_effect_apply_card_guard(gs: Node) -> int:
 	else:
 		failed += _fail("card guard: lose 的守衛成立時未執行")
 
-	EffectApply.apply({ "lose": [
+	_apply_effect({ "lose": [
 		{ "card": "k_twenty_years_ago", "if": { "has_knowledge": "k_town_covers" } }
 	] }, gs)
 	if (gs.get("knowledge") as Dictionary).has("k_twenty_years_ago"):
@@ -726,3 +726,16 @@ func _test_lint_vocabulary() -> int:
 		failed += _ok("lint_free_slot_rules: unexempted panel without protagonist slot caught as error (K-27)")
 
 	return failed
+
+
+## P5-B：EffectApply 改為 preflight／commit 兩階段，測試沿用同一條管線取代舊的 apply()。
+func _apply_effect(effect: Variant, gs: Node) -> PackedStringArray:
+	var pf := EffectApply.preflight([effect], gs)
+	if not bool(pf.get("ok", false)):
+		push_error("_apply_effect: preflight 失敗 → %s" % str(pf.get("reason_code", "")))
+		return PackedStringArray()
+	var shadow: Node = pf.get("shadow")
+	if shadow != null:
+		shadow.free()
+	var commit_res := EffectApply.commit(pf.get("plan", {}) as Dictionary, gs)
+	return commit_res.get("lines", PackedStringArray())

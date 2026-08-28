@@ -368,10 +368,12 @@ func _test_cap_be_seen_retention(gs: Node, _data_node: Node) -> int:
 	var phase_after: String = str(gs.get("phase"))
 	var seen_after: Dictionary = gs.get("night_locations_seen")
 
-	if emitted_endings == ["ending_madness_be"] and day_after == 1 and phase_after == "morning" and bool(seen_after.get("n_source", false)):
-		failed += _ok("進入地點撞 cap 觸發發瘋 BE，回到第 1 天 morning 且 meta night_locations_seen 仍記錄 n_source")
+	# P5-B：撞 cap 改為啟動結局狀態機，day／phase 不動、run 不清；meta seen 一樣要留著。
+	if emitted_endings == ["ending_madness_be"] and str(gs.get("flow_mode")) == "ending" \
+			and day_after == 7 and phase_after == "night" and bool(seen_after.get("n_source", false)):
+		failed += _ok("進入地點撞 cap 啟動發瘋 BE，停在原時段且 meta night_locations_seen 仍記錄 n_source")
 	else:
-		failed += _fail("撞 cap BE 狀態異常: endings=%s, day=%d, phase=%s, seen=%s" % [str(emitted_endings), day_after, phase_after, str(seen_after)])
+		failed += _fail("撞 cap BE 狀態異常: endings=%s, mode=%s, day=%d, phase=%s, seen=%s" % [str(emitted_endings), str(gs.get("flow_mode")), day_after, phase_after, str(seen_after)])
 
 	# BE 發生時不回傳 marker 文字行
 	if (res.get("lines", PackedStringArray()) as PackedStringArray).is_empty():
@@ -419,17 +421,24 @@ func _test_main_scene_cap_be_screen(tree: SceneTree, gs: Node, _data_node: Node)
 			str(main.get("_is_showing_ending")), str(flow_lines), str(loc_panel.visible)
 		])
 
-	# 點擊推進按鈕重啟輪次
+	# P5-B：結局啟動後 run 不清空，推進按鈕也不得偷推時間（正式結局畫面在 P5-E）。
 	main.call("_on_advance_pressed")
 	await tree.process_frame
 
 	var day_after: int = int(gs.get("day"))
 	var phase_after: String = str(gs.get("phase"))
 	var seen_after: bool = bool(gs.call("night_location_seen", "n_ahong_1"))
-	if not bool(main.get("_is_showing_ending")) and day_after == 1 and phase_after == "morning" and seen_after:
-		failed += _ok("點擊推進後乾淨重啟至 D1 morning，且 meta night_locations_seen 成功保留")
+	if str(gs.get("flow_mode")) == "ending" and day_after == 6 and phase_after == "night" and seen_after:
+		failed += _ok("BE 啟動後停在原時段，meta night_locations_seen 成功保留")
 	else:
-		failed += _fail("BE 後推進狀態異常: day=%d, phase=%s, seen=%s" % [day_after, phase_after, str(seen_after)])
+		failed += _fail("BE 後狀態異常: mode=%s, day=%d, phase=%s, seen=%s" % [str(gs.get("flow_mode")), day_after, phase_after, str(seen_after)])
+
+	# legacy end_run 收尾（P5-D 由 complete_ending() 取代）
+	gs.call("end_run", "ending_madness_be")
+	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning" and bool(gs.call("night_location_seen", "n_ahong_1")):
+		failed += _ok("legacy end_run 後乾淨重啟至 D1 morning，且 meta night_locations_seen 成功保留")
+	else:
+		failed += _fail("legacy end_run 後狀態異常: day=%d, phase=%s" % [int(gs.get("day")), str(gs.get("phase"))])
 
 	main.queue_free()
 	await tree.process_frame

@@ -378,8 +378,11 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 
 	# D45 coda 的 UI 案例必須真的帶著第 13 天名冊情報卡，否則只能驗到
 	# 「比對槽不存在」而不是結局的升級路徑。
+	# P5-B：D45 evening 的 coda 門檻會啟動 ending_replaced，而正常結局要求慶典代付者已凍結。
+	# 逾期預設要到 P5-D 才由規則層自動結算，因此這裡先明示走「不邀」把代付者定下來。
 	var d45_coda_decisions: Array[Dictionary] = [
-		{ "day": 13, "phase": "afternoon", "beat_id": "d13_pm_registry", "slot_id": "read", "card_id": "protagonist" }
+		{ "day": 13, "phase": "afternoon", "beat_id": "d13_pm_registry", "slot_id": "read", "card_id": "protagonist" },
+		{ "day": 29, "phase": "afternoon", "beat_id": "d29_pm_invitation", "slot_id": "invite_none", "group_id": "invitation" }
 	]
 	var d45_coda_cp: Dictionary = {
 		"d45_evening": { "day": 45, "phase": "evening" },
@@ -787,7 +790,8 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 		"d43_afternoon":
 			return day == 43 and phase == "afternoon" and hand.has("info_acai_walk")
 		"d45_evening":
-			return day == 45 and phase == "evening" and hand.has("info_registry")
+			return day == 45 and phase == "evening" and hand.has("info_registry") \
+				and str((snapshot.get("run", {}) as Dictionary).get("selected_festival_proxy_npc", "")) != ""
 		"d8_evening":
 			return day == 8 and phase == "evening"
 		"d13_evening":

@@ -233,6 +233,15 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 
 	gs.disconnect("run_ended", on_run_ended)
 
+	# P5-B：45 天走完不必然啟動結局（D45 coda 門檻要求先完成名冊比對），
+	# 終局數字改為走查結束時直接取一次；run_ended 只用來確認中途有沒有 BE。
+	final_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
+	var end_mcards: Array = []
+	for card in (gs.get("hand") as Array):
+		if str(card).begins_with("madness"):
+			end_mcards.append(card)
+	final_madness_cards_box[0] = end_mcards
+
 	# 收集視野窗口（桌上 >= 3 張的天數）
 	var vision_days: Array[int] = []
 	for day_idx in range(1, 46):

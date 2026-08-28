@@ -361,6 +361,17 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 
 	gs.disconnect("run_ended", on_run_ended)
 
+	# P5-B：45 天走完不必然啟動結局（D45 coda 門檻要求先完成名冊比對），
+	# 終局數字改為走查結束時直接取一次；run_ended 只用來確認中途有沒有 BE。
+	if endings_received.is_empty():
+		final_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
+		var end_mcards: Array = []
+		for card in (gs.get("hand") as Array):
+			if str(card).begins_with("madness"):
+				end_mcards.append(card)
+		final_madness_cards_box[0] = end_mcards
+		final_madness_cleared_box[0] = int(gs.get("madness_cards_cleared"))
+
 	return {
 		"strategy": strategy_type,
 		"errors": sync_errors,
@@ -409,9 +420,10 @@ func _test_first_round_path_efficiency_13(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("重置前手牌發狂卡異常: 預期 2, 實際 %d" % in_hand)
 
+	# P5-B：P1 的 ending_default stub 已退場；本組驗的是「全程沒有中途 BE」。
 	var endings: Array = res.get("endings", []) as Array
-	if endings.size() == 1 and endings[0] == "ending_default":
-		failed += _ok("順利走完 45 天並觸發 ending_default，未觸發發瘋 BE")
+	if not endings.has("ending_madness_be"):
+		failed += _ok("順利走完 45 天，全程未觸發發瘋 BE")
 	else:
 		failed += _fail("結局異常: %s" % str(endings))
 
@@ -464,9 +476,10 @@ func _test_first_round_max_pressure_14(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("重置前手牌發狂卡異常: 預期 2, 實際 %d" % in_hand)
 
+	# P5-B：P1 的 ending_default stub 已退場；本組驗的是「全程沒有中途 BE」。
 	var endings: Array = res.get("endings", []) as Array
-	if endings.size() == 1 and endings[0] == "ending_default":
-		failed += _ok("順利走完 45 天並觸發 ending_default，未觸發發瘋 BE")
+	if not endings.has("ending_madness_be"):
+		failed += _ok("順利走完 45 天，全程未觸發發瘋 BE")
 	else:
 		failed += _fail("結局異常: %s" % str(endings))
 
@@ -482,6 +495,10 @@ func _test_second_round_replay_and_five_paths(gs: Node, data_node: Node) -> int:
 
 	# 先以路徑效率策略跑完第一輪
 	_run_first_round_sim(gs, data_node, "path_efficiency_13")
+
+	# P5-B：走查停在第 45 天 evening（本策略沒有完成 D45 coda 門檻，因此不會啟動結局）。
+	# 跨輪驗收沿用 legacy end_run() 收尾；P5-D 會換成正式的 complete_ending()。
+	gs.call("end_run", "test_loop_reset")
 
 	# 驗證第 1 輪真實 end_run() 後的狀態
 	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
@@ -627,8 +644,11 @@ func _test_determinism_across_two_runs(gs: Node, data_node: Node) -> int:
 	var failed := 0
 	_reset_gs(gs)
 
-	# 跑完第一輪並取得存檔
+	# 跑完第一輪並取得存檔。P5-B：走查停在第 45 天 evening，第二輪必須從重置後的狀態起跑，
+	# 因此先以 legacy end_run() 收尾再取存檔（P5-D 換成正式的 complete_ending()）。
 	var res1 := _run_first_round_sim(gs, data_node, "path_efficiency_13")
+	gs.call("end_run", "test_loop_reset")
+	res1["final_state"] = gs.call("serialize")
 	var checkpoint_state: Dictionary = res1.get("final_state", {}) as Dictionary
 
 	# 建立兩個獨立的 GameState 實例進行第二輪走查

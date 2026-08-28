@@ -106,8 +106,10 @@ func _initialize() -> void:
 		print("  ok  重置後手牌只剩主角卡")
 
 	var knowledge: Dictionary = gs.get("knowledge") as Dictionary
-	if not knowledge.has("k_not_today"):
-		push_error("FAIL: 重置後知識卡 k_not_today 未保留")
+	# P5-B：走查現在會真的完成 D45 比對（coda 門檻的必要條件），
+	# 因此保留下來的是升級後的 k_already_on_list，不再是被 lose 掉的 k_not_today。
+	if not knowledge.has("k_already_on_list"):
+		push_error("FAIL: 重置後知識卡 k_already_on_list 未保留")
 		failed += 1
 	else:
 		print("  ok  重置後 meta 層知識卡已完整保留 (%d 張知識卡)" % knowledge.size())
@@ -131,6 +133,12 @@ func _initialize() -> void:
 	else:
 		print("=== 45 天貪心走查測試全部通過 (總行動數: %d) ===" % int(res.get("actions_taken", 0)))
 		quit(0)
+
+
+## 定向優先槽："day::phase" -> [beat_id, slot_id]。理由見 execute_action_phase() 內註解。
+const PRIORITY_SLOTS := {
+	"13::afternoon": ["d13_pm_registry", "read"],
+}
 
 
 ## 執行 45 天貪心走查（K-36：供 test_p1f 與本腳本共用）
@@ -223,6 +231,13 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		if res_a.get("placed", false):
 			actions_taken += 1
 		last_ind_count = int(gs.get("indulgence_count"))
+		# D29 邀請組：P5-B 尚未實作逾期預設（P5-D 才由規則層自動結算 invite_none）。
+		# 慶典代付者沒凍結的話第 45 天啟動 ending_replaced 會 data_conflict，走查到不了結局，
+		# 因此這裡先以「明示不邀」補上同一個原子入口；P5-D 落地後這段要刪掉。
+		if d == 29 and str(gs.get("phase")) == "afternoon":
+			if not (gs.get("choices") as Dictionary).has("d29_pm_invitation::invitation"):
+				gs.choose("d29_pm_invitation", "invitation", "invite_none")
+
 		if str(gs.get("phase")) == "afternoon":
 			var adv_a: Dictionary = gs.advance_phase()
 			if not adv_a.get("ok", false):
@@ -245,7 +260,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
 
-		# 第 45 天 evening 推進後已自動呼叫 end_run()，不進第 45 夜
+		# 第 45 天 evening 推進：coda 門檻完成後由規則層啟動 ending_replaced，不進第 45 夜。
 		if d == 45:
 			break
 
@@ -260,6 +275,12 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		gs.advance_phase()
 
 	gs.run_ended.disconnect(cb)
+
+	# P5-B：結局啟動後 run 尚未清空（正式的 complete_ending() 與跨輪重置在 P5-D 落地）。
+	# 走查的跨輪重置驗收沿用 legacy end_run() 收尾，且必須在 disconnect 之後，
+	# 才不會讓相容用的 run_ended 訊號被重複計數。
+	if str(gs.get("flow_mode")) == "ending":
+		gs.call("end_run", str(last_ending_box[0]))
 
 	if verbose:
 		print("\n=== 45 天行動時段統計表（共 90 時段）===")
@@ -383,6 +404,22 @@ static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: Str
 				gs.play_beat(play_bid)
 				played_beats[play_bid] = true
 				changed = true
+
+	# 走查專用的定向優先槽（P5-B）：貪心策略本身不知道哪一格是結局的必要條件。
+	# `info_registry` 只有第 13 天下午的信徒名冊會發，而它是 D45 coda `compare_registry`
+	# 唯一收的卡；沒拿到就過不了 phase_exit 門檻，整輪走不到結局。
+	var priority_key := "%d::%s" % [day, phase]
+	if PRIORITY_SLOTS.has(priority_key):
+		var target: Array = PRIORITY_SLOTS[priority_key] as Array
+		var prio_res: Dictionary = gs.try_place("protagonist", str(target[0]), str(target[1]))
+		if prio_res.get("ok", false):
+			return {
+				"ok": true,
+				"placed": true,
+				"category": "placed",
+				"detail": "%s::%s" % [str(target[0]), str(target[1])],
+				"summary": "放置 [%s::%s]" % [str(target[0]), str(target[1])],
+			}
 
 	# 貪心尋找第一個可放主角卡的 OPEN 槽
 	for loc_id in locs:
