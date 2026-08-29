@@ -89,6 +89,7 @@ var madness_cards_cleared: int = 0             # 本輪消除的發狂卡張數�
 var forced_pending: Array[String] = []         # 已歸零、還沒吃到行動格的發狂卡實例 id（run 層）
 var last_forced_lines: PackedStringArray = []  # 當前時段強制縱慾產生的演出文字行（transient UI）
 var last_auto_enter_lines: PackedStringArray = [] # 當前時段自動進場 beat 產生的演出文字行（transient UI）
+var last_choice_default_lines: PackedStringArray = [] # 離場前結算的逾期 choice default 演出文字行（transient UI）
 var run_generation: int = 0                    # 輪次世代計數（單調遞增，供 EffectApply 與結算器偵測 end_run）
 
 # --- 頂層流程與結局狀態機（P5-B）---
@@ -186,13 +187,24 @@ func advance_phase() -> Dictionary:
 		if not bool(plan.get("ok", false)):
 			return _advance_reject("data_conflict", str(plan.get("reason_text", "")))
 		ending_snapshot = plan.get("snapshot", {}) as Dictionary
-	elif day >= LAST_DAY and phase == PHASES[PHASES.size() - 1]:
-		# 最後一天沒有 night，走到這裡代表資料把玩家帶往第 46 天。
-		return _advance_reject("data_conflict", "推進目標超出最後一天")
+	else:
+		var target := _next_phase_target()
+		if int(target.get("day", 0)) > LAST_DAY:
+			# 最後一天沒有 night，走到這裡代表資料把玩家帶往第 46 天。
+			return _advance_reject("data_conflict", "推進目標超出最後一天")
+		# 目標時段的 fixed 遭遇由規則層自動建立，UI 沒有第二次機會擋。任何一筆壞掉
+		# 就必須在換時段之前擋下來——換過去才發現，玩家會停在一個「本該有遭遇卻沒有」
+		# 的時段，而且狀態已經動了。
+		var enc_error := _due_encounter_data_error(int(target.get("day", 0)), str(target.get("phase", "")))
+		if not enc_error.is_empty():
+			return _advance_reject("data_conflict", enc_error)
 
 	# ⑦ 一次 commit：先落地逾期預設，再走 transition 或啟動結局。
 	_commit_choice_default_plan(default_plan, self)
 	var lines: PackedStringArray = defaults.get("lines", PackedStringArray())
+	# 逾期預設發生在換時段之前，因此它的文字要在新時段的畫面最上面。
+	# `_commit_phase_transition()` 刻意不清這一個 transient（其餘三個它自己清）。
+	last_choice_default_lines = lines
 
 	if not ending_snapshot.is_empty():
 		_commit_ending_plan(ending_snapshot)
@@ -204,6 +216,53 @@ func advance_phase() -> Dictionary:
 
 func _advance_reject(code: String, text: String) -> Dictionary:
 	return { "ok": false, "reason_code": code, "reason_text": text, "lines": PackedStringArray(), "phase_advanced": false }
+
+
+## 純函式：一般推進的目標時段。與 `_commit_phase_transition()` 的走法必須一致。
+## 第 45 天 afternoon 直接跳 evening（沒有第 45 夜）。
+func _next_phase_target() -> Dictionary:
+	if day == LAST_DAY and phase == "afternoon":
+		return { "day": day, "phase": "evening" }
+	var idx := PHASES.find(phase)
+	if idx < PHASES.size() - 1:
+		return { "day": day, "phase": PHASES[idx + 1] }
+	return { "day": day + 1, "phase": PHASES[0] }
+
+
+## 純函式：目標時段所有掛遭遇的 fixed beat 的資料檢查。回空字串＝全部合格。
+## 這裡刻意不求值 condition——換時段途中的 auto_enter 效果可能才讓某個遭遇成立，
+## 因此「哪一個會開場」在 commit 前無法確定，能確定的是**任何一個都不能是壞資料**。
+func _due_encounter_data_error(target_day: int, target_phase: String) -> String:
+	if Data == null or Data.loader == null:
+		return "資料未載入"
+	if target_phase == "night":
+		return ""
+	for b in Data.loader.beats_at(target_day, target_phase):
+		if not bool(b.get("fixed", false)) or not b.has("encounter"):
+			continue
+		var err := _encounter_data_error(b)
+		if not err.is_empty():
+			return err
+	return ""
+
+
+## 遭遇資料形狀的唯一檢查點：`start_encounter()` 與換時段前的預檢共用同一份規則，
+## 避免兩份分歧的判斷讓「預檢過了、真的開場卻失敗」。回空字串＝資料合格。
+func _encounter_data_error(beat: Dictionary) -> String:
+	if not beat.has("encounter"):
+		return "未知的遭遇事件"
+	var enc_val: Variant = beat.get("encounter")
+	if not enc_val is Dictionary:
+		return "遭遇資料格式錯誤"
+	var enc := enc_val as Dictionary
+	var rounds_val: Variant = enc.get("rounds")
+	if not rounds_val is Array or (rounds_val as Array).is_empty():
+		return "遭遇資料缺少回合定義"
+	if not enc.has("per_round_slot_cost") or int(enc.get("per_round_slot_cost", 0)) < 0:
+		return "遭遇資料 slot_cost 錯誤"
+	if not enc.has("after_finish"):
+		return "遭遇資料缺少 after_finish"
+	return ""
 
 
 ## 真正換時段的那一步。只在 advance_phase() 第 ⑦ 步呼叫，別處不得複製一份。
@@ -326,6 +385,7 @@ func _reset_run_state() -> void:
 	forced_pending.clear()
 	last_forced_lines.clear()
 	last_auto_enter_lines.clear()
+	last_choice_default_lines.clear()
 
 	delegates_used_today.clear()
 	pending_delegation_reports.clear()
@@ -782,7 +842,9 @@ func complete_ending() -> Dictionary:
 func _build_history_record(snapshot: Dictionary) -> Dictionary:
 	if Data == null or Data.loader == null:
 		return {}
-	if not Data.loader.endings_by_id.has(str(snapshot.get("ending_id", ""))):
+	# 先用讀檔那一份逐欄驗證重跑一次：ending 專屬 nullable 矩陣、variant 合法集合、
+	# page ref 一致性、日期／時段型別都在裡面。history 是 append-only，寧可在這裡擋下來。
+	if _parse_ending_snapshot(snapshot).is_empty():
 		return {}
 
 	var opening_ref: Variant = snapshot.get("opening_choice_id")
@@ -1249,7 +1311,11 @@ func _check_fixed_encounter_for_current_phase() -> void:
 		if is_meta_once and night_once_beats_seen.has(bid):
 			continue
 		if ConditionEval.eval(b.get("condition"), self) and ConditionEval.eval(b.get("requires"), self):
-			start_encounter(bid)
+			# 資料已由 advance_phase() 第 ⑥ 步預檢過，這裡再失敗就是規則層的 bug，不吞掉。
+			var start_res := start_encounter(bid)
+			if not bool(start_res.get("ok", false)):
+				push_error("_check_fixed_encounter_for_current_phase: 自動建立遭遇失敗 '%s'（%s）"
+					% [bid, str(start_res.get("reason_code", ""))])
 			break
 
 
@@ -1582,12 +1648,14 @@ func lose_card(id: String, permanent: bool = false) -> void:
 		push_error("lose_card: cannot lose protagonist card (data bug)")
 		return
 
+	# 一般 lose 只令這一輪消失，下一輪照樣恢復；只有明示 permanent 才真的斷掉跨輪繼承。
+	# 這一步不看卡還在不在手上——「本輪先普通失去、之後才永久失去」也必須真的斷掉。
+	if permanent and card.get("loop_persistent", false) == true:
+		loop_persistent_item_ids.erase(base_id)
+
 	var idx := hand.find(id)
 	if idx >= 0:
 		hand.remove_at(idx)
-		# 一般 lose 只令這一輪消失，下一輪照樣恢復；只有明示 permanent 才真的斷掉跨輪繼承。
-		if permanent and card.get("loop_persistent", false) == true:
-			loop_persistent_item_ids.erase(base_id)
 		if card.get("type", "") == "madness":
 			madness_clock.erase(id)
 			madness_cards_cleared += 1
@@ -2415,19 +2483,10 @@ func start_encounter(beat_id: String) -> Dictionary:
 	if not beat.has("encounter"):
 		return { "ok": false, "reason_code": "unknown_beat", "reason_text": "未知的遭遇事件" }
 
-	var enc_val: Variant = beat.get("encounter")
-	if not enc_val is Dictionary:
-		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料格式錯誤" }
-
-	var enc := enc_val as Dictionary
-	# 3. data conflict
-	var rounds_val: Variant = enc.get("rounds")
-	if not rounds_val is Array or (rounds_val as Array).is_empty():
-		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料缺少回合定義" }
-	if not enc.has("per_round_slot_cost") or int(enc.get("per_round_slot_cost", 0)) < 0:
-		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料 slot_cost 錯誤" }
-	if not enc.has("after_finish"):
-		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇資料缺少 after_finish" }
+	# 3. data conflict（與換時段前的預檢共用同一份檢查）
+	var enc_error := _encounter_data_error(beat)
+	if not enc_error.is_empty():
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": enc_error }
 
 	var attempted_ids: Array[String] = []
 	var visited_ids: Array[String] = []
@@ -2996,6 +3055,10 @@ func _parse_persistent_items(d: Dictionary) -> Dictionary:
 	var ids: Dictionary = {}
 	for card_id: Variant in (raw as Dictionary).keys():
 		var cid := str(card_id)
+		# 這是一個 set：值只能是 true。收 false 再靜默正規化成 true 等於偷偷改存檔語意。
+		var flag: Variant = (raw as Dictionary)[card_id]
+		if typeof(flag) != TYPE_BOOL or not bool(flag):
+			return { "ok": false, "ids": {} }
 		if Data == null or Data.loader == null or not Data.loader.cards.has(cid):
 			return { "ok": false, "ids": {} }
 		if (Data.loader.cards[cid] as Dictionary).get("loop_persistent", false) != true:

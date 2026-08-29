@@ -154,8 +154,11 @@ func _on_advance_pressed() -> void:
 	if not bool(res.get("ok", false)):
 		_refresh_advance_hint()
 		return
-	var lines: PackedStringArray = res.get("lines", PackedStringArray())
+	# 真的換了時段時，`phase_changed` 已經在 advance_phase() 內部重建畫面，回傳的
+	# 那幾行（逾期預設）也已經寫進 GameState 的 transient，由 `_settlement_lines()`
+	# 播出；這裡再播一次會變兩份。只有停拍（夜間直接睡）要自己渲染。
 	if not bool(res.get("phase_advanced", false)):
+		var lines: PackedStringArray = res.get("lines", PackedStringArray())
 		if lines.size() > 0:
 			_flow_text.clear()
 			_flow_text.append_lines(lines)
@@ -450,12 +453,20 @@ func _layout_flow_full() -> void:
 	_flow_text.offset_bottom = _LAYOUT_BOTTOM
 
 
+## 進入本時段前後由規則層結算出來的演出文字，依 advance_phase() 內實際的結算順序合併：
+## 逾期 choice default（換時段之前）→ 強制縱慾 → 委託延遲回報 → 自動進場 beat。
+## 玩家沒有第二次機會看到這些字，因此每一種畫面都要播（K-193）。
+func _settlement_lines() -> PackedStringArray:
+	var lines: PackedStringArray = GameState.last_choice_default_lines.duplicate()
+	lines.append_array(GameState.last_forced_lines)
+	lines.append_array(GameState.last_delegation_report_lines)
+	lines.append_array(GameState.last_auto_enter_lines)
+	return lines
+
+
 func _play_forced_lines() -> void:
 	_flow_text.clear()
-	# P4-B 強制縱慾與 P4-C 委託延遲回報同屬「換日上午既有結算」產生的演出文字，
-	# 依 advance_phase() 內實際結算順序（強制縱慾先、委託回報後）合併播出。
-	var lines: PackedStringArray = GameState.last_forced_lines.duplicate()
-	lines.append_array(GameState.last_delegation_report_lines)
+	var lines := _settlement_lines()
 	if lines.size() > 0:
 		_flow_text.append_lines(lines)
 		_flow_text.visible = true
@@ -465,8 +476,9 @@ func _play_forced_lines() -> void:
 
 func _play_evening() -> void:
 	_flow_text.clear()
-	var lines := GameState.play_evening()
-	_flow_text.append_lines(lines)
+	# 進場結算的文字在晚間演出之前，順序與規則層一致。
+	_flow_text.append_lines(GameState.last_choice_default_lines)
+	_flow_text.append_lines(GameState.play_evening())
 
 
 func _show_final_coda(encounter_lines: PackedStringArray = PackedStringArray()) -> void:
@@ -499,7 +511,8 @@ func _show_final_coda(encounter_lines: PackedStringArray = PackedStringArray()) 
 
 func _play_night_fixed() -> void:
 	_flow_text.clear()
-	var lines := GameState.play_night_fixed()
+	var lines: PackedStringArray = GameState.last_choice_default_lines.duplicate()
+	lines.append_array(GameState.play_night_fixed())
 	if lines.size() > 0:
 		_flow_text.append_lines(lines)
 		_flow_text.visible = true

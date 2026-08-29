@@ -46,11 +46,37 @@
 
 最後一列是已知且刻意保留的缺口：`resolve_unfinished_choice_groups()` 的「代付者必須非空且 eligible」後置條件，在 `EffectApply._resolve_festival_proxy()` 已擋掉非候選與已凍結兩種情形之後，沒有任何合法資料能讓它為真。程式碼註解已明寫這是擋 EffectApply 回歸用的第二道防線、且不宣稱已覆蓋。
 
+### P5-D 第一輪 review 修復（2026-08-29）
+
+Verifier 提兩個 blocker、三條非阻擋，全部已修並各自有變異證據。
+
+**Blocker 1：`advance_phase()` 沒有在 commit 前驗證目標時段的 fixed encounter。**
+第 ⑥ 步新增 `_next_phase_target()`（純函式算目標時段）與 `_due_encounter_data_error()`：把目標 day／phase 上**所有**掛 `encounter` 的 fixed beat 逐一過資料檢查，任一壞掉就回 `data_conflict` 且完整狀態零變化。這裡刻意不求值 `condition`——換時段途中的 auto_enter 效果可能才讓某個遭遇成立，「哪一個會開場」在 commit 前無法確定，能確定的是任何一個都不能是壞資料。資料檢查抽成 `_encounter_data_error()`，`start_encounter()` 改用同一份，避免兩份分歧的判斷讓「預檢過了、真的開場卻失敗」。`_check_fixed_encounter_for_current_phase()` 不再吞掉 `start_encounter()` 的失敗，改 `push_error`。
+
+**Blocker 2：`complete_ending()` 沒有完整重驗 snapshot。**
+`_build_history_record()` 第一步改成呼叫 `_parse_ending_snapshot()`——讀檔用的那份逐欄驗證（ending 專屬 nullable 矩陣、variant 合法集合、page ref 一致性、日期／時段型別）整套重跑一次，不合法就回 `data_conflict`，全部發生在 append 之前。
+
+**K-193：規則層結算文字上不了畫面。**
+GameState 新增 transient `last_choice_default_lines`（與既有三個 transient 同族，不進存檔），在第 ⑦ 步 commit 逾期預設之後、換時段之前寫入；`_commit_phase_transition()` 刻意不清它。`main.gd` 新增 `_settlement_lines()`，依規則層實際結算順序合併「逾期預設 → 強制縱慾 → 委託回報 → 自動進場」，morning／afternoon 走它，evening 與 night 各自在演出前插入逾期預設那一段。推進成功時 main.gd 不再自己渲染回傳的 lines（畫面已由 `phase_changed` 重建），只有停拍那一種自己畫。
+
+**Persistent 邊界兩條。**
+`lose_card()` 的 permanent 分支移到手牌查找之前，「本輪先普通失去、之後才永久失去」也真的斷掉跨輪繼承。`_parse_persistent_items()` 改成 set 語意：值只接受 boolean `true`，`false`／字串／數字一律 `invalid_save_shape`，不再靜默正規化。
+
+**`.uid`**：`tests/headless/test_p5d.gd.uid` 由 `--import` 補上，headless 測試不再有缺 uid 的檔案。
+
+**新增測試**：`test_p5d.gd` 由 16 組擴到 20 組——第 17 組（目標時段遭遇壞資料，含正向對照與還原後回綠）、第 18 組（八種 snapshot 破壞法逐一驗 `data_conflict`＋history 零污染）、第 19 組（persistent 邊界與存檔 set 型別）、第 20 組（結算文字真的走到 FlowText，含 D29 evening、D45 morning auto_enter 與合成 beat 的行動時段路徑）。
+
+**修復後自跑證據**：32 套 headless exit 0；UI sim run `20260829-200245-959-p23404-0913928c` 為 108 variants／85 contracts／85 completed／0 failed checks。
+
+**本輪變異記錄**（各自套用後 `test_p5d` 轉紅，還原後全綠）：拿掉 due encounter 預檢、history 不重驗 snapshot、permanent lose 又看手牌、persistent set 收 false、`_settlement_lines()` 不含逾期預設、不含 auto_enter、`_play_evening()` 不含逾期預設。
+
 ### P5-D 留給 verifier 的判斷點
 
 - `main.gd` 的開局／結局 stub 是過渡品，`測試指南.md > P5-D` 沒有 UI 條目；正式面板與逐字節奏屬 P5-E。
 - 測試工廠 `PlaythroughGreedy.setup_game_state()` 現在每個 process 正規化一次成 run mode（autoload 也可能已把 GameState 掛在 `/root` 底下），fresh boot 為 opening 這條由 `test_boot` 與 `test_p5d` 驗。
 - 「備用區」在 `測試指南.md > P5-D` 的逐欄清單裡有一項，但該系統目前不存在（P2 時移出範圍），因此 `_reset_run_state()` 沒有對應欄位可清。
+- 目標時段遭遇的預檢是**資料形狀檢查**，不是「這一次會不會開場」的預測；後者要等 auto_enter 效果落地才能確定，規格第 ⑥ 步要的也是壞資料攔截。
+- `last_choice_default_lines` 是第四個 UI transient，與既有三個一樣不進 `serialize()`；P5-E 做正式面板時沿用同一組。
 
 ---
 

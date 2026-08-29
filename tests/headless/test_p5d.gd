@@ -5,7 +5,10 @@ extends SceneTree
 ## `complete_ending()` 的固定順序與 history 封閉欄位集合、跨輪重置逐欄稽核、
 ## `loop_persistent` 合成 fixture 的取得／恢復／永久失去、
 ## D29 逾期預設三路等價與慶典代付者凍結、`advance_phase()` 七步固定順序逐層反證、
-## `choice_requires_card` 回歸與第二輪重入。
+## `choice_requires_card` 回歸與第二輪重入、
+## 目標時段 due encounter 壞資料的 commit 前攔截、history append 前的 snapshot 完整重驗、
+## persistent 邊界（先普通失去再永久失去、存檔 set 只收 true）、
+## 規則層結算文字真的走到畫面上（K-193）。
 ## 跑法：Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p5d.gd
 
 const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
@@ -47,6 +50,10 @@ func _initialize() -> void:
 	_test_14_card_required_regression(gs)
 	_test_15_reject_matrix(gs)
 	_test_16_second_run_reentry(gs)
+	_test_17_due_encounter_data_conflict(gs, data_node)
+	_test_18_history_snapshot_revalidation(gs)
+	_test_19_persistent_boundaries(gs, data_node)
+	await _test_20_settlement_lines_reach_screen(gs)
 
 	if _failed > 0:
 		push_error("test_p5d: %d 個斷言失敗" % _failed)
@@ -875,3 +882,258 @@ func _test_16_second_run_reentry(gs: Node) -> void:
 	_check(bool((gs.get("flags") as Dictionary).get("outside_job_waiting", false)), "第三輪電話開局旗標正確")
 	_check(not (gs.get("hand") as Array).has("item_family_album"), "第三輪不殘留上一輪的相簿")
 	_check(int(gs.get("run_number")) == 3, "第三輪的 run_number 為 3")
+
+
+# ── 17. 目標時段 due encounter 壞資料在 commit 前被擋下 ──────────────────────
+
+func _test_17_due_encounter_data_conflict(gs: Node, data_node: Node) -> void:
+	print("\n--- 17. 目標時段 due encounter 壞資料 ---")
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var beat: Dictionary = loader.beats_by_id.get("d45_encounter", {}) as Dictionary
+	_check(not beat.is_empty(), "找得到 d45_encounter")
+	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
+	var orig_after_finish: Variant = enc.get("after_finish")
+
+	# 正向對照：資料完整時 D45 morning 推進成功並在 afternoon 自動建立遭遇。
+	_fresh_run(gs, 45, "morning")
+	gs.call("set_flag", "final_day", true)
+	var good: Dictionary = gs.call("advance_phase")
+	_check(bool(good.get("ok", false)) and bool(good.get("phase_advanced", false)), "對照組：資料完整時推進成功")
+	_check(str((gs.get("active_encounter") as Dictionary).get("beat_id", "")) == "d45_encounter",
+		"對照組：進入 D45 afternoon 後自動建立遭遇")
+
+	# 壞資料：after_finish 消失。推進必須在換時段之前擋下來。
+	enc.erase("after_finish")
+	_fresh_run(gs, 45, "morning")
+	gs.call("set_flag", "final_day", true)
+	var before := _state_text(gs)
+	var bad: Dictionary = gs.call("advance_phase")
+	_check(_reject_code(bad) == "data_conflict", "目標時段遭遇資料壞掉 → data_conflict")
+	_check(not bool(bad.get("phase_advanced", true)), "拒絕時 phase_advanced 為 false")
+	_check(int(gs.get("day")) == 45 and str(gs.get("phase")) == "morning", "拒絕後停在原 day／phase")
+	_check((gs.get("active_encounter") as Dictionary).is_empty(), "拒絕後沒有半個遭遇")
+	_check(_state_text(gs) == before, "拒絕後完整序列化零變化")
+
+	# 另一種壞法：rounds 空陣列。
+	enc["after_finish"] = orig_after_finish
+	var orig_rounds: Variant = enc.get("rounds")
+	enc["rounds"] = []
+	_fresh_run(gs, 45, "morning")
+	gs.call("set_flag", "final_day", true)
+	var before_rounds := _state_text(gs)
+	var bad_rounds: Dictionary = gs.call("advance_phase")
+	_check(_reject_code(bad_rounds) == "data_conflict", "遭遇 rounds 空陣列 → data_conflict")
+	_check(_state_text(gs) == before_rounds, "rounds 壞掉的拒絕同樣零變化")
+
+	enc["rounds"] = orig_rounds
+
+	# 還原後再走一次，確認不是被測試自己毒死的。
+	_fresh_run(gs, 45, "morning")
+	gs.call("set_flag", "final_day", true)
+	var restored: Dictionary = gs.call("advance_phase")
+	_check(bool(restored.get("phase_advanced", false)), "還原資料後推進恢復正常")
+
+
+# ── 18. history append 前的 snapshot 完整重驗 ───────────────────────────────
+
+func _test_18_history_snapshot_revalidation(gs: Node) -> void:
+	print("\n--- 18. complete_ending 的 snapshot 完整重驗 ---")
+
+	# 每個案例都先走到 ready，再單獨破壞 active snapshot 的一個欄位。
+	var cases := [
+		{ "label": "BE ending 卻保留三個 variant", "field": "ending_id", "value": "ending_madness_be" },
+		{ "label": "variant 值不在 ending 宣告的合法集合裡", "field": "partner_variant", "value": "no_such_rule" },
+		{ "label": "正常結局的 variant 被清成 null", "field": "livelihood_variant", "value": null },
+		{ "label": "ended_day 是字串", "field": "ended_day", "value": "45" },
+		{ "label": "ended_phase 不是合法時段", "field": "ended_phase", "value": "midnight" },
+		{ "label": "ended_day 超出最後一天", "field": "ended_day", "value": 46 },
+		{ "label": "source 與 ending 不配對", "field": "source_id", "value": "madness_cap" },
+		{ "label": "opening_choice_id 用空字串代 null", "field": "opening_choice_id", "value": "" },
+	]
+
+	for c: Dictionary in cases:
+		_ready_replaced_ending(gs)
+		var history_before: int = (gs.get("ending_history") as Array).size()
+		var run_before: int = int(gs.get("run_number"))
+		(gs.get("active_ending") as Dictionary)[str(c["field"])] = c["value"]
+		var before := _state_text(gs)
+		var res: Dictionary = gs.call("complete_ending")
+		_check(_reject_code(res) == "data_conflict", "%s → data_conflict" % str(c["label"]))
+		_check((gs.get("ending_history") as Array).size() == history_before, "%s：history 沒有被污染" % str(c["label"]))
+		_check(int(gs.get("run_number")) == run_before, "%s：輪數不變" % str(c["label"]))
+		_check(str(gs.get("flow_mode")) == "ending", "%s：仍留在 ending mode" % str(c["label"]))
+		_check(_state_text(gs) == before, "%s：拒絕後完整序列化零變化" % str(c["label"]))
+
+	# 對照組：不動 snapshot 就結算得掉。
+	_ready_replaced_ending(gs)
+	_check(bool((gs.call("complete_ending") as Dictionary).get("ok", false)), "對照組：完整 snapshot 可以正常結算")
+
+
+## 起一輪走到「正常替換結局已可結算」的狀態。
+func _ready_replaced_ending(gs: Node) -> void:
+	_fresh_opening(gs)
+	gs.call("choose_opening", "take_family_album")
+	gs.set("day", 45)
+	gs.set("phase", "evening")
+	gs.set("selected_festival_proxy_npc", "ajie")
+	gs.call("start_ending", "ending_replaced", "d45_coda")
+	var guard := 200
+	while guard > 0 and not bool((gs.call("ending_view") as Dictionary).get("can_complete", false)):
+		guard -= 1
+		if not bool((gs.call("ending_view") as Dictionary).get("page_revealed", false)):
+			gs.call("reveal_ending_page")
+		else:
+			gs.call("advance_ending_page")
+
+
+# ── 19. persistent 邊界 ─────────────────────────────────────────────────────
+
+func _test_19_persistent_boundaries(gs: Node, data_node: Node) -> void:
+	print("\n--- 19. persistent 邊界 ---")
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var magic_id := "p5d_item_magic_edge"
+	loader.cards[magic_id] = {
+		"id": magic_id, "name": "測試魔法物品（邊界）", "type": "equipment",
+		"slotless": false, "stashable": true, "discardable": true, "loop_persistent": true,
+	}
+
+	# (a) 本輪先普通失去、之後才永久失去：下一輪不得復活。
+	_fresh_opening(gs)
+	gs.call("choose_opening", "take_family_album")
+	gs.call("gain_card", magic_id)
+	gs.call("lose_card", magic_id)
+	_check(not (gs.get("hand") as Array).has(magic_id), "普通 lose 之後手上已經沒有這張")
+	_check((gs.get("loop_persistent_item_ids") as Dictionary).has(magic_id), "普通 lose 不動 meta set")
+	gs.call("lose_card", magic_id, true)
+	_check(not (gs.get("loop_persistent_item_ids") as Dictionary).has(magic_id),
+		"卡不在手上時的 permanent lose 一樣移除 meta set")
+	_complete_replaced(gs, "ajie")
+	gs.call("choose_opening", "take_family_album")
+	_check(not (gs.get("hand") as Array).has(magic_id), "先普通失去再永久失去之後，下一輪不復活")
+
+	# (b) 存檔的 persistent set 是 set：值只能是 true。
+	_fresh_opening(gs)
+	gs.call("choose_opening", "take_family_album")
+	gs.call("gain_card", magic_id)
+	var saved: Dictionary = gs.call("serialize")
+	var round_trip: Dictionary = JSON.parse_string(JSON.stringify(saved))
+	_check(bool((gs.call("deserialize", round_trip) as Dictionary).get("ok", false)), "對照組：正常存檔讀得回來")
+	_check((gs.get("loop_persistent_item_ids") as Dictionary).has(magic_id), "對照組：讀回後 meta set 仍有這張")
+
+	var bad_cases := [
+		{ "label": "值為 false", "value": false },
+		{ "label": "值為字串", "value": "true" },
+		{ "label": "值為 1", "value": 1 },
+	]
+	for c: Dictionary in bad_cases:
+		var bad: Dictionary = JSON.parse_string(JSON.stringify(saved))
+		((bad["meta"] as Dictionary)["loop_persistent_item_ids"] as Dictionary)[magic_id] = c["value"]
+		var before := _state_text(gs)
+		var res: Dictionary = gs.call("deserialize", bad)
+		_check(str(res.get("reason_code", "")) == "invalid_save_shape",
+			"persistent set 的%s → invalid_save_shape" % str(c["label"]))
+		_check(_state_text(gs) == before, "persistent set 壞形狀拒絕後零變化（%s）" % str(c["label"]))
+
+	# 引用不存在的卡同樣不靜默修復。
+	var unknown: Dictionary = JSON.parse_string(JSON.stringify(saved))
+	((unknown["meta"] as Dictionary)["loop_persistent_item_ids"] as Dictionary)["p5d_no_such_card"] = true
+	_check(str((gs.call("deserialize", unknown) as Dictionary).get("reason_code", "")) == "invalid_save_shape",
+		"persistent set 引用不存在的卡 → invalid_save_shape")
+
+	# 引用普通卡（非 loop_persistent）同樣拒絕。
+	var plain: Dictionary = JSON.parse_string(JSON.stringify(saved))
+	((plain["meta"] as Dictionary)["loop_persistent_item_ids"] as Dictionary)["item_family_album"] = true
+	_check(str((gs.call("deserialize", plain) as Dictionary).get("reason_code", "")) == "invalid_save_shape",
+		"persistent set 引用非 loop_persistent 卡 → invalid_save_shape")
+
+	loader.cards.erase(magic_id)
+	_fresh_opening(gs)
+
+
+# ── 20. 規則層結算出來的文字真的走到畫面上（K-193）─────────────────────────
+
+func _test_20_settlement_lines_reach_screen(gs: Node) -> void:
+	print("\n--- 20. 結算演出文字上得了畫面（K-193）---")
+
+	# (a) 規則層：D29 逾期預設的文字留在 transient 上，不是只回傳一次就丟。
+	_fresh_run(gs, 29, "afternoon")
+	var adv: Dictionary = gs.call("advance_phase")
+	var returned: PackedStringArray = adv.get("lines", PackedStringArray())
+	var kept: PackedStringArray = gs.get("last_choice_default_lines")
+	_check(returned.size() > 0, "D29 逾期預設有回傳演出文字")
+	_check(JSON.stringify(kept) == JSON.stringify(returned), "回傳的文字與 transient 逐字相同")
+
+	# (b) 畫面：同一條路走 main.gd 的推進按鈕，文字必須出現在 FlowText 上。
+	var main: Control = load("res://scenes/main.tscn").instantiate() as Control
+	get_root().add_child(main)
+	await process_frame
+	var flow: Node = main.get_node("ContentView/FlowText")
+
+	_fresh_run(gs, 29, "afternoon")
+	main.call("_route_view")
+	await process_frame
+	main.call("_on_advance_pressed")
+	await process_frame
+	_check(str(gs.get("phase")) == "evening", "按推進後離開 D29 afternoon")
+	var evening_text := str(flow.call("get_text"))
+	_check(evening_text.contains("你想了一下，決定誰都不找。"),
+		"D29 逾期「不邀」的文字出現在畫面上（實際：%s）" % evening_text.substr(0, 60))
+
+	# (c) 自動進場 beat 的文字同樣不能只留在 transient 裡。
+	_fresh_run(gs, 44, "night")
+	main.call("_route_view")
+	await process_frame
+	var guard := 4
+	while guard > 0 and int(gs.get("day")) != 45:
+		guard -= 1
+		main.call("_on_advance_pressed")
+		await process_frame
+	_check(int(gs.get("day")) == 45 and str(gs.get("phase")) == "morning", "按推進走進 D45 morning")
+	_check((gs.get("last_auto_enter_lines") as PackedStringArray).size() > 0, "D45 morning 有自動進場演出文字")
+	var morning_text := str(flow.call("get_text"))
+	var auto_lines: PackedStringArray = gs.get("last_auto_enter_lines")
+	_check(morning_text.contains(auto_lines[0]),
+		"D45 自動進場的文字出現在畫面上（實際：%s）" % morning_text.substr(0, 60))
+
+	# (d) 行動時段的畫面走的是另一條渲染路徑（_play_forced_lines）。正式資料只有 D29
+	#     afternoon 有逾期預設，落點是 evening，因此這一條用合成 beat 補上。
+	var synth_id := "p5d_default_lines_probe"
+	var probe_text := "（測試用：逾期預設的演出文字）"
+	var loader: DataLoader = gs.call("loader")
+	var synth_beat := {
+		"id": synth_id,
+		"location": "sanquan",
+		"when": { "day": 20, "phase": "morning" },
+		"fixed": true,
+		"title": "測試逾期預設",
+		"text": "測試用",
+		"slots": [{
+			"id": "probe_default",
+			"occupant": null,
+			"label": "預設",
+			"accepts": [],
+			"choice_group": "probe",
+			"default_if_unresolved": true,
+			"on_place": { "text": probe_text },
+		}],
+	}
+	loader.beats.append(synth_beat)
+	loader.beats_by_id[synth_id] = synth_beat
+
+	_fresh_run(gs, 20, "morning")
+	main.call("_route_view")
+	await process_frame
+	main.call("_on_advance_pressed")
+	await process_frame
+
+	loader.beats_by_id.erase(synth_id)
+	loader.beats.erase(synth_beat)
+
+	_check(str(gs.get("phase")) == "afternoon", "合成預設：按推進後進入 afternoon")
+	_check((gs.get("choices") as Dictionary).has(synth_id + "::probe"), "合成預設：離場前已結算")
+	var afternoon_text := str(flow.call("get_text"))
+	_check(afternoon_text.contains(probe_text),
+		"行動時段畫面也播得出逾期預設的文字（實際：%s）" % afternoon_text.substr(0, 60))
+
+	main.queue_free()
+	await process_frame
