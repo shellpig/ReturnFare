@@ -399,7 +399,7 @@ func _build_ending_plan(ending_id: String, source_id: String, src: Node, allow_o
 		"ending_id": ending_id,
 		"source_id": source_id,
 		"run_number": int(src.get("run_number")),
-		"opening_choice_id": null if src_opening.is_empty() else src_opening,
+		"opening_choice_id": _opening_choice_for_ending(ending_id) if is_refuse else (null if src_opening.is_empty() else src_opening),
 		"ended_day": null if is_refuse else int(src.get("day")),
 		"ended_phase": null if is_refuse else str(src.get("phase")),
 		"partner_variant": variants.get("partner_variant", null),
@@ -407,13 +407,36 @@ func _build_ending_plan(ending_id: String, source_id: String, src: Node, allow_o
 		"inn_appearance_variant": variants.get("inn_appearance_variant", null),
 		# 正常結局用凍結值；兩種 BE 有凍結就複製，不上車一律 null。
 		"festival_proxy_npc": null if (is_refuse or frozen_proxy.is_empty()) else frozen_proxy,
-		"knowledge_gained_this_run": _knowledge_gained_since_start(src),
+		"knowledge_gained_this_run": [] as Array[String] if is_refuse else _knowledge_gained_since_start(src),
 		"page_refs": refs,
 		"page_index": 0,
 		"page_revealed": false,
 		"ready_to_complete": false,
 	}
 	return { "ok": true, "reason_code": "", "reason_text": "", "snapshot": snapshot }
+
+
+## 開局選擇不上車啟動結局的私有入口（P5-D 由 choose_opening 呼叫，P5-C/D 測試共用）。
+func _start_ending_from_opening(choice_id: String) -> Dictionary:
+	if flow_mode != FLOW_OPENING:
+		return _mutation_reject("not_opening", "目前不在開局中")
+	if not active_ending.is_empty():
+		return _mutation_reject("ending_active", "已有進行中的結局")
+	if Data == null or Data.loader == null:
+		return _mutation_reject("data_conflict", "資料未載入")
+	var choice: Dictionary = Data.loader.opening_choices_by_id.get(choice_id, {}) as Dictionary
+	if choice.is_empty():
+		return _mutation_reject("unknown_opening_choice", "未知的開局選項：%s" % choice_id)
+	var ending_id := str(choice.get("ending", ""))
+	if ending_id.is_empty():
+		return _mutation_reject("data_conflict", "開局選項未設定 ending")
+
+	var plan := _build_ending_plan(ending_id, "opening_choice", self, true)
+	if not bool(plan.get("ok", false)):
+		return _mutation_reject(str(plan.get("reason_code", "data_conflict")), str(plan.get("reason_text", "")))
+
+	_commit_ending_plan(plan.get("snapshot", {}) as Dictionary)
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray() }
 
 
 ## 快照落地：先寫 active_ending，再切 mode，最後才通知 UI。

@@ -4,17 +4,16 @@
 
 ## 目前狀態
 
-**P5-B 已由 verifier 完整複驗關門並轉 ✅。下一步 P5-C 四類結局與組合後日談。**
+**P5-C（四類結局與組合後日談）已由 implementer 實作完成，交付 verifier 進行複驗與關門。**
 
-第一版實作在 commit `db41ba8`；本次是依使用者拍板的決定 A1／B1／C 做的第二輪修正，詳見下方
-「P5-B 五項必修：實作紀錄」。實作者自跑證據（打勾與落檔仍由 verifier 做）：
+實作者自跑證據（打勾與落檔仍由 verifier 做）：
 
-- 30 套 headless 全數 exit 0（`tests/run_all_headless.ps1`）
-- `verify_data`：引用 0 錯誤、Lint 1～20 全 0 錯誤（Lint 20 為本次新增）
-- `test_p5b` 新增第 11 組（四類完整動作的原子性）與第 12 組（D45 終局鏈正式資料端到端）
-- `test_p5a` 新增 PE-4～PE-6（phase_exit choice group）與 LC-0～LC-4（lint 20）
-- 變異驗證 25 條逐一反轉並確認精確轉紅，見下方「變異記錄」
-- UI sim run `20260829-084809-561-p41632-333d0387`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks
+- 31 套 headless 全數 exit 0（`tests/run_all_headless.ps1`，新增 `test_p5c.gd`）
+- `verify_data`：引用 0 錯誤、Lint 1～20 全 0 錯誤
+- `test_p5c` 9 組測試全綠（覆蓋伴侶、生計、修繕、查表防篡改、首見／重見分支、兩種 BE 隔離、不上車快照、逐頁門檻、全 48 組排列走查）
+- 變異驗證 4 條（rule 優先序、repeat 判定、when_group 門控、不上車快照欄位）逐一反轉並確認精確轉紅
+- UI sim run `20260829-093247-625-p30628-76301bc6`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks
+- K-197 已由 implementer 於 `開發設計方針.md > P5-A` 同步修復
 
 Verifier 關門證據（2026-08-29，HEAD `0c82046`）：`test_p5b` 12 組 exit 0、`test_p5a` 含 PE-4～PE-6／LC-0～LC-4 全綠、30 套 headless exit 0、greedy 90 時段全覆蓋且實際走 `empty_handed`、UI sim run `20260829-090655-957-p77948-d1e58860` 為 108 variants／85 contracts／0 failed。原五個 blocker 全數解除；非阻擋殘留編為 K-193～K-198。
 
@@ -186,13 +185,22 @@ Verifier 關門證據（2026-08-29，HEAD `0c82046`）：`test_p5b` 12 組 exit 
 - `d45_then::empty_handed` 的結構版草稿沒有新增世界規則或改寫角色命運，可供 prototype 使用；正式文案仍留內容期潤飾。
 - 五項修正的程式、資料與斷言互相對齊，P5-B 規則／機器層可關門。
 
+## P5-C 變異記錄
+
+| 編號 | 變異點 | 預期失敗測試 | 實際結果 |
+|---|---|---|---|
+| M-C1 | `EndingResolver._pick_rule` 逆轉 rules 遍歷順序 | `test_p5c` (生計/修繕優先序) | 轉紅（9 斷言失敗，exit 1） |
+| M-C2 | `EndingResolver.resolve` 略過 `has_seen_ending` 強制 `is_first_seen := true` | `test_p5c` (首見/重見/BE/不上車) | 轉紅（11 斷言失敗，exit 1） |
+| M-C3 | `EndingResolver.resolve` 略過 lookup fragments 的 `when_group` 門控 | `test_p5c` (未邀代付片段啟用) | 轉紅（1 斷言失敗，exit 1） |
+| M-C4 | `GameState._build_ending_plan` 破壞不上車快照 `ended_day` 為 1 | `test_p5c` (不上車快照 null 斷言) | 轉紅（1 斷言失敗，exit 1） |
+
 ## 已知殘留
 
 - K-193：`last_auto_enter_lines` 尚未接進 `main.gd`；D45 邀請效果成立但文字可能看不到，歸 P5-D transition lines 接線。
 - K-194：UI `full_walk` 仍優先取得 D13 名冊，空手 coda 尚無真實輸入 UI 證據，歸 P5-E／F。
 - K-195：`choice_requires_card` 仍建立直接選擇按鈕，且持名冊時空手選項仍顯示，歸 P5-E UI 收斂。
-- K-196：`test_p5b.gd.uid` 尚未進版控，下一次 import／實作 commit 順手補。
-- K-197：`開發設計方針.md > P5-A` 仍留 D45 required slot 舊敘述；implementer 動 P5-C 前同步。
+- K-196：✅ `test_p5b.gd.uid`／`test_p5c.gd.uid` 已進版控。
+- K-197：✅ 已於 P5-C 由 implementer 修復。
 - K-198：`clone_for_preflight()` 未檢查 `deserialize()` 回傳值；下次動 preflight 時補防禦。
 - K-183：`repeat_page_ids` 尚未納入 fragment 的 `repeat_pages`；現行 `skip_to` 指 suffix，不受影響
 - K-190：舊壞資料 fixture 缺 P5 新必填欄位；下次動 fixture 或 lint 19 時處理
@@ -203,7 +211,7 @@ Verifier 關門證據（2026-08-29，HEAD `0c82046`）：`test_p5b` 12 組 exit 
 
 ## 下一個最安全任務
 
-**依三份文件的 `P5-C 四類結局與組合後日談` 同名段落動工。** 先補四類內容覆蓋、首見／重見分支、BE 不誤接替換後日談，以及結構版頁面實際播放檢查；`complete_ending()` 仍留 P5-D。
+**交由 Verifier 進行 P5-C 複驗與關門。** 複驗通過後推進至 **P5-D 開局、歷輪摘要與跨輪重置**。
 
 > 跑 UI 模擬一律加 `-Background`：
 > `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`
