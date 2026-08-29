@@ -217,6 +217,8 @@ func _test_advance_day45() -> int:
 	else:
 		failed += _ok("day45 evening: coda 門檻未完成時拒絕離場")
 
+	# B1：coda 門檻改成「d45_coda 選擇組已結算」，比對與空手兩條路都算完成。
+	(gs.get("choices") as Dictionary)["d45_then::d45_coda"] = "compare_registry"
 	(gs.get("slots_placed") as Dictionary)["d45_then::compare_registry"] = true
 	gs.set("selected_festival_proxy_npc", "ajie")
 	gs.call("advance_phase")
@@ -254,7 +256,10 @@ func _test_full_45_days_loop() -> int:
 	gs.set("phase", "morning")
 
 	# 45 天 × 4 時段：Day 1 morning 到 Day 45 evening 需推進 178 次 advance_phase()
+	# P5-B／A1：D45 終局鏈現在是時段生命週期的一部分（morning 的 fixed beat 自動進場，
+	# afternoon 因此自動起遭遇）。本測試只驗時間軸本身，所以每一步先把遭遇清掉。
 	for i in range(178):
+		(gs.get("active_encounter") as Dictionary).clear()
 		gs.call("advance_phase")
 
 	var failed := 0

@@ -238,6 +238,17 @@ func _initialize() -> void:
 		return
 	print("跨輪與慶典代付完整性 (Lint 19)　0 錯誤")
 
+	# Lint 20: 時段生命週期鏈完整性
+	var lifecycle_errs := DataLoader.lint_phase_lifecycle(loader)
+	if lifecycle_errs.size() > 0:
+		print("
+時段生命週期鏈完整性錯誤 %d 筆：" % lifecycle_errs.size())
+		for e in lifecycle_errs:
+			print("  " + e)
+		quit(1)
+		return
+	print("時段生命週期鏈完整性 (Lint 20)　0 錯誤")
+
 	print("\ntuning：手牌 %d／發狂上限 %d／倒數 %d 天／視野門檻 %d" % [
 		loader.tuning.get("hand_size", -1),
 		loader.tuning.get("madness_cap", -1),

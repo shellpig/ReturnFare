@@ -32,6 +32,8 @@ func _initialize() -> void:
 	_test_8_two_phase_effects(gs, data_node)
 	_test_9_source_matrix(gs)
 	_test_10_rejection_order(gs)
+	_test_11_action_atomicity(gs, data_node)
+	_test_12_d45_lifecycle(gs)
 
 	if _failed > 0:
 		push_error("test_p5b: %d 個斷言失敗" % _failed)
@@ -434,6 +436,532 @@ func _test_7_serialization(gs: Node) -> void:
 			"壞存檔「%s」→ invalid_save_shape" % label)
 		_check(_state_text(gs) == before, "壞存檔「%s」拒絕後狀態零變化" % label)
 
+	# (c) ending 專屬矩陣：泛用 nullable 過關、但這個 ending 收不起的組合。
+	# 先證明基準快照本身合法，錯誤案例才不會是被別道檢查順手擋掉的假綠。
+	_enter_replaced_ending(gs)
+	gs.call("reveal_ending_page")
+	var composite_good: Dictionary = gs.call("serialize")
+	_check(bool((gs.call("deserialize", JSON.parse_string(JSON.stringify(composite_good)) as Dictionary) as Dictionary).get("ok", false)),
+		"矩陣基準：合法 composite 快照可載入")
+
+	var matrix_cases: Array = [
+		["composite 的 partner_variant 為 null", func(s: Dictionary) -> void: _snap(s)["partner_variant"] = null],
+		["composite 的 livelihood_variant 為 null", func(s: Dictionary) -> void: _snap(s)["livelihood_variant"] = null],
+		["composite 的 inn_appearance_variant 為 null", func(s: Dictionary) -> void: _snap(s)["inn_appearance_variant"] = null],
+		["composite 的代付者為 null", func(s: Dictionary) -> void: _snap(s)["festival_proxy_npc"] = null],
+		["代付者不是正式候選", func(s: Dictionary) -> void: _snap(s)["festival_proxy_npc"] = "uncle"],
+		["composite 沒有結束日", func(s: Dictionary) -> void:
+			_snap(s)["ended_day"] = null
+			_snap(s)["ended_phase"] = null],
+		# 只換掉其中一個 ref，保持頁數、index、revealed、ready 全部不動，
+		# 這樣轉紅的只會是「ref 歸屬」那道檢查，不是頁面進度一致性。
+		["page ref 指向另一個 ending", func(s: Dictionary) -> void:
+			var refs: Array = (_snap(s)["page_refs"] as Array).duplicate()
+			refs[refs.size() - 1] = "ending_madness_be/first_seen/pages/madness_lost"
+			_snap(s)["page_refs"] = refs],
+		["page refs 混用 first_seen 與 repeat", func(s: Dictionary) -> void:
+			var refs: Array = (_snap(s)["page_refs"] as Array).duplicate()
+			refs.append("ending_replaced/repeat/suffix_pages/short_return")
+			_snap(s)["page_refs"] = refs],
+		["未到末頁卻 ready_to_complete", func(s: Dictionary) -> void: _snap(s)["ready_to_complete"] = true],
+	]
+	_reject_saves(gs, composite_good, matrix_cases)
+
+	# 末頁已揭露卻沒有 ready：ready 與頁面進度必須一致，兩個方向都要擋。
+	_enter_replaced_ending(gs)
+	var guard_last := 0
+	while guard_last < 64:
+		guard_last += 1
+		var v2: Dictionary = gs.call("ending_view")
+		if bool(v2.get("is_last_page", false)) and bool(v2.get("page_revealed", false)):
+			break
+		if not bool(v2.get("page_revealed", false)):
+			gs.call("reveal_ending_page")
+		else:
+			gs.call("advance_ending_page")
+	var last_good: Dictionary = gs.call("serialize")
+	_check(bool((gs.call("deserialize", JSON.parse_string(JSON.stringify(last_good)) as Dictionary) as Dictionary).get("ok", false)),
+		"矩陣基準：末頁已揭露且 ready 的快照可載入")
+	_reject_saves(gs, last_good, [
+		["末頁已揭露卻 ready_to_complete 為 false", func(s: Dictionary) -> void: _snap(s)["ready_to_complete"] = false],
+	])
+
+	# (d) 不上車專屬矩陣。P5-B 的 run 入口不放行這個 ending，因此以手寫快照驗載入面。
+	var refuse_good: Dictionary = JSON.parse_string(JSON.stringify(composite_good)) as Dictionary
+	(refuse_good["flow"] as Dictionary)["active_ending"] = _refuse_snapshot()
+	_check(bool((gs.call("deserialize", JSON.parse_string(JSON.stringify(refuse_good)) as Dictionary) as Dictionary).get("ok", false)),
+		"矩陣基準：合法不上車快照可載入")
+	_reject_saves(gs, refuse_good, [
+		["不上車的 opening_choice_id 不是 refuse_boarding", func(s: Dictionary) -> void: _snap(s)["opening_choice_id"] = "take_family_album"],
+		["不上車的 opening_choice_id 為 null", func(s: Dictionary) -> void: _snap(s)["opening_choice_id"] = null],
+		["不上車帶結束日", func(s: Dictionary) -> void:
+			_snap(s)["ended_day"] = 45
+			_snap(s)["ended_phase"] = "evening"],
+		["不上車帶代付者", func(s: Dictionary) -> void: _snap(s)["festival_proxy_npc"] = "ajie"],
+		["linear ending 帶 partner_variant", func(s: Dictionary) -> void: _snap(s)["partner_variant"] = "ajie"],
+	])
+
+	_fresh_run(gs, 20, "morning")
+
+
+## 壞存檔逐例：精確回 invalid_save_shape，且載入前後完整序列化零變化。
+func _reject_saves(gs: Node, good: Dictionary, cases: Array) -> void:
+	for case_raw: Variant in cases:
+		var case_arr := case_raw as Array
+		var label := str(case_arr[0])
+		var broken: Dictionary = JSON.parse_string(JSON.stringify(good)) as Dictionary
+		(case_arr[1] as Callable).call(broken)
+		var before := _state_text(gs)
+		var res: Dictionary = gs.call("deserialize", broken)
+		_check(not bool(res.get("ok", true)) and str(res.get("reason_code", "")) == "invalid_save_shape",
+			"壞存檔「%s」→ invalid_save_shape" % label)
+		_check(_state_text(gs) == before, "壞存檔「%s」拒絕後狀態零變化" % label)
+
+
+## 存檔裡的 active_ending 快照捷徑。
+func _snap(save: Dictionary) -> Dictionary:
+	return (save["flow"] as Dictionary)["active_ending"] as Dictionary
+
+
+## 手寫的合法不上車快照（P5-B 沒有 opening 入口可以產生它）。
+func _refuse_snapshot() -> Dictionary:
+	return {
+		"ending_id": "ending_refuse_boarding",
+		"source_id": "opening_choice",
+		"run_number": 1,
+		"opening_choice_id": "refuse_boarding",
+		"ended_day": null,
+		"ended_phase": null,
+		"partner_variant": null,
+		"livelihood_variant": null,
+		"inn_appearance_variant": null,
+		"festival_proxy_npc": null,
+		"knowledge_gained_this_run": [],
+		"page_refs": [
+			"ending_refuse_boarding/first_seen/pages/refuse_outside_life",
+			"ending_refuse_boarding/first_seen/pages/refuse_early_death",
+		],
+		"page_index": 0,
+		"page_revealed": false,
+		"ready_to_complete": false,
+	}
+
+
+# ── 11. 完整玩家動作的原子性（四條先前繞過 preflight 的路徑）─────────────────
+
+func _test_11_action_atomicity(gs: Node, data_node: Node) -> void:
+	print("\n--- 11. 完整玩家動作的原子性 ---")
+
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var orig_cap: Variant = loader.tuning["madness_cap"]
+	loader.tuning["madness_cap"] = 2
+
+	_atomicity_indulge(gs, loader)
+	_atomicity_forced_indulge(gs, loader, data_node)
+	_atomicity_delegation_report(gs, loader)
+	_atomicity_encounter(gs, loader)
+	_atomicity_encounter_capacity_order(gs, loader)
+
+	loader.tuning["madness_cap"] = orig_cap
+
+
+## (a) 主動縱慾：代價（行動格、發狂卡、次數）與效果必須同生同死。
+func _atomicity_indulge(gs: Node, loader: DataLoader) -> void:
+	var beat_id := "p5b_atomic_indulge"
+
+	# 正向：效果只套一次，代價各扣一次。
+	_fresh_run(gs, 20, "morning")
+	gs.call("gain_card", "madness", false)
+	var card_id := _first_madness(gs)
+	_inject_indulgence_beat(loader, beat_id, 20, "morning", { "switch_progress": { "s6": 1 } })
+	var ok_res: Dictionary = gs.call("indulge", beat_id, "slot", card_id)
+	_check(bool(ok_res.get("ok", false)), "縱慾：合法效果結算成功")
+	_check(int((gs.get("switch_progress") as Dictionary).get("s6", 0)) == 1, "縱慾：效果只套一次（可累加值為 1）")
+	_check(int(gs.get("indulgence_count")) == 1, "縱慾：次數只加一次")
+	_check(not bool(gs.call("has_card", card_id)), "縱慾：發狂卡只消一次")
+	_check(bool(gs.get("action_spent")), "縱慾：行動格消一次")
+	_remove_beat(loader, beat_id)
+
+	# 反向：同一動作兩個不同 ending request → 代價一律不得落地。
+	_fresh_run(gs, 20, "morning")
+	gs.call("gain_card", "madness", false)
+	gs.call("gain_card", "madness", false)
+	var bad_card := _first_madness(gs)
+	_inject_indulgence_beat(loader, beat_id, 20, "morning", {
+		"madness": 1,
+		"switch_progress": { "s6": 1 },
+		"ending": "ending_inventory_be",
+	})
+	var before := _state_text(gs)
+	var bad_res: Dictionary = gs.call("indulge", beat_id, "slot", bad_card)
+	_check(_reject_code(bad_res) == "data_conflict", "縱慾：雙 ending request → data_conflict")
+	_check(_state_text(gs) == before, "縱慾：拒絕後行動格、手牌、次數與效果全部零變化")
+	_check(str(gs.get("flow_mode")) == "run", "縱慾：拒絕後仍在 run mode")
+	_remove_beat(loader, beat_id)
+
+
+## (b) 強制縱慾：結算失敗時債留在 forced_pending，行動格與手牌都不動。
+func _atomicity_forced_indulge(gs: Node, loader: DataLoader, data_node: Node) -> void:
+	_fresh_run(gs, 20, "morning")
+	gs.call("gain_card", "madness", false)
+	gs.call("gain_card", "madness", false)
+	var debt_card := _first_madness(gs)
+	var forced: Array = gs.get("forced_pending") as Array
+	forced.clear()
+	forced.append(debt_card)
+
+	var exit_result: Dictionary = Indulgence.pick_exit(gs, data_node)
+	_check(not exit_result.is_empty(), "強制縱慾：pick_exit 選到出口")
+	var slot: Dictionary = _find_slot_in(loader, str(exit_result.get("beat_id", "")), str(exit_result.get("slot_id", "")))
+	_check(not slot.is_empty(), "強制縱慾：出口槽存在")
+
+	var orig_on_place: Variant = slot.get("on_place")
+	slot["on_place"] = { "madness": 1, "ending": "ending_inventory_be" }
+	var before := _state_text(gs)
+	var lines: PackedStringArray = gs.call("_settle_forced_indulgence")
+	_check(lines.is_empty(), "強制縱慾：結算失敗時不產生文字")
+	_check(_state_text(gs) == before, "強制縱慾：失敗後行動格、手牌、次數與 forced_pending 全部零變化")
+	_check((gs.get("forced_pending") as Array).has(debt_card), "強制縱慾：債仍留在 forced_pending（帳不豁免）")
+
+	if orig_on_place == null:
+		slot.erase("on_place")
+	else:
+		slot["on_place"] = orig_on_place
+	forced.clear()
+
+
+## (c) 延遲委託回報：結算失敗的那一筆原樣留在 pending，不得被吞掉。
+func _atomicity_delegation_report(gs: Node, loader: DataLoader) -> void:
+	var beat_id := "p5b_atomic_report"
+	_fresh_run(gs, 20, "morning")
+	gs.call("gain_card", "madness", false)
+	gs.call("gain_card", "madness", false)
+
+	_inject_delegation_beat(loader, beat_id, 20, "morning", {
+		"madness": 1,
+		"switch_progress": { "s6": 1 },
+		"ending": "ending_inventory_be",
+	})
+	var report := { "beat_id": beat_id, "slot_id": "slot", "due_day": 20 }
+	var pending: Array = gs.get("pending_delegation_reports") as Array
+	pending.clear()
+	pending.append(report)
+
+	var before := _state_text(gs)
+	gs.call("_settle_pending_delegation_reports")
+	_check(_state_text(gs) == before, "延遲回報：結算失敗後完整序列化零變化")
+	_check((gs.get("pending_delegation_reports") as Array).size() == 1, "延遲回報：失敗那筆仍留在 pending")
+	_check(int((gs.get("switch_progress") as Dictionary).get("s6", 0)) == 0, "延遲回報：失敗時同塊效果一次都沒套")
+	_remove_beat(loader, beat_id)
+
+	# 正向對照：合法回報出列一次、效果套一次。
+	_fresh_run(gs, 20, "morning")
+	_inject_delegation_beat(loader, beat_id, 20, "morning", { "switch_progress": { "s6": 1 } })
+	var good_report := { "beat_id": beat_id, "slot_id": "slot", "due_day": 20 }
+	var pending2: Array = gs.get("pending_delegation_reports") as Array
+	pending2.clear()
+	pending2.append(good_report)
+	gs.call("_settle_pending_delegation_reports")
+	_check((gs.get("pending_delegation_reports") as Array).is_empty(), "延遲回報：成功那筆出列一次")
+	_check(int((gs.get("switch_progress") as Dictionary).get("s6", 0)) == 1, "延遲回報：效果只套一次")
+	_remove_beat(loader, beat_id)
+
+
+## (d) 遭遇：response 的 on_resolve 與同一次出口效果必須合併成同一個 action plan。
+func _atomicity_encounter(gs: Node, loader: DataLoader) -> void:
+	var beat_id := "p5b_atomic_encounter"
+
+	# 正向：on_resolve 與 on_victory 各套一次，遭遇結束。
+	_fresh_run(gs, 20, "morning")
+	gs.call("gain_card", "k_forty_something")
+	_inject_encounter_beat(loader, beat_id,
+		{ "switch_progress": { "s6": 1 } },
+		{ "switch_progress": { "s6": 1 }, "flag": { "p5b_enc_victory": true } })
+	_check(bool((gs.call("start_encounter", beat_id) as Dictionary).get("ok", false)), "遭遇：開場成功")
+	gs.call("acknowledge_encounter_intro")
+	var win_res: Dictionary = gs.call("respond_to_encounter", "k_forty_something")
+	_check(bool(win_res.get("ok", false)), "遭遇：命中回應成功")
+	_check(int((gs.get("switch_progress") as Dictionary).get("s6", 0)) == 2,
+		"遭遇：on_resolve 與 on_victory 各套一次（可累加值為 2）")
+	_check(bool((gs.get("flags") as Dictionary).get("p5b_enc_victory", false)), "遭遇：勝利出口 flag 落地")
+	_check((gs.get("active_encounter") as Dictionary).is_empty(), "遭遇：出口後 active_encounter 清空")
+	_remove_beat(loader, beat_id)
+
+	# 反向：on_resolve 撞 cap 與 on_victory 的 inventory ending 是兩個不同 request，
+	# 合併驗證後整個動作原子拒絕——不得扣卡、不得換回合、不得覆寫前一個結局。
+	_fresh_run(gs, 20, "morning")
+	gs.call("gain_card", "k_forty_something")
+	gs.call("gain_card", "madness", false)
+	_inject_encounter_beat(loader, beat_id,
+		{ "madness": 1, "switch_progress": { "s6": 1 } },
+		{ "ending": "ending_inventory_be" })
+	gs.call("start_encounter", beat_id)
+	gs.call("acknowledge_encounter_intro")
+	var before := _state_text(gs)
+	var conflict_res: Dictionary = gs.call("respond_to_encounter", "k_forty_something")
+	_check(_reject_code(conflict_res) == "data_conflict", "遭遇：回應與出口的雙 ending request → data_conflict")
+	_check(_state_text(gs) == before,
+		"遭遇：拒絕後 attempted／blocked_slots／手牌／發狂與效果全部零變化")
+	_check(str(gs.get("flow_mode")) == "run", "遭遇：拒絕後仍在 run mode")
+	_remove_beat(loader, beat_id)
+	_fresh_run(gs, 20, "morning")
+
+
+# ── 12. D45 終局鏈：只按推進也走得完，兩條 coda 路都收得了尾 ──────────────────
+
+func _test_12_d45_lifecycle(gs: Node) -> void:
+	print("\n--- 12. D45 終局鏈（正式資料端到端）---")
+
+	# (a) A1：D45 morning 不開任何地點、只按推進，終局鏈仍必須成立。
+	_walk_into_day45(gs)
+	_check(bool((gs.get("flags") as Dictionary).get("final_day", false)),
+		"D45 morning：不開地點，final_day 仍由 auto_enter 自動寫入")
+	_check((gs.get("beats_entered") as Dictionary).has("d45_morning_invitation"),
+		"D45 morning：終局鏈的 fixed beat 自動進場")
+
+	gs.call("advance_phase")
+	_check(int(gs.get("day")) == 45 and str(gs.get("phase")) == "afternoon", "推進到 D45 afternoon")
+	_check(str((gs.get("active_encounter") as Dictionary).get("beat_id", "")) == "d45_encounter",
+		"D45 afternoon：終局遭遇自動開場，不必玩家先開山泉閣")
+
+	PlaythroughGreedy.solve_active_encounter_if_any(gs)
+	if str(gs.get("phase")) == "afternoon":
+		gs.call("advance_phase")
+	_check(int(gs.get("day")) == 45 and str(gs.get("phase")) == "evening", "遭遇結算後進入 D45 evening")
+
+	# 門檻未結算時不得離場，更不得出現第 46 天。
+	gs.call("play_evening")
+	gs.set("selected_festival_proxy_npc", "ajie")
+	var before_gate := _state_text(gs)
+	var gate_res: Dictionary = gs.call("advance_phase")
+	_check(_reject_code(gate_res) == "phase_requirements_incomplete",
+		"D45 evening：coda 選擇組未結算 → phase_requirements_incomplete")
+	_check(_state_text(gs) == before_gate, "D45 evening：門檻未過拒絕後序列化零變化")
+	_check(int(gs.get("day")) == 45, "D45 evening：門檻未過時不會走到第 46 天")
+
+	# (b) B1 未持名冊：空手槽一樣收得了尾，且什麼都不給。
+	var knowledge_before: Dictionary = (gs.get("knowledge") as Dictionary).duplicate()
+	var flags_before: Dictionary = (gs.get("flags") as Dictionary).duplicate()
+	_check(not bool(gs.call("has_card", "info_registry")), "未持名冊：手上確實沒有 info_registry")
+	var empty_res: Dictionary = gs.call("choose", "d45_then", "d45_coda", "empty_handed")
+	_check(bool(empty_res.get("ok", false)), "未持名冊：空手槽可結算 d45_coda 選擇組")
+	_check((gs.get("knowledge") as Dictionary) == knowledge_before, "空手槽不發任何知識卡")
+	_check((gs.get("flags") as Dictionary) == flags_before, "空手槽不發任何旗標")
+	_check(bool(gs.call("has_knowledge", "k_not_today")), "未持名冊：留著 k_not_today（沒有升級）")
+	_check(not bool(gs.call("has_knowledge", "k_already_on_list")), "未持名冊：拿不到 k_already_on_list")
+
+	var empty_adv: Dictionary = gs.call("advance_phase")
+	_check(bool(empty_adv.get("ok", false)), "未持名冊：門檻完成後推進成功")
+	_check(str(gs.get("flow_mode")) == "ending", "未持名冊：仍啟動結局")
+	_check(str((gs.get("active_ending") as Dictionary).get("ending_id", "")) == "ending_replaced",
+		"未持名冊：啟動的是 ending_replaced")
+	_check(str((gs.get("active_ending") as Dictionary).get("source_id", "")) == "d45_coda",
+		"未持名冊：source 為 d45_coda")
+	_check(int(gs.get("day")) == 45 and str(gs.get("phase")) == "evening", "未持名冊：進結局後 day／phase 不動")
+
+	# (c) B1 持名冊：同一個選擇組換另一條路，拿到升級知識卡。
+	_walk_into_day45(gs)
+	gs.call("advance_phase")
+	PlaythroughGreedy.solve_active_encounter_if_any(gs)
+	if str(gs.get("phase")) == "afternoon":
+		gs.call("advance_phase")
+	gs.call("play_evening")
+	gs.set("selected_festival_proxy_npc", "ajie")
+	gs.call("gain_card", "info_registry")
+	var compare_res: Dictionary = gs.call("try_place", "info_registry", "d45_then", "compare_registry")
+	_check(bool(compare_res.get("ok", false)), "持名冊：比對槽放置成功")
+	_check(bool(gs.call("has_knowledge", "k_already_on_list")), "持名冊：升級成 k_already_on_list")
+	_check(not bool(gs.call("has_knowledge", "k_not_today")), "持名冊：舊的 k_not_today 被換掉")
+	_check(str((gs.get("choices") as Dictionary).get("d45_then::d45_coda", "")) == "compare_registry",
+		"持名冊：比對槽同樣結算了 d45_coda 選擇組")
+
+	var compare_adv: Dictionary = gs.call("advance_phase")
+	_check(bool(compare_adv.get("ok", false)), "持名冊：門檻完成後推進成功")
+	_check(str(gs.get("flow_mode")) == "ending", "持名冊：啟動結局")
+	_check(int(gs.get("day")) == 45, "持名冊：進結局後仍停在第 45 天")
+
+	# (d) 選擇組是互斥的：已走一條就不能再走另一條。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	var second_res: Dictionary = gs.call("choose", "d45_then", "d45_coda", "empty_handed")
+	_check(not bool(second_res.get("ok", true)), "d45_coda 選擇組結算後不得再選另一條")
+
+	# 比對槽掛 choice_requires_card：沒有名冊時不得用「選擇」繞過放卡，
+	# 否則會多出一條看起來像比對、實際上什麼都沒升級的第三條路。
+	_walk_into_day45(gs)
+	gs.call("advance_phase")
+	PlaythroughGreedy.solve_active_encounter_if_any(gs)
+	if str(gs.get("phase")) == "afternoon":
+		gs.call("advance_phase")
+	gs.call("play_evening")
+	var bare_choose: Dictionary = gs.call("choose", "d45_then", "d45_coda", "compare_registry")
+	_check(_reject_code(bare_choose) == "card_required", "未持名冊直呼比對槽 → card_required")
+	_check(not (gs.get("choices") as Dictionary).has("d45_then::d45_coda"), "card_required 拒絕後選擇組仍未結算")
+
+	# (e) 第二道防線：門檻整個不成立時（例如 final_day 沒寫進來），最後一天的
+	# evening 仍然不得被越過。少了這道防線，時段機會把玩家送進第 46 天。
+	_fresh_run(gs, 45, "evening")
+	_check(not bool((gs.get("flags") as Dictionary).get("final_day", false)), "對照組：final_day 未成立")
+	_check(not bool((gs.call("phase_exit_status") as Dictionary).get("has_gate", false)),
+		"對照組：門檻 beat 因條件不成立而不存在")
+	var no_gate_res: Dictionary = gs.call("advance_phase")
+	_check(_reject_code(no_gate_res) == "phase_requirements_incomplete",
+		"D45 evening 無門檻時仍拒絕離場")
+	_check(int(gs.get("day")) == 45 and str(gs.get("phase")) == "evening", "D45 evening 無門檻時不會進第 46 天")
+
+	_fresh_run(gs, 20, "morning")
+
+
+## 從第 44 天 night 只按推進走進第 45 天 morning，全程不開任何地點。
+func _walk_into_day45(gs: Node) -> void:
+	_fresh_run(gs, 44, "night")
+	gs.call("advance_phase")
+	_check(int(gs.get("day")) == 45 and str(gs.get("phase")) == "morning",
+		"只按推進即可從 D44 night 進到 D45 morning")
+
+
+## (e) 容量與死局判定必須看得到 on_resolve 之後的手牌。
+## 合併成單一 plan 之後，這個順序只存在於複本上，因此要有自己的斷言。
+func _atomicity_encounter_capacity_order(gs: Node, loader: DataLoader) -> void:
+	var beat_id := "p5b_atomic_capacity"
+	var orig_cap: Variant = loader.tuning["madness_cap"]
+	loader.tuning["madness_cap"] = 99
+
+	_fresh_run(gs, 20, "morning")
+	gs.call("gain_card", "info_registry")
+	_inject_two_round_encounter(loader, beat_id, { "madness": 11 })
+	gs.call("start_encounter", beat_id)
+	gs.call("acknowledge_encounter_intro")
+	var res: Dictionary = gs.call("respond_to_encounter", "info_registry")
+	_check(bool(res.get("ok", false)), "容量順序：回應本身成功")
+	_check(int((gs.get("hand") as Array).size()) == 13, "容量順序：on_resolve 真的把手牌撐到 13 張")
+	_check((gs.get("active_encounter") as Dictionary).is_empty(),
+		"容量順序：換回合時看的是 on_resolve 之後的手牌，因此直接走 failure 出口")
+	_check(bool((gs.get("flags") as Dictionary).get("p5b_enc_failure", false)),
+		"容量順序：落地的是 failure 出口效果")
+
+	_remove_beat(loader, beat_id)
+	loader.tuning["madness_cap"] = orig_cap
+
+
+## 合成兩回合遭遇：第一回合命中後換到第二回合，途中會做容量判定。
+func _inject_two_round_encounter(loader: DataLoader, beat_id: String, on_resolve: Dictionary) -> void:
+	var beat := {
+		"id": beat_id,
+		"location": "jinghe_back",
+		"title": "P5-B 合成兩回合遭遇",
+		"encounter": {
+			"per_round_slot_cost": 1,
+			"escape_cost": 1,
+			"allow_discard": true,
+			"after_finish": "stay",
+			"rounds": [
+				{
+					"id": "first_round",
+					"demand": "合成提問一",
+					"responses": [{
+						"id": "answer", "accepts": ["info_registry"], "consume_card": false,
+						"next_round": "second_round", "on_resolve": on_resolve,
+					}],
+					"fallback": { "requires_discardable": true, "next_round": "second_round", "on_resolve": {} },
+				},
+				{
+					"id": "second_round",
+					"demand": "合成提問二",
+					"responses": [{
+						"id": "answer2", "accepts": ["info_registry"], "consume_card": false,
+						"next_round": null, "on_resolve": {},
+					}],
+					"fallback": { "requires_discardable": true, "next_round": null, "on_resolve": {} },
+				},
+			],
+			"on_victory": { "flag": { "p5b_enc_victory": true } },
+			"on_failure": { "flag": { "p5b_enc_failure": true } },
+			"on_escape": { "flag": { "p5b_enc_escape": true } },
+		},
+	}
+	loader.beats.append(beat)
+	loader.beats_by_id[beat_id] = beat
+
+
+## 手上第一張發狂卡的實例 id。
+func _first_madness(gs: Node) -> String:
+	for c: Variant in gs.get("hand") as Array:
+		if str(c).begins_with("madness"):
+			return str(c)
+	return ""
+
+
+func _find_slot_in(loader: DataLoader, beat_id: String, slot_id: String) -> Dictionary:
+	var beat: Dictionary = loader.beats_by_id.get(beat_id, {}) as Dictionary
+	for slot_raw: Variant in beat.get("slots", []) as Array:
+		var slot := slot_raw as Dictionary
+		if str(slot.get("id", "")) == slot_id:
+			return slot
+	return {}
+
+
+## 合成一個縱慾出口 beat（收發狂卡、非泡湯）。
+func _inject_indulgence_beat(loader: DataLoader, beat_id: String, day: int, phase: String, on_place: Dictionary) -> void:
+	var beat := {
+		"id": beat_id,
+		"location": "jinghe_back",
+		"when": { "day": day, "phase": phase },
+		"title": "P5-B 合成縱慾出口",
+		"slots": [{
+			"id": "slot", "occupant": null, "label": "合成出口槽", "accepts": ["madness"],
+			"indulgence": { "auto": false, "weight": 1 },
+			"on_place": on_place,
+		}],
+	}
+	loader.beats.append(beat)
+	loader.beats_by_id[beat_id] = beat
+
+
+## 合成一個隔日回報的委託 beat。
+func _inject_delegation_beat(loader: DataLoader, beat_id: String, day: int, phase: String, report: Dictionary) -> void:
+	var beat := {
+		"id": beat_id,
+		"location": "jinghe_back",
+		"when": { "day": day, "phase": phase },
+		"title": "P5-B 合成委託",
+		"slots": [{
+			"id": "slot", "occupant": null, "label": "合成委託槽", "accepts": ["person_ahong"],
+			"delegation": { "result_timing": "next_morning", "report": report },
+		}],
+	}
+	loader.beats.append(beat)
+	loader.beats_by_id[beat_id] = beat
+
+
+## 合成一個單回合遭遇 beat：命中 k_forty_something 直接走勝利出口。
+func _inject_encounter_beat(loader: DataLoader, beat_id: String, on_resolve: Dictionary, on_victory: Dictionary) -> void:
+	var beat := {
+		"id": beat_id,
+		"location": "jinghe_back",
+		"title": "P5-B 合成遭遇",
+		"encounter": {
+			"per_round_slot_cost": 1,
+			"escape_cost": 1,
+			"allow_discard": true,
+			"after_finish": "stay",
+			"rounds": [{
+				"id": "only_round",
+				"demand": "合成提問",
+				"responses": [{
+					"id": "answer", "accepts": ["k_forty_something"], "consume_card": false,
+					"next_round": null, "on_resolve": on_resolve,
+				}],
+				"fallback": { "requires_discardable": true, "next_round": null, "on_resolve": {} },
+			}],
+			"on_victory": on_victory,
+			"on_failure": { "flag": { "p5b_enc_failure": true } },
+			"on_escape": { "flag": { "p5b_enc_escape": true } },
+		},
+	}
+	loader.beats.append(beat)
+	loader.beats_by_id[beat_id] = beat
+
 
 ## 一次往返：page ref、index、revealed、ready 完全相等，且續播結果一致。
 func _roundtrip_case(gs: Node, label: String) -> void:
@@ -587,6 +1115,10 @@ func _test_9_source_matrix(gs: Node) -> void:
 		"d45_coda": "ending_replaced",
 		"opening_choice": "ending_refuse_boarding",
 	}
+	# 公開 start_ending() 只收前三個 run 來源；opening_choice → ending_refuse_boarding
+	# 的成功路徑屬 P5-D 的私有 opening 入口，本階段只以資料層配對（lint 17）與下方
+	# 的拒絕案例證明，不在 run 中放行。
+	var run_sources := ["madness_cap", "ending_effect", "d45_coda"]
 	var sources: Array = pairs.keys()
 	var endings: Array = pairs.values()
 
@@ -596,17 +1128,40 @@ func _test_9_source_matrix(gs: Node) -> void:
 			gs.set("selected_festival_proxy_npc", "ajie")
 			var before := _state_text(gs)
 			var res: Dictionary = gs.call("start_ending", ending, source)
-			if str(pairs[source]) == ending:
-				_check(bool(res.get("ok", false)), "合法配對 %s → %s 成功" % [source, ending])
+			if str(pairs[source]) == ending and run_sources.has(source):
+				_check(bool(res.get("ok", false)), "合法 run 配對 %s → %s 成功" % [source, ending])
 			else:
-				_check(_reject_code(res) == "invalid_ending_source", "錯配 %s → %s 精確回 invalid_ending_source" % [source, ending])
-				_check(_state_text(gs) == before, "錯配 %s → %s 拒絕後零變化" % [source, ending])
+				_check(_reject_code(res) == "invalid_ending_source", "%s → %s 精確回 invalid_ending_source" % [source, ending])
+				_check(_state_text(gs) == before, "%s → %s 拒絕後零變化" % [source, ending])
 
 	_fresh_run(gs, 45, "evening")
 	_check(_reject_code(gs.call("start_ending", "ending_replaced", "some_unknown_source")) == "invalid_ending_source",
 		"未知 source → invalid_ending_source")
 	_check(_reject_code(gs.call("start_ending", "ending_nonexistent", "d45_coda")) == "unknown_ending",
 		"未知 ending → unknown_ending")
+
+	# 兩道 source 檢查必須可分辨：一道擋錯配，一道擋「配對正確但不是 run 來源」。
+	# 只反轉後者時，下面四條會轉紅而上面 12 種錯配仍綠。
+	_fresh_run(gs, 45, "evening")
+	gs.set("selected_festival_proxy_npc", "ajie")
+	gs.set("opening_choice_id", "refuse_boarding")
+	var refuse_before := _state_text(gs)
+	var refuse_res: Dictionary = gs.call("start_ending", "ending_refuse_boarding", "opening_choice")
+	_check(_reject_code(refuse_res) == "invalid_ending_source",
+		"run 中公開啟動不上車 → invalid_ending_source")
+	_check(_state_text(gs) == refuse_before, "run 中公開啟動不上車：完整序列化零變化")
+	_check(str(gs.get("flow_mode")) == "run", "run 中公開啟動不上車：mode 仍為 run")
+	_check((gs.get("active_ending") as Dictionary).is_empty(), "run 中公開啟動不上車：active_ending 仍為空")
+
+	# 第四組配對本身仍要留在封閉表裡，P5-D 的私有入口才有東西可用。
+	var const_map: Dictionary = (gs.get_script() as Script).get_script_constant_map()
+	var pairs_const: Dictionary = const_map.get("ENDING_SOURCE_PAIRS", {}) as Dictionary
+	_check(str(pairs_const.get("opening_choice", "")) == "ending_refuse_boarding",
+		"第四組配對仍在封閉表內（供 P5-D 私有入口）")
+	var run_const: Array = const_map.get("RUN_ENDING_SOURCES", []) as Array
+	_check(run_const.size() == 3 and not run_const.has("opening_choice"),
+		"RUN_ENDING_SOURCES 恰為三個 run 來源")
+	_fresh_run(gs, 45, "evening")
 
 
 # ── 10. 拒絕順序（每組同時具有兩個錯誤）─────────────────────────────────────

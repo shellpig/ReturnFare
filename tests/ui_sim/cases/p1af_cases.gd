@@ -1351,11 +1351,17 @@ class UiCase extends CaseBaseClass:
 				if QAStepClass.has_visible_qa_id(tree.get_root(), "beat_advance"):
 					var coda_drain := await QAStepClass.drain_beats(tree)
 					assert_true(bool(coda_drain.get("ok", false)), "完整走查 D45 coda 演出")
+				# B1：coda 是一個選擇組——持名冊走比對槽，沒有就走空手槽。
+				# 走查不再強迫第 13 天去拿名冊，因此兩條路都要接得住。
 				var coda_places := _visible_ids(tree, "place::d45_then::compare_registry::")
-				assert_true(not coda_places.is_empty(), "完整走查 D45 必須持有名冊情報卡")
-				if coda_places.is_empty():
-					return { "ok": false, "errors": errors }
-				await _click(tree, coda_places[0])
+				if not coda_places.is_empty():
+					await _click(tree, coda_places[0])
+				else:
+					var empty_ids := _visible_ids(tree, "choose::d45_then::d45_coda::empty_handed")
+					assert_true(not empty_ids.is_empty(), "未持名冊時 D45 空手收尾入口必須存在")
+					if empty_ids.is_empty():
+						return { "ok": false, "errors": errors }
+					await _click(tree, empty_ids[0])
 				await _close(tree)
 				await _advance(tree)
 				# P5-B：coda 門檻完成後進 ending mode，run 不清；正式結算在 P5-D 的

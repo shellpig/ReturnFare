@@ -29,6 +29,16 @@ const ENDING_SOURCE_PAIRS := {
 	"opening_choice": "ending_refuse_boarding",
 }
 
+## 公開 `start_ending()` 只收這三個 run 來源。`opening_choice` 專屬 P5-D 的
+## `_start_ending_from_opening()`，在 run 生命週期中不得成立。
+const RUN_ENDING_SOURCES := ["madness_cap", "ending_effect", "d45_coda"]
+
+## 三個 variant 欄位。欄名去掉 `_variant` 就是 `endings.json` 的 variant group id，
+## 因此「這個 ending 該不該有這一欄」由資料決定，不由這裡列白名單。
+const ENDING_VARIANT_KEYS := ["partner_variant", "livelihood_variant", "inn_appearance_variant"]
+const ENDING_REPLACED := "ending_replaced"
+const ENDING_REFUSE_BOARDING := "ending_refuse_boarding"
+
 ## active_ending 快照的固定欄位；缺一不可，也不得用空字串代替 null。
 const ENDING_SNAPSHOT_KEYS := [
 	"ending_id", "source_id", "run_number", "opening_choice_id", "ended_day", "ended_phase",
@@ -78,6 +88,7 @@ var indulgence_count: int = 0                  # 本輪縱慾次數（主動＋�
 var madness_cards_cleared: int = 0             # 本輪消除的發狂卡張數累計（run 層，避免依賴縱慾次數換算卡數）
 var forced_pending: Array[String] = []         # 已歸零、還沒吃到行動格的發狂卡實例 id（run 層）
 var last_forced_lines: PackedStringArray = []  # 當前時段強制縱慾產生的演出文字行（transient UI）
+var last_auto_enter_lines: PackedStringArray = [] # 當前時段自動進場 beat 產生的演出文字行（transient UI）
 var run_generation: int = 0                    # 輪次世代計數（單調遞增，供 EffectApply 與結算器偵測 end_run）
 
 # --- 頂層流程與結局狀態機（P5-B）---
@@ -135,6 +146,11 @@ func advance_phase() -> Dictionary:
 				"phase_advanced": false,
 			}
 
+	# 第二道防線：最後一天的 evening 只有結局一個出口。門檻沒接上（資料壞掉或
+	# 條件不成立）時寧可卡在原地，也不能讓時段機把玩家送進第 46 天。
+	if day == LAST_DAY and phase == "evening":
+		return { "ok": false, "reason_code": "phase_requirements_incomplete", "reason_text": "本時段的內容尚未完成", "lines": PackedStringArray(), "phase_advanced": false }
+
 	var prev_ch := chapter()
 
 	# 第 45 天特殊路徑：afternoon → evening（結局 coda）；evening 由上方 phase_exit 門檻接結局，不進 night
@@ -143,12 +159,14 @@ func advance_phase() -> Dictionary:
 		action_spent = false
 		last_forced_lines.clear()
 		last_delegation_report_lines.clear()
+		last_auto_enter_lines = _settle_auto_enter_beats()
 		_check_fixed_encounter_for_current_phase()
 		phase_changed.emit(day, phase)
 		return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "phase_advanced": true }
 
 	last_forced_lines.clear()
 	last_delegation_report_lines.clear()
+	last_auto_enter_lines.clear()
 
 	# 一般推進
 	var idx := PHASES.find(phase)
@@ -184,7 +202,10 @@ func advance_phase() -> Dictionary:
 		_settle_pending_delegation_reports()
 		delegates_used_today.clear()
 
-	# 換時段途中若被強制縱慾或委託回報的效果推進到結局，就不再自動建立新遭遇。
+	# 生命週期 beat 先於固定遭遇：遭遇的 condition 可能就靠這一步寫進來的旗標。
+	last_auto_enter_lines = _settle_auto_enter_beats()
+
+	# 換時段途中若被強制縱慾、委託回報或自動進場的效果推進到結局，就不再自動建立新遭遇。
 	if flow_mode == FLOW_RUN:
 		_check_fixed_encounter_for_current_phase()
 
@@ -195,6 +216,26 @@ func advance_phase() -> Dictionary:
 		chapter_changed.emit(new_ch)
 
 	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "phase_advanced": true }
+
+
+## 進入時段時自動結算的 fixed beat（SCHEMA `auto_enter`）。
+## 這類 beat 是時段生命週期的一部分，不能等玩家主動打開某個地點才成立——
+## D45 的終局鏈就是靠這條走通的。規則層只讀資料欄位，不特判 beat id。
+## `play_beat()` 的 on_enter 只結算一次，因此重複進場只會重播文字。
+func _settle_auto_enter_beats() -> PackedStringArray:
+	var lines := PackedStringArray()
+	if Data == null or Data.loader == null or flow_mode != FLOW_RUN:
+		return lines
+	for b in Data.loader.beats_at(day, phase):
+		if not bool(b.get("fixed", false)) or not bool(b.get("auto_enter", false)):
+			continue
+		if not ConditionEval.eval(b.get("condition"), self) or not ConditionEval.eval(b.get("requires"), self):
+			continue
+		lines.append_array(play_beat(str(b.get("id", ""))))
+		# 自動進場的效果本身也可能啟動結局，之後就不該再播下一個。
+		if flow_mode != FLOW_RUN:
+			break
+	return lines
 
 
 ## 輪結束結算與迴圈重置（規格書第十六節、P1-F、B-02）。
@@ -225,6 +266,7 @@ func end_run(ending_id: String = "ending_default") -> void:
 	madness_cards_cleared = 0
 	forced_pending.clear()
 	last_forced_lines.clear()
+	last_auto_enter_lines.clear()
 	delegates_used_today.clear()
 	pending_delegation_reports.clear()
 	last_delegation_report_lines.clear()
@@ -300,7 +342,8 @@ func clone_for_preflight() -> Node:
 
 ## 結局啟動的唯一公開入口（run 來源）。固定檢查順序：
 ## mode run → 無 active ending → ending 存在 → source 與 ending 精確配對 →
-## ending 專屬前置完整 → resolver 成功。拒絕後完整序列化零變化。
+## source 屬於 run 生命週期 → ending 專屬前置完整 → resolver 成功。
+## 拒絕後完整序列化零變化。
 func start_ending(ending_id: String, source_id: String) -> Dictionary:
 	if flow_mode != FLOW_RUN:
 		return _mutation_reject("not_run", _REASON_TEXT_NOT_RUN)
@@ -317,17 +360,21 @@ func start_ending(ending_id: String, source_id: String) -> Dictionary:
 
 ## 純函式：依 `src` 的當下狀態建結局快照，不寫任何狀態。
 ## `src` 可以是自己，也可以是 preflight 複本（因此快照看得到剛完成的動作）。
+## `allow_opening_source` 只有 P5-D 的 opening 私有入口會給 true。
 ## 回傳：{ ok, reason_code, reason_text, snapshot }
-func _build_ending_plan(ending_id: String, source_id: String, src: Node) -> Dictionary:
+func _build_ending_plan(ending_id: String, source_id: String, src: Node, allow_opening_source: bool = false) -> Dictionary:
 	if Data == null or Data.loader == null:
 		return { "ok": false, "reason_code": "data_conflict", "reason_text": "資料未載入", "snapshot": {} }
 	if not Data.loader.endings_by_id.has(ending_id):
 		return { "ok": false, "reason_code": "unknown_ending", "reason_text": "", "snapshot": {} }
 	if str(ENDING_SOURCE_PAIRS.get(source_id, "")) != ending_id:
 		return { "ok": false, "reason_code": "invalid_ending_source", "reason_text": "", "snapshot": {} }
+	# 配對正確不代表這條入口收得起：run 生命週期只認 RUN_ENDING_SOURCES。
+	if not allow_opening_source and not RUN_ENDING_SOURCES.has(source_id):
+		return { "ok": false, "reason_code": "invalid_ending_source", "reason_text": "來源不屬於 run 生命週期：%s" % source_id, "snapshot": {} }
 
 	var frozen_proxy := str(src.get("selected_festival_proxy_npc"))
-	var is_composite := ending_id == "ending_replaced"
+	var is_composite := ending_id == ENDING_REPLACED
 	if is_composite:
 		# 結局當下不得重算投入：代付者必須已在 D29 凍結，且必須是正式候選。
 		if frozen_proxy.is_empty() or not _is_festival_candidate(frozen_proxy):
@@ -345,7 +392,7 @@ func _build_ending_plan(ending_id: String, source_id: String, src: Node) -> Dict
 		refs.append(ref_str)
 
 	var variants: Dictionary = resolved.get("variants", {}) as Dictionary
-	var is_refuse := ending_id == "ending_refuse_boarding"
+	var is_refuse := ending_id == ENDING_REFUSE_BOARDING
 	var src_opening := str(src.get("opening_choice_id"))
 
 	var snapshot := {
@@ -523,6 +570,7 @@ func _phase_exit_gate() -> Dictionary:
 	var out := {
 		"has_gate": false, "satisfied": true, "beat_id": "", "location": "",
 		"ending": "", "source": "", "required_slots": [] as Array[String],
+		"required_choice_groups": [] as Array[String],
 	}
 	if Data == null or Data.loader == null:
 		return out
@@ -539,11 +587,19 @@ func _phase_exit_gate() -> Dictionary:
 		var pe := pe_raw as Dictionary
 		var beat_id := str(b.get("id", ""))
 		var required: Array[String] = []
+		var required_groups: Array[String] = []
 		var satisfied := true
 		for rs: Variant in pe.get("required_slots", []) as Array:
 			var slot_id := str(rs)
 			required.append(slot_id)
 			if not slots_placed.has(beat_id + "::" + slot_id):
+				satisfied = false
+		# choice group 形態：組內任一槽結算就算完成，因此「有替代選項」的時段
+		# 不會因為玩家沒有那張特定的卡而卡死。
+		for rg: Variant in pe.get("required_choice_groups", []) as Array:
+			var group_id := str(rg)
+			required_groups.append(group_id)
+			if not choices.has(beat_id + "::" + group_id):
 				satisfied = false
 		return {
 			"has_gate": true,
@@ -553,6 +609,7 @@ func _phase_exit_gate() -> Dictionary:
 			"ending": str(pe.get("ending", "")),
 			"source": str(pe.get("source", "")),
 			"required_slots": required,
+			"required_choice_groups": required_groups,
 		}
 	return out
 
@@ -566,12 +623,24 @@ func phase_exit_status() -> Dictionary:
 ## preflight（複本模擬）→ 驗 action bookkeeping 與結局快照 → commit（effects → bookkeeping → ending）。
 ## 任一步失敗則完整狀態零變化，並原樣回傳精確的 reason_code。
 ## 回傳：{ ok, reason_code, reason_text, lines }
-func _settle_effects(blocks: Array, bookkeeping: Dictionary = {}) -> Dictionary:
+func _settle_effects(blocks: Array, bookkeeping: Dictionary = {}, pre_bookkeeping: Dictionary = {}) -> Dictionary:
 	if not _has_any_effect(blocks):
+		_apply_bookkeeping(self, pre_bookkeeping)
 		_apply_bookkeeping(self, bookkeeping)
 		return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray() }
 
-	var pf := EffectApply.preflight(blocks, self)
+	# 效果必須看得到這個動作「已經付出的代價」（扣卡、扣格、遭遇轉態），
+	# 因此 pre bookkeeping 先落在來源複本上，preflight 再從那份複本出發。
+	var source: Node = self
+	var pre_shadow: Node = null
+	if not pre_bookkeeping.is_empty():
+		pre_shadow = clone_for_preflight()
+		_apply_bookkeeping(pre_shadow, pre_bookkeeping)
+		source = pre_shadow
+
+	var pf := EffectApply.preflight(blocks, source)
+	if pre_shadow != null:
+		pre_shadow.free()
 	if not bool(pf.get("ok", false)):
 		return _mutation_reject(str(pf.get("reason_code", "data_conflict")), str(pf.get("reason_text", "")))
 
@@ -588,6 +657,7 @@ func _settle_effects(blocks: Array, bookkeeping: Dictionary = {}) -> Dictionary:
 		ending_snapshot = plan.get("snapshot", {}) as Dictionary
 	shadow.free()
 
+	_apply_bookkeeping(self, pre_bookkeeping)
 	var commit_res := EffectApply.commit(pf.get("plan", {}) as Dictionary, self)
 	_apply_bookkeeping(self, bookkeeping)
 	if not ending_snapshot.is_empty():
@@ -633,12 +703,48 @@ func _apply_bookkeeping(target: Node, bk: Dictionary) -> void:
 	if report is Dictionary:
 		(target.get("pending_delegation_reports") as Array).append((report as Dictionary).duplicate())
 
+	var removed_report: Variant = bk.get("report_removed")
+	if removed_report is Dictionary:
+		var pend: Array = target.get("pending_delegation_reports") as Array
+		for i in range(pend.size()):
+			if (pend[i] as Dictionary) == (removed_report as Dictionary):
+				pend.remove_at(i)
+				break
+
 	if bool(bk.get("consume_action", false)):
 		target.call("consume_action")
 		var npc_id := str(bk.get("attention_npc", ""))
 		if not npc_id.is_empty():
 			var counts: Dictionary = target.get("npc_action_counts") as Dictionary
 			counts[npc_id] = int(counts.get(npc_id, 0)) + 1
+
+	# ── 縱慾與遭遇的代價：與效果同屬一個動作，因此也走這條共用路徑 ──────────
+	var action_cost := int(bk.get("action_cost", 0))
+	if action_cost > 0:
+		target.call("consume_action", action_cost)
+
+	for card_inst: Variant in bk.get("lose_cards", []) as Array:
+		target.call("lose_card", str(card_inst))
+
+	var indulgence_delta := int(bk.get("indulgence_delta", 0))
+	if indulgence_delta != 0:
+		target.set("indulgence_count", int(target.get("indulgence_count")) + indulgence_delta)
+
+	var forced_pop := str(bk.get("forced_pop", ""))
+	if not forced_pop.is_empty():
+		var pending: Array = target.get("forced_pending") as Array
+		var pos := pending.find(forced_pop)
+		if pos >= 0:
+			pending.remove_at(pos)
+
+	# 遭遇轉態一律以「這個動作結束後的完整狀態」落地；空字典＝遭遇結束。
+	var enc_set: Variant = bk.get("encounter_set")
+	if enc_set is Dictionary:
+		var enc_target: Dictionary = target.get("active_encounter") as Dictionary
+		enc_target.clear()
+		var enc_src := enc_set as Dictionary
+		for key: Variant in enc_src.keys():
+			enc_target[key] = enc_src[key]
 
 
 ## 晚間演出規則層唯一入口（UI、走查腳本、測試共用，規格書第十一節、K-26）。
@@ -1579,37 +1685,26 @@ func indulge(beat_id: String, slot_id: String, card_inst_id: String) -> Dictiona
 		if ACTION_PHASES.has(phase) and action_spent:
 			return { "ok": false, "reason_code": _REASON_ACTION_SPENT, "reason_text": "", "lines": PackedStringArray() }
 
-	# 4. 消耗行動格
-	if is_soak:
-		consume_action(soak_cost)
-	else:
-		consume_action(1)
-
-	# 5. 消掉卡片（泡湯消 soak_cards_cleared 張，以傳入的 card_inst_id 為主；其餘消傳入那張）
+	# 4~7 是同一個玩家動作：行動格、卡片、次數與效果一起 preflight，
+	# 任何一步失敗都不得留下扣卡或扣格的殘骸。
+	var cards_to_lose: Array[String] = [card_inst_id]
 	if is_soak:
 		var cards_cleared := int(Data.tuning("indulgence.soak_cards_cleared", 1))
-		lose_card(card_inst_id)
-		var remaining_to_clear := cards_cleared - 1
-		if remaining_to_clear > 0:
-			var to_remove: Array[String] = []
+		if cards_cleared > 1:
 			for c in hand:
 				if _card_base_id(c) == "madness" and c != card_inst_id:
-					to_remove.append(c)
-					if to_remove.size() == remaining_to_clear:
+					cards_to_lose.append(c)
+					if cards_to_lose.size() == cards_cleared:
 						break
-			for c in to_remove:
-				lose_card(c)
-	else:
-		lose_card(card_inst_id)
 
-	# 6. indulgence_count += 1
-	indulgence_count += 1
-
-	# 7. 套 on_place，再套 on_place_by_level（同一動作合併 preflight）
-	var settle := _settle_indulgence_effects(slot)
+	var pre_bk := {
+		"action_cost": soak_cost if is_soak else 1,
+		"lose_cards": cards_to_lose,
+		"indulgence_delta": 1,
+	}
 
 	# 出口槽不記入 slots_placed，理由見函式開頭註解（K-54）。
-	return settle
+	return _settle_indulgence_effects(slot, pre_bk)
 
 
 ## 強制縱慾結算（規格書第八節、P2-C、開發設計方針 P2-C）。
@@ -1646,20 +1741,17 @@ func _settle_forced_indulgence() -> PackedStringArray:
 		push_error("_settle_forced_indulgence: slot not found '%s::%s'" % [beat_id, slot_id])
 		return PackedStringArray()
 
-	# 確定執行後才 pop 隊首
-	var card_inst_id := str(forced_pending.pop_front())
+	# 隊首出列、行動格、發狂卡與效果同屬一個動作：結算失敗則債留在 forced_pending，
+	# 行動格與手牌都不動（帳不豁免，也不會被扣兩次）。
+	var card_inst_id := str(forced_pending[0])
+	var pre_bk := {
+		"forced_pop": card_inst_id,
+		"action_cost": 1,
+		"lose_cards": [card_inst_id] as Array[String],
+		"indulgence_delta": 1,
+	}
 
-	# 1. 消耗該時段行動格
-	consume_action(1)
-
-	# 2. 消掉發狂卡
-	lose_card(card_inst_id)
-
-	# 3. 累計縱慾次數
-	indulgence_count += 1
-
-	# 4. 套用效果：基底 on_place + 當次強度級追加效果
-	var settle := _settle_indulgence_effects(slot)
+	var settle := _settle_indulgence_effects(slot, pre_bk)
 	if not bool(settle.get("ok", false)):
 		push_error("_settle_forced_indulgence: 效果結算失敗 → %s" % str(settle.get("reason_code", "")))
 		return PackedStringArray()
@@ -1668,15 +1760,17 @@ func _settle_forced_indulgence() -> PackedStringArray:
 
 
 ## 縱慾效果的共用結算：基底 on_place 與當次強度級追加塊合併成同一個動作。
-func _settle_indulgence_effects(slot: Dictionary) -> Dictionary:
+func _settle_indulgence_effects(slot: Dictionary, pre_bookkeeping: Dictionary) -> Dictionary:
 	var blocks: Array = [slot.get("on_place", {})]
 	var by_level: Variant = slot.get("on_place_by_level")
 	if by_level is Dictionary:
-		var lvl := Indulgence.level_for(indulgence_count, Data.loader.tuning)
+		# 強度級看的是「含這一次」的縱慾次數，因此用尚未落地的 delta 先加上去。
+		var effective_count := indulgence_count + int(pre_bookkeeping.get("indulgence_delta", 0))
+		var lvl := Indulgence.level_for(effective_count, Data.loader.tuning)
 		var lvl_effect: Variant = (by_level as Dictionary).get(lvl)
 		if lvl_effect is Dictionary:
 			blocks.append(lvl_effect)
-	return _settle_effects(blocks, {})
+	return _settle_effects(blocks, {}, pre_bookkeeping)
 
 
 ## 隔日上午委託回報結算（規格書 P4-B、開發設計方針 P4-B）。
@@ -1688,12 +1782,10 @@ func _settle_pending_delegation_reports() -> void:
 		return
 
 	var current_day := day
-	var remaining_reports: Array[Dictionary] = []
 	var due_reports: Array[Dictionary] = []
 
 	for r: Dictionary in pending_delegation_reports:
 		if int(r.get("due_day", 0)) > current_day:
-			remaining_reports.append(r)
 			continue
 
 		# 驗證接點合法性（beat 存在、slot 存在、delegation 為 next_morning 且 report 為非空字典）
@@ -1708,11 +1800,11 @@ func _settle_pending_delegation_reports() -> void:
 
 		if beat_dict.is_empty() or slot_dict.is_empty() or not is_valid_del or not is_valid_rep:
 			push_error("GameState: pending delegation report data conflict on beat '%s', slot '%s' (retaining in pending)" % [b_id, s_id])
-			remaining_reports.append(r)
 		else:
 			due_reports.append(r)
 
-	pending_delegation_reports = remaining_reports
+	# pending 不在這裡整份覆寫：每一筆回報的「出列」與它自己的效果同屬一個動作，
+	# 由 pre bookkeeping 一起落地。未到期、資料壞掉與結算失敗的三種都原樣留在原位。
 
 	var rep_lines: PackedStringArray = []
 	for r: Dictionary in due_reports:
@@ -1724,7 +1816,7 @@ func _settle_pending_delegation_reports() -> void:
 		var rep_dict: Dictionary = del_dict["report"] as Dictionary
 
 		var gen_before := run_generation
-		var settle := _settle_effects([rep_dict], {})
+		var settle := _settle_effects([rep_dict], {}, { "report_removed": r })
 		if not bool(settle.get("ok", false)):
 			push_error("_settle_pending_delegation_reports: 回報效果結算失敗 → %s" % str(settle.get("reason_code", "")))
 			return
@@ -2042,32 +2134,36 @@ func acknowledge_encounter_intro() -> Dictionary:
 	if first_round.is_empty():
 		return { "ok": false, "reason_code": "data_conflict", "reason_text": "遭遇第一回合資料遺失", "lines": PackedStringArray() }
 
-	# 超載時確認開場後立即結算 failure 出口（不進入第一回合、不增加佔格、不保留 active encounter）
+	# 進場與「開場就結束」的失敗出口屬同一個動作：先在複本推演，再一次落地。
+	var sh: Node = clone_for_preflight()
+	var sh_enc: Dictionary = sh.get("active_encounter") as Dictionary
+	var entered_round := true
+	var outcome := ""
+
 	if is_overloaded():
-		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()), "entered_round": false }
+		# 超載時確認開場後立即結算 failure 出口（不進入第一回合、不增加佔格）
+		entered_round = false
+		outcome = "failure"
+	else:
+		var cost := int(enc.get("per_round_slot_cost", 1))
+		sh_enc["stage"] = "round"
+		sh_enc["round_id"] = first_round_id
+		sh_enc["blocked_slots"] = int(sh_enc.get("blocked_slots", 0)) + cost
+		var visited: Array = sh_enc.get("visited_round_ids", []) as Array
+		if not visited.has(first_round_id):
+			visited.append(first_round_id)
 
-	var cost := int(enc.get("per_round_slot_cost", 1))
+		# 佔格達/超出手牌上限，或第一回合就沒有合法動作，都直接走 failure 出口
+		if bool(sh.call("_check_encounter_capacity_failure")):
+			outcome = "failure"
+		elif not Encounter.has_legal_moves(enc, first_round, sh_enc, sh, Data.loader):
+			outcome = "failure"
 
-	# 進入第一回合
-	active_encounter["stage"] = "round"
-	active_encounter["round_id"] = first_round_id
-	active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
-	var visited: Array = active_encounter.get("visited_round_ids", []) as Array
-	if not visited.has(first_round_id):
-		visited.append(first_round_id)
-
-	# 檢查佔格是否已達/超出手牌上限
-	if _check_encounter_capacity_failure():
-		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()), "entered_round": true }
-
-	# 檢查是否有合法動作
-	if not Encounter.has_legal_moves(enc, first_round, active_encounter, self, Data.loader):
-		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()), "entered_round": true }
-
-	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "entered_round": true }
+	var plan := _encounter_plan(enc, [], [] as Array[String], sh_enc.duplicate(true), outcome)
+	sh.free()
+	var res := _commit_encounter_action(plan)
+	res["entered_round"] = entered_round if bool(res.get("ok", false)) else false
+	return res
 
 
 ## 遭遇 View Model（規格書第十三節、P4-D）。
@@ -2145,94 +2241,100 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 	if round_data.is_empty():
 		return { "ok": false, "reason_code": "data_conflict", "reason_text": "當前回合資料遺失", "lines": PackedStringArray() }
 
-	# 通過所有檢查 → 開始結算
-	attempted.append(base_id)
+	# 通過所有檢查 → 先在複本上把整回合推演到出口，回應與出口效果合併成同一個動作。
+	var plan := _plan_encounter_response(card_id, base_id, enc, round_data, is_discardable)
+	return _commit_encounter_action(plan)
+
+
+## 在複本上推演一次回應：扣卡、佔格、換回合、容量與死局判定全部先在複本跑完，
+## 回傳單一 action plan。真狀態在這裡完全不動。
+## 回傳：{ blocks, pre, advance_after }
+func _plan_encounter_response(card_id: String, base_id: String, enc: Dictionary, round_data: Dictionary, is_discardable: bool) -> Dictionary:
+	var sh: Node = clone_for_preflight()
+	var sh_enc: Dictionary = sh.get("active_encounter") as Dictionary
+	var lose_cards: Array[String] = []
+	var blocks: Array = []
+
+	(sh_enc["attempted_card_ids"] as Array).append(base_id)
 	var cost := int(enc.get("per_round_slot_cost", 1))
-	var lines := PackedStringArray()
+	var matching_resp := Encounter.find_matching_response(round_data, card_id, base_id)
+	var hit := not matching_resp.is_empty()
+	var branch: Dictionary = matching_resp if hit else (round_data.get("fallback", {}) as Dictionary)
 
-	if not matching_resp.is_empty():
-		# ── 命中 Response ──
+	if hit:
 		if bool(matching_resp.get("consume_card", false)) and is_discardable:
-			lose_card(card_id)
-
+			lose_cards.append(card_id)
 		# 正解釋放本回合佔格
-		active_encounter["blocked_slots"] = max(0, int(active_encounter.get("blocked_slots", 0)) - cost)
-
-		# 套用 on_resolve
-		if matching_resp.has("on_resolve"):
-			lines.append_array(_settle_encounter_effect(matching_resp["on_resolve"]))
-
-		var next_round_val: Variant = matching_resp.get("next_round")
-		if next_round_val == null or str(next_round_val).is_empty():
-			# 勝利出口
-			var fin_res := _finish_encounter("victory", enc.get("on_victory", {}))
-			lines.append_array(fin_res.get("lines", PackedStringArray()))
-			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
-		else:
-			var next_rid := str(next_round_val)
-			var visited: Array = active_encounter.get("visited_round_ids", []) as Array
-			if visited.has(next_rid):
-				push_error("Encounter: cycle detected on round '%s'" % next_rid)
-				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-				lines.append_array(fail_res.get("lines", PackedStringArray()))
-				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
-			visited.append(next_rid)
-
-			active_encounter["round_id"] = next_rid
-			active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
-
-			if _check_encounter_capacity_failure():
-				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-				lines.append_array(fail_res.get("lines", PackedStringArray()))
-				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
-
-			var next_round := Encounter.get_round(enc, next_rid)
-			if not Encounter.has_legal_moves(enc, next_round, active_encounter, self, Data.loader):
-				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-				lines.append_array(fail_res.get("lines", PackedStringArray()))
-				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
-
-			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
-	else:
-		# ── 未命中 Fallback ──
-		if is_discardable:
-			lose_card(card_id)
+		sh_enc["blocked_slots"] = max(0, int(sh_enc.get("blocked_slots", 0)) - cost)
+	elif is_discardable:
 		# 錯答保留佔格（不釋放）
+		lose_cards.append(card_id)
 
-		if fallback.has("on_resolve"):
-			lines.append_array(_settle_encounter_effect(fallback["on_resolve"]))
+	for c: String in lose_cards:
+		sh.call("lose_card", c)
 
-		var next_round_val: Variant = fallback.get("next_round")
-		if next_round_val == null or str(next_round_val).is_empty():
-			# 失敗出口
-			var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-			lines.append_array(fail_res.get("lines", PackedStringArray()))
-			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+	if branch.has("on_resolve"):
+		blocks.append(branch["on_resolve"])
+		# 容量與死局判定看的是 on_resolve 之後的手牌，因此複本上要先把它套下去。
+		# 複本是 simulation_mode，撞 cap 只會被記錄，不會在這裡啟動結局。
+		var pf_sh := EffectApply.preflight([branch["on_resolve"]], sh)
+		var pf_shadow: Node = pf_sh.get("shadow")
+		if pf_shadow != null:
+			pf_shadow.free()
+		if bool(pf_sh.get("ok", false)):
+			EffectApply.commit(pf_sh.get("plan", {}) as Dictionary, sh)
+
+	var outcome := ""
+	var next_round_val: Variant = branch.get("next_round")
+	if next_round_val == null or str(next_round_val).is_empty():
+		outcome = "victory" if hit else "failure"
+	else:
+		var next_rid := str(next_round_val)
+		var visited: Array = sh_enc.get("visited_round_ids", []) as Array
+		if visited.has(next_rid):
+			push_error("Encounter: cycle detected on round '%s'" % next_rid)
+			outcome = "failure"
 		else:
-			var next_rid := str(next_round_val)
-			var visited: Array = active_encounter.get("visited_round_ids", []) as Array
-			if visited.has(next_rid):
-				push_error("Encounter: cycle detected on round '%s'" % next_rid)
-				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-				lines.append_array(fail_res.get("lines", PackedStringArray()))
-				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 			visited.append(next_rid)
+			sh_enc["round_id"] = next_rid
+			sh_enc["blocked_slots"] = int(sh_enc.get("blocked_slots", 0)) + cost
+			if bool(sh.call("_check_encounter_capacity_failure")):
+				outcome = "failure"
+			elif not Encounter.has_legal_moves(enc, Encounter.get_round(enc, next_rid), sh_enc, sh, Data.loader):
+				outcome = "failure"
 
-			active_encounter["round_id"] = next_rid
-			active_encounter["blocked_slots"] = int(active_encounter.get("blocked_slots", 0)) + cost
+	var plan := _encounter_plan(enc, blocks, lose_cards, sh_enc.duplicate(true), outcome)
+	sh.free()
+	return plan
 
-			if _check_encounter_capacity_failure():
-				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-				lines.append_array(fail_res.get("lines", PackedStringArray()))
-				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 
-			var next_round := Encounter.get_round(enc, next_rid)
-			if not Encounter.has_legal_moves(enc, next_round, active_encounter, self, Data.loader):
-				var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-				lines.append_array(fail_res.get("lines", PackedStringArray()))
-				return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+## 遭遇 action plan 的共用組裝：有出口就把出口效果併進同一批 blocks 並清掉遭遇。
+func _encounter_plan(enc: Dictionary, blocks: Array, lose_cards: Array[String], final_enc: Dictionary, outcome: String) -> Dictionary:
+	var pre: Dictionary = { "lose_cards": lose_cards, "encounter_set": final_enc }
+	var advance_after := false
+	if not outcome.is_empty():
+		var exit_key := "on_%s" % outcome
+		var exit_effect: Dictionary = enc.get(exit_key, {}) as Dictionary
+		if not exit_effect.is_empty():
+			blocks.append(exit_effect)
+		pre["encounter_set"] = {}
+		advance_after = str(enc.get("after_finish", "stay")) == "advance_phase"
+	return { "blocks": blocks, "pre": pre, "advance_after": advance_after }
 
-			return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
+
+## 遭遇 action plan 的唯一落地點。`after_finish` 的推進本身可能失敗，
+## 因此固定留在原子區塊外，不混進 commit。
+func _commit_encounter_action(plan: Dictionary) -> Dictionary:
+	var gen_before := run_generation
+	var settle := _settle_effects(plan.get("blocks", []) as Array, {}, plan.get("pre", {}) as Dictionary)
+	if not bool(settle.get("ok", false)):
+		return settle
+
+	var lines: PackedStringArray = settle.get("lines", PackedStringArray())
+	if bool(plan.get("advance_after", false)) and run_generation == gen_before and flow_mode == FLOW_RUN:
+		var adv_res := advance_phase()
+		lines.append_array(adv_res.get("lines", PackedStringArray()))
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines }
 
 
 ## 主動丟棄卡片（規格書第十三節、開發設計方針 P4-D）。
@@ -2283,16 +2385,16 @@ func discard_in_encounter(card_id: String) -> Dictionary:
 	if not bool(card_def.get("discardable", false)):
 		return { "ok": false, "reason_code": "not_discardable", "reason_text": "此卡片不可丟棄", "lines": PackedStringArray() }
 
-	lose_card(card_id)
-
-	# 檢查丟棄後是否仍有合法動作
+	# 丟棄與「丟完沒棋可走」的失敗出口屬同一個動作：先在複本判定，再一次落地。
+	var sh: Node = clone_for_preflight()
+	sh.call("lose_card", card_id)
 	var round_id := str(active_encounter.get("round_id", ""))
 	var round_data := Encounter.get_round(enc, round_id)
-	if not Encounter.has_legal_moves(enc, round_data, active_encounter, self, Data.loader):
-		var fail_res := _finish_encounter("failure", enc.get("on_failure", {}))
-		return { "ok": true, "reason_code": "", "reason_text": "", "lines": fail_res.get("lines", PackedStringArray()) }
-
-	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray() }
+	var sh_enc: Dictionary = sh.get("active_encounter") as Dictionary
+	var out_of_moves := not Encounter.has_legal_moves(enc, round_data, sh_enc, sh, Data.loader)
+	var plan := _encounter_plan(enc, [], [card_id] as Array[String], sh_enc.duplicate(true), "failure" if out_of_moves else "")
+	sh.free()
+	return _commit_encounter_action(plan)
 
 
 ## 逃離遭遇（規格書第十三節、開發設計方針 P4-D）。
@@ -2355,45 +2457,12 @@ func escape_encounter(card_ids: Array[String]) -> Dictionary:
 		if not bool(card_def.get("discardable", false)):
 			return { "ok": false, "reason_code": "not_discardable", "reason_text": "不可丟棄卡無法作為逃離代價", "lines": PackedStringArray() }
 
-	# 支付代價
+	# 支付代價與逃離出口效果屬同一個動作：任一步失敗都不得只扣卡不逃離。
+	var paid: Array[String] = []
 	for cid in card_ids:
-		lose_card(cid)
-
-	var fin_res := _finish_encounter("escape", enc.get("on_escape", {}))
-	return { "ok": true, "reason_code": "", "reason_text": "", "lines": fin_res.get("lines", PackedStringArray()) }
-
-
-## 遭遇結束出口（內部 helper）。
-func _finish_encounter(outcome: String, effect_data: Dictionary) -> Dictionary:
-	var beat_id := str(active_encounter.get("beat_id", ""))
-	var beat: Dictionary = Data.loader.beats_by_id.get(beat_id, {}) as Dictionary if Data != null and Data.loader != null else {}
-	var enc: Dictionary = beat.get("encounter", {}) as Dictionary
-	var after_finish := str(enc.get("after_finish", "stay"))
-
-	active_encounter.clear()
-
-	var gen_before := run_generation
-	var lines := PackedStringArray()
-	if not effect_data.is_empty():
-		lines.append_array(_settle_encounter_effect(effect_data))
-
-	if run_generation != gen_before or flow_mode != FLOW_RUN:
-		return { "ok": true, "outcome": outcome, "lines": lines }
-
-	if after_finish == "advance_phase":
-		var adv_res := advance_phase()
-		lines.append_array(adv_res.get("lines", PackedStringArray()))
-
-	return { "ok": true, "outcome": outcome, "lines": lines }
-
-
-## 遭遇內效果的共用結算入口（回應 on_resolve 與三種出口共用同一條兩階段管線）。
-func _settle_encounter_effect(effect: Variant) -> PackedStringArray:
-	var settle := _settle_effects([effect], {})
-	if not bool(settle.get("ok", false)):
-		push_error("_settle_encounter_effect: 效果結算失敗 → %s" % str(settle.get("reason_code", "")))
-		return PackedStringArray()
-	return settle.get("lines", PackedStringArray())
+		paid.append(cid)
+	var plan := _encounter_plan(enc, [], paid, {}, "escape")
+	return _commit_encounter_action(plan)
 
 
 ## 檢查可用格數是否歸零或小於 0（容量超載失敗，K-135/K-136）。
@@ -2621,13 +2690,44 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 
 	if not _is_null_or_filled_string(raw["opening_choice_id"]):
 		return {}
-	for variant_key: String in ["partner_variant", "livelihood_variant", "inn_appearance_variant", "festival_proxy_npc"]:
+	for variant_key: String in ENDING_VARIANT_KEYS + ["festival_proxy_npc"]:
 		if not _is_null_or_filled_string(raw[variant_key]):
 			return {}
+
+	# ── ending 專屬矩陣：泛用 nullable 過關不代表這個 ending 收得起這組值 ──────
+	var ending_data: Dictionary = Data.loader.endings_by_id[str(ending_id)] as Dictionary
+	var is_refuse := str(ending_id) == ENDING_REFUSE_BOARDING
+
+	# 不上車必須由資料中指向它的那個開局選項進場；其餘結局不得偽稱不上車。
+	if is_refuse and str(raw["opening_choice_id"]) != _opening_choice_for_ending(str(ending_id)):
+		return {}
+
+	# variant 欄有值 ⇔ 這個 ending 真的有同名 variant group（只有 composite 有）。
+	var group_ids := {}
+	for group: Variant in ending_data.get("variant_groups", []) as Array:
+		if group is Dictionary:
+			group_ids[str((group as Dictionary).get("id", ""))] = true
+	for variant_key: String in ENDING_VARIANT_KEYS:
+		if group_ids.has(variant_key.trim_suffix("_variant")) == (raw[variant_key] == null):
+			return {}
+
+	# 代付者：正常結局必須是已凍結的正式候選；不上車一律 null；BE 有值就得是候選。
+	var proxy_raw: Variant = raw["festival_proxy_npc"]
+	if is_refuse:
+		if proxy_raw != null:
+			return {}
+	elif str(ending_id) == ENDING_REPLACED:
+		if proxy_raw == null or not _is_festival_candidate(str(proxy_raw)):
+			return {}
+	elif proxy_raw != null and not _is_festival_candidate(str(proxy_raw)):
+		return {}
 
 	var ended_day: Variant = raw["ended_day"]
 	var ended_phase: Variant = raw["ended_phase"]
 	if (ended_day == null) != (ended_phase == null):
+		return {}
+	# 不上車沒有 run，因此沒有結束日；其餘三個結局一定結束在某個時段。
+	if is_refuse != (ended_day == null):
 		return {}
 	if ended_day != null:
 		var day_val: Variant = _strict_int(ended_day)
@@ -2648,10 +2748,19 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 	if not raw["page_refs"] is Array:
 		return {}
 	var refs: Array[String] = []
+	var branch_seen := ""
 	for item: Variant in raw["page_refs"] as Array:
 		if typeof(item) != TYPE_STRING:
 			return {}
 		if not bool(EndingResolver.resolve_ref(str(item), Data.loader).get("ok", false)):
+			return {}
+		# 可解析不等於屬於這一次結局：ref 必須指向本 ending，且全部同一個 branch。
+		var parts := str(item).split("/")
+		if parts[0] != str(ending_id):
+			return {}
+		if branch_seen.is_empty():
+			branch_seen = parts[1]
+		elif parts[1] != branch_seen:
 			return {}
 		refs.append(str(item))
 	if refs.is_empty():
@@ -2662,6 +2771,10 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 		return {}
 
 	if typeof(raw["page_revealed"]) != TYPE_BOOL or typeof(raw["ready_to_complete"]) != TYPE_BOOL:
+		return {}
+	# ready 只由「揭露末頁」或「跳到末頁」產生，兩者都同時把頁碼停在末頁並標記已揭露。
+	var at_last := int(index_val) == refs.size() - 1
+	if bool(raw["ready_to_complete"]) != (at_last and bool(raw["page_revealed"])):
 		return {}
 
 	return {
@@ -2681,6 +2794,16 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 		"page_revealed": bool(raw["page_revealed"]),
 		"ready_to_complete": bool(raw["ready_to_complete"]),
 	}
+
+
+## 資料中宣告 `ending` 指向 `ending_id` 的開局選項 id；找不到回空字串。
+func _opening_choice_for_ending(ending_id: String) -> String:
+	if Data == null or Data.loader == null:
+		return ""
+	for choice: Dictionary in Data.loader.opening_choices:
+		if str(choice.get("ending", "")) == ending_id:
+			return str(choice.get("id", ""))
+	return ""
 
 
 ## JSON 往返會把 int 變 float，因此整數欄位接受「值為整數的 float」，其餘一律拒絕。

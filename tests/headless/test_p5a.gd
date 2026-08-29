@@ -154,7 +154,8 @@ func _test_positive_real_data() -> void:
 	var d45_beat: Variant = loader.beats_by_id.get("d45_then")
 	if d45_beat is Dictionary:
 		var pe: Variant = (d45_beat as Dictionary).get("phase_exit")
-		if pe is Dictionary and (pe as Dictionary).get("ending") == "ending_replaced" and (pe as Dictionary).get("source") == "d45_coda" and (pe as Dictionary).get("required_slots") == ["compare_registry"]:
+		# B1：門檻改由 d45_coda 選擇組把關，比對與空手兩條路都能收尾。
+		if pe is Dictionary and (pe as Dictionary).get("ending") == "ending_replaced" and (pe as Dictionary).get("source") == "d45_coda" and (pe as Dictionary).get("required_choice_groups") == ["d45_coda"]:
 			_ok("d45_then phase_exit 接點符合契約")
 		else:
 			_fail("d45_then phase_exit 不符契約: " + str(pe))
@@ -936,6 +937,97 @@ func _test_source_pairing_matrix() -> void:
 		_ok("PE-3 抓到 phase_exit 缺少 source 欄位")
 	else:
 		_fail("PE-3 未抓到缺少 source: " + str(errs_pe3))
+
+	# PE-4: required_choice_groups 引用父 beat 沒有的 choice group
+	var pe_bad_group = base_loader.beats.duplicate(true)
+	for b in pe_bad_group:
+		if b.get("id") == "d45_then":
+			b["phase_exit"]["required_choice_groups"] = ["no_such_group"]
+	var l_pe_bg := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, pe_bad_group, base_loader.cards, base_loader.npcs)
+	var errs_pe4 := DataLoader.lint_endings(l_pe_bg)
+	if _errs_contain(errs_pe4, "required_choice_groups 引用父 beat 不存在的 choice group"):
+		_ok("PE-4 抓到 required_choice_groups 引用不存在的組")
+	else:
+		_fail("PE-4 未抓到不存在的 choice group: " + str(errs_pe4))
+
+	# PE-5: 兩種門檻形態都空＝這個 phase_exit 沒有攔任何東西
+	var pe_empty = base_loader.beats.duplicate(true)
+	for b in pe_empty:
+		if b.get("id") == "d45_then":
+			b["phase_exit"].erase("required_choice_groups")
+	var l_pe_empty := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, pe_empty, base_loader.cards, base_loader.npcs)
+	var errs_pe5 := DataLoader.lint_endings(l_pe_empty)
+	if _errs_contain(errs_pe5, "required_slots 與 required_choice_groups 至少一個必須是非空 Array"):
+		_ok("PE-5 抓到兩種門檻形態皆空")
+	else:
+		_fail("PE-5 未抓到空門檻: " + str(errs_pe5))
+
+	# PE-6: required_choice_groups 重複
+	var pe_dup_group = base_loader.beats.duplicate(true)
+	for b in pe_dup_group:
+		if b.get("id") == "d45_then":
+			b["phase_exit"]["required_choice_groups"] = ["d45_coda", "d45_coda"]
+	var l_pe_dg := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, pe_dup_group, base_loader.cards, base_loader.npcs)
+	var errs_pe6 := DataLoader.lint_endings(l_pe_dg)
+	if _errs_contain(errs_pe6, "required_choice_groups 包含重複 group id"):
+		_ok("PE-6 抓到重複的 choice group id")
+	else:
+		_fail("PE-6 未抓到重複 group id: " + str(errs_pe6))
+
+	# ── Lint 20：時段生命週期鏈完整性 ────────────────────────────────────────
+	var l_clean := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats.duplicate(true), base_loader.cards, base_loader.npcs)
+	if DataLoader.lint_phase_lifecycle(l_clean).is_empty():
+		_ok("LC-0 正式資料 lint 20 為 0 錯誤")
+	else:
+		_fail("LC-0 正式資料 lint 20 有錯: " + str(DataLoader.lint_phase_lifecycle(l_clean)))
+
+	# LC-1: 拿掉 auto_enter → phase_exit 的 condition 旗標沒有生命週期寫入者
+	var lc_no_auto = base_loader.beats.duplicate(true)
+	for b in lc_no_auto:
+		if b.get("id") == "d45_morning_invitation":
+			b.erase("auto_enter")
+	var l_lc1 := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, lc_no_auto, base_loader.cards, base_loader.npcs)
+	var errs_lc1 := DataLoader.lint_phase_lifecycle(l_lc1)
+	if _errs_contain(errs_lc1, "沒有任何 auto_enter beat 寫入"):
+		_ok("LC-1 抓到 phase_exit 旗標缺少 auto_enter 寫入者")
+	else:
+		_fail("LC-1 未抓到缺少寫入者: " + str(errs_lc1))
+
+	# LC-2: auto_enter 掛在非 fixed beat 上
+	var lc_non_fixed = base_loader.beats.duplicate(true)
+	for b in lc_non_fixed:
+		if b.get("id") == "d45_morning_invitation":
+			b["fixed"] = false
+	var l_lc2 := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, lc_non_fixed, base_loader.cards, base_loader.npcs)
+	var errs_lc2 := DataLoader.lint_phase_lifecycle(l_lc2)
+	if _errs_contain(errs_lc2, "auto_enter:true 只能用於 fixed:true 的 beat"):
+		_ok("LC-2 抓到 auto_enter 掛在非 fixed beat")
+	else:
+		_fail("LC-2 未抓到非 fixed auto_enter: " + str(errs_lc2))
+
+	# LC-3: 寫入者跟門檻同一個時段（來不及）
+	var lc_same_phase = base_loader.beats.duplicate(true)
+	for b in lc_same_phase:
+		if b.get("id") == "d45_morning_invitation":
+			(b["when"] as Dictionary)["phase"] = "evening"
+	var l_lc3 := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, lc_same_phase, base_loader.cards, base_loader.npcs)
+	var errs_lc3 := DataLoader.lint_phase_lifecycle(l_lc3)
+	if _errs_contain(errs_lc3, "只由同時段或更晚的 auto_enter beat 寫入"):
+		_ok("LC-3 抓到寫入者不早於門檻")
+	else:
+		_fail("LC-3 未抓到寫入時序問題: " + str(errs_lc3))
+
+	# LC-4: auto_enter 型別錯誤
+	var lc_bad_type = base_loader.beats.duplicate(true)
+	for b in lc_bad_type:
+		if b.get("id") == "d45_morning_invitation":
+			b["auto_enter"] = "yes"
+	var l_lc4 := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, lc_bad_type, base_loader.cards, base_loader.npcs)
+	var errs_lc4 := DataLoader.lint_phase_lifecycle(l_lc4)
+	if _errs_contain(errs_lc4, "auto_enter 必須是 boolean"):
+		_ok("LC-4 抓到 auto_enter 型別錯誤")
+	else:
+		_fail("LC-4 未抓到型別錯誤: " + str(errs_lc4))
 
 
 # ─────────────────────────── 6. 引用檢查負向 Fixtures (K-186.10, 11, 12, 14) ───────────────────────────

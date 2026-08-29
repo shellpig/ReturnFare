@@ -106,13 +106,18 @@ func _initialize() -> void:
 		print("  ok  重置後手牌只剩主角卡")
 
 	var knowledge: Dictionary = gs.get("knowledge") as Dictionary
-	# P5-B：走查現在會真的完成 D45 比對（coda 門檻的必要條件），
-	# 因此保留下來的是升級後的 k_already_on_list，不再是被 lose 掉的 k_not_today。
-	if not knowledge.has("k_already_on_list"):
-		push_error("FAIL: 重置後知識卡 k_already_on_list 未保留")
+	# P5-B／B1：D45 coda 是一個 choice group，比對與空手兩條路都能收尾。
+	# 走查不再強迫第 13 天去拿名冊，因此驗的是「保留下來的那張，對得上本輪真的走的那條路」。
+	var coda_path := str(res.get("coda_path", ""))
+	var expected_knowledge := "k_already_on_list" if coda_path == "compare_registry" else "k_not_today"
+	if coda_path.is_empty():
+		push_error("FAIL: D45 coda 選擇組未結算")
+		failed += 1
+	elif not knowledge.has(expected_knowledge):
+		push_error("FAIL: 重置後知識卡 %s 未保留（coda 路徑：%s）" % [expected_knowledge, coda_path])
 		failed += 1
 	else:
-		print("  ok  重置後 meta 層知識卡已完整保留 (%d 張知識卡)" % knowledge.size())
+		print("  ok  重置後 meta 層知識卡已完整保留 (%d 張知識卡，coda 路徑：%s)" % [knowledge.size(), coda_path])
 
 	var flags: Dictionary = gs.get("flags") as Dictionary
 	var switches: Dictionary = gs.get("switches") as Dictionary
@@ -135,16 +140,11 @@ func _initialize() -> void:
 		quit(0)
 
 
-## 定向優先槽："day::phase" -> [beat_id, slot_id]。理由見 execute_action_phase() 內註解。
-const PRIORITY_SLOTS := {
-	"13::afternoon": ["d13_pm_registry", "read"],
-}
-
-
 ## 執行 45 天貪心走查（K-36：供 test_p1f 與本腳本共用）
 static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) -> Dictionary:
 	var run_ended_box := [0]
 	var last_ending_box := [""]
+	var coda_path_box := [""]
 	var final_night_markers_box := [{}]
 	var final_madness_count_box := [0]
 	var final_madness_cards_box := [[]]
@@ -257,6 +257,8 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			if verbose:
 				push_error(err_e)
 		execute_evening_phase(gs, data_node, d)
+		if d == 45:
+			coda_path_box[0] = str((gs.get("choices") as Dictionary).get("d45_then::d45_coda", ""))
 		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
 
@@ -315,6 +317,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		"final_madness_cards": final_madness_cards_box[0],
 		"final_indulgence_count": final_indulgence_count_box[0],
 		"final_madness_cards_cleared": final_madness_cards_cleared_box[0],
+		"coda_path": coda_path_box[0],
 	}
 
 
@@ -404,22 +407,6 @@ static func execute_action_phase(gs: Node, data_node: Node, day: int, phase: Str
 				gs.play_beat(play_bid)
 				played_beats[play_bid] = true
 				changed = true
-
-	# 走查專用的定向優先槽（P5-B）：貪心策略本身不知道哪一格是結局的必要條件。
-	# `info_registry` 只有第 13 天下午的信徒名冊會發，而它是 D45 coda `compare_registry`
-	# 唯一收的卡；沒拿到就過不了 phase_exit 門檻，整輪走不到結局。
-	var priority_key := "%d::%s" % [day, phase]
-	if PRIORITY_SLOTS.has(priority_key):
-		var target: Array = PRIORITY_SLOTS[priority_key] as Array
-		var prio_res: Dictionary = gs.try_place("protagonist", str(target[0]), str(target[1]))
-		if prio_res.get("ok", false):
-			return {
-				"ok": true,
-				"placed": true,
-				"category": "placed",
-				"detail": "%s::%s" % [str(target[0]), str(target[1])],
-				"summary": "放置 [%s::%s]" % [str(target[0]), str(target[1])],
-			}
 
 	# 貪心尋找第一個可放主角卡的 OPEN 槽
 	for loc_id in locs:
@@ -549,10 +536,13 @@ static func execute_evening_phase(gs: Node, _data_node: Node, day: int) -> void:
 	# 統一走 GameState.play_evening() 結算 fixed beat 與殘響（K-26）
 	gs.play_evening()
 
-	# 第 45 天 evening 特殊比對槽處理
+	# 第 45 天 evening 的 coda 選擇組：持名冊就比對，沒有就空手收尾。
+	# 兩條路都能結算同一個 choice group，因此錯過第 13 天的名冊不會卡死這一輪。
 	if day == 45:
 		if gs.has_card("info_registry"):
 			gs.try_place("info_registry", "d45_then", "compare_registry")
+		else:
+			gs.choose("d45_then", "d45_coda", "empty_handed")
 
 
 static func execute_night_phase(gs: Node, data_node: Node, _day: int, open_markers: bool = true) -> void:

@@ -465,6 +465,8 @@ func _test_run_ended_emitted_exactly_once(gs: Node, data_node: Node) -> int:
 	gs.set("day", 45)
 	gs.set("phase", "evening")
 	gs.set_flag("final_day", true)
+	# B1：coda 門檻改看 d45_coda 選擇組是否已結算。
+	(gs.get("choices") as Dictionary)["d45_then::d45_coda"] = "compare_registry"
 	(gs.get("slots_placed") as Dictionary)["d45_then::compare_registry"] = true
 	gs.set("selected_festival_proxy_npc", "ajie")
 

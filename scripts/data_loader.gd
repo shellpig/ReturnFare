@@ -178,14 +178,22 @@ func verify_references() -> PackedStringArray:
 		var pe: Variant = b.get("phase_exit")
 		if pe is Dictionary:
 			var ped := pe as Dictionary
+			var b_slot_ids := {}
+			var b_group_ids := {}
+			for s in b.get("slots", []):
+				b_slot_ids[str(s.get("id", ""))] = true
+				if s.has("choice_group"):
+					b_group_ids[str(s.get("choice_group", ""))] = true
 			var req_slots: Variant = ped.get("required_slots")
 			if req_slots is Array:
-				var b_slot_ids := {}
-				for s in b.get("slots", []):
-					b_slot_ids[str(s.get("id", ""))] = true
 				for rs in req_slots as Array:
 					if not b_slot_ids.has(str(rs)):
 						problems.append("%s [phase_exit]：required_slots 引用不存在的槽 → %s" % [bid, str(rs)])
+			var req_groups: Variant = ped.get("required_choice_groups")
+			if req_groups is Array:
+				for rg in req_groups as Array:
+					if not b_group_ids.has(str(rg)):
+						problems.append("%s [phase_exit]：required_choice_groups 引用不存在的 choice group → %s" % [bid, str(rg)])
 			if ped.has("ending"):
 				var pe_end := str(ped.get("ending", ""))
 				if not endings_by_id.has(pe_end):
@@ -1575,13 +1583,26 @@ static func lint_endings(loader: DataLoader) -> PackedStringArray:
 				var w: Variant = b.get("when")
 				if not (w is Dictionary) or not (w as Dictionary).has("day") or not (w as Dictionary).has("phase"):
 					problems.append("%s：phase_exit 所在的 beat 必須有明確整數 day 與合法 phase" % bid)
+				var b_slot_ids := {}
+				var b_group_ids := {}
+				for s in b.get("slots", []):
+					b_slot_ids[str(s.get("id", ""))] = true
+					if s.has("choice_group"):
+						b_group_ids[str(s.get("choice_group", ""))] = true
+
 				var req_slots: Variant = ped.get("required_slots")
-				if not (req_slots is Array) or (req_slots as Array).is_empty():
-					problems.append("%s [phase_exit]：required_slots 必須為非空 Array" % bid)
-				else:
-					var b_slot_ids := {}
-					for s in b.get("slots", []):
-						b_slot_ids[str(s.get("id", ""))] = true
+				var req_groups: Variant = ped.get("required_choice_groups")
+				var has_slots: bool = req_slots is Array and not (req_slots as Array).is_empty()
+				var has_groups: bool = req_groups is Array and not (req_groups as Array).is_empty()
+				# 兩種門檻形態至少要有一個；否則這個 phase_exit 沒有攔任何東西。
+				if not has_slots and not has_groups:
+					problems.append("%s [phase_exit]：required_slots 與 required_choice_groups 至少一個必須是非空 Array" % bid)
+				if req_slots != null and not (req_slots is Array):
+					problems.append("%s [phase_exit]：required_slots 必須為 Array" % bid)
+				if req_groups != null and not (req_groups is Array):
+					problems.append("%s [phase_exit]：required_choice_groups 必須為 Array" % bid)
+
+				if has_slots:
 					var seen_rs := {}
 					for rs in req_slots as Array:
 						var rs_str := str(rs)
@@ -1590,6 +1611,16 @@ static func lint_endings(loader: DataLoader) -> PackedStringArray:
 						seen_rs[rs_str] = true
 						if not b_slot_ids.has(rs_str):
 							problems.append("%s [phase_exit]：required_slots 引用父 beat 不存在的 slot id → %s" % [bid, rs_str])
+
+				if has_groups:
+					var seen_rg := {}
+					for rg in req_groups as Array:
+						var rg_str := str(rg)
+						if seen_rg.has(rg_str):
+							problems.append("%s [phase_exit]：required_choice_groups 包含重複 group id → %s" % [bid, rg_str])
+						seen_rg[rg_str] = true
+						if not b_group_ids.has(rg_str):
+							problems.append("%s [phase_exit]：required_choice_groups 引用父 beat 不存在的 choice group → %s" % [bid, rg_str])
 
 				var has_ending: bool = ped.has("ending")
 				var has_source: bool = ped.has("source")
@@ -1840,6 +1871,102 @@ static func lint_opening_and_defaults(loader: DataLoader) -> PackedStringArray:
 					problems.append("%s [%s]：choice_group '%s' 的槽 accepts 只能收 protagonist（實際 %s）" % [bid, csid, need_card_cg, str(c_accepts)])
 
 	return problems
+
+
+## 時段先後比較用的固定順序（lint 20）。
+const PHASE_ORDER := ["morning", "afternoon", "evening", "night"]
+
+
+## lint 20：時段生命週期鏈完整性（規格書第十七節 lint 20、SCHEMA `auto_enter`）。
+## `phase_exit` 是一個時段唯一的出口；如果它的 beat 只在某個 flag 成立時才存在，
+## 那個 flag 就必須由生命週期自己寫入，不能靠玩家剛好去開了某個地點——否則
+## 玩家一路按推進就會把整條鏈跳掉，時段機繼續往下走。
+## 因此驗兩件事：
+##   (1) `auto_enter` 只能掛在 `fixed: true` 的 beat 上；
+##   (2) 帶 `phase_exit` 的 beat，其 `condition` 依賴的每個 flag，
+##       都要有一個 `auto_enter` 的 fixed beat 在同一輪較早的時段以 `on_enter.flag` 寫成 true。
+static func lint_phase_lifecycle(loader: DataLoader) -> PackedStringArray:
+	var problems: PackedStringArray = []
+
+	# 各 flag 由哪些 auto_enter beat 寫成 true（記下最早的 day／phase 序）。
+	var auto_flag_order: Dictionary = {}
+	for beat in loader.beats:
+		var bid := str(beat.get("id", ""))
+		if not beat.has("auto_enter"):
+			continue
+		if not (beat["auto_enter"] is bool):
+			problems.append("beat %s：auto_enter 必須是 boolean" % bid)
+			continue
+		if beat["auto_enter"] != true:
+			continue
+		if beat.get("fixed", false) != true:
+			problems.append("beat %s：auto_enter:true 只能用於 fixed:true 的 beat" % bid)
+			continue
+
+		var order := _phase_order_of(beat)
+		if order < 0:
+			problems.append("beat %s：auto_enter:true 需要明確的 when.day 與 when.phase" % bid)
+			continue
+		var on_enter: Variant = beat.get("on_enter")
+		if not (on_enter is Dictionary):
+			continue
+		var flag_set: Variant = (on_enter as Dictionary).get("flag")
+		if not (flag_set is Dictionary):
+			continue
+		for flag_name: Variant in (flag_set as Dictionary).keys():
+			if (flag_set as Dictionary)[flag_name] != true:
+				continue
+			var key := str(flag_name)
+			if not auto_flag_order.has(key) or order < int(auto_flag_order[key]):
+				auto_flag_order[key] = order
+
+	# 每個 phase_exit 的 condition flag 都必須有更早的 auto_enter 來源。
+	for beat in loader.beats:
+		if not beat.has("phase_exit"):
+			continue
+		var bid := str(beat.get("id", ""))
+		var order := _phase_order_of(beat)
+		if order < 0:
+			problems.append("beat %s：帶 phase_exit 需要明確的 when.day 與 when.phase" % bid)
+			continue
+		var needed: PackedStringArray = []
+		_collect_condition_flags(beat.get("condition"), needed)
+		for flag_name: String in needed:
+			if not auto_flag_order.has(flag_name):
+				problems.append("beat %s [phase_exit]：condition 依賴的旗標 %s 沒有任何 auto_enter beat 寫入，玩家可能繞過整條生命週期" % [bid, flag_name])
+			elif int(auto_flag_order[flag_name]) >= order:
+				problems.append("beat %s [phase_exit]：condition 依賴的旗標 %s 只由同時段或更晚的 auto_enter beat 寫入" % [bid, flag_name])
+
+	return problems
+
+
+## `when.day` × 4 ＋ 時段序，用來比較同一輪內兩個 beat 的先後。缺欄回 -1。
+static func _phase_order_of(beat: Dictionary) -> int:
+	var when: Variant = beat.get("when")
+	if not (when is Dictionary):
+		return -1
+	var when_dict := when as Dictionary
+	if not when_dict.has("day") or not when_dict.has("phase"):
+		return -1
+	var phase_idx := PHASE_ORDER.find(str(when_dict["phase"]))
+	if phase_idx < 0:
+		return -1
+	return int(when_dict["day"]) * PHASE_ORDER.size() + phase_idx
+
+
+## 從 condition 樹裡收集「必須為真」的 flag 名。`not` 底下的不算（那是反向依賴）。
+static func _collect_condition_flags(cond: Variant, out: PackedStringArray) -> void:
+	if not (cond is Dictionary):
+		return
+	var d := cond as Dictionary
+	if d.has("flag"):
+		var name := str(d["flag"])
+		if not out.has(name):
+			out.append(name)
+	for key: String in ["all", "any"]:
+		if d.has(key) and d[key] is Array:
+			for sub: Variant in d[key] as Array:
+				_collect_condition_flags(sub, out)
 
 
 ## lint 19：跨輪與慶典代付完整性（規格書第十七節 lint 19）。

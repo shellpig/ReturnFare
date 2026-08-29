@@ -465,6 +465,7 @@ resolver 輸出的 `page_refs` 是有序 `Array[String]`。每一筆都用穩定
 | `title` / `text` | 面板標題與敘述 |
 | `slots` | 槽陣列 |
 | `on_enter` | beat 首次呈現給玩家時結算一次的效果；鍵同 `on_place` |
+| `auto_enter` | P5 選填 boolean；只供 `fixed: true` 的 beat。`true` ＝**進入該時段時由規則層自動進場**，不必玩家先打開那個地點。用途是「這一段是時段生命週期的一部分」——例如 D45 上午的邀請，它寫下的旗標是整條終局鏈的前提。`on_enter` 仍只結算一次，重複進場只重播文字。lint 20 會驗鏈完整性 |
 | `echo` | 沒到場時留下什麼：`{day, text, condition}`——該天 `condition` 成立才播（企劃書第十七節殘響三級）。**`day` 必填且必須大於本 beat 的 `when.day`**：引擎掃的是 `echo.day == 今天`，缺欄的 echo 永遠不播。同一段 `text` 不得在多個 beat 重複（lint 8） |
 | `encounter` | 遭遇定義，精確形狀見本節下方 `encounter` 專節 |
 | `phase_exit` | P5 選填；fixed beat 對離開當下時段的通用門檻與結局接點，精確形狀見下。UI 與規則層不得靠 beat id 或槽 id 特判 |
@@ -663,16 +664,18 @@ round graph 必須為有向無環圖（DAG），不得有任何 cycle，必須�
 
 ```json
 "phase_exit": {
-  "required_slots": ["compare_registry"],
+  "required_choice_groups": ["d45_coda"],
   "ending": "ending_replaced",
   "source": "d45_coda"
 }
 ```
 
-- 只允許掛在有明確整數 `when.day`／合法 `when.phase` 的 `fixed:true` beat；`required_slots` 必填、非空、不得重複，且每個 id 必須引用同一父 beat 的槽。
-- 離開該時段前，所有 required slot 都必須已結算；否則 `advance_phase()` 回 `phase_requirements_incomplete`。這只擋離場，不自動放卡或套效果。
+- 只允許掛在有明確整數 `when.day`／合法 `when.phase` 的 `fixed:true` beat。
+- `required_slots` 與 `required_choice_groups` **至少一個必須是非空陣列**；兩者都可省略其一。陣列內不得重複，且每個 id 必須引用同一父 beat 的槽／該 beat 上真的存在的 `choice_group`。
+- 離開該時段前，所有 required slot 都必須已結算，且所有 required choice group 都必須已選定；否則 `advance_phase()` 回 `phase_requirements_incomplete`。這只擋離場，不自動放卡或套效果。
+- **需要「有替代選項」的時段用 choice group 形態。** required slot 形態要求那一格一定被填，一旦那格只收某張特定的卡，沒拿到卡的玩家就會永久卡在這個時段。D45 coda 因此收在 `d45_coda` 這個組上：持名冊走比對槽、沒有就走空手槽，兩條都能離場。
 - `ending` 與 `source` 必須同時存在或同時省略；P5 正式資料只有 D45 coda 使用 `ending_replaced`＋`d45_coda`。門檻成立後由規則層啟動結局，不先改 day／phase。
-- `phase_exit` 是資料形狀，不代表所有 fixed beat 都會自動打開面板。D45 仍依既有 fixed 演出進場；本欄只讓規則層可通用判斷「內容完成後才准離開」。
+- `phase_exit` 是資料形狀，不代表所有 fixed beat 都會自動打開面板；要讓某個 beat 進時段就自動結算，用 `auto_enter`。本欄只讓規則層可通用判斷「內容完成後才准離開」。
 
 ### `condition` / `requires` 語彙
 

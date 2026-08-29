@@ -963,6 +963,7 @@
     },
     {
       "id": "d45_morning_invitation",
+      "auto_enter": true,
       "location": "sanquan",
       "when": {
         "day": 45,
@@ -1201,6 +1202,8 @@
           "accepts": [
             "info_registry"
           ],
+          "choice_group": "d45_coda",
+          "choice_requires_card": true,
           "on_place": {
             "text": "第 13 天你翻過那本名冊。你的名字已經在上面，那一格註記「不在」。\n那時你看不懂。\n\n你不是今天才被寫進去的。你回來之前它就在那裡了。",
             "lose": [
@@ -1210,6 +1213,17 @@
               "k_already_on_list"
             ]
           }
+        },
+        {
+          "id": "empty_handed",
+          "occupant": null,
+          "label": "你手上什麼都沒有",
+          "accepts": [],
+          "choice_group": "d45_coda",
+          "on_place": {
+            "text": "你沒有那本名冊。你只是又想了一遍那句話。\n蒸氣沒有散。水裡那個人也沒有再轉頭。"
+          },
+          "note": "未持名冊玩家的替代收尾：一樣走完 d45_then、一樣接結局，只是不做比對，也拿不到升級知識卡。刻意什麼都不給——兩條路的差別就只有有沒有 k_already_on_list，第二輪的起點目標因此不同。⚠️ 文字為結構版草稿，待 verifier 審。"
         }
       ],
       "on_enter": {
@@ -1229,8 +1243,8 @@
       },
       "note": "那是第 2 天泡湯留下的備份。第 7 夜他在源頭看過同一畫面，那時醒了；這次沒有醒。\n一定產出「不是今天才輪到我」。拒絕仍被帶走，只證明第 45 天邀請不是起因。\n升級路徑走比對：把第 13 天的 info_registry 拖進來，換成 k_already_on_list。不吃行動格——你人已經在那裡了（SCHEMA「不收主角卡的槽」那條）。這也是 SCHEMA 第三種比對形態（產出升級版並移除舊的）在資料裡的第一個實例。\n那張升級卡直接生成第二輪的第一個目標：我要找出自己是什麼時候被寫進去的。那條路通向契書、廟與十六歲\n然後：結局演出（第三章故事線第六節）→ 出門前的十分鐘\n\n⚠️ on_enter 的發卡帶條件：已經有 k_already_on_list 就不再發 k_not_today。升級是單向的。知識卡跨輪保留而 beats_entered 每輪清空，所以第二輪這一格會再演一次；沒有這個守衛的話，玩家會同時持有升級前與升級後兩張。flag 不受影響——守衛下在單張卡上，不是整個 on_enter",
       "phase_exit": {
-        "required_slots": [
-          "compare_registry"
+        "required_choice_groups": [
+          "d45_coda"
         ],
         "ending": "ending_replaced",
         "source": "d45_coda"
