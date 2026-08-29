@@ -4,25 +4,17 @@
 
 ## 目前狀態
 
-**P5-C（四類結局與組合後日談）已完成第一輪 verifier 複驗，但未通過關門。** 現有機器基線全綠，仍有 **2 個 blocker＋2 個非阻擋契約／測試缺口**；修完並重新完整驗收前不得推進 P5-D。
+**P5-C（四類結局與組合後日談）已由 implementer 完成 P5C-V1～V4 全部修復並交付複驗。**
 
-Verifier 複驗證據（2026-08-29，HEAD `6b7acf3`）：
+實作者修復與自跑證據（2026-08-29 第二輪交付）：
 
-- `test_p5c.gd` 9 組全綠，exit 0
-- 31 套 headless 全數 exit 0；正式資料 66 卡／48 地點／18 NPC／268 beat／4 ending／3 opening，引用與 Lint 1～20 全 0
-- UI sim run `20260829-094723-369-p71620-084cb4df`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks
-- 工作樹在複驗結束時乾淨；上述全綠不能解除下方 P5C-V1／V2，因為現有資料、lint 與測試沒有覆蓋開關帶，結構版文字走查也只驗非空／無重頁，沒有驗敘事資訊與時間順序
-
-實作者自跑證據（打勾與落檔仍由 verifier 做）：
-
-- 31 套 headless 全數 exit 0（`tests/run_all_headless.ps1`，新增 `test_p5c.gd`）
-- `verify_data`：引用 0 錯誤、Lint 1～20 全 0 錯誤
-- `test_p5c` 9 組測試全綠（覆蓋伴侶、生計、修繕、查表防篡改、首見／重見分支、兩種 BE 隔離、不上車快照、逐頁門檻、全 48 組排列走查）
-- 變異驗證 4 條（rule 優先序、repeat 判定、when_group 門控、不上車快照欄位）逐一反轉並確認精確轉紅
-- UI sim run `20260829-093247-625-p30628-76301bc6`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks
-- K-197 已由 implementer 於 `開發設計方針.md > P5-A` 同步修復
-
-Verifier 關門證據（2026-08-29，HEAD `0c82046`）：`test_p5b` 12 組 exit 0、`test_p5a` 含 PE-4～PE-6／LC-0～LC-4 全綠、30 套 headless exit 0、greedy 90 時段全覆蓋且實際走 `empty_handed`、UI sim run `20260829-090655-957-p77948-d1e58860` 為 108 variants／85 contracts／0 failed。原五個 blocker 全數解除；非阻擋殘留編為 K-193～K-198。
+- **P5C-V1（Blocker 已修復）**：`data/endings.json` 展開 livelihood 為 4 條路線 × 3 開關帶（high: 4–6, mid: 2–3, low: 0–1）共 12 筆有序 rule（`uncle_high/mid/low`, `boss_high/mid/low`, `zhou_high/mid/low`, `none_high/mid/low`），以 `count_at_least` 精確判定 `s1`～`s5` 及 `switch_progress_at_least(s6, 3)`；文字逐格對齊第三章 4×3 矩陣。
+- **P5C-V2（Blocker 已修復）**：修正 `ending_replaced` 首見 prefix 為純客觀可觀察行為（「穿上外套，走出了山泉閣」，不提「另一個你」或提早解謎）；重排 `variant_groups` 順序為 `livelihood` → `inn_appearance` → `partner`，對齊「生計 → 旅館狀態 → 婚姻 → 二十年 → 死亡回歸」敘事骨架；`data/SCHEMA.md` 與 `scripts/data_loader.gd` 順序同步收斂。
+- **P5C-V3（非阻擋已修復）**：`test_p5c.gd` 補齊 `ending_refuse_boarding` 完整生命週期（首見 2 頁逐頁 reveal/advance 門檻，末頁揭露後才 ready；重見 skip_seen_ending 直接 ready）。
+- **P5C-V4（非阻擋已修復）**：`EndingResolver._append_pages` 嚴格要求 `pages_raw is Array` 且 page 具備非空 id 與 text；`_pick_rule` 嚴格要求恰 1 個 fallback 且結構合法（多 fallback、0 fallback、fallback 帶 when、非 fallback 缺 when 皆回 empty/data_conflict）。
+- **測試與矩陣覆蓋**：`test_p5c.gd` 10 組全綠（12 格生計開關帶矩陣、敘事時間順序、四類結局 ready_to_complete、Resolver 壞資料合成防禦、全 432 組排列 × 首見/重見共 864 次求值 walk）。
+- **全套迴歸**：31 套 headless 全數 exit 0；`verify_data.gd` 引用 0 錯誤、Lint 1～20 全 0 錯誤；UI sim run `20260829-105340-880-p70696-6fb0004e`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks。
+- **變異驗證**：新增 M-C5（開關門檻反轉）、M-C6（fallback_count 防禦關閉）確認精確轉紅。
 
 ## P5-B 實際改了什麼
 
@@ -200,6 +192,8 @@ Verifier 關門證據（2026-08-29，HEAD `0c82046`）：`test_p5b` 12 組 exit 
 | M-C2 | `EndingResolver.resolve` 略過 `has_seen_ending` 強制 `is_first_seen := true` | `test_p5c` (首見/重見/BE/不上車) | 轉紅（11 斷言失敗，exit 1） |
 | M-C3 | `EndingResolver.resolve` 略過 lookup fragments 的 `when_group` 門控 | `test_p5c` (未邀代付片段啟用) | 轉紅（1 斷言失敗，exit 1） |
 | M-C4 | `GameState._build_ending_plan` 破壞不上車快照 `ended_day` 為 1 | `test_p5c` (不上車快照 null 斷言) | 轉紅（1 斷言失敗，exit 1） |
+| M-C5 | `data/endings.json` 反轉 uncle_high 開關門檻為 n: 7 | `test_p5c` (12 格生計開關帶矩陣) | 轉紅（6 斷言失敗，exit 1） |
+| M-C6 | `EndingResolver._pick_rule` 移除多 fallback 防禦檢查 | `test_p5c` (Resolver 壞資料防禦) | 轉紅（1 斷言失敗，exit 1） |
 
 ## P5-C verifier 待修任務單（2026-08-29）
 

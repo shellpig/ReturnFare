@@ -6,7 +6,7 @@
       "prefix_pages": [
         {
           "id": "replacement",
-          "text": "蒸氣散去。水裡的那個人轉過頭來——那是你，也不是你。你被留在了這裡，而另一個你穿上外套，走出了山泉閣。"
+          "text": "蒸氣散去。你穿上外套，走出了山泉閣。"
         }
       ],
       "suffix_pages": [
@@ -37,134 +37,462 @@
     },
     "variant_groups": [
       {
-        "id": "partner",
-        "history_field": "partner_variant",
-        "rules": [
-          {
-            "id": "ajie",
-            "when": {
-              "flag": "invited_ajie"
-            },
-            "first_seen_pages": [
-              {
-                "id": "partner_ajie_long",
-                "text": "他跟阿婕結婚了。他們沒有小孩。\n她先走，也是四十出頭，癌症走得很快。"
-              }
-            ],
-            "repeat_pages": [
-              {
-                "id": "partner_ajie_short",
-                "text": "他與阿婕成婚，膝下無子。多年後她先一步離世。"
-              }
-            ]
-          },
-          {
-            "id": "awei",
-            "when": {
-              "flag": "invited_awei"
-            },
-            "first_seen_pages": [
-              {
-                "id": "partner_awei_long",
-                "text": "他跟阿薇結婚了。他們沒有小孩。\n她先走，也是四十出頭，癌症走得很快。"
-              }
-            ],
-            "repeat_pages": [
-              {
-                "id": "partner_awei_short",
-                "text": "他與阿薇成婚，膝下無子。多年後她先一步離世。"
-              }
-            ]
-          },
-          {
-            "id": "none",
-            "fallback": true,
-            "first_seen_pages": [
-              {
-                "id": "partner_none_long",
-                "text": "他沒有結婚，一個人過完剩下的日子。"
-              }
-            ],
-            "repeat_pages": [
-              {
-                "id": "partner_none_short",
-                "text": "他獨身一人過完餘生。"
-              }
-            ]
-          }
-        ]
-      },
-      {
         "id": "livelihood",
         "history_field": "livelihood_variant",
         "rules": [
           {
-            "id": "uncle",
+            "id": "uncle_high",
+            "when": {
+              "all": [
+                {
+                  "flag": "accepted_inn"
+                },
+                {
+                  "count_at_least": {
+                    "n": 4,
+                    "of": [
+                      {
+                        "switch": "s1"
+                      },
+                      {
+                        "switch": "s2"
+                      },
+                      {
+                        "switch": "s3"
+                      },
+                      {
+                        "switch": "s4"
+                      },
+                      {
+                        "switch": "s5"
+                      },
+                      {
+                        "switch_progress_at_least": {
+                          "switch": "s6",
+                          "n": 3
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_uncle_high_long",
+                "text": "他接下了山泉閣。旅館做起來了。他慢慢變成了叔叔當年的樣子。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_uncle_high_short",
+                "text": "他接掌山泉閣並將旅館經營起來，成為下一任經營者。"
+              }
+            ]
+          },
+          {
+            "id": "uncle_mid",
+            "when": {
+              "all": [
+                {
+                  "flag": "accepted_inn"
+                },
+                {
+                  "count_at_least": {
+                    "n": 2,
+                    "of": [
+                      {
+                        "switch": "s1"
+                      },
+                      {
+                        "switch": "s2"
+                      },
+                      {
+                        "switch": "s3"
+                      },
+                      {
+                        "switch": "s4"
+                      },
+                      {
+                        "switch": "s5"
+                      },
+                      {
+                        "switch_progress_at_least": {
+                          "switch": "s6",
+                          "n": 3
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_uncle_mid_long",
+                "text": "他接下了山泉閣。做得普通，但守住了老屋與溫泉。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_uncle_mid_short",
+                "text": "他接掌山泉閣，規模普通但守住經營。"
+              }
+            ]
+          },
+          {
+            "id": "uncle_low",
             "when": {
               "flag": "accepted_inn"
             },
             "first_seen_pages": [
               {
-                "id": "livelihood_uncle_long",
-                "text": "他接下了山泉閣。他留下來了，慢慢變成了叔叔當年的樣子。"
+                "id": "livelihood_uncle_low_long",
+                "text": "他接下了山泉閣，撐了兩年後收掉。叔叔在他手上走了。"
               }
             ],
             "repeat_pages": [
               {
-                "id": "livelihood_uncle_short",
-                "text": "他接掌山泉閣，成為下一任經營者。"
+                "id": "livelihood_uncle_low_short",
+                "text": "他接下山泉閣但未能維持，兩年後歇業，叔叔離世。"
               }
             ]
           },
           {
-            "id": "boss",
+            "id": "boss_high",
+            "when": {
+              "all": [
+                {
+                  "flag": "accepted_outside_job"
+                },
+                {
+                  "count_at_least": {
+                    "n": 4,
+                    "of": [
+                      {
+                        "switch": "s1"
+                      },
+                      {
+                        "switch": "s2"
+                      },
+                      {
+                        "switch": "s3"
+                      },
+                      {
+                        "switch": "s4"
+                      },
+                      {
+                        "switch": "s5"
+                      },
+                      {
+                        "switch_progress_at_least": {
+                          "switch": "s6",
+                          "n": 3
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_boss_high_long",
+                "text": "他回到熟悉的工作。旅館交給別人顧，但仍撐著。他下山了，但每年還是會回來一次。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_boss_high_short",
+                "text": "他重回外地職務，旅館由他人代管維持，每年返鄉一次。"
+              }
+            ]
+          },
+          {
+            "id": "boss_mid",
+            "when": {
+              "all": [
+                {
+                  "flag": "accepted_outside_job"
+                },
+                {
+                  "count_at_least": {
+                    "n": 2,
+                    "of": [
+                      {
+                        "switch": "s1"
+                      },
+                      {
+                        "switch": "s2"
+                      },
+                      {
+                        "switch": "s3"
+                      },
+                      {
+                        "switch": "s4"
+                      },
+                      {
+                        "switch": "s5"
+                      },
+                      {
+                        "switch_progress_at_least": {
+                          "switch": "s6",
+                          "n": 3
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_boss_mid_long",
+                "text": "他回去排班，日子普通；旅館後來縮小了。他下山了，但每年還是會回來一次。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_boss_mid_short",
+                "text": "他回外地排班，旅館規模縮小，每年仍回鎮上一趟。"
+              }
+            ]
+          },
+          {
+            "id": "boss_low",
             "when": {
               "flag": "accepted_outside_job"
             },
             "first_seen_pages": [
               {
-                "id": "livelihood_boss_long",
-                "text": "他回到了外地熟悉的工作。他下山了，但每年還是會回來一次。"
+                "id": "livelihood_boss_low_long",
+                "text": "他回外地工作，旅館後來收掉了。叔叔在診所走了。他每年還是會回來一次。"
               }
             ],
             "repeat_pages": [
               {
-                "id": "livelihood_boss_short",
-                "text": "他回外地工作，每年仍回鎮上一趟。"
+                "id": "livelihood_boss_low_short",
+                "text": "他回外地工作，旅館歇業且叔叔於診所離世，每年定期返鄉。"
               }
             ]
           },
           {
-            "id": "zhou",
+            "id": "zhou_high",
+            "when": {
+              "all": [
+                {
+                  "flag": "accepted_job"
+                },
+                {
+                  "count_at_least": {
+                    "n": 4,
+                    "of": [
+                      {
+                        "switch": "s1"
+                      },
+                      {
+                        "switch": "s2"
+                      },
+                      {
+                        "switch": "s3"
+                      },
+                      {
+                        "switch": "s4"
+                      },
+                      {
+                        "switch": "s5"
+                      },
+                      {
+                        "switch_progress_at_least": {
+                          "switch": "s6",
+                          "n": 3
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_zhou_high_long",
+                "text": "他去了周先生介紹的公司上班。旅館交給別人顧。他下山了，但每年還是會回來一次。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_zhou_high_short",
+                "text": "他任職於周先生安排的職位，旅館交他人代管，每年定期返鄉。"
+              }
+            ]
+          },
+          {
+            "id": "zhou_mid",
+            "when": {
+              "all": [
+                {
+                  "flag": "accepted_job"
+                },
+                {
+                  "count_at_least": {
+                    "n": 2,
+                    "of": [
+                      {
+                        "switch": "s1"
+                      },
+                      {
+                        "switch": "s2"
+                      },
+                      {
+                        "switch": "s3"
+                      },
+                      {
+                        "switch": "s4"
+                      },
+                      {
+                        "switch": "s5"
+                      },
+                      {
+                        "switch_progress_at_least": {
+                          "switch": "s6",
+                          "n": 3
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_zhou_mid_long",
+                "text": "他下山上班，只是旅館後來撐不了太久。他每年還是會回來一次。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_zhou_mid_short",
+                "text": "他下山任職，旅館經營未久，每年定期返鄉。"
+              }
+            ]
+          },
+          {
+            "id": "zhou_low",
             "when": {
               "flag": "accepted_job"
             },
             "first_seen_pages": [
               {
-                "id": "livelihood_zhou_long",
-                "text": "他去了周先生介紹的公司。他下山了，但每年還是會回來一次。"
+                "id": "livelihood_zhou_low_long",
+                "text": "他去周先生那裡上班，旅館後來收掉了。叔叔在診所走了。他每年還是會回來一次。"
               }
             ],
             "repeat_pages": [
               {
-                "id": "livelihood_zhou_short",
-                "text": "他任職於周先生安排的職位，每年仍定期返鄉。"
+                "id": "livelihood_zhou_low_short",
+                "text": "他下山就職，旅館歇業且叔叔於診所離世，每年定期返鄉。"
               }
             ]
           },
           {
-            "id": "none",
-            "fallback": true,
+            "id": "none_high",
+            "when": {
+              "count_at_least": {
+                "n": 4,
+                "of": [
+                  {
+                    "switch": "s1"
+                  },
+                  {
+                    "switch": "s2"
+                  },
+                  {
+                    "switch": "s3"
+                  },
+                  {
+                    "switch": "s4"
+                  },
+                  {
+                    "switch": "s5"
+                  },
+                  {
+                    "switch_progress_at_least": {
+                      "switch": "s6",
+                      "n": 3
+                    }
+                  }
+                ]
+              }
+            },
             "first_seen_pages": [
               {
-                "id": "livelihood_none_long",
-                "text": "他哪裡都沒答應去，只是守著老屋，日子一天天過去。"
+                "id": "livelihood_none_high_long",
+                "text": "沒說要接，也沒走。旅館一直是他在顧。"
               }
             ],
             "repeat_pages": [
               {
-                "id": "livelihood_none_short",
-                "text": "他未作任何承諾，留在鎮上度過歲月。"
+                "id": "livelihood_none_high_short",
+                "text": "他未做承諾，留在鎮上持續照料旅館。"
+              }
+            ]
+          },
+          {
+            "id": "none_mid",
+            "when": {
+              "count_at_least": {
+                "n": 2,
+                "of": [
+                  {
+                    "switch": "s1"
+                  },
+                  {
+                    "switch": "s2"
+                  },
+                  {
+                    "switch": "s3"
+                  },
+                  {
+                    "switch": "s4"
+                  },
+                  {
+                    "switch": "s5"
+                  },
+                  {
+                    "switch_progress_at_least": {
+                      "switch": "s6",
+                      "n": 3
+                    }
+                  }
+                ]
+              }
+            },
+            "first_seen_pages": [
+              {
+                "id": "livelihood_none_mid_long",
+                "text": "沒說要接，也沒走。只是山泉閣規模一直沒起來。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_none_mid_short",
+                "text": "他留在鎮上守著老屋，規模未見擴展。"
+              }
+            ]
+          },
+          {
+            "id": "none_low",
+            "fallback": true,
+            "first_seen_pages": [
+              {
+                "id": "livelihood_none_low_long",
+                "text": "他哪裡都沒答應去，山泉閣關門了。叔叔在診所走了。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "livelihood_none_low_short",
+                "text": "他未作承諾，旅館歇業，叔叔於診所離世。"
               }
             ]
           }
@@ -241,6 +569,64 @@
               {
                 "id": "inn_none_short",
                 "text": "旅館維持風災後的樣貌未變。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "partner",
+        "history_field": "partner_variant",
+        "rules": [
+          {
+            "id": "ajie",
+            "when": {
+              "flag": "invited_ajie"
+            },
+            "first_seen_pages": [
+              {
+                "id": "partner_ajie_long",
+                "text": "他跟阿婕結婚了。他們沒有小孩。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "partner_ajie_short",
+                "text": "他與阿婕成婚，膝下無子。"
+              }
+            ]
+          },
+          {
+            "id": "awei",
+            "when": {
+              "flag": "invited_awei"
+            },
+            "first_seen_pages": [
+              {
+                "id": "partner_awei_long",
+                "text": "他跟阿薇結婚了。他們沒有小孩。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "partner_awei_short",
+                "text": "他與阿薇成婚，膝下無子。"
+              }
+            ]
+          },
+          {
+            "id": "none",
+            "fallback": true,
+            "first_seen_pages": [
+              {
+                "id": "partner_none_long",
+                "text": "他沒有結婚，一個人過著剩下的日子。"
+              }
+            ],
+            "repeat_pages": [
+              {
+                "id": "partner_none_short",
+                "text": "他獨身一人過完餘生。"
               }
             ]
           }

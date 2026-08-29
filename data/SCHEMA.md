@@ -327,7 +327,7 @@ resolver 輸出的 `page_refs` 是有序 `Array[String]`。每一筆都用穩定
 
 | 結構 | 規約 |
 |---|---|
-| `variant_groups[].id` | `ending_replaced` 正式資料恰有 `partner`、`livelihood`、`inn_appearance`，順序就是後日談順序 |
+| `variant_groups[].id` | `ending_replaced` 正式資料恰有 `livelihood`、`inn_appearance`、`partner`，順序就是後日談順序 |
 | `history_field` | 三組分別寫 `partner_variant`、`livelihood_variant`、`inn_appearance_variant`，不得重複 |
 | `rules[]` | 依序第一個 `when` 成立者命中；最後恰一筆 `{fallback:true}`，fallback 不得同時有 when |
 | `rules[].id` | 寫入 history 的穩定 variant id；同組唯一 |

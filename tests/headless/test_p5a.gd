@@ -249,8 +249,8 @@ func _test_lint17_negative() -> void:
 	# 6. 缺 fallback / 多 fallback / fallback 帶 when
 	var bad_fb_endings = base_loader.endings.duplicate(true)
 	var vgs: Array = bad_fb_endings[0]["variant_groups"]
-	vgs[0]["rules"][2].erase("fallback")
-	vgs[0]["rules"][2]["when"] = { "flag": "no_such_flag" }
+	vgs[0]["rules"][-1].erase("fallback")
+	vgs[0]["rules"][-1]["when"] = { "flag": "no_such_flag" }
 	var l_bad_fb := _make_loader_for_p5(bad_fb_endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
 	errs = DataLoader.lint_endings(l_bad_fb)
 	if _errs_contain(errs, "必須恰有一個 fallback"):

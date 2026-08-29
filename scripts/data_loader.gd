@@ -1422,7 +1422,7 @@ static func lint_endings(loader: DataLoader) -> PackedStringArray:
 				problems.append("%s：variant_groups 必須是 Array" % eid)
 			else:
 				var vg_arr := vgroups as Array
-				var expected_vgs := ["partner", "livelihood", "inn_appearance"]
+				var expected_vgs := ["livelihood", "inn_appearance", "partner"]
 				var actual_vgs := []
 				var hist_fields := {}
 				for vg in vg_arr:

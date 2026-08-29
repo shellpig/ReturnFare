@@ -189,7 +189,7 @@ func _test_3_snapshot_freeze(gs: Node) -> void:
 	_check(int(snapshot.get("ended_day", 0)) == 45 and str(snapshot.get("ended_phase", "")) == "evening",
 		"快照凍結結束日與時段")
 	_check(str(snapshot.get("partner_variant", "")) == "ajie", "快照凍結伴侶 variant＝ajie")
-	_check(str(snapshot.get("livelihood_variant", "")) == "uncle", "快照凍結生計 variant＝uncle")
+	_check(str(snapshot.get("livelihood_variant", "")) == "uncle_low", "快照凍結生計 variant＝uncle_low")
 	_check(str(snapshot.get("inn_appearance_variant", "")) == "sign", "快照凍結旅館 variant＝sign")
 	_check(str(snapshot.get("festival_proxy_npc", "")) == "ajie", "快照凍結慶典代付者")
 	_check((snapshot.get("knowledge_gained_this_run", []) as Array).has("k_forty_something"),

@@ -211,38 +211,49 @@ static func _variant_page_key(is_first_seen: bool) -> String:
 
 ## 把 pages 陣列串成 ref 附加到 refs。空陣列合法（該維度不貢獻頁面）；非陣列或壞 page 回 false。
 static func _append_pages(refs: Array[String], pages_raw: Variant, prefix: String) -> bool:
-	if pages_raw == null:
-		return true
 	if not pages_raw is Array:
 		return false
 	for page_raw: Variant in pages_raw as Array:
 		if not page_raw is Dictionary:
 			return false
-		var page_id := str((page_raw as Dictionary).get("id", ""))
-		if page_id.is_empty():
+		var page := page_raw as Dictionary
+		var page_id := str(page.get("id", ""))
+		var text := str(page.get("text", ""))
+		if page_id.is_empty() or text.strip_edges().is_empty():
 			return false
 		refs.append(prefix + page_id)
 	return true
 
 
 ## 依資料順序取第一個 when 成立的 rule；都不成立才用 fallback。
+## 嚴格要求 rules 必須恰有一個 fallback，且所有項目形狀合法；違反直接回 {} (data_conflict)。
 static func _pick_rule(rules_raw: Variant, gs: Node) -> Dictionary:
-	if not rules_raw is Array:
+	if not rules_raw is Array or (rules_raw as Array).is_empty():
 		return {}
 	var fallback: Dictionary = {}
+	var fallback_count := 0
+	var matched: Dictionary = {}
+
 	for rule_raw: Variant in rules_raw as Array:
 		if not rule_raw is Dictionary:
-			continue
+			return {}
 		var rule := rule_raw as Dictionary
-		if rule.get("fallback", false) == true:
-			if fallback.is_empty():
-				fallback = rule
-			continue
-		if not rule.has("when"):
-			continue
-		if ConditionEval.eval(rule.get("when"), gs):
-			return rule
-	return fallback
+		var is_fb: bool = rule.get("fallback", false) == true
+		if is_fb:
+			fallback_count += 1
+			if rule.has("when"):
+				return {}
+			fallback = rule
+		else:
+			if not rule.has("when"):
+				return {}
+			if matched.is_empty() and ConditionEval.eval(rule.get("when"), gs):
+				matched = rule
+
+	if fallback_count != 1:
+		return {}
+
+	return matched if not matched.is_empty() else fallback
 
 
 static func _find_entry(entries_raw: Variant, value: String) -> Dictionary:

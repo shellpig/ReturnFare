@@ -1,10 +1,11 @@
 extends SceneTree
 
 ## P5-C 四類結局與組合後日談測試（實作規格書 P5-C、測試指南 P5-C）。
-## 涵蓋：正常結局三組 variant 求值與優先序、關係獨立性、
-## uninvited_proxy 查表與防篡改、首見長版 vs 重見短版分支、
-## 兩種 BE 的後日談隔離與獨立首見計算、不上車外地人生快照、
-## 逐頁 ready_to_complete 門檻與動作原子性、48 組全排列結構版文字走查。
+## 涵蓋：4×3 生計開關帶矩陣、伴侶／生計／修繕優先序與時間軸順序、
+## uninvited_proxy 查表與防篡改、首見長版（可觀察敘事）vs 重見短版分支、
+## 兩種 BE 的後日談隔離與獨立首見計算、不上車外地人生快照與生命週期、
+## 四類結局逐頁 ready_to_complete 門檻與動作原子性、
+## Resolver 壞資料 data_conflict 防禦、全排列結構版文字走查。
 ## 跑法：Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p5c.gd
 
 const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
@@ -24,14 +25,15 @@ func _initialize() -> void:
 
 	print("=== P5-C 四類結局與組合後日談測試 ===")
 	_test_1_partner_variants(gs, data_node)
-	_test_2_livelihood_variants(gs, data_node)
+	_test_2_livelihood_switch_matrix(gs, data_node)
 	_test_3_inn_appearance_variants(gs, data_node)
 	_test_4_uninvited_proxy_lookup(gs, data_node)
-	_test_5_first_seen_vs_repeat(gs, data_node)
+	_test_5_first_seen_vs_repeat_and_chronology(gs, data_node)
 	_test_6_be_endings_independence(gs, data_node)
 	_test_7_refuse_boarding_ending(gs, data_node)
-	_test_8_lifecycle_ready_to_complete_and_atomicity(gs, data_node)
-	_test_9_structural_text_walkthrough(gs, data_node)
+	_test_8_lifecycle_ready_to_complete_all_four(gs, data_node)
+	_test_9_resolver_bad_data_defense(gs, data_node)
+	_test_10_structural_text_walkthrough(gs, data_node)
 
 	if _failed > 0:
 		push_error("test_p5c: %d 個斷言失敗" % _failed)
@@ -75,6 +77,8 @@ func _fresh_run(gs: Node, day: int = 45, phase: String = "evening") -> void:
 	(gs.get("flags") as Dictionary).clear()
 	(gs.get("relations") as Dictionary).clear()
 	(gs.get("npc_action_counts") as Dictionary).clear()
+	(gs.get("switches") as Dictionary).clear()
+	(gs.get("switch_progress") as Dictionary).clear()
 	gs.set("selected_festival_proxy_npc", "")
 	gs.set("opening_choice_id", "")
 
@@ -92,6 +96,27 @@ func _refs_contain(refs: Array, needle: String) -> bool:
 		if needle in str(r):
 			return true
 	return false
+
+
+func _set_switches(gs: Node, count: int) -> void:
+	var sw: Dictionary = gs.get("switches") as Dictionary
+	sw.clear()
+	var sp: Dictionary = gs.get("switch_progress") as Dictionary
+	sp.clear()
+
+	# 6 switches: s1, s2, s3, s4, s5, s6 (target 3)
+	if count >= 1:
+		sw["s1"] = true
+	if count >= 2:
+		sw["s2"] = true
+	if count >= 3:
+		sw["s3"] = true
+	if count >= 4:
+		sw["s4"] = true
+	if count >= 5:
+		sw["s5"] = true
+	if count >= 6:
+		sp["s6"] = 3
 
 
 # ── 1. 伴侶 variants 涵蓋與關係獨立性 ─────────────────────────────────────────
@@ -143,65 +168,87 @@ func _test_1_partner_variants(gs: Node, data_node: Node) -> void:
 		"只改 relation 不改 D29 choice 時伴侶仍為 none（resolver 不偷看關係度）")
 
 
-# ── 2. 生計 variants 涵蓋與優先序 ─────────────────────────────────────────────
+# ── 2. 生計 4×3 開關帶矩陣、優先序與合成防禦 (P5C-V1) ─────────────────────────
 
-func _test_2_livelihood_variants(gs: Node, data_node: Node) -> void:
-	print("\n--- 2. 生計 variants 覆蓋、優先序與合成防禦 ---")
+func _test_2_livelihood_switch_matrix(gs: Node, data_node: Node) -> void:
+	print("\n--- 2. 生計 4×3 開關帶矩陣、優先序與合成防禦 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
-	# (a) accepted_inn -> livelihood_variant: "uncle"
+	# 12 格人生矩陣測試：4 routes × 3 bands (high: 4-6, mid: 2-3, low: 0-1)
+	var matrix_cases := [
+		# 1. 答應叔叔 (accepted_inn)
+		{ "route": "accepted_inn", "switches": 6, "expected": "uncle_high", "ref": "livelihood_uncle_high_long" },
+		{ "route": "accepted_inn", "switches": 4, "expected": "uncle_high", "ref": "livelihood_uncle_high_long" },
+		{ "route": "accepted_inn", "switches": 3, "expected": "uncle_mid", "ref": "livelihood_uncle_mid_long" },
+		{ "route": "accepted_inn", "switches": 2, "expected": "uncle_mid", "ref": "livelihood_uncle_mid_long" },
+		{ "route": "accepted_inn", "switches": 1, "expected": "uncle_low", "ref": "livelihood_uncle_low_long" },
+		{ "route": "accepted_inn", "switches": 0, "expected": "uncle_low", "ref": "livelihood_uncle_low_long" },
+
+		# 2. 前老闆 (accepted_outside_job)
+		{ "route": "accepted_outside_job", "switches": 6, "expected": "boss_high", "ref": "livelihood_boss_high_long" },
+		{ "route": "accepted_outside_job", "switches": 4, "expected": "boss_high", "ref": "livelihood_boss_high_long" },
+		{ "route": "accepted_outside_job", "switches": 3, "expected": "boss_mid", "ref": "livelihood_boss_mid_long" },
+		{ "route": "accepted_outside_job", "switches": 2, "expected": "boss_mid", "ref": "livelihood_boss_mid_long" },
+		{ "route": "accepted_outside_job", "switches": 1, "expected": "boss_low", "ref": "livelihood_boss_low_long" },
+		{ "route": "accepted_outside_job", "switches": 0, "expected": "boss_low", "ref": "livelihood_boss_low_long" },
+
+		# 3. 周先生 (accepted_job)
+		{ "route": "accepted_job", "switches": 6, "expected": "zhou_high", "ref": "livelihood_zhou_high_long" },
+		{ "route": "accepted_job", "switches": 4, "expected": "zhou_high", "ref": "livelihood_zhou_high_long" },
+		{ "route": "accepted_job", "switches": 3, "expected": "zhou_mid", "ref": "livelihood_zhou_mid_long" },
+		{ "route": "accepted_job", "switches": 2, "expected": "zhou_mid", "ref": "livelihood_zhou_mid_long" },
+		{ "route": "accepted_job", "switches": 1, "expected": "zhou_low", "ref": "livelihood_zhou_low_long" },
+		{ "route": "accepted_job", "switches": 0, "expected": "zhou_low", "ref": "livelihood_zhou_low_long" },
+
+		# 4. 皆無 (none)
+		{ "route": "none", "switches": 6, "expected": "none_high", "ref": "livelihood_none_high_long" },
+		{ "route": "none", "switches": 4, "expected": "none_high", "ref": "livelihood_none_high_long" },
+		{ "route": "none", "switches": 3, "expected": "none_mid", "ref": "livelihood_none_mid_long" },
+		{ "route": "none", "switches": 2, "expected": "none_mid", "ref": "livelihood_none_mid_long" },
+		{ "route": "none", "switches": 1, "expected": "none_low", "ref": "livelihood_none_low_long" },
+		{ "route": "none", "switches": 0, "expected": "none_low", "ref": "livelihood_none_low_long" },
+	]
+
+	for mc in matrix_cases:
+		_fresh_run(gs)
+		gs.set("selected_festival_proxy_npc", "ajie")
+		if str(mc["route"]) != "none":
+			(gs.get("flags") as Dictionary)[str(mc["route"])] = true
+		_set_switches(gs, int(mc["switches"]))
+
+		var res := EndingResolver.resolve("ending_replaced", gs, loader)
+		var actual_var := str((res.get("variants") as Dictionary).get("livelihood_variant", ""))
+		_check(actual_var == str(mc["expected"]),
+			"生計矩陣 [%s + %d 開關] → variant: %s" % [str(mc["route"]), int(mc["switches"]), actual_var])
+		_check(_refs_contain(res.get("page_refs", []) as Array, str(mc["ref"])),
+			"包含頁面 %s" % str(mc["ref"]))
+
+	# 優先序與開關帶組合：三旗標同時成立，開關為 3 (mid band) -> 依序只取 uncle_mid
 	_fresh_run(gs)
 	gs.set("selected_festival_proxy_npc", "ajie")
 	(gs.get("flags") as Dictionary)["accepted_inn"] = true
-	var res_uncle := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(str((res_uncle.get("variants") as Dictionary).get("livelihood_variant", "")) == "uncle", "生計為 uncle")
-	_check(_refs_contain(res_uncle.get("page_refs", []) as Array, "livelihood_uncle_long"), "包含 livelihood_uncle_long 頁面")
-
-	# (b) accepted_outside_job -> livelihood_variant: "boss"
-	_fresh_run(gs)
-	gs.set("selected_festival_proxy_npc", "ajie")
-	(gs.get("flags") as Dictionary)["accepted_outside_job"] = true
-	var res_boss := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(str((res_boss.get("variants") as Dictionary).get("livelihood_variant", "")) == "boss", "生計為 boss")
-	_check(_refs_contain(res_boss.get("page_refs", []) as Array, "livelihood_boss_long"), "包含 livelihood_boss_long 頁面")
-
-	# (c) accepted_job -> livelihood_variant: "zhou"
-	_fresh_run(gs)
-	gs.set("selected_festival_proxy_npc", "ajie")
-	(gs.get("flags") as Dictionary)["accepted_job"] = true
-	var res_zhou := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(str((res_zhou.get("variants") as Dictionary).get("livelihood_variant", "")) == "zhou", "生計為 zhou")
-	_check(_refs_contain(res_zhou.get("page_refs", []) as Array, "livelihood_zhou_long"), "包含 livelihood_zhou_long 頁面")
-
-	# (d) 皆無 -> fallback livelihood_variant: "none"
-	_fresh_run(gs)
-	gs.set("selected_festival_proxy_npc", "ajie")
-	var res_none := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(str((res_none.get("variants") as Dictionary).get("livelihood_variant", "")) == "none", "生計為 fallback none")
-	_check(_refs_contain(res_none.get("page_refs", []) as Array, "livelihood_none_long"), "包含 livelihood_none_long 頁面")
-
-	# (e) 優先序：同時令 accepted_inn, accepted_outside_job, accepted_job 為 true -> 依資料順序只取 uncle
-	_fresh_run(gs)
-	gs.set("selected_festival_proxy_npc", "ajie")
-	(gs.get("flags") as Dictionary)["accepted_inn"] = true
 	(gs.get("flags") as Dictionary)["accepted_outside_job"] = true
 	(gs.get("flags") as Dictionary)["accepted_job"] = true
+	_set_switches(gs, 3)
 	var res_multi := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(str((res_multi.get("variants") as Dictionary).get("livelihood_variant", "")) == "uncle", "三旗標同時成立時依資料順序只取 uncle")
+	_check(str((res_multi.get("variants") as Dictionary).get("livelihood_variant", "")) == "uncle_mid",
+		"三旗標同時成立且開關=3 時依序取 uncle_mid")
 	var refs_multi: Array = res_multi.get("page_refs", []) as Array
-	_check(_refs_contain(refs_multi, "livelihood_uncle_long"), "優先取 uncle 頁面")
-	_check(not _refs_contain(refs_multi, "livelihood_boss_long") and not _refs_contain(refs_multi, "livelihood_zhou_long"), "不包含 boss 或 zhou 頁面")
+	_check(_refs_contain(refs_multi, "livelihood_uncle_mid_long"), "優先取 uncle_mid 頁面")
+	_check(not _refs_contain(refs_multi, "boss") and not _refs_contain(refs_multi, "zhou"), "不包含 boss 或 zhou 頁面")
 
-	# (f) 合成防禦案例：無 accepted_inn，但同時成立 accepted_outside_job 與 accepted_job -> 依序取 boss
+	# 合成防禦：無叔叔但雙 D43 旗標成立，開關為 5 (high band) -> 依序取 boss_high
 	_fresh_run(gs)
 	gs.set("selected_festival_proxy_npc", "ajie")
 	(gs.get("flags") as Dictionary)["accepted_outside_job"] = true
 	(gs.get("flags") as Dictionary)["accepted_job"] = true
+	_set_switches(gs, 5)
 	var res_dual := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(str((res_dual.get("variants") as Dictionary).get("livelihood_variant", "")) == "boss", "無叔叔但雙 D43 旗標同時成立時只取前老闆 (boss)")
+	_check(str((res_dual.get("variants") as Dictionary).get("livelihood_variant", "")) == "boss_high",
+		"無叔叔雙 D43 且開關=5 時只取前老闆 high (boss_high)")
 	var refs_dual: Array = res_dual.get("page_refs", []) as Array
-	_check(_refs_contain(refs_dual, "livelihood_boss_long"), "只有前老闆入頁")
-	_check(not _refs_contain(refs_dual, "livelihood_zhou_long"), "周先生頁面未入頁（不拼裝互斥人生）")
+	_check(_refs_contain(refs_dual, "livelihood_boss_high_long"), "只有前老闆 high 入頁")
+	_check(not _refs_contain(refs_dual, "zhou"), "周先生頁面未入頁（不拼裝互斥人生）")
 
 
 # ── 3. 旅館修繕 variants 涵蓋與排他 ───────────────────────────────────────────
@@ -253,26 +300,6 @@ func _test_3_inn_appearance_variants(gs: Node, data_node: Node) -> void:
 	_check(_refs_contain(refs_multi, "inn_sign_long"), "只有 sign 頁面入頁")
 	_check(not _refs_contain(refs_multi, "inn_pipes_long") and not _refs_contain(refs_multi, "inn_windows_long"), "互斥修繕不拼在一起")
 
-	# (f) 負向防禦：無 fallback 且 when 不成立的壞 group fixture -> data_conflict
-	var bad_loader := DataLoader.new()
-	bad_loader.endings_by_id = loader.endings_by_id.duplicate(true)
-	var bad_ending: Dictionary = (bad_loader.endings_by_id["ending_replaced"] as Dictionary).duplicate(true)
-	var bad_groups: Array = (bad_ending["variant_groups"] as Array).duplicate(true)
-	var bad_inn: Dictionary = (bad_groups[2] as Dictionary).duplicate(true)
-	var bad_rules: Array = [
-		{ "id": "only_sign", "when": { "flag": "repaired_sign" }, "first_seen_pages": [{ "id": "s", "text": "sign" }] }
-	]
-	bad_inn["rules"] = bad_rules
-	bad_groups[2] = bad_inn
-	bad_ending["variant_groups"] = bad_groups
-	bad_loader.endings_by_id["ending_replaced"] = bad_ending
-
-	_fresh_run(gs)
-	gs.set("selected_festival_proxy_npc", "ajie")
-	var bad_res := EndingResolver.resolve("ending_replaced", gs, bad_loader)
-	_check(not bool(bad_res.get("ok", false)) and str(bad_res.get("reason_code", "")) == "data_conflict",
-		"無 fallback 且 when 不成立時回 data_conflict")
-
 
 # ── 4. uninvited_proxy 查表與防篡改 ──────────────────────────────────────────
 
@@ -321,21 +348,42 @@ func _test_4_uninvited_proxy_lookup(gs: Node, data_node: Node) -> void:
 		"邀阿婕時 uninvited_proxy 查表片段不啟用")
 
 
-# ── 5. 首見長版 vs 重見短版分支 ───────────────────────────────────────────────
+# ── 5. 首見長版 vs 重見短版分支與時間軸順序 (P5C-V2) ───────────────────────────
 
-func _test_5_first_seen_vs_repeat(gs: Node, data_node: Node) -> void:
-	print("\n--- 5. 首見長版 vs 重見短版分支 ---")
+func _test_5_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> void:
+	print("\n--- 5. 首見長版 vs 重見短版分支與時間軸順序 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
 	# (a) history 為空但 run_number > 1 (如第 5 輪) -> 首見長版
 	_fresh_run(gs)
 	gs.set("run_number", 5)
 	gs.set("selected_festival_proxy_npc", "ajie")
+	(gs.get("flags") as Dictionary)["invited_ajie"] = true
+	(gs.get("flags") as Dictionary)["accepted_inn"] = true
+	(gs.get("flags") as Dictionary)["repaired_sign"] = true
+	_set_switches(gs, 6)
+
 	var res_first := EndingResolver.resolve("ending_replaced", gs, loader)
 	_check(str(res_first.get("branch", "")) == "first_seen", "history 為空但 run_number > 1 時仍為 first_seen")
 	var refs_first: Array = res_first.get("page_refs", []) as Array
 	_check(_refs_contain(refs_first, "replacement") and _refs_contain(refs_first, "long_return"), "首見包含長版 prefix/suffix")
 	_check(not _refs_contain(refs_first, "again_replaced") and not _refs_contain(refs_first, "short_return"), "首見不包含短版 prefix/suffix")
+
+	# 驗證敘事順序：prefix (走出山泉閣) -> 生計 -> 旅館修繕 -> 伴侶婚姻 -> suffix (二十年) -> suffix (四十出頭死亡回歸)
+	var p_prefix := EndingResolver.resolve_ref(str(refs_first[0]), loader)
+	var text_prefix := str(p_prefix.get("text", ""))
+	_check("穿上外套" in text_prefix and "走出了山泉閣" in text_prefix, "首見 prefix 呈現可觀察畫面")
+	_check(not ("另一個你" in text_prefix) and not ("替換" in text_prefix), "首見 prefix 不過早揭露替換真相")
+
+	_check("livelihood" in str(refs_first[1]), "第 2 頁為生計落地")
+	_check("inn_appearance" in str(refs_first[2]), "第 3 頁為旅館修繕")
+	_check("partner" in str(refs_first[3]), "第 4 頁為伴侶婚姻")
+	_check("years_passed" in str(refs_first[4]), "第 5 頁為二十年過去")
+	_check("long_return" in str(refs_first[5]), "第 6 頁為四十出頭死亡與庇佑回歸")
+
+	var p_partner := EndingResolver.resolve_ref(str(refs_first[3]), loader)
+	var text_partner := str(p_partner.get("text", ""))
+	_check("結婚" in text_partner and "沒有小孩" in text_partner, "伴侶頁描述婚姻與無小孩")
 
 	# (b) history 只有 BE 結局 -> 首見長版
 	_fresh_run(gs)
@@ -351,13 +399,14 @@ func _test_5_first_seen_vs_repeat(gs: Node, data_node: Node) -> void:
 	(gs.get("flags") as Dictionary)["invited_ajie"] = true
 	(gs.get("flags") as Dictionary)["accepted_inn"] = true
 	(gs.get("flags") as Dictionary)["repaired_sign"] = true
+	_set_switches(gs, 6)
 	(gs.get("ending_history") as Array[Dictionary]).append({ "ending_id": "ending_replaced", "run_number": 1 })
 	var res_repeat := EndingResolver.resolve("ending_replaced", gs, loader)
 	_check(str(res_repeat.get("branch", "")) == "repeat", "history 已有 ending_replaced 時為 repeat")
 	var refs_rep: Array = res_repeat.get("page_refs", []) as Array
 	_check(_refs_contain(refs_rep, "again_replaced") and _refs_contain(refs_rep, "short_return"), "重見包含短版 prefix/suffix")
 	_check(_refs_contain(refs_rep, "partner_ajie_short"), "重見包含 partner_ajie_short")
-	_check(_refs_contain(refs_rep, "livelihood_uncle_short"), "重見包含 livelihood_uncle_short")
+	_check(_refs_contain(refs_rep, "livelihood_uncle_high_short"), "重見包含 livelihood_uncle_high_short")
 	_check(_refs_contain(refs_rep, "inn_sign_short"), "重見包含 inn_sign_short")
 	_check(EndingResolver.skip_target("ending_replaced", loader) == "short_return", "正常結局 skip_to 指向 short_return")
 
@@ -446,18 +495,18 @@ func _test_7_refuse_boarding_ending(gs: Node, data_node: Node) -> void:
 	_check(EndingResolver.skip_target("ending_refuse_boarding", loader) == "complete", "不上車 skip_to 指向 complete")
 
 
-# ── 8. 逐頁 ready_to_complete 門檻與動作原子性 ───────────────────────────────
+# ── 8. 四類結局逐頁 ready_to_complete 門檻與動作原子性 (P5C-V3) ───────────────
 
-func _test_8_lifecycle_ready_to_complete_and_atomicity(gs: Node, data_node: Node) -> void:
-	print("\n--- 8. 逐頁 ready_to_complete 門檻與動作原子性 ---")
+func _test_8_lifecycle_ready_to_complete_all_four(gs: Node, data_node: Node) -> void:
+	print("\n--- 8. 四類結局逐頁 ready_to_complete 門檻與動作原子性 ---")
 
-	# (a) 四類 ending 在末頁揭露前 ready_to_complete 恆為 false
-	var cases := [
+	# (a) 三類 run 結局在末頁揭露前 ready_to_complete 恆為 false
+	var run_cases := [
 		{ "id": "ending_replaced", "source": "d45_coda", "proxy": "ajie" },
 		{ "id": "ending_madness_be", "source": "madness_cap", "proxy": "" },
 		{ "id": "ending_inventory_be", "source": "ending_effect", "proxy": "" },
 	]
-	for c in cases:
+	for c in run_cases:
 		_fresh_run(gs, 45, "evening")
 		if not str(c["proxy"]).is_empty():
 			gs.set("selected_festival_proxy_npc", str(c["proxy"]))
@@ -479,7 +528,46 @@ func _test_8_lifecycle_ready_to_complete_and_atomicity(gs: Node, data_node: Node
 			else:
 				_check(bool(cur_view.get("can_complete", false)), "%s 末頁揭露後 can_complete 變為 true" % str(c["id"]))
 
-	# (b) 重見結局 skip_seen_ending 後直接進入 ready
+	# (b) 不上車結局 (ending_refuse_boarding) 首見 2 頁逐頁門檻
+	_fresh_run(gs)
+	_force_opening_mode(gs)
+	var rb_start: Dictionary = gs.call("_start_ending_from_opening", "refuse_boarding")
+	_check(bool(rb_start.get("ok", false)), "首見不上車啟動成功")
+	var rb_view0: Dictionary = gs.call("ending_view")
+	_check(int(rb_view0.get("page_count", 0)) == 2, "不上車首見為 2 頁")
+	_check(not bool(rb_view0.get("can_complete", true)), "不上車初始 can_complete 為 false")
+
+	# 揭露第 0 頁
+	var rb_rev0: Dictionary = gs.call("reveal_ending_page")
+	_check(bool(rb_rev0.get("ok", false)), "不上車揭露第 0 頁成功")
+	var rb_view_rev0: Dictionary = gs.call("ending_view")
+	_check(not bool(rb_view_rev0.get("can_complete", true)), "不上車第 0 頁 (非末頁) 揭露後 can_complete 仍為 false")
+
+	# 翻到第 1 頁（末頁）
+	var rb_adv0: Dictionary = gs.call("advance_ending_page")
+	_check(bool(rb_adv0.get("ok", false)), "不上車翻到第 1 頁成功")
+	var rb_view_adv0: Dictionary = gs.call("ending_view")
+	_check(not bool(rb_view_adv0.get("can_complete", true)), "不上車第 1 頁未揭露前 can_complete 仍為 false")
+
+	# 揭露第 1 頁（末頁）
+	var rb_rev1: Dictionary = gs.call("reveal_ending_page")
+	_check(bool(rb_rev1.get("ok", false)), "不上車揭露第 1 頁成功")
+	var rb_view_rev1: Dictionary = gs.call("ending_view")
+	_check(bool(rb_view_rev1.get("can_complete", false)), "不上車末頁揭露後 can_complete 變為 true")
+
+	# (c) 重見不上車 skip_seen_ending 後直接 ready
+	_fresh_run(gs)
+	_force_opening_mode(gs)
+	(gs.get("ending_history") as Array[Dictionary]).append({ "ending_id": "ending_refuse_boarding", "run_number": 1 })
+	gs.call("_start_ending_from_opening", "refuse_boarding")
+	var rb_rep_view: Dictionary = gs.call("ending_view")
+	_check(bool(rb_rep_view.get("can_skip", false)), "重見不上車 can_skip 為 true")
+	var rb_skip_res: Dictionary = gs.call("skip_seen_ending")
+	_check(bool(rb_skip_res.get("ok", false)), "不上車 skip_seen_ending 成功")
+	var rb_after_skip: Dictionary = gs.call("ending_view")
+	_check(bool(rb_after_skip.get("can_complete", false)), "不上車跳過後直接進入 can_complete")
+
+	# (d) 重見正常結局 skip_seen_ending 後直接進入 ready
 	_fresh_run(gs, 45, "evening")
 	gs.set("selected_festival_proxy_npc", "ajie")
 	(gs.get("ending_history") as Array[Dictionary]).append({ "ending_id": "ending_replaced", "run_number": 1 })
@@ -491,27 +579,131 @@ func _test_8_lifecycle_ready_to_complete_and_atomicity(gs: Node, data_node: Node
 	var after_skip: Dictionary = gs.call("ending_view")
 	_check(bool(after_skip.get("can_complete", false)), "跳過後直接進入 can_complete")
 
-	# (c) 重複 start_ending 被擋，且不產生第二份快照
+	# (e) 重複 start_ending 被擋，且不產生第二份快照
 	var snap_before := JSON.stringify(gs.get("active_ending"))
 	var dup_res: Dictionary = gs.call("start_ending", "ending_replaced", "d45_coda")
 	_check(str(dup_res.get("reason_code", "")) == "not_run", "ending mode 重複呼叫 start_ending 回 not_run")
 	_check(JSON.stringify(gs.get("active_ending")) == snap_before, "重複呼叫不產生第二份快照，active_ending 零變化")
 
 
-# ── 9. 全 48 組排列與全結局結構版文字走查 ──────────────────────────────────────
+# ── 9. Resolver 壞資料 data_conflict 防禦 (P5C-V4) ────────────────────────────
 
-func _test_9_structural_text_walkthrough(gs: Node, data_node: Node) -> void:
-	print("\n--- 9. 全 48 組 normal composite 與全結局結構版文字走查 ---")
+func _test_9_resolver_bad_data_defense(gs: Node, data_node: Node) -> void:
+	print("\n--- 9. Resolver 壞資料 data_conflict 防禦 ---")
+	var base_loader: DataLoader = data_node.get("loader") as DataLoader
+
+	_fresh_run(gs)
+	gs.set("selected_festival_proxy_npc", "ajie")
+
+	# (a) 刪除 prefix_pages
+	var bad_l1 := DataLoader.new()
+	bad_l1.endings_by_id = base_loader.endings_by_id.duplicate(true)
+	var e1: Dictionary = (bad_l1.endings_by_id["ending_replaced"] as Dictionary).duplicate(true)
+	var fs1: Dictionary = (e1["first_seen"] as Dictionary).duplicate(true)
+	fs1.erase("prefix_pages")
+	e1["first_seen"] = fs1
+	bad_l1.endings_by_id["ending_replaced"] = e1
+	var r1 := EndingResolver.resolve("ending_replaced", gs, bad_l1)
+	_check(not bool(r1.get("ok", false)) and str(r1.get("reason_code", "")) == "data_conflict",
+		"缺少 prefix_pages 回 data_conflict")
+
+	# (b) 刪除 suffix_pages
+	var bad_l2 := DataLoader.new()
+	bad_l2.endings_by_id = base_loader.endings_by_id.duplicate(true)
+	var e2: Dictionary = (bad_l2.endings_by_id["ending_replaced"] as Dictionary).duplicate(true)
+	var fs2: Dictionary = (e2["first_seen"] as Dictionary).duplicate(true)
+	fs2.erase("suffix_pages")
+	e2["first_seen"] = fs2
+	bad_l2.endings_by_id["ending_replaced"] = e2
+	var r2 := EndingResolver.resolve("ending_replaced", gs, bad_l2)
+	_check(not bool(r2.get("ok", false)) and str(r2.get("reason_code", "")) == "data_conflict",
+		"缺少 suffix_pages 回 data_conflict")
+
+	# (c) 刪除 variant rule 的 first_seen_pages 欄位
+	var bad_l3 := DataLoader.new()
+	bad_l3.endings_by_id = base_loader.endings_by_id.duplicate(true)
+	var e3: Dictionary = (bad_l3.endings_by_id["ending_replaced"] as Dictionary).duplicate(true)
+	var vgs3: Array = (e3["variant_groups"] as Array).duplicate(true)
+	var vg0: Dictionary = (vgs3[0] as Dictionary).duplicate(true)
+	var rules0: Array = (vg0["rules"] as Array).duplicate(true)
+	var r0_0: Dictionary = (rules0[0] as Dictionary).duplicate(true)
+	r0_0.erase("first_seen_pages")
+	rules0[0] = r0_0
+	vg0["rules"] = rules0
+	vgs3[0] = vg0
+	e3["variant_groups"] = vgs3
+	bad_l3.endings_by_id["ending_replaced"] = e3
+	(gs.get("flags") as Dictionary)["accepted_inn"] = true
+	_set_switches(gs, 6)
+	var r3 := EndingResolver.resolve("ending_replaced", gs, bad_l3)
+	_check(not bool(r3.get("ok", false)) and str(r3.get("reason_code", "")) == "data_conflict",
+		"rule 缺少 first_seen_pages 欄位回 data_conflict")
+
+	# (d) 建立多個 fallback: true
+	var bad_l4 := DataLoader.new()
+	bad_l4.endings_by_id = base_loader.endings_by_id.duplicate(true)
+	var e4: Dictionary = (bad_l4.endings_by_id["ending_replaced"] as Dictionary).duplicate(true)
+	var vgs4: Array = (e4["variant_groups"] as Array).duplicate(true)
+	var vg_inn: Dictionary = (vgs4[1] as Dictionary).duplicate(true)
+	var r_inn: Array = (vg_inn["rules"] as Array).duplicate(true)
+	# 把 sign 也改成 fallback
+	var r_sign: Dictionary = (r_inn[0] as Dictionary).duplicate(true)
+	r_sign["fallback"] = true
+	r_sign.erase("when")
+	r_inn[0] = r_sign
+	vg_inn["rules"] = r_inn
+	vgs4[1] = vg_inn
+	e4["variant_groups"] = vgs4
+	bad_l4.endings_by_id["ending_replaced"] = e4
+	var r4 := EndingResolver.resolve("ending_replaced", gs, bad_l4)
+	_check(not bool(r4.get("ok", false)) and str(r4.get("reason_code", "")) == "data_conflict",
+		"多個 fallback: true 回 data_conflict")
+
+	# (e) 0 個 fallback
+	var bad_l5 := DataLoader.new()
+	bad_l5.endings_by_id = base_loader.endings_by_id.duplicate(true)
+	var e5: Dictionary = (bad_l5.endings_by_id["ending_replaced"] as Dictionary).duplicate(true)
+	var vgs5: Array = (e5["variant_groups"] as Array).duplicate(true)
+	var vg_p: Dictionary = (vgs5[2] as Dictionary).duplicate(true)
+	var r_p: Array = (vg_p["rules"] as Array).duplicate(true)
+	r_p[-1].erase("fallback")
+	r_p[-1]["when"] = { "flag": "no_flag" }
+	vg_p["rules"] = r_p
+	vgs5[2] = vg_p
+	e5["variant_groups"] = vgs5
+	bad_l5.endings_by_id["ending_replaced"] = e5
+	var r5 := EndingResolver.resolve("ending_replaced", gs, bad_l5)
+	_check(not bool(r5.get("ok", false)) and str(r5.get("reason_code", "")) == "data_conflict",
+		"0 個 fallback 回 data_conflict")
+
+
+# ── 10. 全 432 組排列與全結局結構版文字走查 ────────────────────────────────────
+
+func _test_10_structural_text_walkthrough(gs: Node, data_node: Node) -> void:
+	print("\n--- 10. 全 432 組 normal composite 與全結局結構版文字走查 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
 	var partners := ["invited_ajie", "invited_awei", "invited_none"]
-	var livelihoods := ["accepted_inn", "accepted_outside_job", "accepted_job", "none"]
+	var livelihood_routes := [
+		{ "flag": "accepted_inn", "sw": 6 },
+		{ "flag": "accepted_inn", "sw": 3 },
+		{ "flag": "accepted_inn", "sw": 0 },
+		{ "flag": "accepted_outside_job", "sw": 6 },
+		{ "flag": "accepted_outside_job", "sw": 3 },
+		{ "flag": "accepted_outside_job", "sw": 0 },
+		{ "flag": "accepted_job", "sw": 6 },
+		{ "flag": "accepted_job", "sw": 3 },
+		{ "flag": "accepted_job", "sw": 0 },
+		{ "flag": "none", "sw": 6 },
+		{ "flag": "none", "sw": 3 },
+		{ "flag": "none", "sw": 0 },
+	]
 	var inn_repairs := ["repaired_sign", "repaired_pipes", "repaired_windows", "none"]
 	var proxy_npcs := ["ajie", "awei", "acai"]
 
 	var total_combos := 0
 	for p in partners:
-		for l in livelihoods:
+		for l in livelihood_routes:
 			for r in inn_repairs:
 				for prx in proxy_npcs:
 					total_combos += 1
@@ -519,8 +711,9 @@ func _test_9_structural_text_walkthrough(gs: Node, data_node: Node) -> void:
 					gs.set("selected_festival_proxy_npc", prx)
 					if p != "invited_none":
 						(gs.get("flags") as Dictionary)[p] = true
-					if l != "none":
-						(gs.get("flags") as Dictionary)[l] = true
+					if str(l["flag"]) != "none":
+						(gs.get("flags") as Dictionary)[str(l["flag"])] = true
+					_set_switches(gs, int(l["sw"]))
 					if r != "none":
 						(gs.get("flags") as Dictionary)[r] = true
 
@@ -533,7 +726,7 @@ func _test_9_structural_text_walkthrough(gs: Node, data_node: Node) -> void:
 					var res_short := EndingResolver.resolve("ending_replaced", gs, loader)
 					_check_walkthrough_result(res_short, "combo_short_%d" % total_combos, loader)
 
-	_ok("48 組組合（含 3 位 proxy NPC × 首見／重見）共 288 次求值全部無缺頁、無重頁、無空白頁")
+	_ok("432 組組合（12 生計 × 4 修繕 × 3 伴侶 × 3 proxy × 首見／重見共 864 次求值）全部無缺頁、無重頁、無空白頁")
 
 	# 走查 linear 結局 (madness, inventory, refuse_boarding)
 	for lid in ["ending_madness_be", "ending_inventory_be", "ending_refuse_boarding"]:
