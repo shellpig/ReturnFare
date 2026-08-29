@@ -1,10 +1,31 @@
 # ReturnFare 交接狀態
 
-最後更新：2026-08-29
+最後更新：2026-08-30
 
 ## 目前狀態
 
-**P5-E（開局與結局 UI）實作完成，已通過全套 32 套 Headless 測試與 93 條 UI Sim 契約驗收，自跑全綠且通過變異測試，等待 Verifier 驗收關門。**
+**P5-E（開局與結局 UI）程式碼層通過 verifier 複驗，四個 blocker 全數解除；尚未關門，卡在兩件文件／證據工作（K-213、K-214）。**
+
+複驗證據（verifier 於 2026-08-30 於 `311200f` 獨立重跑）：
+
+- Headless：32 套 exit 0，`ALL HEADLESS TESTS PASSED!`
+- UI Sim：run `20260830-074157-585-p14592-0bd1cddb`，116 variants／93 catalog contracts／93 executed／93 completed／**0 failed checks**
+
+## ⚠️ implementer 待辦（P5-E 關門前必做）
+
+以下兩條是關門條件，其餘為非阻擋殘留。完整條目見 `驗證後已知問題.md > K-213 ~ K-219`。
+
+| 條目 | 要做什麼 |
+|---|---|
+| **K-213（關門）** | `p5e_03`／`p5e_04`／`p5e_06`／`p5e_07`／`p5e_08` 五條契約沒有任何變異證據，違反 `AGENTS.md` 實作守則 5。逐條反轉接線驗紅（例：ending mode 下讓 `advance_phase()` 放行、`_route_view()` 在 ending 時不隱藏 HandBar、ending page 文字換成 `ending_replaced` 字面、`empty_handed` 未持卡時不建立），確認精確轉紅後還原重跑全綠，並把結果補進下方變異表。`p5e_07` 尤其不能略過——它上一輪就是空跑，「現在能轉紅」正是這次修的重點 |
+| **K-214（關門）** | 更新本檔：`311200f` 改了什麼、新的複驗 run ID、**移除下方第 5 點的「K-195 修復」字樣**（實際只修了前半） |
+| K-215 | `p1af_cases.gd` 的 skip 落點斷言含 `or not txt_skip.is_empty()` 而恆真；改成由 `repeat.skip_to` 反查 page index 再比對 `ending_view().page_index` |
+| K-216 | 測試指南 P5-E 要求的「滑鼠連點」「Enter key repeat（echo）」零覆蓋，`not k.echo` 無反證；`p5e_06` 未驗委託狀態殘留 |
+| K-217 | `opening_panel.gd` 的 `_MSG_TITLE`／`_MSG_PROMPT` 是故事散文卻硬寫在腳本，不在 `SCHEMA.md` 可翻譯欄位清單內；標題另在 `.tscn` 與 `main.gd` 重複共三份 |
+| K-218 | `p5e_04` 假設按鍵當下逐字仍在播；先斷言 `is_typewriting()` 為真再送鍵，否則字速或幀率一變就會因錯誤原因轉紅 |
+| K-219 | `開發設計方針.md > P5-E` 寫「mode 改變即卸載前一個 panel」，實作是常駐切 `visible`。改方針或改實作，二擇一 |
+
+**K-194 已由 verifier 結案**（`311200f` 的 `d45_evening__no_registry` 自然走查狀態＋`p5e_08` 真實輸入）。**K-195 只有前半結案**（card-required 槽不再建直選按鈕）；後半（`empty_handed` 無「未持 `info_registry`」條件，持卡玩家仍看得到「你手上什麼都沒有」）未動，且 `311200f` 之後持卡狀態連斷言都沒有，已改列 P5-F。
 
 ### P5-E 實際改了什麼
 
@@ -19,20 +40,34 @@
 3. **`scenes/ui/ending_panel.gd` / `.tscn`（新增）**
    - 讀取 `GameState.ending_view()`，內嵌 `EndingFlowText` 逐字逐頁播映（節點名稱命名為 `EndingFlowText`，避免與主畫面 `FlowText` 發生全域搜尋衝突）。
    - 推進按鈕（QA ID: `ending_advance`）及點擊/鍵盤（Space/Enter）支援：打字中按一次補完全文、已 revealed 按一次翻進下一頁、末頁且 ready 按一次呼叫 `complete_ending()`。
+   - 注：鍵盤與點擊在第一版其實不可達（`_gui_input` 收不到鍵盤事件、`EndingFlowText` 擋掉點擊），由 `311200f` 改走 `_unhandled_key_input` ＋ `mouse_filter` PASS 才真的接上。
    - 跳過按鈕（QA ID: `ending_skip`）：首見結局完全隱藏（visible=false）；重見同 ending id 且未 ready 時可見，點擊直接跳至資料指定的 skip 落點頁面。
 4. **`scenes/main.gd` / `.tscn`**
    - 掛載 `OpeningPanel` 與 `EndingPanel`，移除舊的過渡 stub 函式。
    - 依 `GameState.flow_mode` 動態掛載與切換（`FLOW_OPENING`, `FLOW_RUN`, `FLOW_ENDING`）。
    - ending 模式下 HandBar、MapList、LocationPanel、EncounterPanel、AdvanceButton 等 run 控制項全部隱藏。
-5. **`scenes/ui/location_panel.gd`（K-195 修復）**
+5. **`scenes/ui/location_panel.gd`（K-195 **前半**修復）**
    - `choice_requires_card: true` 的 slot 不再生成直接選取按鈕，強制玩家依持卡路徑或 fallback 選擇。
+   - ⚠️ K-195 後半（`empty_handed` 無「未持 `info_registry`」條件，持卡玩家仍看得到）**未修**，已改列 P5-F。
 6. **測試與 UI Sim 契約套件**
    - 擴充 `tests/ui_sim/cases/p1af_cases.gd`，新增 P5-E 專屬 8 個驗收案例（`p5e_01` ~ `p5e_08`），UI 契約總數從 85 條擴充至 93 條（含 variants 共 116 種組合）。
    - `tests/ui_sim/qa_contract_matrix.gd` 註冊 8 條 P5-E 契約及 Special Evidence tokens。
    - `tests/ui_sim/run_ui_sim.ps1` 更新契約總數檢查為 93 條。
    - 更新既有 headless 測試（`test_boot.gd`, `test_p2d.gd`, `test_p3b.gd`）適配 `EndingPanel` 與 `EndingFlowText` 節點結構。
 
+### P5-E review 修正（`311200f`）
+
+verifier 第一輪 review 開四個 blocker 與 N1～N12，`311200f` 處理如下（複驗確認四個 blocker 全數解除）：
+
+- **B1／B2**：新增 `d45_evening__no_registry` 走查狀態——`make_states.gd` 讓 D13 下午改去 `d13_pm_festival_business` 自然錯過名冊，後置條件斷言 `not hand.has("info_registry")`；`p5e_08` 改吃這個狀態，真實點 `empty_handed` 並斷言進 ending。原本 `p5e_08` 用的是持卡 fixture 卻斷言「未持名冊」，方向相反。
+- **B3**：`p5e_07` 原本 checkpoint 為空、停在開局畫面，而 `_texts()` 只收 `visible_in_tree`，七個 forbidden key 全是 ending 相關 → 結構性空跑。改吃 `d45_evening.json` 並先進 ending，加 `assert_true(not texts.is_empty())` 防空跑，補 `festival_proxy_is`／`ch3_coda_`／`{"has_card"`／`"condition"`。
+- **B4**：`_gui_input` 的鍵盤分支移到 `_unhandled_key_input`（不需 focus）；tscn 補 `focus_mode = 2`、`EndingPanel` `mouse_filter = 0`、`EndingFlowText` `mouse_filter = 1`（PASS）；`p5e_04` 改送真實 `InputEventKey`（Space → Enter）。
+- **N1～N4**：`p5e_03` 補 run 入口全面拒絕矩陣（`advance_phase`／`enter_night_location`／`try_place`／`choose`／`start_encounter`）＋ serialize 零變化；`p5e_04` 補 serialize→deserialize 保頁；`p5e_05` 補重見 `ending_replaced` 並 skip 到 `short_return`；`p5e_06` 補畫面與手牌零殘留。
+- **N5～N9**：`confirm_text` 接上（`preview` 為 fallback）、`remove_child` 先於 `queue_free`、`_is_showing_ending` 移除、`finish_typewriter()` 後補 `reveal_ending_page()`、`manifest.json` 刪除並 gitignore。
+
 ### P5-E 自跑證據（實作者，非驗收）
+
+> 以下為 `5f93cdf` 當下的自跑數字，已被上方 verifier 的 `311200f` 複驗取代，保留供對照。
 
 - **Headless 測試套件**：全部 32 套測試全數 exit 0 通過（`tests/run_all_headless.ps1`），`ALL HEADLESS TESTS PASSED!`。
 - **UI Simulation 測試套件**：全套 93 條契約（116 variants）全數 exit 0 通過（`tests/ui_sim/run_ui_sim.ps1 -Background`），`completed contracts 93, failed checks 0`（Run ID: `20260829-221358-446-p31236-587b677e`）。
@@ -44,6 +79,8 @@
 |---|---|---|
 | 變異 1：Skip 按鈕顯示條件反轉 | `_skip_btn.visible = not can_skip` | `p5e_05_ending_skip_seen_only` 確切轉紅（5 checks failed），還原後回綠 |
 | 變異 2：開局選項鎖定狀態反轉 | `btn.disabled = false` | `p5e_01_boot_opening` 確切轉紅（1 check failed），還原後回綠 |
+
+⚠️ **只有這兩條，對應 `p5e_05` 與 `p5e_01`。`p5e_03`／`p5e_04`／`p5e_06`／`p5e_07`／`p5e_08` 尚無變異證據——這就是 K-213，關門前必補。**
 
 ---
 
@@ -432,8 +469,9 @@ Verifier 關門結論（2026-08-29，實作至 `44e1dd9`）：
 ## 已知殘留
 
 - K-193：✅ 已於 `1b48c8a` 接進 `main.gd._settlement_lines()`，P5-D 關門時結案。
-- K-194：UI `full_walk` 仍優先取得 D13 名冊，空手 coda 尚無真實輸入 UI 證據，歸 P5-E／F。
-- K-195：`choice_requires_card` 仍建立直接選擇按鈕，且持名冊時空手選項仍顯示，歸 P5-E UI 收斂。
+- K-194：✅ 已於 `311200f` 結案（`d45_evening__no_registry` 自然走查狀態＋`p5e_08` 真實輸入點 `empty_handed`），verifier 2026-08-30 複驗通過。
+- K-195：**前半**已於 `5f93cdf` 修（card-required 槽不再建直選按鈕）；**後半**（`empty_handed` 無「未持 `info_registry`」條件，持卡玩家仍看得到）未動，改列 P5-F。
+- K-213～K-219：P5-E 複驗新增，K-213／K-214 是關門條件，明細見本檔開頭的待辦表。
 - K-196：✅ `test_p5b.gd.uid`／`test_p5c.gd.uid` 已進版控。
 - K-197：✅ 已於 P5-C 由 implementer 修復。
 - K-198：`clone_for_preflight()` 未檢查 `deserialize()` 回傳值；下次動 preflight 時補防禦。
@@ -447,7 +485,9 @@ Verifier 關門結論（2026-08-29，實作至 `44e1dd9`）：
 
 ## 下一個最安全任務
 
-**實作 P5-E 開局與結局 UI。** 先讀三份 P5-E 對齊段落。`main.gd` 現在的開局／結局畫面只是過渡 stub（FlowText 列選項、推進鍵確認第一個可選項），正式面板、逐字節奏、按一下補整頁、再按翻頁、重見跳過都在這一階段；K-194 與 K-195 也一併在這裡收。不做 title／save／history UI。
+**補 K-213 的變異證據，然後更新本檔（K-214），P5-E 即可關門。** 兩條都不動功能程式碼：K-213 是對 `p5e_03`／`04`／`06`／`07`／`08` 逐條反轉接線驗紅再還原，把結果填進上面的變異表；K-214 是把複驗 run ID 與 `311200f` 的變更寫進「目前狀態」。順手能收的非阻擋項是 K-215（恆真斷言）與 K-218（`p5e_04` 時序），都在 `p1af_cases.gd`，同一次動檔一起改。
+
+關門後才進 P5-F 多結局與跨輪全流程驗收；K-195 後半與 K-216 的雙狀態／連點契約歸在那一階段。
 
 > 跑 UI 模擬一律加 `-Background`：
 > `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`
