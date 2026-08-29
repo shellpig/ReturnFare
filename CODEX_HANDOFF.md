@@ -4,7 +4,7 @@
 
 ## 目前狀態
 
-**P5-C（四類結局與組合後日談）最後一筆死亡主詞修正完成，實作面已無已知 blocker 或非阻擋缺口。** 三位 proxy 的首見／重見頁均明確由「那個走出山泉閣的人」病逝，不再把死亡語意接到阿婕／阿薇／阿財；待 Verifier 做文件關門。
+**P5-C（四類結局與組合後日談）已由 Verifier 完整複驗關門並轉 ✅。** 四類 ending、正常結局 4×3 生計／開關帶與組合後日談、首見／重見、逐頁門檻、resolver 壞資料與 snapshot/ref 一致性均完成；P5-C 已無已知 blocker 或非阻擋缺口。
 
 實作者第四輪修復與自跑證據（2026-08-29）：
 
@@ -20,6 +20,12 @@
 - `data/endings.json` 的 `proxy_ajie`／`proxy_awei`／`proxy_acai` 長版明示「至於那個走出山泉閣的人」，短版明示「那個走出山泉閣的人在四十出頭病逝」；不新增 NPC 死亡結果，也不提早揭露替換者身分。
 - `test_p5c.gd` 逐一解析三位 proxy 的首見與重見共 6 個正式頁面，斷言 NPC 仍在回顧文字中，死亡主詞則精確切回走出山泉閣的人。
 - `test_p5c.gd` 12 組 exit 0；31 套 headless（含 `verify_data`、greedy）全數 exit 0；UI sim run `20260829-143245-094-p36912-2d0e76af` 為 108 variants／85 contracts／0 failed checks。
+
+Verifier 關門結論（2026-08-29，實作至 `44e1dd9`）：
+
+- `測試指南.md > P5-C` 十一條機器／文字驗收全數打勾；`驗證後已知問題.md` 的 K-199～K-208 全數結案。
+- 正常長版代表路徑（阿婕、阿薇、不邀）與兩種 BE、不上車首見／重見逐頁審讀通過；沒有缺頁、重頁、主詞錯置、互斥人生並存或提早揭露替換真相。
+- 下一階段為 P5-D；P5-D 才公開 `complete_ending()`、寫 history、完成 opening 與跨輪 reset，不回頭把這些責任塞進 P5-C resolver。
 
 ## P5-B 實際改了什麼
 
@@ -279,7 +285,7 @@
 
 ## 下一個最安全任務
 
-**交由 Verifier 關門 P5-C。** 依既定分工更新 `測試指南.md`、`驗證後已知問題.md`、`PROJECT_BRIEF.md`，完成文件關門後同 turn commit＋push；下一個實作階段才是 **P5-D 開局、歷輪摘要與跨輪重置**。
+**實作 P5-D 開局、歷輪摘要與跨輪重置。** 先讀三份 P5-D 對齊段落；承接唯一 `complete_ending()`、history、opening choice、D29 逾期預設、魔法物品例外與第二輪重入，不提前做 P5-E UI。
 
 > 跑 UI 模擬一律加 `-Background`：
 > `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`
