@@ -409,13 +409,46 @@ func _test_5_uninvited_proxy_lookup(gs: Node, data_node: Node) -> void:
 	_fresh_run(gs)
 	gs.set("selected_festival_proxy_npc", "ajie")
 	var res_ajie := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(_refs_contain(res_ajie.get("page_refs", []) as Array, "proxy_ajie_long"), "包含 proxy_ajie_long 頁面")
+	var refs_ajie: Array = res_ajie.get("page_refs", []) as Array
+	_check(_refs_contain(refs_ajie, "proxy_ajie_long"), "包含 proxy_ajie_long 頁面")
 
 	# (c) partner: none + proxy: awei -> proxy_awei_long
 	_fresh_run(gs)
 	gs.set("selected_festival_proxy_npc", "awei")
 	var res_awei := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(_refs_contain(res_awei.get("page_refs", []) as Array, "proxy_awei_long"), "包含 proxy_awei_long 頁面")
+	var refs_awei: Array = res_awei.get("page_refs", []) as Array
+	_check(_refs_contain(refs_awei, "proxy_awei_long"), "包含 proxy_awei_long 頁面")
+
+	# 三個首見 proxy 頁都要明確把死亡主詞切回走出山泉閣的人，不能接在 NPC 主詞上。
+	for long_case in [
+		{ "npc": "阿財", "refs": refs_acai },
+		{ "npc": "阿婕", "refs": refs_ajie },
+		{ "npc": "阿薇", "refs": refs_awei },
+	]:
+		var long_ref := str((long_case["refs"] as Array)[4])
+		var long_page := EndingResolver.resolve_ref(long_ref, loader)
+		var long_text := str(long_page.get("text", ""))
+		_check(str(long_case["npc"]) in long_text and "至於那個走出山泉閣的人" in long_text,
+			"%s 首見 proxy 頁明確切回後日談主體" % str(long_case["npc"]))
+		_check("四十出頭" in long_text and "癌症" in long_text and "走得很快" in long_text,
+			"%s 首見 proxy 頁由走出山泉閣的人病逝" % str(long_case["npc"]))
+
+	# 重見短版同樣逐一守住主詞，避免把「四十出頭病逝」接到 proxy NPC。
+	for repeat_case in [
+		{ "id": "acai", "npc": "阿財" },
+		{ "id": "ajie", "npc": "阿婕" },
+		{ "id": "awei", "npc": "阿薇" },
+	]:
+		_fresh_run(gs)
+		gs.set("selected_festival_proxy_npc", str(repeat_case["id"]))
+		(gs.get("ending_history") as Array[Dictionary]).append({ "ending_id": "ending_replaced", "run_number": 1 })
+		var repeat_res := EndingResolver.resolve("ending_replaced", gs, loader)
+		var repeat_refs: Array = repeat_res.get("page_refs", []) as Array
+		var repeat_ref := str(repeat_refs[4])
+		var repeat_page := EndingResolver.resolve_ref(repeat_ref, loader)
+		var repeat_text := str(repeat_page.get("text", ""))
+		_check(str(repeat_case["npc"]) in repeat_text and "那個走出山泉閣的人在四十出頭病逝" in repeat_text,
+			"%s 重見 proxy 頁明確由走出山泉閣的人病逝" % str(repeat_case["npc"]))
 
 	# (d) D29 凍結後改動 npc_action_counts：結局 festival_proxy_npc 仍為凍結 id
 	_fresh_run(gs)

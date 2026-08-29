@@ -4,7 +4,7 @@
 
 ## 目前狀態
 
-**P5-C（四類結局與組合後日談）第四輪實作者修復完成（不邀時間順序修正、lookup ref NPC 交叉驗證、s6 獨立變異保真全數通過）。** 待 Verifier 複驗關門。
+**P5-C（四類結局與組合後日談）最後一筆死亡主詞修正完成，實作面已無已知 blocker 或非阻擋缺口。** 三位 proxy 的首見／重見頁均明確由「那個走出山泉閣的人」病逝，不再把死亡語意接到阿婕／阿薇／阿財；待 Verifier 做文件關門。
 
 實作者第四輪修復與自跑證據（2026-08-29）：
 
@@ -14,6 +14,12 @@
 - **測試與矩陣覆蓋**：`test_p5c.gd` 12 組全綠（exit 0）。
 - **全套迴歸**：31 套 headless 全數 exit 0；UI sim run `20260829-141401-422-p74208-e6424f96`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks。
 - **變異記錄**：新增 M-C7（移除 s5 條件，4 斷言失敗，exit 1）、M-C8（移除 s6 條件，4 斷言失敗，exit 1）、M-C9（proxy lookup 快照矛盾，1 斷言失敗，exit 1）。
+
+最後一筆主詞修正與自跑證據（2026-08-29）：
+
+- `data/endings.json` 的 `proxy_ajie`／`proxy_awei`／`proxy_acai` 長版明示「至於那個走出山泉閣的人」，短版明示「那個走出山泉閣的人在四十出頭病逝」；不新增 NPC 死亡結果，也不提早揭露替換者身分。
+- `test_p5c.gd` 逐一解析三位 proxy 的首見與重見共 6 個正式頁面，斷言 NPC 仍在回顧文字中，死亡主詞則精確切回走出山泉閣的人。
+- `test_p5c.gd` 12 組 exit 0；31 套 headless（含 `verify_data`、greedy）全數 exit 0；UI sim run `20260829-143245-094-p36912-2d0e76af` 為 108 variants／85 contracts／0 failed checks。
 
 ## P5-B 實際改了什麼
 
@@ -273,7 +279,7 @@
 
 ## 下一個最安全任務
 
-**由 implementer 修復 P5C-V5／V6，並建議同批處理 P5C-V7；先不要開工 P5-D。** 修復完成後交回 verifier 做 P5-C 最終複驗；只有 V5／V6 關閉、P5-C 文件關門後才推進 **P5-D 開局、歷輪摘要與跨輪重置**，V7 最遲必須在 P5-D 寫 history 前完成。
+**交由 Verifier 關門 P5-C。** 依既定分工更新 `測試指南.md`、`驗證後已知問題.md`、`PROJECT_BRIEF.md`，完成文件關門後同 turn commit＋push；下一個實作階段才是 **P5-D 開局、歷輪摘要與跨輪重置**。
 
 > 跑 UI 模擬一律加 `-Background`：
 > `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`
