@@ -500,7 +500,7 @@ func _test_6_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 	_check("阿薇" in t3_awei and "她先" in t3_awei and "然後是他" in t3_awei and "同一個病" in t3_awei,
 		"阿薇長版包含婚姻、她先走與主角同病死亡")
 
-	# (c) 不邀首見長版：獨身二十年，不誤播「她先」
+	# (c) 不邀首見長版：先獨身二十年，再播 proxy 回顧與四十出頭癌逝，最後庇佑回歸（不誤播「她先」）
 	_fresh_run(gs)
 	gs.set("selected_festival_proxy_npc", "acai")
 	(gs.get("flags") as Dictionary)["invited_none"] = true
@@ -511,13 +511,26 @@ func _test_6_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 	var res_none := EndingResolver.resolve("ending_replaced", gs, loader)
 	var refs_none: Array = res_none.get("page_refs", []) as Array
 	_check(refs_none.size() == 6, "不邀首見長版（含 proxy 照片）恰 6 頁 (page_count=%d)" % refs_none.size())
+	
+	# 第 4 頁：伴侶頁只有獨身二十年，不提前播死亡
 	var p3_none := EndingResolver.resolve_ref(str(refs_none[3]), loader)
 	var t3_none := str(p3_none.get("text", ""))
-	_check("沒有結婚" in t3_none and "一個人過完二十年" in t3_none and "四十出頭" in t3_none and "癌症" in t3_none,
-		"無伴侶長版包含獨身二十年與四十出頭癌症")
-	_check(not ("她先" in t3_none) and not ("然後是他" in t3_none), "無伴侶長版不得誤播「她先」或「然後是他」")
+	_check("沒有結婚" in t3_none and "一個人過完二十年" in t3_none, "無伴侶長版伴侶頁包含獨身二十年")
+	_check(not ("癌症" in t3_none) and not ("四十出頭" in t3_none), "無伴侶伴侶頁不提前播癌症早死（留待 proxy 回顧之後）")
+	_check(not ("她先" in t3_none) and not ("然後是他" in t3_none), "無伴侶伴侶頁不得誤播「她先」或「然後是他」")
+	
+	# 第 5 頁：proxy 回顧＋四十出頭癌症早死（時間軸：照片回顧 → 癌症早死）
 	_check("proxy_acai_long" in str(refs_none[4]), "第 5 頁為代付者阿財照片")
+	var p4_none := EndingResolver.resolve_ref(str(refs_none[4]), loader)
+	var t4_none := str(p4_none.get("text", ""))
+	_check("阿財" in t4_none and "四十出頭" in t4_none and "癌症" in t4_none and "走得很快" in t4_none,
+		"proxy 頁面呈現多年後回顧與四十出頭癌症早死")
+	
+	# 第 6 頁：黑畫面與庇佑回歸
 	_check("long_return" in str(refs_none[5]), "第 6 頁為庇佑回歸")
+	var p5_none := EndingResolver.resolve_ref(str(refs_none[5]), loader)
+	var t5_none := str(p5_none.get("text", ""))
+	_check("然後是黑" in t5_none and "庇佑再次發動" in t5_none, "第 6 頁呈現黑畫面與庇佑回歸")
 
 	# (d) history 只有 BE 結局 -> 正常結局仍為 first_seen
 	_fresh_run(gs)
@@ -875,6 +888,29 @@ func _test_11_deserialize_variant_validation(gs: Node, _data_node: Node) -> void
 	_check(not bool(res_linear.get("ok", true)) and str(res_linear.get("reason_code", "")) == "invalid_save_shape",
 		"linear ending 偽帶 partner_variant → invalid_save_shape")
 	_check(_state_text(gs) == before_linear, "linear 偽帶 variant 拒絕後狀態零變化")
+
+	# (d) lookup ref 的 NPC 與 festival_proxy_npc 矛盾（快照標 proxy=ajie，但 refs 包含 proxy_acai_long）
+	_fresh_run(gs, 45, "evening")
+	gs.set("selected_festival_proxy_npc", "acai")
+	(gs.get("flags") as Dictionary)["invited_none"] = true
+	gs.call("start_ending", "ending_replaced", "d45_coda")
+	var uninvited_base_text := _state_text(gs)
+	var broken_proxy_mismatch: Dictionary = JSON.parse_string(uninvited_base_text) as Dictionary
+	((broken_proxy_mismatch["flow"] as Dictionary)["active_ending"] as Dictionary)["festival_proxy_npc"] = "ajie"
+	var before_proxy_mismatch := _state_text(gs)
+	var res_proxy_mismatch: Dictionary = gs.call("deserialize", broken_proxy_mismatch)
+	_check(not bool(res_proxy_mismatch.get("ok", true)) and str(res_proxy_mismatch.get("reason_code", "")) == "invalid_save_shape",
+		"lookup ref 與 festival_proxy_npc 矛盾 → invalid_save_shape")
+	_check(_state_text(gs) == before_proxy_mismatch, "proxy 矛盾快照拒絕後狀態零變化")
+
+	# (e) lookup ref 的 when_group 與 partner_variant 矛盾（快照標 partner=ajie，但 refs 包含 uninvited proxy）
+	var broken_when_mismatch: Dictionary = JSON.parse_string(uninvited_base_text) as Dictionary
+	((broken_when_mismatch["flow"] as Dictionary)["active_ending"] as Dictionary)["partner_variant"] = "ajie"
+	var before_when_mismatch := _state_text(gs)
+	var res_when_mismatch: Dictionary = gs.call("deserialize", broken_when_mismatch)
+	_check(not bool(res_when_mismatch.get("ok", true)) and str(res_when_mismatch.get("reason_code", "")) == "invalid_save_shape",
+		"lookup ref 與 partner_variant (when_group) 矛盾 → invalid_save_shape")
+	_check(_state_text(gs) == before_when_mismatch, "when_group 矛盾快照拒絕後狀態零變化")
 
 
 # ── 12. 全 432 組排列與全結局結構版文字走查 ────────────────────────────────────

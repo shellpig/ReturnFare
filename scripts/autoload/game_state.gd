@@ -2813,6 +2813,25 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 			var snapshot_val := str(raw.get(group_id + "_variant", ""))
 			if snapshot_val != rule_id:
 				return {}
+		# 驗證 lookup_fragments 的 page ref lookup_value 與 snapshot 欄位及 when_group 完全一致
+		if parts.size() >= 5 and parts[2] == "lookup_fragments":
+			var lf_id := parts[3]
+			var lookup_val := parts[4]
+			var found_lf: Dictionary = {}
+			for lf_item: Variant in ending_data.get("lookup_fragments", []) as Array:
+				if lf_item is Dictionary and str((lf_item as Dictionary).get("id", "")) == lf_id:
+					found_lf = lf_item as Dictionary
+					break
+			if found_lf.is_empty():
+				return {}
+			var when_group := found_lf.get("when_group", {}) as Dictionary
+			var wg_group := str(when_group.get("group", ""))
+			var wg_variant := str(when_group.get("variant", ""))
+			if not wg_group.is_empty() and str(raw.get(wg_group + "_variant", "")) != wg_variant:
+				return {}
+			var source_field := str(found_lf.get("source_field", ""))
+			if not source_field.is_empty() and str(raw.get(source_field, "")) != lookup_val:
+				return {}
 		refs.append(str(item))
 	if refs.is_empty():
 		return {}

@@ -4,16 +4,16 @@
 
 ## 目前狀態
 
-**P5-C（四類結局與組合後日談）第三輪實作者修復完成（P5C-V5、P5C-V6、P5C-V7 全數落地並通過變異保真驗證）。** 待 Verifier 複驗關門。
+**P5-C（四類結局與組合後日談）第四輪實作者修復完成（不邀時間順序修正、lookup ref NPC 交叉驗證、s6 獨立變異保真全數通過）。** 待 Verifier 複驗關門。
 
-實作者第三輪修復與自跑證據（2026-08-29）：
+實作者第四輪修復與自跑證據（2026-08-29）：
 
-- **P5C-V5（Blocker 已修復）**：`data/endings.json` 移除共用 `years_passed`；在 `partner_ajie_long` / `partner_awei_long` 補入「二十年過去。四十出頭，她先。癌症，走得很快。\n然後是他。同一個病，一樣快。」；在 `partner_none_long` 補入「他沒有結婚，一個人過完二十年。\n四十出頭。癌症，走得很快。」（不誤播「她先」）；共用 `long_return` 只播黑畫面與庇佑發動。短版同步保留「她先離世，隨後他也因同病而終」。
-- **P5C-V6（關門測試缺口已修復）**：`tests/headless/test_p5c.gd` 新增 `_test_3_switch_matrix_independent_boundaries()`，為 `s1`～`s6` 每一條開關建立獨立的 3→4 邊界測試（3 個其他開關為 `uncle_mid`，加上該開關後必為 `uncle_high`，其中 `s6` 精確以 `switch_progress.s6 = 3` 參與）；並新增對 `endings.json` 4 條 high 生計規則 `count_at_least.of` 的 6 條件結構斷言。
-- **P5C-V7（非阻擋已修復）**：`scripts/autoload/game_state.gd` 的 `_parse_ending_snapshot()` 嚴格校驗 composite 的 3 個 variant 值必須存在於對應 group 宣告的 rules id 集合中；並解析 `page_refs` 中所有 variant group 頁面之 rule id，確保與 snapshot 欄位值嚴格一致；若有不符回 `invalid_save_shape` 且狀態零變化。`deserialize()` 亦針對 `switch_progress`、`relations`、`npc_action_counts` 數值字典做 integer normalization，確保往返序列化逐字一致。
+- **P5C-V5（Blocker 已修復：不邀時間軸修復）**：`data/endings.json` 修正 `partner_none_long` 僅敘述「他沒有結婚，一個人過完二十年。」；將主角四十出頭癌症早死移至 `uninvited_proxy` 各 NPC 條目中（`proxy_ajie_long`、`proxy_awei_long`、`proxy_acai_long`），在「很多年後的一張照片……」回顧之後接「四十出頭。癌症，走得很快。」，最後接 `long_return` 黑畫面與庇佑發動。消除主角死後又看生前照片之時間順序矛盾。
+- **P5C-V6（關門測試缺口與變異已修復）**：`tests/headless/test_p5c.gd` 包含 `s1`～`s6` 獨立 3→4 邊界測試與 4 條 high 生計規則 `count_at_least.of` 的 6 條件結構斷言。完成 `s5`（M-C7）與 `s6`（M-C8）分別移除的變異測試，均精確轉紅（4 個斷言失敗，exit 1），還原後重回 exit 0。
+- **P5C-V7（非阻擋已修復：存檔 Variant 與 Lookup Ref 交叉校驗）**：`scripts/autoload/game_state.gd` 的 `_parse_ending_snapshot()` 不僅驗證 3 個 variant 欄位合法性及與 `page_refs` 一致性，更擴充驗證 `lookup_fragments`：提取 lookup_value 與 `when_group`，交叉驗證必須與 snapshot 的 `festival_proxy_npc` 及 `partner_variant` 嚴格一致；若有矛盾回 `invalid_save_shape` 且狀態零變化。
 - **測試與矩陣覆蓋**：`test_p5c.gd` 12 組全綠（exit 0）。
-- **全套迴歸**：31 套 headless 全數 exit 0；UI sim run `20260829-134502-666-p60712-2e8f89dc`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks。
-- **變異驗證**：暫時從 `uncle_high` 移除 `s5` 條件，`test_p5c.gd` 精確轉紅（4 個斷言失敗，exit 1），還原後重回 exit 0。
+- **全套迴歸**：31 套 headless 全數 exit 0；UI sim run `20260829-141401-422-p74208-e6424f96`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks。
+- **變異記錄**：新增 M-C7（移除 s5 條件，4 斷言失敗，exit 1）、M-C8（移除 s6 條件，4 斷言失敗，exit 1）、M-C9（proxy lookup 快照矛盾，1 斷言失敗，exit 1）。
 
 ## P5-B 實際改了什麼
 
@@ -193,6 +193,9 @@
 | M-C4 | `GameState._build_ending_plan` 破壞不上車快照 `ended_day` 為 1 | `test_p5c` (不上車快照 null 斷言) | 轉紅（1 斷言失敗，exit 1） |
 | M-C5 | `data/endings.json` 反轉 uncle_high 開關門檻為 n: 7 | `test_p5c` (12 格生計開關帶矩陣) | 轉紅（6 斷言失敗，exit 1） |
 | M-C6 | `EndingResolver._pick_rule` 移除多 fallback 防禦檢查 | `test_p5c` (Resolver 壞資料防禦) | 轉紅（1 斷言失敗，exit 1） |
+| M-C7 | `data/endings.json` 移除 uncle_high 的 s5 條件 | `test_p5c` (獨立開關邊界與結構斷言) | 轉紅（4 斷言失敗，exit 1） |
+| M-C8 | `data/endings.json` 移除 uncle_high 的 s6 (switch_progress_at_least) 條件 | `test_p5c` (獨立開關邊界與結構斷言) | 轉紅（4 斷言失敗，exit 1） |
+| M-C9 | `GameState._parse_ending_snapshot` 移除 lookup ref 交叉驗證 | `test_p5c` (快照與 lookup ref 矛盾防禦) | 轉紅（2 斷言失敗，exit 1） |
 
 ## P5-C 第一輪 verifier 待修任務單（P5C-V1～V4）
 
