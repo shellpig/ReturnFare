@@ -4,7 +4,7 @@
 
 ## 目前狀態
 
-**P5-D（開局、歷輪摘要與跨輪重置）實作完成，待 verifier 驗收。** 開局三選項、唯一 `complete_ending()`、history、跨輪繼承、D29 逾期預設與 `advance_phase()` 七步固定順序全部落地；`end_run()`／`run_ended`／`resolve_night_advance()` 三個舊接線同批退場。
+**P5-D（開局、歷輪摘要與跨輪重置）已由 Verifier 完整複驗關門並轉 ✅。** 開局三選項、唯一 `complete_ending()`、history、跨輪繼承、D29 逾期預設與 `advance_phase()` 七步固定順序全部落地；`end_run()`／`run_ended`／`resolve_night_advance()` 三個舊接線同批退場。
 
 ### P5-D 實際改了什麼
 
@@ -386,22 +386,23 @@ Verifier 關門結論（2026-08-29，實作至 `44e1dd9`）：
 
 ## 已知殘留
 
-- K-193：`last_auto_enter_lines` 尚未接進 `main.gd`；D45 邀請效果成立但文字可能看不到，歸 P5-D transition lines 接線。
+- K-193：✅ 已於 `1b48c8a` 接進 `main.gd._settlement_lines()`，P5-D 關門時結案。
 - K-194：UI `full_walk` 仍優先取得 D13 名冊，空手 coda 尚無真實輸入 UI 證據，歸 P5-E／F。
 - K-195：`choice_requires_card` 仍建立直接選擇按鈕，且持名冊時空手選項仍顯示，歸 P5-E UI 收斂。
 - K-196：✅ `test_p5b.gd.uid`／`test_p5c.gd.uid` 已進版控。
 - K-197：✅ 已於 P5-C 由 implementer 修復。
 - K-198：`clone_for_preflight()` 未檢查 `deserialize()` 回傳值；下次動 preflight 時補防禦。
+- K-209～K-212：✅ 均於 `ec9c56d` 結案。K-210（permanent lose 的假 ERROR）沒有斷言守得住——GDScript 無法在同一 process 攔截 `push_error`，證據是 `test_p5d` 的 stderr 全空。
 - K-183：`repeat_page_ids` 尚未納入 fragment 的 `repeat_pages`；現行 `skip_to` 指 suffix，不受影響
 - K-190：舊壞資料 fixture 缺 P5 新必填欄位；下次動 fixture 或 lint 19 時處理
 - K-191：P5-A 首次交付的大面積 JSON 重排只記紀律，不回頭重排
 - P4-E／P4-F：K-165 ①、K-175、K-176、K-177 四條低度殘留
 - 人工體感：P3-F 與 P4-F 合計 8 項待真人落檔
-- `lose` 的 `permanent` 與 `loop_persistent_item_ids` 只有結構，尚未接行為（依方針屬 P5-D）
+- `lose` 的 `permanent` 與 `loop_persistent_item_ids`：✅ 已於 P5-D 接上行為（取得寫 meta set、`permanent:true` 才斷跨輪繼承、開局按資料順序恢復）。正式 catalog 的 `loop_persistent:true` 仍為 0 張，第一輪玩不到。
 
 ## 下一個最安全任務
 
-**實作 P5-D 開局、歷輪摘要與跨輪重置。** 先讀三份 P5-D 對齊段落；承接唯一 `complete_ending()`、history、opening choice、D29 逾期預設、魔法物品例外與第二輪重入，不提前做 P5-E UI。
+**實作 P5-E 開局與結局 UI。** 先讀三份 P5-E 對齊段落。`main.gd` 現在的開局／結局畫面只是過渡 stub（FlowText 列選項、推進鍵確認第一個可選項），正式面板、逐字節奏、按一下補整頁、再按翻頁、重見跳過都在這一階段；K-194 與 K-195 也一併在這裡收。不做 title／save／history UI。
 
 > 跑 UI 模擬一律加 `-Background`：
 > `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`

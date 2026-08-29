@@ -4,7 +4,7 @@
 
 最後更新：2026-08-29
 
-> **當前進度**：第一輪資料層與四份關鍵文件完成；**Phase 1～2 全部實作，Phase 3～4 機器層完成**（P3-F／P4-F 各剩 4 項真人體感）；**P5-A～P5-C 已由 verifier 關門並轉 ✅**。P5-C 的四類 ending、正常結局 4×3 生計／開關帶與組合後日談、首見／重見、四類逐頁門檻、resolver 壞資料與 active snapshot 一致性均完成；最新證據為 31 套 headless exit 0、`test_p5c` 12 組全綠、greedy 全覆蓋、UI sim 108 variants／85 contracts／0 failed。**下一步 P5-D 開局、歷輪摘要與跨輪重置。**
+> **當前進度**：第一輪資料層與四份關鍵文件完成；**Phase 1～2 全部實作，Phase 3～4 機器層完成**（P3-F／P4-F 各剩 4 項真人體感）；**P5-A～P5-D 已由 verifier 關門並轉 ✅**。P5-D 的三個 opening choice、唯一 `complete_ending()`、歷輪摘要、跨輪重置與魔法物品例外、D29 逾期預設三路等價與 `advance_phase()` 七步固定順序均完成；讀寫兩端共用同一份 history 驗證，殘缺紀錄不再能解鎖不上車。最新證據為 32 套 headless exit 0、`test_p5d` 21 組 382 個 ok 且 stderr 全空、UI sim 108 variants／85 contracts／0 failed。**下一步 P5-E 開局與結局 UI。**
 
 ---
 
@@ -79,7 +79,7 @@ headless 實測（2026-08-29，`verify_data.gd`）：**66 張卡／48 個地點�
 | P5-A 結局、開局與跨輪資料 | ✅ | `endings.json`／`opening_choices.json`、四 ending id、兩張新卡、D7／D11／D26／D29／D31／D39／D43／D45 映射、lint 17～19 均完成；K-178～K-189、K-192 結案。verifier 複驗：`test_p5a` 80 個 ok、29 套 headless exit 0、UI sim 108／85／0；15 項變異記錄逐條對上現行斷言。流程與 UI 仍依邊界留 P5-B～E |
 | P5-B 頂層流程與結局狀態機 | ✅ | 三種 flow mode、ending snapshot、逐頁 reveal／advance／skip、跨 mode 封鎖、flow／active 序列化矩陣、EffectApply 完整動作原子性、D45 `auto_enter`＋Lint 20＋持卡／空手 coda 均完成。verifier 複驗：`test_p5b` 12 組、30 套 headless、greedy 空手路、UI sim 108／85／0 全綠；原五個 blocker 解除；K-196／K-197 已隨 P5-C 結案，仍留 K-193～K-195／K-198 低度殘留 |
 | P5-C 四類結局與組合後日談 | ✅ | 正常結局 4 生計 × 3 開關帶、三修繕、三伴侶與不邀 proxy 組合完成；兩種 BE／不上車、同 ending id 首見長版／重見摘要、四類逐頁門檻與 snapshot/ref 防禦全綠。verifier 複驗：`test_p5c` 12 組、31 套 headless、greedy、UI sim 108／85／0；K-199～K-208 全數結案 |
-| P5-D 開局、歷輪摘要與跨輪重置 | 📐 | 三個 opening choice、唯一 `complete_ending()`、history、魔法物品例外、D29 逾期預設與第二輪重入 |
+| P5-D 開局、歷輪摘要與跨輪重置 | ✅ | 三個 opening choice、唯一 `complete_ending()`、history、魔法物品例外、D29 逾期預設與第二輪重入均完成；`advance_phase()` 收斂為七步固定順序，`end_run()`／`run_ended`／`resolve_night_advance()` 退場。verifier 兩輪 review：第一輪兩個 blocker（目標時段遭遇預檢、append 前重驗 snapshot）、第二輪一個 blocker（`ending_history` 讀檔零驗證）全數解除。`test_p5d` 21 組 382 個 ok、32 套 headless、UI sim 108／85／0 全綠；K-193、K-209～K-212 結案，K-194／K-195／K-198 留 P5-E／F |
 | P5-E 開局與結局 UI | 📐 | 故事內開局、結局逐頁、按一下補整頁／再按翻頁、重見跳過；不做 title／save／history UI |
 | P5-F 多結局與跨輪全流程驗收 | 📐 | 首輪三類＋解鎖後不上車、連續多輪、P1～P4 reset／meta、headless＋UI sim＋真人閱讀 |
 | i18n 管線 | ⬜ | 抽取工具、可翻譯欄位規約、id 凍結、引擎改走翻譯查詢。**銜接工作不是 Phase**；卡它的是資料 schema 定案（P5 補完 opening／ending 玩家欄位），放 P6 之前讓存檔格式一次定稿 |
@@ -129,6 +129,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps
 - `.claude/` 是本機 tooling config，不 commit。
 
 ## 下一步
+- 2026-08-29：**P5-D 開局、歷輪摘要與跨輪重置經 verifier 兩輪複驗關門並轉 ✅。** 第一輪 review 的兩個 blocker——`advance_phase()` 未在 commit 前預檢目標時段的 fixed encounter、`complete_ending()` 未在 append 前重驗 snapshot——由 `1b48c8a` 修復，同批把 K-193 的結算文字接上 `main.gd._settlement_lines()` 並收斂 persistent 邊界。第二輪抓到真正會改變玩法的 blocker：`deserialize()` 完全不驗 `ending_history`，只含 `{"ending_id":"ending_replaced"}` 的殘缺紀錄就足以解鎖不上車。`ec9c56d` 把結局結果那十欄抽成 `_parse_ending_result_fields()`，讓寫入端與讀檔端共用同一份判斷，並新增 `_parse_history_records()` 在任何 mutation 之前驗精確十欄、四類 nullable 矩陣、opening／variant／proxy 引用與當輪知識的型別／重複／資料順序；同批修掉 permanent lose 的假 ERROR（K-210）、補 opening 的三種 `data_conflict`（K-211）與 D29 凍結後追加投入的反證（K-212）。關門證據：`test_p5d` 21 組 382 個 ok、exit 0 且 stderr 全空；32 套 headless exit 0；UI sim run `20260829-205247-527-p3196-0dbb1b0e` 為 108 variants／85 contracts／85 executed／85 completed／0 failed。本輪 6 個變異精確轉紅（37／10／3／5／1／5 個斷言失敗）；K-210 屬 log 行為，GDScript 無法在同一 process 攔截 `push_error`，證據是 stderr 的有無，已在該條明記不宣稱有斷言覆蓋。K-193、K-209～K-212 全數結案；K-194／K-195／K-198 依原排程留給 P5-E／P5-F。**下一步實作 P5-E 開局與結局 UI。**
 - 2026-08-29：**P5-C 四類結局與組合後日談經 verifier 完整複驗關門並轉 ✅。** 正常替換結局完成伴侶、生計／六開關帶、D26 修繕與 D29 frozen proxy 的資料組合；發瘋 BE、庫存 BE、不上車各自隔離，首見／重見只查同 ending history。四輪 review 先後補齊 4×3 生計矩陣、六開關獨立變異、首見敘事順序與伴侶死亡承重、四類完成門檻、resolver 壞資料拒絕、variant／lookup refs 的存檔一致性，以及不邀路徑死亡主詞。最終實作至 `44e1dd9`；verifier 自跑 `test_p5c` 12 組、31 套 headless（含 verify_data／greedy）全綠，正式資料 66／48／18／268／4／3 且引用與 Lint 1～20 全零；UI sim run `20260829-143245-094-p36912-2d0e76af` 為 108 variants／85 contracts／0 failed。K-196／K-197、K-199～K-208 全數結案。**下一步實作 P5-D 開局、歷輪摘要與跨輪重置。**
 - 2026-08-29：**P5-B 頂層流程與結局狀態機經 verifier 完整複驗關門並轉 ✅。** 第一版 review 的五個 blocker——D13 名冊鎖死 D45、可走到 day 46、四類完整動作非原子、active snapshot 矩陣不足、run 中可公開啟動不上車——已由 `0c82046` 全數修復。verifier 自跑 `test_p5b` 12 組、`test_p5a` 新增 phase-exit／Lint 20 負向、全套 30 套 headless、greedy 與完整 UI sim 全綠；正式資料為 66／48／18／268／4／3，引用與 Lint 1～20 全零。UI sim run `20260829-090655-957-p77948-d1e58860` 為 108 variants／85 contracts／0 failed。非阻擋殘留落 K-193～K-198。**下一步實作 P5-C 四類結局與組合後日談。**
 - 2026-08-28：**P5-A 結局、開局與跨輪資料經 verifier 完整複驗關門並轉 ✅。** 首次交付後三輪 review 先後修正 lint 巢狀掃描、D29／D43 正向形狀、慶典候選引用、ending `skip_to`／`when_group`／組裝路徑、K-186 回歸覆蓋與 K-187 負向類別；最後補回 D43 `info_zhou_job` 履歷門檻與 D7 `opening_choice` 單一真值。關門證據：`verify_data` 66 卡／48 地點／18 NPC／268 beat／4 ending／3 opening且引用與 Lint 1～19 全 0；`test_p5a` 80 個 ok；29 套 headless exit 0；UI sim run `20260828-210154-995-p31932-6d2f2785` 為 108 variants／85 contracts／0 failed；K-186 的 15 項變異記錄逐條對上現行斷言。K-184／K-186／K-187／K-188／K-192 同批結案；K-182、K-183 各留一項已知低度殘留，K-190／K-191 依原排程不擋關門。**下一步實作 P5-B 頂層流程與結局狀態機。**
