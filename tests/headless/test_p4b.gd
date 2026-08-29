@@ -6,7 +6,7 @@ extends SceneTree
 ## 3. immediate vs next_morning 差異與手牌保留
 ## 4. 委託不吃行動格、不增 npc_action_counts、與 choice_group 親自處理互斥
 ## 5. 關係增減完全由資料驅動、決定論無 RNG
-## 6. pending 序列化往返、人物卡中途移除仍照常回報、end_run 清空
+## 6. pending 序列化往返、人物卡中途移除仍照常回報、run_reset 清空
 ## 7. 11 碼封閉拒絕矩陣與狀態零變化
 ## 8. 拒絕優先順序反證測試
 ## 9. 延遲回報接點失效保留（不靜默丟棄）與 K-65 回報迴圈防呆
@@ -58,7 +58,10 @@ func _fail(msg: String) -> int:
 
 
 func _reset_gs(gs: Node) -> void:
-	gs.call("end_run")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	var hand: Array = gs.get("hand") as Array
 	hand.clear()
 	hand.append("protagonist")
@@ -588,9 +591,9 @@ func _test_relation_determinism_no_rng(gs: Node, data_node: Node) -> int:
 	return failed
 
 
-# ─── 6. pending 序列化往返、人物卡中途移除仍照常回報、end_run 清空 ───
+# ─── 6. pending 序列化往返、人物卡中途移除仍照常回報、run_reset 清空 ───
 func _test_serialization_and_resilience(gs: Node, data_node: Node) -> int:
-	print("\n--- 6. pending 序列化往返、人物卡中途移除仍照常回報、end_run 清空 ---")
+	print("\n--- 6. pending 序列化往返、人物卡中途移除仍照常回報、run_reset 清空 ---")
 	var failed: int = 0
 	_reset_gs(gs)
 
@@ -653,15 +656,15 @@ func _test_serialization_and_resilience(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("lose_card npc_ajie 失敗")
 
-	# (c) end_run 清空所有委託狀態
-	gs.call("end_run")
+	# (c) run_reset 清空所有委託狀態
+	PlaythroughGreedy.start_fresh_run(gs)
 	var dut_end: Dictionary = gs.get("delegates_used_today")
 	var pnd_end: Array = gs.get("pending_delegation_reports") as Array
 	var lines_end: PackedStringArray = gs.get("last_delegation_report_lines")
 	if dut_end.is_empty() and pnd_end.is_empty() and lines_end.is_empty():
-		_ok("end_run 清空 delegates_used_today、pending_delegation_reports 與 last_delegation_report_lines")
+		_ok("run_reset 清空 delegates_used_today、pending_delegation_reports 與 last_delegation_report_lines")
 	else:
-		failed += _fail("end_run 未清空委託狀態：dut=%s pnd=%s lines=%s" % [str(dut_end), str(pnd_end), str(lines_end)])
+		failed += _fail("run_reset 未清空委託狀態：dut=%s pnd=%s lines=%s" % [str(dut_end), str(pnd_end), str(lines_end)])
 
 	return failed
 
@@ -1091,7 +1094,7 @@ func _test_data_conflict_and_k65_pending_resilience(gs: Node, data_node: Node) -
 	gs.call("advance_phase") # night
 	gs.call("advance_phase") # morning
 
-	# 因第 1 筆 report 灌入 10 張 madness 觸發 BE，end_run() 重置回 Day 1 morning
+	# 因第 1 筆 report 灌入 10 張 madness 觸發 BE，run_reset() 重置回 Day 1 morning
 	# 驗證：
 	# 1. new_day == 1
 	# 2. 同一筆 report 的後置 flag（k65_intra_leaked_flag）未被寫入新輪

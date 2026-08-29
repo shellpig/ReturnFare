@@ -18,6 +18,7 @@ func _initialize() -> void:
 	var gs_created := false
 	if gs == null:
 		gs = load("res://scripts/autoload/game_state.gd").new()
+		gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 		gs.name = "GameState"
 		get_root().add_child(gs)
 		Engine.register_singleton("GameState", gs)
@@ -96,8 +97,8 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 	var final_madness_cards_box := [[]]
 	var endings_received: Array[String] = []
 
-	var on_run_ended := func(eid: String) -> void:
-		endings_received.append(eid)
+	var on_ending_started := func() -> void:
+		endings_received.append(str((gs.get("active_ending") as Dictionary).get("ending_id", "")))
 		final_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
 		var mcards: Array = []
 		for card in (gs.get("hand") as Array):
@@ -105,8 +106,8 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 				mcards.append(card)
 		final_madness_cards_box[0] = mcards
 
-	gs.connect("run_ended", on_run_ended)
-	gs.call("end_run")
+	gs.connect("ending_started", on_ending_started)
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("night_locations_seen", {})
 	gs.set("night_once_beats_seen", {})
 	gs.set("knowledge", {})
@@ -205,7 +206,7 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 		PlaythroughGreedy.solve_active_encounter_if_any(gs)
 		gs.advance_phase()
 
-		# 第 45 天 evening 推進後已呼叫 end_run，不進第 45 夜
+		# 第 45 天 evening 推進後已呼叫 run_reset，不進第 45 夜
 		if d == 45:
 			daily_max_madness[d] = d_max
 			if d_max > peak_madness:
@@ -228,13 +229,13 @@ static func _run_simulation(gs: Node, data_node: Node, strategy_type: String) ->
 			peak_madness = d_max
 			peak_day = d
 
-		gs.sleep_night()
-		gs.advance_phase()
+		# P5-D：夜間停拍已由 advance_phase() 吸收；走查不另呼叫 sleep_night()。
+		PlaythroughGreedy.advance_until_phase_changes(gs)
 
-	gs.disconnect("run_ended", on_run_ended)
+	gs.disconnect("ending_started", on_ending_started)
 
 	# P5-B：45 天走完不必然啟動結局（D45 coda 門檻要求先完成名冊比對），
-	# 終局數字改為走查結束時直接取一次；run_ended 只用來確認中途有沒有 BE。
+	# 終局數字改為走查結束時直接取一次；ending_started 只用來確認中途有沒有 BE。
 	final_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
 	var end_mcards: Array = []
 	for card in (gs.get("hand") as Array):

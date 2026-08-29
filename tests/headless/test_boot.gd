@@ -135,6 +135,22 @@ func _test_main_scene_enters_normal_branch() -> int:
 
 	# 驗證 Day 1 night fixed 演出 (n_corridor_ch1) 在 FlowText 顯示
 	var gs: Node = get_root().get_node("GameState")
+
+	# P5-D：正式啟動路徑一律從開局進場，run 畫面要先由 choose_opening() 建起來。
+	if str(gs.get("flow_mode")) != "opening":
+		failed += _fail("fresh boot 的 flow.mode 不是 opening（實際：%s）" % str(gs.get("flow_mode")))
+	else:
+		failed += _ok("fresh boot 的 flow.mode 為 opening")
+	if not flow_text.visible or not flow_text.get_text().contains("出門前的十分鐘"):
+		failed += _fail("開局 stub 未寫入 FlowText")
+	else:
+		failed += _ok("開局 stub 成功寫入 FlowText")
+	var open_res: Dictionary = gs.call("choose_opening", "take_family_album")
+	if not bool(open_res.get("ok", false)) or str(gs.get("flow_mode")) != "run":
+		failed += _fail("choose_opening(take_family_album) 未能由正式啟動路徑建立 run")
+	else:
+		failed += _ok("choose_opening(take_family_album) 由正式啟動路徑建立 run")
+
 	gs.set("day", 1)
 	gs.set("phase", "night")
 	main.call("_route_view")
@@ -238,8 +254,8 @@ func _test_main_scene_enters_normal_branch() -> int:
 				% [occupant_lines.size(), ", ".join(occupant_lines)])
 	main.call("_on_panel_closed")
 
-	# 驗證 run_ended 結局 stub 在 FlowText 顯示且保持可見
-	main.call("_on_run_ended", "ending_default")
+	# 驗證 ending_started 結局 stub 在 FlowText 顯示且保持可見
+	main.call("_on_ending_started")
 	if not flow_text.visible or not flow_text.get_text().contains("[結局 stub]"):
 		failed += _fail("結局 stub 未能寫入 FlowText")
 	else:

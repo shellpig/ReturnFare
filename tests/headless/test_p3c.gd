@@ -10,7 +10,7 @@ extends SceneTree
 ## 7. D24 d24_night_laozeng 每輪重演與文字不重複播放
 ## 8. D3 n3_map_opens 環境引導跨輪測試
 ## 9. Lint 14 四種負向 fixture 驗證
-## 10. resolve_night_advance 三態與文字停拍驗證
+## 10. advance_phase() 夜間三態與文字停拍驗證（P5-D 起 resolve_night_advance 退場）
 
 const DataLoader := preload("res://scripts/data_loader.gd")
 const ConditionEval := preload("res://scripts/core/condition_eval.gd")
@@ -62,7 +62,10 @@ func _fail(msg: String) -> int:
 
 
 func _reset_gs(gs: Node) -> void:
-	gs.call("end_run")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("night_locations_seen", {})
 	gs.set("night_once_beats_seen", {})
 	gs.set("knowledge", {})
@@ -274,8 +277,8 @@ func _test_gathering_intro_and_d31(gs: Node, _data_node: Node) -> int:
 	else:
 		failed += _fail("已看過常態內容後第 31 夜未取 n_gathering_d31: %s" % str(res_after))
 
-	# 3. 跨輪重置：end_run 後 meta night_locations_seen 保留，但 run flag 清空，不得直接播特殊內容
-	gs.call("end_run")
+	# 3. 跨輪重置：run_reset 後 meta night_locations_seen 保留，但 run flag 清空，不得直接播特殊內容
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 31)
 	gs.set("phase", "night")
 	var res_loop2: Dictionary = gs.call("resolved_night_content", "n_gathering")
@@ -435,7 +438,7 @@ func _test_dual_run_d1_d2_d15(gs: Node, _data_node: Node) -> int:
 		failed += _fail("n15_everyone 未寫入 night_once_beats_seen")
 
 	# --- 第二輪跨輪重演 ---
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 1)
 	gs.set("phase", "night")
 	gs.set("night_location_chosen", "")
@@ -503,7 +506,7 @@ func _test_dual_run_d24_laozeng(gs: Node, _data_node: Node) -> int:
 		failed += _fail("同夜重建錯誤重播了文字: %s" % str(d24_rebuild_lines))
 
 	# 第二輪 D24
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 24)
 	gs.set("phase", "night")
 	var d24_lines2: PackedStringArray = gs.call("play_night_fixed")
@@ -543,7 +546,7 @@ func _test_dual_run_d3_n3_map_opens(gs: Node, _data_node: Node) -> int:
 		failed += _fail("n3_map_opens 錯誤佔用了 night_location_chosen")
 
 	# 第二輪 D3
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 3)
 	gs.set("phase", "night")
 	var d3_lines2: PackedStringArray = gs.call("play_night_fixed")
@@ -721,13 +724,13 @@ func _test_forced_night_visit_rejection_and_abort(gs: Node, _data_node: Node) ->
 	return failed
 
 
-# ── 11. resolve_night_advance 停拍與推進 ────────────────────────────────────
+# ── 11. 夜間停拍與推進（P5-D 起由 advance_phase() 吸收）─────────────────────
 
 func _test_resolve_night_advance(gs: Node, _data_node: Node) -> int:
-	print("--- 11. resolve_night_advance flow, pending停拍 and chosen bypass ---")
+	print("--- 11. advance_phase() night staging: pending 停拍 and chosen bypass ---")
 	var failed := 0
 
-	# Case A: 未選地點按「直接睡」，有睡眠內容時先播、停在進入隔天；再次呼叫才換日
+	# Case A: 未選地點按「推進」，有睡眠內容時先播、停在原時段；再按一次才換日
 	_reset_gs(gs)
 	gs.set("day", 24)
 	gs.set("phase", "night")
@@ -736,39 +739,40 @@ func _test_resolve_night_advance(gs: Node, _data_node: Node) -> int:
 	gs.call("gain_card", "madness")
 	gs.call("gain_card", "madness") # 3 cards -> triggers d24_night_bleed
 
-	var adv_step1: Dictionary = gs.call("resolve_night_advance")
-	if not bool(adv_step1.get("advance", true)) and (adv_step1.get("lines", PackedStringArray()) as PackedStringArray).size() > 0:
-		failed += _ok("有睡眠內容時 resolve_night_advance 回傳 advance: false 並附帶文字行")
+	var adv_step1: Dictionary = gs.call("advance_phase")
+	if bool(adv_step1.get("ok", false)) and not bool(adv_step1.get("phase_advanced", true)) \
+			and (adv_step1.get("lines", PackedStringArray()) as PackedStringArray).size() > 0:
+		failed += _ok("有睡眠內容時第 1 次推進成功但 phase_advanced 為 false，並附帶文字行")
 	else:
-		failed += _fail("第 1 步未回傳 advance: false: %s" % str(adv_step1))
+		failed += _fail("第 1 步未如預期停拍: %s" % str(adv_step1))
 
-	if bool(gs.get("night_sleep_pending")):
-		failed += _ok("第 1 步成功設定 night_sleep_pending: true")
+	if bool(gs.get("night_sleep_pending")) and int(gs.get("day")) == 24 and str(gs.get("phase")) == "night":
+		failed += _ok("第 1 步成功設定 night_sleep_pending: true 且停在原時段")
 	else:
-		failed += _fail("night_sleep_pending 未設為 true")
+		failed += _fail("night_sleep_pending 或時段狀態異常")
 
-	var adv_step2: Dictionary = gs.call("resolve_night_advance")
-	if bool(adv_step2.get("advance", false)):
-		failed += _ok("第 2 步 pending 清除後回傳 advance: true 允許換日")
+	var adv_step2: Dictionary = gs.call("advance_phase")
+	if bool(adv_step2.get("phase_advanced", false)) and int(gs.get("day")) == 25:
+		failed += _ok("第 2 步 pending 清除後真正換日")
 	else:
-		failed += _fail("第 2 步未回傳 advance: true: %s" % str(adv_step2))
+		failed += _fail("第 2 步未換日: %s" % str(adv_step2))
 
 	if not bool(gs.get("night_sleep_pending")):
 		failed += _ok("第 2 步成功清除 night_sleep_pending")
 	else:
 		failed += _fail("night_sleep_pending 未被清除")
 
-	# Case B: 無睡眠內容時直接換日
+	# Case B: 無睡眠內容時一次就換日
 	_reset_gs(gs)
 	gs.set("day", 10)
 	gs.set("phase", "night")
-	var adv_direct: Dictionary = gs.call("resolve_night_advance")
-	if bool(adv_direct.get("advance", false)) and (adv_direct.get("lines", PackedStringArray()) as PackedStringArray).is_empty():
-		failed += _ok("無睡眠內容時 resolve_night_advance 直接回傳 advance: true")
+	var adv_direct: Dictionary = gs.call("advance_phase")
+	if bool(adv_direct.get("phase_advanced", false)) and (adv_direct.get("lines", PackedStringArray()) as PackedStringArray).is_empty():
+		failed += _ok("無睡眠內容時第 1 次推進就換日，且不回傳文字行")
 	else:
-		failed += _fail("無睡眠內容時未直接 advance: %s" % str(adv_direct))
+		failed += _fail("無睡眠內容時未直接換日: %s" % str(adv_direct))
 
-	# Case C: 已到訪地點後，不解析睡眠內容，直接回傳 advance: true
+	# Case C: 已到訪地點後，不解析睡眠內容，直接換日
 	_reset_gs(gs)
 	gs.set("day", 24)
 	gs.set("phase", "night")
@@ -777,9 +781,9 @@ func _test_resolve_night_advance(gs: Node, _data_node: Node) -> int:
 	gs.call("gain_card", "madness")
 	gs.call("gain_card", "madness")
 	gs.set("night_location_chosen", "n_source")
-	var adv_chosen: Dictionary = gs.call("resolve_night_advance")
-	if bool(adv_chosen.get("advance", false)) and (adv_chosen.get("lines", PackedStringArray()) as PackedStringArray).is_empty():
-		failed += _ok("已到訪地點後 resolve_night_advance 絕不播放 sleep beat，直接回傳 advance: true")
+	var adv_chosen: Dictionary = gs.call("advance_phase")
+	if bool(adv_chosen.get("phase_advanced", false)) and (adv_chosen.get("lines", PackedStringArray()) as PackedStringArray).is_empty():
+		failed += _ok("已到訪地點後絕不播放 sleep beat，直接換日")
 	else:
 		failed += _fail("已到訪地點後錯誤觸發了 sleep: %s" % str(adv_chosen))
 

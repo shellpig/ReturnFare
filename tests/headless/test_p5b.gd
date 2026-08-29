@@ -68,7 +68,7 @@ func _state_text(gs: Node) -> String:
 
 ## 乾淨的 run：清掉上一段測試的所有殘留，含 flow 層與 meta 歷輪。
 func _fresh_run(gs: Node, day: int = 20, phase: String = "morning") -> void:
-	gs.call("end_run", "test_reset")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", day)
 	gs.set("phase", phase)
 	gs.set("ending_history", [] as Array[Dictionary])
@@ -262,7 +262,6 @@ func _test_4_run_mutations_blocked_in_ending(gs: Node) -> void:
 
 	var calls := {
 		"advance_phase": gs.call("advance_phase"),
-		"resolve_night_advance": gs.call("resolve_night_advance"),
 		"enter_night_location": gs.call("enter_night_location", "n_source"),
 		"try_place": gs.call("try_place", "protagonist", "d45_then", "compare_registry"),
 		"choose": gs.call("choose", "d29_invitation", "invitation", "invite_none"),

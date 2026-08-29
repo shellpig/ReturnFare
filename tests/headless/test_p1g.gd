@@ -253,6 +253,9 @@ func _find_slot(beat_view: Dictionary, slot_id: String) -> Dictionary:
 
 
 func _reset_gs(gs: Node) -> void:
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
 	(gs.get("hand") as Array).clear()
 	(gs.get("knowledge") as Dictionary).clear()
 	(gs.get("madness_clock") as Dictionary).clear()

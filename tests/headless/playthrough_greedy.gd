@@ -86,24 +86,45 @@ func _initialize() -> void:
 	else:
 		print("  ok  全 90 個行動時段均已完成合法性分類與驗證 (K-25)")
 
-	if int(res.get("run_ended_count", 0)) != 1:
-		push_error("FAIL: run_ended 發射次數不為 1（實際為 %d）" % int(res.get("run_ended_count", 0)))
+	if int(res.get("ending_started_count", 0)) != 1:
+		push_error("FAIL: ending_started 發射次數不為 1（實際為 %d）" % int(res.get("ending_started_count", 0)))
 		failed += 1
 	else:
-		print("  ok  run_ended 恰好發射 1 次 (ending_id: %s)" % str(res.get("last_ending_id", "")))
+		print("  ok  ending_started 恰好發射 1 次 (ending_id: %s)" % str(res.get("last_ending_id", "")))
 
-	if int(gs.get("day")) != 1 or str(gs.get("phase")) != "morning":
-		push_error("FAIL: 迴圈重置後時間不為第 1 天 morning (實際: 第 %d 天 %s)" % [int(gs.get("day")), str(gs.get("phase"))])
+	if str(gs.get("flow_mode")) != "opening":
+		push_error("FAIL: 結局結算後未回到 opening (實際: %s)" % str(gs.get("flow_mode")))
 		failed += 1
 	else:
-		print("  ok  重置後時間為第 1 天 morning")
+		print("  ok  結局結算後停在 opening（下一輪要明示選一個開局選項才開始）")
+
+	if int(gs.get("run_number")) != 2 or (gs.get("ending_history") as Array).size() != 1:
+		push_error("FAIL: 結算後輪數／歷輪摘要不正確 (run_number=%d, history=%d)"
+			% [int(gs.get("run_number")), (gs.get("ending_history") as Array).size()])
+		failed += 1
+	else:
+		print("  ok  結算後 run_number 加一且歷輪摘要恰一筆")
+
+	if not bool(gs.call("has_knowledge", "k_i_returned")):
+		push_error("FAIL: 結算後未取得「我回來過」")
+		failed += 1
+	else:
+		print("  ok  結算後取得「我回來過」")
 
 	var hand: Array = gs.get("hand") as Array
-	if hand.size() != 1 or hand[0] != "protagonist":
-		push_error("FAIL: 重置後手牌不為 [protagonist] (實際: %s)" % str(hand))
+	if not hand.is_empty():
+		push_error("FAIL: opening 期間手牌不為空 (實際: %s)" % str(hand))
 		failed += 1
 	else:
-		print("  ok  重置後手牌只剩主角卡")
+		print("  ok  opening 期間手牌為空（主角卡由 choose_opening() 發）")
+
+	var open_res: Dictionary = gs.call("choose_opening", "take_family_album")
+	var hand_after: Array = gs.get("hand") as Array
+	if not bool(open_res.get("ok", false)) or hand_after.size() != 2 or hand_after[0] != "protagonist" or hand_after[1] != "item_family_album":
+		push_error("FAIL: 第二輪 choose_opening(take_family_album) 未建立正確手牌 (實際: %s)" % str(hand_after))
+		failed += 1
+	else:
+		print("  ok  第二輪由相簿開局，手牌為 [protagonist, item_family_album] 且回到第 1 天 morning")
 
 	var knowledge: Dictionary = gs.get("knowledge") as Dictionary
 	# P5-B／B1：D45 coda 是一個 choice group，比對與空手兩條路都能收尾。
@@ -140,9 +161,23 @@ func _initialize() -> void:
 		quit(0)
 
 
+## 推進到真的換了時段為止。夜間第一次推進可能只把「直接睡」的文字停拍下來
+## （phase_advanced 為 false），此時要再按一次才會進隔天——這正是玩家看到的節奏。
+## 進了結局或被規則層拒絕時不重試。
+static func advance_until_phase_changes(gs: Node) -> Dictionary:
+	var res: Dictionary = gs.call("advance_phase")
+	if bool(res.get("ok", false)) and not bool(res.get("phase_advanced", false)) and str(gs.get("flow_mode")) == "run":
+		res = gs.call("advance_phase")
+	return res
+
+
 ## 執行 45 天貪心走查（K-36：供 test_p1f 與本腳本共用）
 static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) -> Dictionary:
-	var run_ended_box := [0]
+	# P5-D：fresh boot 停在 opening。走查驗的是 45 天的內容，不是開局選項本身，
+	# 因此用測試 helper 起一輪乾淨的 run（開局選項的正式路徑由 test_p5d 驗）。
+	if str(gs.get("flow_mode")) != "run":
+		start_fresh_run(gs)
+	var ending_started_box := [0]
 	var last_ending_box := [""]
 	var coda_path_box := [""]
 	var final_night_markers_box := [{}]
@@ -150,9 +185,9 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 	var final_madness_cards_box := [[]]
 	var final_indulgence_count_box := [0]
 	var final_madness_cards_cleared_box := [0]
-	var cb := func(eid: String):
-		run_ended_box[0] += 1
-		last_ending_box[0] = eid
+	var cb := func():
+		ending_started_box[0] += 1
+		last_ending_box[0] = str((gs.get("active_ending") as Dictionary).get("ending_id", ""))
 		final_night_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
 		final_madness_count_box[0] = int(gs.get("_madness_counter"))
 		var mcards: Array = []
@@ -163,7 +198,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		final_indulgence_count_box[0] = int(gs.get("indulgence_count"))
 		final_madness_cards_cleared_box[0] = int(gs.get("madness_cards_cleared"))
 
-	gs.run_ended.connect(cb)
+	gs.ending_started.connect(cb)
 
 	if verbose:
 		print("=== 開始 45 天貪心走查 ===")
@@ -231,13 +266,6 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		if res_a.get("placed", false):
 			actions_taken += 1
 		last_ind_count = int(gs.get("indulgence_count"))
-		# D29 邀請組：P5-B 尚未實作逾期預設（P5-D 才由規則層自動結算 invite_none）。
-		# 慶典代付者沒凍結的話第 45 天啟動 ending_replaced 會 data_conflict，走查到不了結局，
-		# 因此這裡先以「明示不邀」補上同一個原子入口；P5-D 落地後這段要刪掉。
-		if d == 29 and str(gs.get("phase")) == "afternoon":
-			if not (gs.get("choices") as Dictionary).has("d29_pm_invitation::invitation"):
-				gs.choose("d29_pm_invitation", "invitation", "invite_none")
-
 		if str(gs.get("phase")) == "afternoon":
 			var adv_a: Dictionary = gs.advance_phase()
 			if not adv_a.get("ok", false):
@@ -274,15 +302,26 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 				push_error(err_n)
 		execute_night_phase(gs, data_node, d)
 		last_ind_count = int(gs.get("indulgence_count"))
-		gs.advance_phase()
+		advance_until_phase_changes(gs)
 
-	gs.run_ended.disconnect(cb)
+	gs.ending_started.disconnect(cb)
 
-	# P5-B：結局啟動後 run 尚未清空（正式的 complete_ending() 與跨輪重置在 P5-D 落地）。
-	# 走查的跨輪重置驗收沿用 legacy end_run() 收尾，且必須在 disconnect 之後，
-	# 才不會讓相容用的 run_ended 訊號被重複計數。
+	# P5-D：走查走到 D45 後由規則層進 ending，逐頁播完再以正式的 complete_ending() 收尾，
+	# 完成後停在 opening——不自己跳回第 1 天，也不再有 legacy end_run() 這條路。
+	var ending_pages := 0
 	if str(gs.get("flow_mode")) == "ending":
-		gs.call("end_run", str(last_ending_box[0]))
+		var page_cap := 200
+		while str(gs.get("flow_mode")) == "ending" and page_cap > 0:
+			page_cap -= 1
+			var view: Dictionary = gs.call("ending_view")
+			if bool(view.get("can_complete", false)):
+				gs.call("complete_ending")
+				break
+			if not bool(view.get("page_revealed", false)):
+				gs.call("reveal_ending_page")
+			else:
+				gs.call("advance_ending_page")
+				ending_pages += 1
 
 	if verbose:
 		print("\n=== 45 天行動時段統計表（共 90 時段）===")
@@ -302,7 +341,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			print("  異常/非法空時段:          %2d 格" % stats["illegal"])
 		print("=========================================\n")
 
-	var is_walk_ok: bool = (errors.is_empty() and illegal_phases == 0 and int(run_ended_box[0]) == 1 and int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning")
+	var is_walk_ok: bool = (errors.is_empty() and illegal_phases == 0 and int(ending_started_box[0]) == 1 and str(gs.get("flow_mode")) == "opening")
 
 	return {
 		"ok": is_walk_ok,
@@ -310,7 +349,8 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		"actions_taken": actions_taken,
 		"illegal_phases": illegal_phases,
 		"stats": stats,
-		"run_ended_count": run_ended_box[0],
+		"ending_started_count": ending_started_box[0],
+		"ending_pages_turned": ending_pages,
 		"last_ending_id": last_ending_box[0],
 		"final_night_markers": final_night_markers_box[0],
 		"final_madness_count": final_madness_count_box[0],
@@ -551,7 +591,6 @@ static func execute_night_phase(gs: Node, data_node: Node, _day: int, open_marke
 	solve_active_encounter_if_any(gs)
 
 	if not open_markers:
-		gs.sleep_night()
 		return
 
 	# 2. 貪心開夜間標記：若當夜有可用的夜間地點，優先開未開啟的收費標記
@@ -584,8 +623,16 @@ static func execute_night_phase(gs: Node, data_node: Node, _day: int, open_marke
 					if not bid.is_empty():
 						gs.play_beat(bid)
 
-	# 3. 夜間收尾：直接睡
-	gs.sleep_night()
+	# 3. 夜間收尾由 advance_phase() 的夜間停拍吸收；走查不另開第二個推進入口（P5-D）。
+
+
+## 測試專用：把狀態重設成「剛開始一輪」的初態（第 1 天 morning、手上只有主角卡）。
+## 正式路徑是 `complete_ending()` → `choose_opening()`；P1～P4 的既有測試只需要一個乾淨的
+## run，因此直接借 GameState 的 run 初始化 helper，不在測試側另寫一份重置邏輯。
+static func start_fresh_run(gs: Node) -> void:
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	gs.call("_apply_run_initialization", gs)
 
 
 static func setup_data(tree: SceneTree) -> Node:
@@ -598,6 +645,13 @@ static func setup_data(tree: SceneTree) -> Node:
 	return data_node
 
 
+## 測試用 GameState 工廠。P5-D 起 fresh state 是 opening（正式啟動路徑），而 P1～P4 的
+## 既有案例要的是一輪乾淨的 run；autoload 也可能已經把 GameState 掛在 /root 底下，
+## 因此正規化的判準是「本 process 還沒起過」，不是「這次有沒有建立節點」。
+## opening 的正式路徑由 `test_boot` 與 `test_p5d` 驗。
+static var _test_run_started := false
+
+
 static func setup_game_state(tree: SceneTree, data_node: Node) -> Node:
 	var gs: Node = tree.get_root().get_node_or_null("GameState")
 	if gs == null:
@@ -606,4 +660,10 @@ static func setup_game_state(tree: SceneTree, data_node: Node) -> Node:
 		gs.set("Data", data_node)
 		tree.get_root().add_child(gs)
 		Engine.register_singleton("GameState", gs)
+	# 每個 process 只正規化一次：重複呼叫拿到同一個 node，不會把測試中途的狀態洗掉。
+	# 資料還沒 ready（autoload 的 _ready 尚未跑）時先不動，交給下一次呼叫，
+	# 避免發不出主角卡卻留下一個看起來已經起好的 run。
+	if not _test_run_started and data_node != null and data_node.get("loader") != null:
+		_test_run_started = true
+		start_fresh_run(gs)
 	return gs

@@ -668,6 +668,9 @@ func _test_runtime_gate() -> void:
 		_fail("GameState/Data 未就緒，跳過 runtime gate 測試")
 		return
 
+	# 前面的案例可能把 flow 留在 ending（撞發狂上限）；這裡要的是乾淨的一輪。
+	PlaythroughGreedy.start_fresh_run(gs)
+
 	# 進 D17 下午、備妥人物卡與主角卡、清掉可能殘留的選擇/放置
 	gs.set("day", 17)
 	gs.set("phase", "afternoon")
@@ -717,7 +720,7 @@ func _test_nb1_d8_be_regression() -> void:
 
 	var cap: int = int(data_node.call("tuning", "madness_cap", 7))
 	# 乾淨重置本輪與 meta seen（讓 D8 是終身首次），排到第 8 夜
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	(gs.get("night_locations_seen") as Dictionary).clear()
 	(gs.get("night_once_beats_seen") as Dictionary).clear()
 	(gs.get("beats_entered") as Dictionary).clear()
@@ -728,10 +731,10 @@ func _test_nb1_d8_be_regression() -> void:
 		gs.call("gain_card", "madness", false)
 
 	var ended := [0]
-	var cb := func(_eid: String): ended[0] += 1
-	gs.connect("run_ended", cb)
+	var cb := func(): ended[0] += 1
+	gs.connect("ending_started", cb)
 	gs.call("play_night_fixed")
-	gs.disconnect("run_ended", cb)
+	gs.disconnect("ending_started", cb)
 
 	# P5-B：撞上限改為啟動 ending_madness_be（不再重置本輪），
 	# 但「不得把 D8 beat 寫進已結束的輪」這條規約不變。

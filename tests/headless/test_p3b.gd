@@ -56,7 +56,10 @@ func _fail(msg: String) -> int:
 
 
 func _reset_gs(gs: Node) -> void:
-	gs.call("end_run")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("night_locations_seen", {})
 	gs.set("night_once_beats_seen", {})
 	gs.set("knowledge", {})
@@ -286,7 +289,7 @@ func _test_entry_cost_and_idempotency(gs: Node, _data_node: Node) -> int:
 # ── 4. 跨輪保留、第二輪重進不收費與序列化往返 ─────────────────────────────────
 
 func _test_meta_persistence_and_serialization(gs: Node, _data_node: Node) -> int:
-	print("--- 4. meta persistence across end_run, Loop 2 re-entry & serialization ---")
+	print("--- 4. meta persistence across run_reset, Loop 2 re-entry & serialization ---")
 	var failed := 0
 	_reset_gs(gs)
 
@@ -294,17 +297,17 @@ func _test_meta_persistence_and_serialization(gs: Node, _data_node: Node) -> int
 	gs.set("phase", "night")
 	gs.call("enter_night_location", "n_ahong_1")
 
-	# end_run 重置 run 層但保留 meta
-	gs.call("end_run")
+	# run_reset 重置 run 層但保留 meta
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	var seen_after: Dictionary = gs.get("night_locations_seen")
 	var chosen_after: String = str(gs.get("night_location_chosen"))
 	var slept_after: bool = bool(gs.get("night_sleep_pending"))
 
 	if bool(seen_after.get("n_ahong_1", false)) and chosen_after.is_empty() and not slept_after:
-		failed += _ok("end_run 後 meta night_locations_seen 保留，run 層 chosen 與 sleep_pending 清空")
+		failed += _ok("run_reset 後 meta night_locations_seen 保留，run 層 chosen 與 sleep_pending 清空")
 	else:
-		failed += _fail("end_run meta/run 分離異常 (seen=%s, chosen=%s, slept=%s)" % [str(seen_after), chosen_after, str(slept_after)])
+		failed += _fail("run_reset meta/run 分離異常 (seen=%s, chosen=%s, slept=%s)" % [str(seen_after), chosen_after, str(slept_after)])
 
 	# 第二輪（跨輪）再次進入已 seen 收費地點（終身首次收費反證）：
 	gs.set("day", 6)
@@ -357,9 +360,9 @@ func _test_cap_be_seen_retention(gs: Node, _data_node: Node) -> int:
 	gs.set("phase", "night")
 
 	var emitted_endings: Array[String] = []
-	var on_run_ended := func(eid: String) -> void:
-		emitted_endings.append(eid)
-	gs.connect("run_ended", on_run_ended)
+	var on_ending_started := func() -> void:
+		emitted_endings.append(str((gs.get("active_ending") as Dictionary).get("ending_id", "")))
+	gs.connect("ending_started", on_ending_started)
 
 	# 進入 cost=1 的收費地點 n_source -> 湊齊 7 張觸發 ending_madness_be
 	var res: Dictionary = gs.call("enter_night_location", "n_source")
@@ -381,7 +384,7 @@ func _test_cap_be_seen_retention(gs: Node, _data_node: Node) -> int:
 	else:
 		failed += _fail("撞 cap 時不應回傳提示文字 (lines: %s)" % str(res.get("lines")))
 
-	gs.disconnect("run_ended", on_run_ended)
+	gs.disconnect("ending_started", on_ending_started)
 	return failed
 
 
@@ -433,12 +436,12 @@ func _test_main_scene_cap_be_screen(tree: SceneTree, gs: Node, _data_node: Node)
 	else:
 		failed += _fail("BE 後狀態異常: mode=%s, day=%d, phase=%s, seen=%s" % [str(gs.get("flow_mode")), day_after, phase_after, str(seen_after)])
 
-	# legacy end_run 收尾（P5-D 由 complete_ending() 取代）
-	gs.call("end_run", "ending_madness_be")
+	# legacy run_reset 收尾（P5-D 由 complete_ending() 取代）
+	PlaythroughGreedy.start_fresh_run(gs)
 	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning" and bool(gs.call("night_location_seen", "n_ahong_1")):
-		failed += _ok("legacy end_run 後乾淨重啟至 D1 morning，且 meta night_locations_seen 成功保留")
+		failed += _ok("legacy run_reset 後乾淨重啟至 D1 morning，且 meta night_locations_seen 成功保留")
 	else:
-		failed += _fail("legacy end_run 後狀態異常: day=%d, phase=%s" % [int(gs.get("day")), str(gs.get("phase"))])
+		failed += _fail("legacy run_reset 後狀態異常: day=%d, phase=%s" % [int(gs.get("day")), str(gs.get("phase"))])
 
 	main.queue_free()
 	await tree.process_frame

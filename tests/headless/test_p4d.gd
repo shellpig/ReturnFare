@@ -75,13 +75,16 @@ func _err(msg: String) -> int:
 
 ## Helper: 建立乾淨測試環境
 func _reset_gs(gs: Node) -> void:
-	gs.end_run("test_reset")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.day = 1
 	gs.phase = "morning"
 	gs.hand.clear()
 	gs.hand.append("protagonist")
 	gs.knowledge.clear()
-	# P5-B：knowledge_at_start 是 end_run 當下的 knowledge 副本；這裡手動清 knowledge
+	# P5-B：knowledge_at_start 是 run_reset 當下的 knowledge 副本；這裡手動清 knowledge
 	# 之後也要一起清，否則兩條對照路徑的開輪基準會不同（K-139 逐字比對）。
 	(gs.get("knowledge_at_start") as Dictionary).clear()
 	gs.flags.clear()
@@ -328,12 +331,12 @@ func _test_mutation_blocking_during_encounter(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("enter_night_location is blocked during active encounter")
 
-	# 8. resolve_night_advance
-	var res_night_adv: Dictionary = gs.resolve_night_advance()
-	if bool(res_night_adv.get("advance", true)) or str(res_night_adv.get("reason_code", "")) != "encounter_active":
-		failed += _err("resolve_night_advance should be blocked with reason_code 'encounter_active'")
+	# 8. 夜間推進（P5-D 起由 advance_phase() 吸收，沒有第二個入口）
+	var res_night_adv: Dictionary = gs.advance_phase()
+	if bool(res_night_adv.get("ok", true)) or str(res_night_adv.get("reason_code", "")) != "encounter_active":
+		failed += _err("night advance_phase should be blocked with reason_code 'encounter_active'")
 	else:
-		failed += _ok("resolve_night_advance is blocked during active encounter")
+		failed += _ok("night advance_phase is blocked during active encounter")
 
 	_clean_mock_beat(data_node, "mock_enc_block")
 	return failed
@@ -1131,12 +1134,12 @@ func _test_after_finish_stay_and_advance(gs: Node, data_node: Node) -> int:
 	gs.respond_to_encounter("k_sol")
 
 	# P5-B：撞 cap 改為啟動 ending_madness_be，出口守衛必須擋掉 after_finish 的額外推進，
-	# day／phase 停在原地（不再有 end_run 的重置）。
+	# day／phase 停在原地（不再有 run_reset 的重置）。
 	if gs.day != 15 or gs.phase != "afternoon" or str(gs.get("flow_mode")) != "ending":
 		failed += _err("K-133 regression: BE 啟動後不得再推進時段，got day=%d, phase=%s, mode=%s" % [gs.day, gs.phase, str(gs.get("flow_mode"))])
 	else:
 		failed += _ok("K-133 regression: 結局啟動後守衛正確阻止 after_finish 的 advance_phase (K-133)")
-	gs.call("end_run", "ending_madness_be")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	_clean_mock_beat(data_node, "mock_enc_adv")
 	_clean_mock_beat(data_node, "mock_enc_stay")

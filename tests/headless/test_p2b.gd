@@ -5,6 +5,7 @@ extends SceneTree
 ##   Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p2b.gd
 ## 全綠 exit 0；任一失敗 exit 1。
 
+const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 const DataFacts := preload("res://scripts/core/data_facts.gd")
 const Indulgence := preload("res://scripts/core/indulgence.gd")
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
@@ -12,6 +13,7 @@ const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
 
 func _initialize() -> void:
 	var gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	gs.name = "GameState"
 	get_root().add_child(gs)
 	Engine.register_singleton("GameState", gs)
@@ -38,7 +40,7 @@ func _initialize() -> void:
 	failed += _test_conflicting_when_fixture()
 	failed += _test_lint_4_and_10(data_node)
 	failed += _test_serialize_roundtrip_p2b(gs)
-	failed += _test_end_run_resets_p2b(gs)
+	failed += _test_run_reset_resets_p2b(gs)
 
 	Engine.unregister_singleton("Data")
 	Engine.unregister_singleton("GameState")
@@ -65,7 +67,7 @@ func _fail(msg: String) -> int:
 
 func _test_exit_slots_visibility(gs: Node, data: Node) -> int:
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# 手上 0 張發狂卡時：山泉閣、老街、靜和園均無出口槽（HIDDEN，不進入 view model）
 	for loc_id in ["sanquan", "oldstreet", "jinghe"]:
@@ -146,7 +148,7 @@ func _test_exit_slots_visibility(gs: Node, data: Node) -> int:
 
 func _test_active_indulgence_smash(gs: Node, data: Node) -> int:
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 2)
 	gs.set("phase", "morning")
 	gs.call("gain_card", "madness") # madness#1
@@ -230,7 +232,7 @@ func _test_active_indulgence_smash(gs: Node, data: Node) -> int:
 
 func _test_soak_morning_vs_afternoon(gs: Node, data: Node) -> int:
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 5)
 	gs.set("phase", "morning")
 	gs.call("gain_card", "madness") # madness#1
@@ -275,7 +277,7 @@ func _test_soak_morning_vs_afternoon(gs: Node, data: Node) -> int:
 			failed += _ok("再次推進正常進入 evening")
 
 	# 下午點泡湯：三態呈 LOCKED 且理由為只能在上午發動
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 5)
 	gs.set("phase", "afternoon")
 	gs.call("gain_card", "madness") # madness#1
@@ -293,7 +295,7 @@ func _test_soak_morning_vs_afternoon(gs: Node, data: Node) -> int:
 		failed += _ok("下午呼叫 indulge 泡湯被正確拒絕且 GameState 零變化")
 
 	# 上午行動格已用時（格數不足）：
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 5)
 	gs.set("phase", "morning")
 	gs.set("action_spent", true)
@@ -318,7 +320,7 @@ func _test_soak_morning_vs_afternoon(gs: Node, data: Node) -> int:
 
 func _test_indulgence_rejection_paths(gs: Node, data: Node) -> int:
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 2)
 	gs.set("phase", "morning")
 	gs.call("gain_card", "madness") # madness#1
@@ -372,7 +374,7 @@ func _test_indulgence_level_escalation(gs: Node, data: Node) -> int:
 	failed += _ok("Indulgence.level_for 強度級查表正確 (1=light, 2~7=normal, 8=heavy)")
 
 	# 實測追加效果套用：
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 17)
 	gs.set("phase", "morning")
 	gs.call("gain_card", "madness") # madness#1
@@ -475,7 +477,7 @@ func _test_lint_4_and_10(data: Node) -> int:
 
 func _test_serialize_roundtrip_p2b(gs: Node) -> int:
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 10)
 	gs.set("phase", "morning")
 	gs.set("indulgence_count", 4)
@@ -485,6 +487,7 @@ func _test_serialize_roundtrip_p2b(gs: Node) -> int:
 	var d: Dictionary = gs.call("serialize")
 
 	var gs2: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs2.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	gs2.name = "GameState2"
 	get_root().add_child(gs2)
 	gs2.call("deserialize", d)
@@ -500,21 +503,21 @@ func _test_serialize_roundtrip_p2b(gs: Node) -> int:
 	return failed
 
 
-# ── 10. end_run 重置 ───────────────────────────────────────────────────────
+# ── 10. run_reset 重置 ───────────────────────────────────────────────────────
 
-func _test_end_run_resets_p2b(gs: Node) -> int:
+func _test_run_reset_resets_p2b(gs: Node) -> int:
 	var failed := 0
 	gs.set("indulgence_count", 5)
 	(gs.get("slots_placed") as Dictionary)["exit_sanquan::x_smash"] = true
 
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	if int(gs.get("indulgence_count")) != 0:
-		failed += _fail("end_run 後 indulgence_count 未重置為 0")
+		failed += _fail("run_reset 後 indulgence_count 未重置為 0")
 	elif not (gs.get("slots_placed") as Dictionary).is_empty():
-		failed += _fail("end_run 後 slots_placed 未清空")
+		failed += _fail("run_reset 後 slots_placed 未清空")
 	else:
-		failed += _ok("end_run 正確重置 indulgence_count 與 slots_placed")
+		failed += _ok("run_reset 正確重置 indulgence_count 與 slots_placed")
 
 	return failed
 

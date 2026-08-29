@@ -587,15 +587,16 @@ static func _run_walk_with_checkpoints(
 					if not overridden and not skipped:
 						PlaythroughGreedy.execute_action_phase(gs, data_node, d, phase)
 					if gs.phase == phase:
-						gs.advance_phase()
+						PlaythroughGreedy.advance_until_phase_changes(gs)
 				"evening":
 					PlaythroughGreedy.execute_evening_phase(gs, data_node, d)
 					if gs.phase == phase:
-						gs.advance_phase()
+						PlaythroughGreedy.advance_until_phase_changes(gs)
 				"night":
+					# P5-D：夜間停拍由 advance_phase() 吸收，第一次可能只回文字不換時段。
 					PlaythroughGreedy.execute_night_phase(gs, data_node, d, false)
 					if gs.phase == phase:
-						gs.advance_phase()
+						PlaythroughGreedy.advance_until_phase_changes(gs)
 
 	return true
 

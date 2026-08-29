@@ -12,6 +12,7 @@ const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 
 func _initialize() -> void:
 	var gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	gs.name = "GameState"
 	get_root().add_child(gs)
 	Engine.register_singleton("GameState", gs)

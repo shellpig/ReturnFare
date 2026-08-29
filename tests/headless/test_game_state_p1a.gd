@@ -12,6 +12,7 @@ const _GS_PATH := "res://scripts/autoload/game_state.gd"
 
 func _initialize() -> void:
 	var gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	gs.name = "GameState"
 	get_root().add_child(gs)
 	Engine.register_singleton("GameState", gs)
@@ -46,8 +47,13 @@ func _fail(msg: String) -> int:
 	return 1
 
 
+## P5-D：fresh state 是 opening。本檔驗的是時間軸本身，因此建好就切進 run
+## （開局選項的正式路徑由 test_p5d 驗）。
 func _new_gs() -> Object:
-	return load(_GS_PATH).new()
+	var gs: Object = load(_GS_PATH).new()
+	gs.set("flow_mode", "run")
+	gs.call("gain_card", "protagonist", false)
+	return gs
 
 
 # 壞 JSON fixture → DataLoader 回報錯誤，Data.ok = false 擋進遊戲
@@ -180,7 +186,7 @@ func _test_chapters() -> int:
 	return failed
 
 
-# 第 45 天：afternoon→evening 不進 night；evening 發出 run_ended
+# 第 45 天：afternoon→evening 不進 night；evening 發出 ending_started
 func _test_advance_day45() -> int:
 	print("--- advance_day45 ---")
 	var gs: Object = _new_gs()
@@ -188,7 +194,7 @@ func _test_advance_day45() -> int:
 
 	# Array 是引用類型，lambda 可以寫入（bool 是值類型，lambda 只拿到副本）
 	var fired: Array = []
-	gs.connect("run_ended", func(_id: String) -> void: fired.append(true))
+	gs.connect("ending_started", func() -> void: fired.append(true))
 
 	gs.set("day", 45)
 	gs.set("phase", "afternoon")
@@ -209,7 +215,7 @@ func _test_advance_day45() -> int:
 		failed += _ok("day45: day stays 45")
 
 	# P5-B：D45 evening 改由 d45_then 的 phase_exit 門檻接結局。
-	# 門檻未完成時不得離場，且不再有 end_run 的跨輪重置（正式結算在 P5-D）。
+	# 門檻未完成時不得離場，且不再有 run_reset 的跨輪重置（正式結算在 P5-D）。
 	(gs.get("flags") as Dictionary)["final_day"] = true
 	var gate_res: Dictionary = gs.call("advance_phase")
 	if str(gate_res.get("reason_code", "")) != "phase_requirements_incomplete":
@@ -224,9 +230,9 @@ func _test_advance_day45() -> int:
 	gs.call("advance_phase")
 
 	if fired.is_empty():
-		failed += _fail("day45 evening advance: run_ended signal not emitted")
+		failed += _fail("day45 evening advance: ending_started signal not emitted")
 	else:
-		failed += _ok("day45 evening advance: run_ended emitted")
+		failed += _ok("day45 evening advance: ending_started emitted")
 
 	var phase_final: String = gs.get("phase")
 	var day_final: int = int(gs.get("day"))
@@ -258,9 +264,16 @@ func _test_full_45_days_loop() -> int:
 	# 45 天 × 4 時段：Day 1 morning 到 Day 45 evening 需推進 178 次 advance_phase()
 	# P5-B／A1：D45 終局鏈現在是時段生命週期的一部分（morning 的 fixed beat 自動進場，
 	# afternoon 因此自動起遭遇）。本測試只驗時間軸本身，所以每一步先把遭遇清掉。
-	for i in range(178):
+	# P5-D：夜間第一次推進只把「直接睡」的文字停拍下來，不換時段，因此這裡數的是
+	# 真正換時段的次數（phase_advanced 為 true），不是按了幾次。
+	var advanced := 0
+	var guard := 0
+	while advanced < 178 and guard < 500:
+		guard += 1
 		(gs.get("active_encounter") as Dictionary).clear()
-		gs.call("advance_phase")
+		var step_res: Dictionary = gs.call("advance_phase")
+		if bool(step_res.get("phase_advanced", false)):
+			advanced += 1
 
 	var failed := 0
 	if gs.get("day") != 45 or gs.get("phase") != "evening":

@@ -15,6 +15,7 @@ func _initialize() -> void:
 	var gs_created := false
 	if gs == null:
 		gs = load("res://scripts/autoload/game_state.gd").new()
+		gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 		gs.name = "GameState"
 		get_root().add_child(gs)
 		Engine.register_singleton("GameState", gs)
@@ -41,7 +42,7 @@ func _initialize() -> void:
 	failed += _test_madness_cap_triggers_be(gs, data_node)
 	failed += await _test_be_flow_text_display()
 	failed += _test_state_reset_after_be(gs, data_node)
-	failed += _test_single_run_ended_emission_on_batch_gain(gs, data_node)
+	failed += _test_single_ending_started_emission_on_batch_gain(gs, data_node)
 	failed += _test_real_data_cap_unreached_in_run1(gs, data_node)
 
 	if data_created:
@@ -72,7 +73,7 @@ func _fail(msg: String) -> int:
 func _test_vision_threshold_visibility(gs: Node, data_node: Node) -> int:
 	print("--- 1. vision threshold visibility (madness_at_least) ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# 合成測試用 beat，掛 condition: { "madness_at_least": 3 }
 	var test_beat_id := "test_beat_vision_threshold"
@@ -185,7 +186,7 @@ func _test_vision_threshold_visibility(gs: Node, data_node: Node) -> int:
 	loader.beats_by_id.erase(test_beat_id)
 
 	# (e) 真資料驗證（K-64）：ch2_nights.json 颱風夜 d23_night_bleed (madness_at_least: 3)
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 23)
 	gs.set("phase", "night")
 	var d23_beat: Dictionary = loader.beats_by_id.get("d23_night_bleed", {})
@@ -217,7 +218,7 @@ func _test_vision_threshold_visibility(gs: Node, data_node: Node) -> int:
 			failed += _ok("降至 2 張後真資料 d23_night_bleed 重新關閉為 false")
 
 	# (f) 真資料驗證（K-64）：ch2_nights.json d24_night_bleed (boundary_bleeding + madness_at_least: 3)
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 24)
 	gs.set("phase", "night")
 	gs.call("set_flag", "boundary_bleeding", true)
@@ -239,7 +240,7 @@ func _test_vision_threshold_visibility(gs: Node, data_node: Node) -> int:
 			failed += _ok("3 張發狂卡時真資料 d24_night_bleed 成功解鎖為 true (K-64)")
 
 	# (g) 真資料驗證（K-64）：indulgence_exits.json exit_sanquan (madness_at_least: 1)
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 1)
 	gs.set("phase", "morning")
 	var exit_beat: Dictionary = loader.beats_by_id.get("exit_sanquan", {})
@@ -265,16 +266,16 @@ func _test_vision_threshold_visibility(gs: Node, data_node: Node) -> int:
 func _test_madness_cap_triggers_be(gs: Node, data_node: Node) -> int:
 	print("--- 2. madness_cap triggers madness BE immediately ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	var loader: DataLoader = data_node.get("loader")
 	var orig_cap = loader.tuning["madness_cap"]
 	loader.tuning["madness_cap"] = 2
 
 	var endings_received: Array[String] = []
-	var on_run_ended := func(eid: String) -> void:
-		endings_received.append(eid)
-	gs.connect("run_ended", on_run_ended)
+	var on_ending_started := func() -> void:
+		endings_received.append(str((gs.get("active_ending") as Dictionary).get("ending_id", "")))
+	gs.connect("ending_started", on_ending_started)
 
 	# 拿第 1 張卡：未達 cap (1/2)
 	gs.call("gain_card", "madness")
@@ -290,7 +291,7 @@ func _test_madness_cap_triggers_be(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("達到 cap 2 時未正確觸發 BE (received=%s)" % str(endings_received))
 
-	gs.disconnect("run_ended", on_run_ended)
+	gs.disconnect("ending_started", on_ending_started)
 	loader.tuning["madness_cap"] = orig_cap
 	return failed
 
@@ -311,8 +312,9 @@ func _test_be_flow_text_display() -> int:
 	get_root().add_child(main)
 	await process_frame
 
-	# 觸發一般結局（透過 GameState 發射 run_ended）
-	gs.call("end_run", "ending_default")
+	# 一般結局分支：直接發 ending_started（此時沒有 active ending），驗的是訊號接線本身。
+	PlaythroughGreedy.start_fresh_run(gs)
+	gs.ending_started.emit()
 	await process_frame
 	var flow_text: FlowText = main.get_node("ContentView/FlowText")
 	var text_default := flow_text.get_text() if flow_text.has_method("get_text") else ""
@@ -324,7 +326,7 @@ func _test_be_flow_text_display() -> int:
 	else:
 		failed += _fail("一般結局未顯示 [結局 stub] (text=%s)" % text_default)
 
-	# 透過真實規則層入口發卡衝破 cap 觸發發瘋 BE（K-67：驗證 GameState.run_ended 訊號接線）
+	# 透過真實規則層入口發卡衝破 cap 觸發發瘋 BE（K-67：驗證 GameState.ending_started 訊號接線）
 	loader.tuning["madness_cap"] = 2
 	gs.call("gain_card", "madness")
 	gs.call("gain_card", "madness")
@@ -350,7 +352,7 @@ func _test_be_flow_text_display() -> int:
 func _test_state_reset_after_be(gs: Node, data_node: Node) -> int:
 	print("--- 4. state reset after madness BE ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# 設置一些 run 層與 meta 層狀態
 	gs.set("day", 15)
@@ -393,8 +395,8 @@ func _test_state_reset_after_be(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("BE 啟動後 run 不應被清空 (hand=%s)" % str(hand))
 
-	# legacy end_run 收尾（P5-D 由 complete_ending() 取代）後才做跨輪重置驗收
-	gs.call("end_run", "ending_madness_be")
+	# legacy run_reset 收尾（P5-D 由 complete_ending() 取代）後才做跨輪重置驗收
+	PlaythroughGreedy.start_fresh_run(gs)
 	var hand_reset: Array = gs.get("hand")
 	var knowledge_reset: Dictionary = gs.get("knowledge")
 	var flags_reset: Dictionary = gs.get("flags")
@@ -403,9 +405,9 @@ func _test_state_reset_after_be(gs: Node, data_node: Node) -> int:
 	var clock_reset: Dictionary = gs.get("madness_clock")
 
 	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
-		failed += _ok("legacy end_run 後回到第 1 天 morning")
+		failed += _ok("legacy run_reset 後回到第 1 天 morning")
 	else:
-		failed += _fail("legacy end_run 後時間未重置為 D1 morning (day=%d, phase=%s)" % [int(gs.get("day")), str(gs.get("phase"))])
+		failed += _fail("legacy run_reset 後時間未重置為 D1 morning (day=%d, phase=%s)" % [int(gs.get("day")), str(gs.get("phase"))])
 
 	if hand_reset == ["protagonist"]:
 		failed += _ok("重置後手牌只剩主角卡")
@@ -431,12 +433,12 @@ func _test_state_reset_after_be(gs: Node, data_node: Node) -> int:
 	return failed
 
 
-# ── 5. 批次發卡衝破 cap 時 run_ended 恰好發射一次且無重置污染 ────────────────
+# ── 5. 批次發卡衝破 cap 時 ending_started 恰好發射一次且無重置污染 ────────────────
 
-func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) -> int:
-	print("--- 5. batch gain over cap emits run_ended exactly once ---")
+func _test_single_ending_started_emission_on_batch_gain(gs: Node, data_node: Node) -> int:
+	print("--- 5. batch gain over cap emits ending_started exactly once ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	var loader: DataLoader = data_node.get("loader")
 	var orig_cap = loader.tuning["madness_cap"]
@@ -455,9 +457,9 @@ func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) ->
 	loader.locations[test_loc_id] = test_loc
 
 	var emitted_endings: Array[String] = []
-	var on_run_ended := func(eid: String) -> void:
-		emitted_endings.append(eid)
-	gs.connect("run_ended", on_run_ended)
+	var on_ending_started := func() -> void:
+		emitted_endings.append(str((gs.get("active_ending") as Dictionary).get("ending_id", "")))
+	gs.connect("ending_started", on_ending_started)
 
 	# 手上原本有 1 張發狂卡
 	gs.call("gain_card", "madness")
@@ -467,9 +469,9 @@ func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) ->
 	gs.call("enter_night_location", test_loc_id)
 
 	if emitted_endings.size() == 1 and emitted_endings == ["ending_madness_be"]:
-		failed += _ok("一次發多張衝破 cap 時，run_ended 恰好發射 1 次")
+		failed += _ok("一次發多張衝破 cap 時，ending_started 恰好發射 1 次")
 	else:
-		failed += _fail("run_ended 發射次數不符 (count=%d, endings=%s)" % [emitted_endings.size(), str(emitted_endings)])
+		failed += _fail("ending_started 發射次數不符 (count=%d, endings=%s)" % [emitted_endings.size(), str(emitted_endings)])
 
 	# P5-B：批次發卡衝破 cap 只啟動一次結局，四張卡都留在快照所描述的這一輪。
 	var hand_after: Array = gs.get("hand")
@@ -479,14 +481,14 @@ func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) ->
 	else:
 		failed += _fail("批次發卡後狀態異常 (hand=%s, clock=%s, mode=%s)" % [str(hand_after), str(clock_after), str(gs.get("flow_mode"))])
 
-	gs.call("end_run", "ending_madness_be")
+	PlaythroughGreedy.start_fresh_run(gs)
 	var hand_reset: Array = gs.get("hand")
 	if hand_reset == ["protagonist"] and (gs.get("madness_clock") as Dictionary).is_empty():
-		failed += _ok("legacy end_run 後手牌為乾淨的 ['protagonist']，後續發卡未污染新一輪")
+		failed += _ok("legacy run_reset 後手牌為乾淨的 ['protagonist']，後續發卡未污染新一輪")
 	else:
 		failed += _fail("重置後手牌受後續發卡污染 (hand=%s)" % str(hand_reset))
 
-	gs.disconnect("run_ended", on_run_ended)
+	gs.disconnect("ending_started", on_ending_started)
 	loader.locations.erase(test_loc_id)
 	loader.tuning["madness_cap"] = orig_cap
 	return failed
@@ -497,7 +499,7 @@ func _test_single_run_ended_emission_on_batch_gain(gs: Node, data_node: Node) ->
 func _test_real_data_cap_unreached_in_run1(gs: Node, data_node: Node) -> int:
 	print("--- 6. real data 45-day playthrough never reaches madness BE (K-63) ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	var res: Dictionary = PlaythroughGreedy.run_greedy_walk(gs, data_node, false)
 	if not bool(res.get("ok", false)):
@@ -512,11 +514,11 @@ func _test_real_data_cap_unreached_in_run1(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("走查結局異常 (last_ending_id=%s)" % last_ending)
 
-	var run_ended_cnt: int = int(res.get("run_ended_count", 0))
-	if run_ended_cnt == 1:
-		failed += _ok("走查全程 run_ended 恰好發射 1 次")
+	var ending_started_cnt: int = int(res.get("ending_started_count", 0))
+	if ending_started_cnt == 1:
+		failed += _ok("走查全程 ending_started 恰好發射 1 次")
 	else:
-		failed += _fail("走查全程 run_ended 發射次數不符 (實際: %d)" % run_ended_cnt)
+		failed += _fail("走查全程 ending_started 發射次數不符 (實際: %d)" % ending_started_cnt)
 
 	var final_madness: int = (res.get("final_madness_cards", []) as Array).size()
 	var cap: int = int(data_node.call("tuning", "madness_cap"))

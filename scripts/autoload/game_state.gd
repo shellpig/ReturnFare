@@ -92,7 +92,7 @@ var last_auto_enter_lines: PackedStringArray = [] # 當前時段自動進場 bea
 var run_generation: int = 0                    # 輪次世代計數（單調遞增，供 EffectApply 與結算器偵測 end_run）
 
 # --- 頂層流程與結局狀態機（P5-B）---
-var flow_mode: String = FLOW_RUN               # opening／run／ending；P5-D 才把 fresh boot 預設改為 opening
+var flow_mode: String = FLOW_OPENING           # opening／run／ending；fresh boot 一律從開局進場（P5-D）
 var active_ending: Dictionary = {}             # 空＝序列化的 null；只有 ending mode 非空
 var opening_choice_id: String = ""             # 本輪由哪個開局選項進場；""＝序列化的 null（run 層）
 var knowledge_at_start: Dictionary = {}        # 開輪時的 knowledge set；只供結局凍結當輪新增知識（run 層）
@@ -106,7 +106,6 @@ var pending_ending_request: Dictionary = {}    # 複本上記下的結局請求�
 signal phase_changed(day: int, phase: String)
 signal day_changed(day: int)
 signal chapter_changed(chapter: int)
-signal run_ended(ending_id: String)            # P5-D 退場；P5-B 期間仍發，讓既有結局 stub UI 不斷線
 signal flow_mode_changed(mode: String)
 signal ending_started
 signal ending_page_changed
@@ -122,47 +121,106 @@ func chapter() -> int:
 	return DataFacts.chapter_for_day(day)
 
 
+## 時段推進的唯一公開入口（開發設計方針 P5-D）。
+## 固定七步：
+##   ① `flow.mode != "run"` → `not_run`
+##   ② active encounter → `encounter_active`
+##   ③ 夜間停拍：已選地點直接續行；`night_sleep_pending` 由本次 transition 清掉後續行；
+##      兩者皆無才解析睡覺，有文字就只停拍（`phase_advanced:false`），無文字才續行
+##   ④ 當下所有逾期 choice group default 的純 preflight → `unresolved_choice_conflict`
+##   ⑤ 當下所有 fixed beat 的 `phase_exit` 門檻 → `phase_requirements_incomplete`
+##   ⑥ 目標 day／phase 與可能的 ending／source／snapshot 驗證 → `data_conflict`
+##   ⑦ 一次 commit 逾期預設與 transition（或 D45 結局）
+## 任一拒絕都必須完整 serialize 零變化。
+## 回傳：{ ok, reason_code, reason_text, lines, phase_advanced }
 func advance_phase() -> Dictionary:
+	# ① mode gate
 	if flow_mode != FLOW_RUN:
-		return { "ok": false, "reason_code": "not_run", "reason_text": _REASON_TEXT_NOT_RUN, "lines": PackedStringArray(), "phase_advanced": false }
+		return _advance_reject("not_run", _REASON_TEXT_NOT_RUN)
 
+	# ② 遭遇進行中
 	if not active_encounter.is_empty():
-		return { "ok": false, "reason_code": "encounter_active", "reason_text": "遭遇進行中，無法推進時段", "lines": PackedStringArray(), "phase_advanced": false }
+		return _advance_reject("encounter_active", "遭遇進行中，無法推進時段")
 
-	# 通用 phase_exit 門檻（SCHEMA phase_exit、P5-B）：規則層只掃當下 fixed beat 的資料欄位，
-	# 不看 beat id 或槽 id 字面值。門檻成立且掛結局時啟動結局，不先改 day／phase。
+	# ③ 夜間停拍。只有「還沒選地點也還沒睡過」才需要解析睡覺；
+	#    此時若真的有內容就停在原時段，讓玩家先讀完再按一次。
+	#    解析睡覺本身會結算 beat，因此刻意排在 ④ 之前——它成功時直接回傳，
+	#    不會與後面的拒絕碼共用同一條路徑。
+	if phase == "night" and night_location_chosen.is_empty() and not night_sleep_pending:
+		var sleep_lines := sleep_night()
+		if sleep_lines.size() > 0:
+			night_sleep_pending = true
+			return { "ok": true, "reason_code": "", "reason_text": "", "lines": sleep_lines, "phase_advanced": false }
+		# 睡覺內容的效果也可能把玩家推進結局，之後就不該再推進時段。
+		if flow_mode != FLOW_RUN:
+			return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "phase_advanced": false }
+
+	# ④ 逾期 choice group default：只 preflight，不落地。
+	var defaults := resolve_unfinished_choice_groups()
+	if not bool(defaults.get("ok", false)):
+		return _advance_reject("unresolved_choice_conflict", str(defaults.get("reason_text", "")))
+	var default_plan: Dictionary = defaults.get("plan", {}) as Dictionary
+
+	# ⑤ 通用 phase_exit 門檻（SCHEMA phase_exit、P5-B）：規則層只掃當下 fixed beat 的
+	#    資料欄位，不看 beat id 或槽 id 字面值。
 	var gate := _phase_exit_gate()
-	if bool(gate.get("has_gate", false)):
-		if not bool(gate.get("satisfied", false)):
-			return { "ok": false, "reason_code": "phase_requirements_incomplete", "reason_text": "本時段的內容尚未完成", "lines": PackedStringArray(), "phase_advanced": false }
-		var gate_ending := str(gate.get("ending", ""))
-		if not gate_ending.is_empty():
-			var start_res := start_ending(gate_ending, str(gate.get("source", "")))
-			return {
-				"ok": bool(start_res.get("ok", false)),
-				"reason_code": str(start_res.get("reason_code", "")),
-				"reason_text": str(start_res.get("reason_text", "")),
-				"lines": PackedStringArray(),
-				"phase_advanced": false,
-			}
+	var has_gate := bool(gate.get("has_gate", false))
+	if has_gate and not bool(gate.get("satisfied", false)):
+		return _advance_reject("phase_requirements_incomplete", "本時段的內容尚未完成")
+
+	var gate_ending := str(gate.get("ending", "")) if has_gate else ""
 
 	# 第二道防線：最後一天的 evening 只有結局一個出口。門檻沒接上（資料壞掉或
 	# 條件不成立）時寧可卡在原地，也不能讓時段機把玩家送進第 46 天。
-	if day == LAST_DAY and phase == "evening":
-		return { "ok": false, "reason_code": "phase_requirements_incomplete", "reason_text": "本時段的內容尚未完成", "lines": PackedStringArray(), "phase_advanced": false }
+	if day == LAST_DAY and phase == "evening" and gate_ending.is_empty():
+		return _advance_reject("phase_requirements_incomplete", "本時段的內容尚未完成")
 
+	# ⑥ 目標與結局資料驗證。逾期預設會影響結局快照（D29 的代付者就是這樣凍結的），
+	#    因此快照要在「已套完預設」的複本上算，不能用當下狀態。
+	var ending_snapshot: Dictionary = {}
+	if not gate_ending.is_empty():
+		var ending_shadow := clone_for_preflight()
+		_commit_choice_default_plan(default_plan, ending_shadow)
+		var plan := _build_ending_plan(gate_ending, str(gate.get("source", "")), ending_shadow)
+		ending_shadow.free()
+		if not bool(plan.get("ok", false)):
+			return _advance_reject("data_conflict", str(plan.get("reason_text", "")))
+		ending_snapshot = plan.get("snapshot", {}) as Dictionary
+	elif day >= LAST_DAY and phase == PHASES[PHASES.size() - 1]:
+		# 最後一天沒有 night，走到這裡代表資料把玩家帶往第 46 天。
+		return _advance_reject("data_conflict", "推進目標超出最後一天")
+
+	# ⑦ 一次 commit：先落地逾期預設，再走 transition 或啟動結局。
+	_commit_choice_default_plan(default_plan, self)
+	var lines: PackedStringArray = defaults.get("lines", PackedStringArray())
+
+	if not ending_snapshot.is_empty():
+		_commit_ending_plan(ending_snapshot)
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines, "phase_advanced": false }
+
+	_commit_phase_transition()
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines, "phase_advanced": true }
+
+
+func _advance_reject(code: String, text: String) -> Dictionary:
+	return { "ok": false, "reason_code": code, "reason_text": text, "lines": PackedStringArray(), "phase_advanced": false }
+
+
+## 真正換時段的那一步。只在 advance_phase() 第 ⑦ 步呼叫，別處不得複製一份。
+func _commit_phase_transition() -> void:
 	var prev_ch := chapter()
 
-	# 第 45 天特殊路徑：afternoon → evening（結局 coda）；evening 由上方 phase_exit 門檻接結局，不進 night
+	# 第 45 天特殊路徑：afternoon → evening（結局 coda）；evening 由 phase_exit 門檻接結局，不進 night
 	if day == LAST_DAY and phase == "afternoon":
 		phase = "evening"
 		action_spent = false
 		last_forced_lines.clear()
 		last_delegation_report_lines.clear()
 		last_auto_enter_lines = _settle_auto_enter_beats()
-		_check_fixed_encounter_for_current_phase()
+		if flow_mode == FLOW_RUN:
+			_check_fixed_encounter_for_current_phase()
 		phase_changed.emit(day, phase)
-		return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "phase_advanced": true }
+		return
 
 	last_forced_lines.clear()
 	last_delegation_report_lines.clear()
@@ -215,8 +273,6 @@ func advance_phase() -> Dictionary:
 	if new_ch != prev_ch:
 		chapter_changed.emit(new_ch)
 
-	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "phase_advanced": true }
-
 
 ## 進入時段時自動結算的 fixed beat（SCHEMA `auto_enter`）。
 ## 這類 beat 是時段生命週期的一部分，不能等玩家主動打開某個地點才成立——
@@ -238,28 +294,31 @@ func _settle_auto_enter_beats() -> PackedStringArray:
 	return lines
 
 
-## 輪結束結算與迴圈重置（規格書第十六節、P1-F、B-02）。
-## 順序固定：發射 run_ended -> meta 層保留 -> run 層重置 -> 回第 1 天 morning。
-func end_run(ending_id: String = "ending_default") -> void:
+## P1～P4 run 層欄位的唯一窮舉清除點（開發設計方針 P5-D）。
+## **不重建主角卡**——手牌由 `choose_opening()` 依開局選項與跨輪魔法物品重新組裝。
+## meta 層（knowledge、night seen、教學、run_number、ending_history、persistent set）一律不動。
+func _reset_run_state() -> void:
 	run_generation += 1
-	run_ended.emit(ending_id)
 
 	day = 1
 	phase = PHASES[0]
 	action_spent = false
 	_actions_spent_ahead = 0
+
 	hand.clear()
-	hand.append("protagonist")
+	madness_clock.clear()
+	_madness_counter = 0
+
+	beats_entered.clear()
+	slots_placed.clear()
+	choices.clear()
+
 	flags.clear()
 	switches.clear()
 	switch_progress.clear()
 	relations.clear()
-	slots_placed.clear()
-	choices.clear()
-	beats_entered.clear()
 	npc_action_counts.clear()
-	madness_clock.clear()
-	_madness_counter = 0
+
 	night_location_chosen = ""
 	night_sleep_pending = false
 	indulgence_count = 0
@@ -267,23 +326,16 @@ func end_run(ending_id: String = "ending_default") -> void:
 	forced_pending.clear()
 	last_forced_lines.clear()
 	last_auto_enter_lines.clear()
+
 	delegates_used_today.clear()
 	pending_delegation_reports.clear()
 	last_delegation_report_lines.clear()
+
 	active_encounter.clear()
 
-	# P5-B：legacy 重置也要把 flow 層帶回 run，避免留下半個結局狀態。
-	# 正式的輪結束結算（history／run_number／回 opening）在 P5-D 的 complete_ending() 一次落地。
-	flow_mode = FLOW_RUN
-	active_ending.clear()
 	opening_choice_id = ""
+	knowledge_at_start.clear()
 	selected_festival_proxy_npc = ""
-	knowledge_at_start = knowledge.duplicate()
-
-	day_changed.emit(day)
-	phase_changed.emit(day, phase)
-	chapter_changed.emit(chapter())
-	hand_changed.emit()
 
 
 # ── 頂層流程與結局狀態機（P5-B）─────────────────────────────────────────────
@@ -445,8 +497,6 @@ func _commit_ending_plan(snapshot: Dictionary) -> void:
 	flow_mode = FLOW_ENDING
 	flow_mode_changed.emit(FLOW_ENDING)
 	ending_started.emit()
-	# P5-D 退場：留著讓既有結局 stub UI 與走查腳本不斷線。
-	run_ended.emit(str(snapshot.get("ending_id", "")))
 
 
 ## 本輪新增的知識卡，依 `cards.json` 資料順序輸出，確保快照可逐字比較。
@@ -585,6 +635,290 @@ func _page_ref_playable(idx: int) -> bool:
 	if Data == null or Data.loader == null:
 		return false
 	return bool(EndingResolver.resolve_ref(str(refs[idx]), Data.loader).get("ok", false))
+
+
+# ── 開局、歷輪摘要與跨輪重置（P5-D）─────────────────────────────────────────
+
+## 結局結算時發給玩家的跨輪知識卡。資料層由 lint 保證它存在且是 slotless 知識卡。
+const RETURNED_KNOWLEDGE_CARD := "k_i_returned"
+
+## history record 的封閉欄位集合。active snapshot 的結果摘要，
+## **不含** `source_id`、`page_refs`、頁面進度或任何 UI 字串。
+const HISTORY_RECORD_KEYS := [
+	"run_number", "ending_id", "opening_choice_id", "ended_day", "ended_phase",
+	"partner_variant", "livelihood_variant", "inn_appearance_variant",
+	"festival_proxy_npc", "knowledge_gained_this_run",
+]
+
+
+## 開局畫面的唯一查詢入口。依 `opening_choices.json` 資料順序回傳，
+## 只給玩家看得到的字串與鎖定理由，不洩漏 unlock condition 或 `on_select`。
+func opening_view() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if Data == null or Data.loader == null:
+		return out
+	for choice: Dictionary in Data.loader.opening_choices:
+		var available := ConditionEval.eval(choice.get("requires"), self)
+		out.append({
+			"id": str(choice.get("id", "")),
+			"label": str(choice.get("label", "")),
+			"preview": str(choice.get("preview", "")),
+			"confirm_text": str(choice.get("confirm_text", "")),
+			"available": available,
+			"reason_text": "" if available else str(choice.get("reject_reason", _REASON_LOCKED_FALLBACK)),
+		})
+	return out
+
+
+## 開局選項的唯一確認入口。檢查順序固定：
+## mode opening → choice 存在 → unlock 成立 → 資料形狀合法。
+## `on_select` 形狀初始化 run；`ending` 形狀不建立 run，直接進結局。
+## 拒絕後完整序列化零變化。
+func choose_opening(choice_id: String) -> Dictionary:
+	if flow_mode != FLOW_OPENING:
+		return _mutation_reject("not_opening", "目前不在開局中")
+	if Data == null or Data.loader == null:
+		return _mutation_reject("data_conflict", "資料未載入")
+
+	var choice: Dictionary = Data.loader.opening_choices_by_id.get(choice_id, {}) as Dictionary
+	if choice.is_empty():
+		return _mutation_reject("unknown_opening_choice", "未知的開局選項：%s" % choice_id)
+
+	if not ConditionEval.eval(choice.get("requires"), self):
+		return _mutation_reject("opening_choice_locked", str(choice.get("reject_reason", _REASON_LOCKED_FALLBACK)))
+
+	# SCHEMA：每筆必須在 `on_select` 與 `ending` 中恰有一個。
+	var has_ending := not str(choice.get("ending", "")).is_empty()
+	var on_select_raw: Variant = choice.get("on_select")
+	var has_select: bool = on_select_raw is Dictionary and not (on_select_raw as Dictionary).is_empty()
+	if has_ending == has_select:
+		return _mutation_reject("data_conflict", "開局選項必須恰有一個 on_select 或 ending：%s" % choice_id)
+
+	if has_ending:
+		return _start_ending_from_opening(choice_id)
+	return _start_run_from_opening(choice_id, on_select_raw as Dictionary)
+
+
+## 相簿／電話兩條開局的原子初始化。
+## 驗證全部在複本上完成：複本先走完「重置 → 主角卡 → 恢復魔法物品 → 凍結開輪知識」，
+## `on_select` 才在真正的開局初態上求值，避免上一輪殘留讓效果誤過或誤擋。
+func _start_run_from_opening(choice_id: String, on_select: Dictionary) -> Dictionary:
+	var probe := clone_for_preflight()
+	_apply_run_initialization(probe)
+	var pf := EffectApply.preflight([on_select], probe)
+	probe.free()
+	if not bool(pf.get("ok", false)):
+		return _mutation_reject("data_conflict", str(pf.get("reason_text", "")))
+	var pf_shadow: Node = pf.get("shadow")
+	var raised_ending: bool = not (pf.get("ending_request", {}) as Dictionary).is_empty()
+	if pf_shadow != null:
+		pf_shadow.free()
+	if raised_ending:
+		return _mutation_reject("data_conflict", "開局選項的 on_select 不得啟動結局")
+
+	_apply_run_initialization(self)
+	EffectApply.commit(pf.get("plan", {}) as Dictionary, self)
+	opening_choice_id = choice_id
+	flow_mode = FLOW_RUN
+
+	flow_mode_changed.emit(FLOW_RUN)
+	day_changed.emit(day)
+	phase_changed.emit(day, phase)
+	chapter_changed.emit(chapter())
+	hand_changed.emit()
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray() }
+
+
+## run 初始化的固定順序，真狀態與複本共用同一條：
+## `_reset_run_state()` → 主角卡 → 按 `cards.json` 資料順序恢復跨輪魔法物品 → 凍結開輪知識。
+## 恢復回來的物品仍是普通手牌，照樣服從卡片既有的佔格與唯一性規則。
+func _apply_run_initialization(target: Node) -> void:
+	target.call("_reset_run_state")
+	target.call("gain_card", "protagonist", false)
+	if Data != null and Data.loader != null:
+		var persistent: Dictionary = target.get("loop_persistent_item_ids") as Dictionary
+		for card_id: Variant in Data.loader.cards.keys():
+			var cid := str(card_id)
+			if persistent.has(cid):
+				target.call("gain_card", cid, false)
+	target.set("knowledge_at_start", (target.get("knowledge") as Dictionary).duplicate())
+
+
+## 正式的輪結束結算：任何結局都只從這裡回到開局。固定順序為
+## 驗 mode／active／ready → 在記憶體中建好並驗完 history record → append →
+## 取得「我回來過」→ `run_number += 1` → `_reset_run_state()` → 清 active → mode opening。
+## 前三步依序回 `not_ending`、`no_active_ending`、`not_ready`；record 或引用不合法回
+## `data_conflict`，且全部發生在 append 前。成功後 mode 已是 opening，重試自然回 `not_ending`。
+func complete_ending() -> Dictionary:
+	if flow_mode != FLOW_ENDING:
+		return _mutation_reject("not_ending", "目前不在結局中")
+	if active_ending.is_empty():
+		return _mutation_reject("no_active_ending", "沒有進行中的結局")
+	if not bool(active_ending.get("ready_to_complete", false)):
+		return _mutation_reject("not_ready", "結局尚未播完")
+
+	var record := _build_history_record(active_ending)
+	if record.is_empty():
+		return _mutation_reject("data_conflict", "結局結果不合法，無法寫入歷輪摘要")
+	if Data == null or Data.loader == null or not Data.loader.cards.has(RETURNED_KNOWLEDGE_CARD):
+		return _mutation_reject("data_conflict", "缺少跨輪知識卡：%s" % RETURNED_KNOWLEDGE_CARD)
+
+	ending_history.append(record)
+	# history 的 knowledge_gained_this_run 取自凍結快照，因此不含這一步才發的知識卡。
+	gain_card(RETURNED_KNOWLEDGE_CARD)
+	run_number += 1
+	_reset_run_state()
+	active_ending.clear()
+	flow_mode = FLOW_OPENING
+
+	flow_mode_changed.emit(FLOW_OPENING)
+	opening_started.emit()
+	hand_changed.emit()
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray() }
+
+
+## 由 active snapshot 建 history record 並驗完所有引用。任一不合法回空字典（＝ data_conflict）。
+## 只複製封閉欄位集合，不整包帶進 page 進度或 source。
+func _build_history_record(snapshot: Dictionary) -> Dictionary:
+	if Data == null or Data.loader == null:
+		return {}
+	if not Data.loader.endings_by_id.has(str(snapshot.get("ending_id", ""))):
+		return {}
+
+	var opening_ref: Variant = snapshot.get("opening_choice_id")
+	if not _is_null_or_filled_string(opening_ref):
+		return {}
+	if opening_ref != null and not Data.loader.opening_choices_by_id.has(str(opening_ref)):
+		return {}
+
+	var proxy_ref: Variant = snapshot.get("festival_proxy_npc")
+	if not _is_null_or_filled_string(proxy_ref):
+		return {}
+	if proxy_ref != null and not _is_festival_candidate(str(proxy_ref)):
+		return {}
+
+	for key: String in ENDING_VARIANT_KEYS:
+		if not _is_null_or_filled_string(snapshot.get(key)):
+			return {}
+
+	var gained: Array[String] = []
+	for card_id: Variant in snapshot.get("knowledge_gained_this_run", []) as Array:
+		var cid := str(card_id)
+		if not Data.loader.cards.has(cid):
+			return {}
+		gained.append(cid)
+
+	var record: Dictionary = {}
+	for key: String in HISTORY_RECORD_KEYS:
+		if not snapshot.has(key):
+			return {}
+		record[key] = snapshot[key]
+	record["knowledge_gained_this_run"] = gained
+	return record
+
+
+## 當下 day／phase 所有逾期 choice group 的 default 結算計畫（只 preflight，不落地）。
+## 掃描條件：父 beat 為 `fixed` 且三態成立、group 仍未結算、組內有 `default_if_unresolved` 槽。
+## **不以 `beats_entered` 或面板是否開過為前置**——沒進過面板與明示走開結果必須相同。
+## 任何一筆不合法就整批失敗，成功 plan 由 `advance_phase()` 最後一步一次 commit。
+## 回傳：{ ok, reason_code, reason_text, lines, plan }
+func resolve_unfinished_choice_groups() -> Dictionary:
+	var groups := _pending_default_groups()
+	if groups.is_empty():
+		return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "plan": {} }
+
+	var shadow := clone_for_preflight()
+	var steps: Array[Dictionary] = []
+	var lines := PackedStringArray()
+	var expects_proxy := false
+
+	for group: Dictionary in groups:
+		var slot: Dictionary = group.get("slot", {}) as Dictionary
+		var effect: Dictionary = slot.get("on_place", {}) as Dictionary
+		if effect.has("festival_proxy"):
+			expects_proxy = true
+		var bookkeeping := {
+			"choice_key": str(group.get("beat_id", "")) + "::" + str(group.get("group_id", "")),
+			"choice_slot_id": str(group.get("slot_id", "")),
+			"slot_key": str(group.get("beat_id", "")) + "::" + str(group.get("slot_id", "")),
+		}
+		# bookkeeping 先落在複本上，後面那一組的 condition 才看得到前一組的結果。
+		_apply_bookkeeping(shadow, bookkeeping)
+
+		var pf := EffectApply.preflight([effect], shadow)
+		if not bool(pf.get("ok", false)):
+			shadow.free()
+			return _default_plan_reject(str(pf.get("reason_text", "")))
+		var pf_shadow: Node = pf.get("shadow")
+		var raised_ending: bool = not (pf.get("ending_request", {}) as Dictionary).is_empty()
+		if pf_shadow != null:
+			pf_shadow.free()
+		if raised_ending:
+			shadow.free()
+			return _default_plan_reject("逾期預設不得啟動結局")
+
+		var plan: Dictionary = pf.get("plan", {}) as Dictionary
+		EffectApply.commit(plan, shadow)
+		steps.append({ "bookkeeping": bookkeeping, "plan": plan })
+		lines.append_array(pf.get("lines", PackedStringArray()))
+
+	# 通用後置條件：只要這批預設裡有人要寫慶典代付者，離開本時段前它就必須非空且是正式候選。
+	# 這條保證 D31／D39／ending 之後可以安全地只讀凍結值，不必在 resolver 補算。
+	# **目前沒有任何合法資料能讓它為真**——EffectApply._resolve_festival_proxy() 已經
+	# 先擋掉非候選與已凍結兩種情形。留著是為了擋 EffectApply 那一層的回歸（例如哪天它
+	# 開始回傳空字串），因此本分支沒有對應的測試案例，不宣稱已覆蓋。
+	if expects_proxy:
+		var frozen := str(shadow.get("selected_festival_proxy_npc"))
+		if frozen.is_empty() or not _is_festival_candidate(frozen):
+			shadow.free()
+			return _default_plan_reject("逾期預設未能凍結合法的慶典代付者")
+
+	shadow.free()
+	return { "ok": true, "reason_code": "", "reason_text": "", "lines": lines, "plan": { "steps": steps } }
+
+
+func _default_plan_reject(text: String) -> Dictionary:
+	return {
+		"ok": false, "reason_code": "unresolved_choice_conflict", "reason_text": text,
+		"lines": PackedStringArray(), "plan": {},
+	}
+
+
+## 掃當下 day／phase 仍未結算、且組內有唯一 default 槽的 choice group。
+## 同組恰一筆 default 與父 beat `fixed:true` 由 lint 18 保證，這裡不重複驗資料。
+func _pending_default_groups() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if Data == null or Data.loader == null:
+		return out
+	for b in Data.loader.beats_at(day, phase):
+		if not bool(b.get("fixed", false)):
+			continue
+		if not ConditionEval.eval(b.get("condition"), self) or not ConditionEval.eval(b.get("requires"), self):
+			continue
+		var beat_id := str(b.get("id", ""))
+		for slot: Dictionary in b.get("slots", []) as Array:
+			if slot.get("default_if_unresolved", false) != true:
+				continue
+			var group_id := str(slot.get("choice_group", ""))
+			if group_id.is_empty():
+				continue
+			if choices.has(beat_id + "::" + group_id):
+				continue
+			out.append({
+				"beat_id": beat_id,
+				"group_id": group_id,
+				"slot_id": str(slot.get("id", "")),
+				"slot": slot,
+			})
+	return out
+
+
+## 逾期預設 plan 的唯一落地點；`target` 可以是真狀態，也可以是結局快照用的複本。
+func _commit_choice_default_plan(plan: Dictionary, target: Node) -> void:
+	for step: Variant in plan.get("steps", []) as Array:
+		var step_dict := step as Dictionary
+		_apply_bookkeeping(target, step_dict.get("bookkeeping", {}) as Dictionary)
+		EffectApply.commit(step_dict.get("plan", {}) as Dictionary, target)
 
 
 ## 當下 day／phase 的通用離場門檻（SCHEMA `phase_exit`）。
@@ -943,30 +1277,6 @@ func sleep_night() -> PackedStringArray:
 	return lines
 
 
-## 夜間推進唯一決策入口（P3-C，main.gd 與走查共用）。
-## 回傳：{ "advance": bool, "lines": PackedStringArray }
-func resolve_night_advance() -> Dictionary:
-	if flow_mode != FLOW_RUN:
-		return { "advance": false, "lines": PackedStringArray(), "reason_code": "not_run" }
-
-	if not active_encounter.is_empty():
-		return { "advance": false, "lines": PackedStringArray(), "reason_code": "encounter_active" }
-
-	if not night_location_chosen.is_empty():
-		return { "advance": true, "lines": PackedStringArray() }
-
-	if night_sleep_pending:
-		night_sleep_pending = false
-		return { "advance": true, "lines": PackedStringArray() }
-
-	var lines := sleep_night()
-	if lines.size() > 0:
-		night_sleep_pending = true
-		return { "advance": false, "lines": lines }
-
-	return { "advance": true, "lines": PackedStringArray() }
-
-
 ## 查詢該夜間地點是否已曾到訪（規格書第九節、P3-B）。
 func night_location_seen(location_id: String) -> bool:
 	return night_locations_seen.has(location_id)
@@ -1212,6 +1522,10 @@ func gain_card(id: String, check_cap: bool = true) -> void:
 	if has_card(id):
 		return
 
+	# 跨輪魔法物品：取得當下就寫進 meta set，不等結局結算（開發設計方針 P5-D）。
+	if card.get("loop_persistent", false) == true:
+		loop_persistent_item_ids[id] = true
+
 	# P4-C：玩家由零張 person card 變一張時發出教學信號；不在此寫 delegation_tutorial_seen，
 	# 由 UI 實際顯示並關閉／略過後才呼叫 mark_delegation_tutorial_seen()。
 	var is_first_person_card := false
@@ -1258,8 +1572,10 @@ func _check_hand_overflow(card_id: String) -> void:
 		push_warning("gain_card: hand is full (%d/%d), card '%s' gained anyway" % [hand.size(), max_hand, card_id])
 
 
-## 丟棄卡片（can作用於 hand 與 knowledge；丟主角卡 = push_error）。
-func lose_card(id: String) -> void:
+## 丟棄卡片（作用於 hand 與 knowledge；丟主角卡 = push_error）。
+## `permanent` 只對 `loop_persistent:true` 卡有意義：省略／false 只移出本輪手牌，
+## true 才同步從 meta persistent set 移除，之後不再跨輪恢復。
+func lose_card(id: String, permanent: bool = false) -> void:
 	var base_id := _card_base_id(id)
 	var card: Dictionary = Data.loader.cards.get(base_id, {})
 	if card.get("type", "") == "protagonist":
@@ -1269,6 +1585,9 @@ func lose_card(id: String) -> void:
 	var idx := hand.find(id)
 	if idx >= 0:
 		hand.remove_at(idx)
+		# 一般 lose 只令這一輪消失，下一輪照樣恢復；只有明示 permanent 才真的斷掉跨輪繼承。
+		if permanent and card.get("loop_persistent", false) == true:
+			loop_persistent_item_ids.erase(base_id)
 		if card.get("type", "") == "madness":
 			madness_clock.erase(id)
 			madness_cards_cleared += 1
@@ -2565,6 +2884,10 @@ func deserialize(d: Dictionary) -> Dictionary:
 	if not bool(flow_parsed.get("ok", false)):
 		return { "ok": false, "reason_code": "invalid_save_shape" }
 
+	var persistent_parsed := _parse_persistent_items(d)
+	if not bool(persistent_parsed.get("ok", false)):
+		return { "ok": false, "reason_code": "invalid_save_shape" }
+
 	var run: Dictionary = d.get("run", {})
 	day = int(run.get("day", 1))
 	phase = str(run.get("phase", "morning"))
@@ -2639,10 +2962,7 @@ func deserialize(d: Dictionary) -> Dictionary:
 	for record: Variant in meta.get("ending_history", []) as Array:
 		if record is Dictionary:
 			ending_history.append((record as Dictionary).duplicate(true))
-	loop_persistent_item_ids.clear()
-	var persistent_raw: Dictionary = meta.get("loop_persistent_item_ids", {}) as Dictionary
-	for card_id: Variant in persistent_raw.keys():
-		loop_persistent_item_ids[str(card_id)] = true
+	loop_persistent_item_ids = persistent_parsed.get("ids", {}) as Dictionary
 
 	var opening_raw: Variant = run.get("opening_choice_id")
 	opening_choice_id = "" if opening_raw == null else str(opening_raw)
@@ -2662,6 +2982,26 @@ func deserialize(d: Dictionary) -> Dictionary:
 	active_ending = flow_parsed.get("active_ending", {}) as Dictionary
 
 	return { "ok": true, "reason_code": "" }
+
+
+## meta persistent set 的原子驗證。引用不存在或非 `loop_persistent:true` 的卡，
+## 在 P6 存檔遷移機制上線前一律視為資料錯誤，不靜默修復。回傳 { ok, ids }。
+func _parse_persistent_items(d: Dictionary) -> Dictionary:
+	var meta_raw: Variant = d.get("meta", {})
+	if not meta_raw is Dictionary:
+		return { "ok": true, "ids": {} }
+	var raw: Variant = (meta_raw as Dictionary).get("loop_persistent_item_ids", {})
+	if not raw is Dictionary:
+		return { "ok": false, "ids": {} }
+	var ids: Dictionary = {}
+	for card_id: Variant in (raw as Dictionary).keys():
+		var cid := str(card_id)
+		if Data == null or Data.loader == null or not Data.loader.cards.has(cid):
+			return { "ok": false, "ids": {} }
+		if (Data.loader.cards[cid] as Dictionary).get("loop_persistent", false) != true:
+			return { "ok": false, "ids": {} }
+		ids[cid] = true
+	return { "ok": true, "ids": ids }
 
 
 ## flow 區塊的原子驗證。回傳 { ok, mode, active_ending }。

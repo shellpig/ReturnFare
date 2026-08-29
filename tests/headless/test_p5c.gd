@@ -71,7 +71,10 @@ func _state_text(gs: Node) -> String:
 
 
 func _fresh_run(gs: Node, day: int = 45, phase: String = "evening") -> void:
-	gs.call("end_run", "test_reset")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", day)
 	gs.set("phase", phase)
 	gs.set("ending_history", [] as Array[Dictionary])

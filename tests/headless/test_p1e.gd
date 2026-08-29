@@ -37,6 +37,7 @@ func _initialize() -> void:
 	var gs: Node = get_root().get_node_or_null("GameState")
 	if gs == null:
 		gs = load("res://scripts/autoload/game_state.gd").new()
+		gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 		gs.name = "GameState"
 		get_root().add_child(gs)
 		Engine.register_singleton("GameState", gs)
@@ -72,6 +73,9 @@ func _fail(msg: String) -> int:
 
 
 func _reset_gs(gs: Node) -> void:
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
 	gs.set("day", 1)
 	gs.set("phase", "morning")
 	gs.set("action_spent", false)
@@ -473,6 +477,7 @@ func _test_choice_serialize_roundtrip(gs: Node) -> int:
 
 	var data: Dictionary = gs.call("serialize")
 	var new_gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	new_gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	new_gs.call("deserialize", data)
 
 	var choices: Dictionary = new_gs.get("choices") as Dictionary

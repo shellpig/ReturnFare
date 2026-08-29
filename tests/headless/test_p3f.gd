@@ -54,7 +54,7 @@ func _fail(msg: String) -> int:
 
 
 static func _reset_gs(gs: Node) -> void:
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("night_locations_seen", {})
 	gs.set("night_once_beats_seen", {})
 	gs.set("knowledge", {})
@@ -210,8 +210,8 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 	var endings_received: Array[String] = []
 	var final_madness_cleared_box := [0]
 
-	var on_run_ended := func(eid: String) -> void:
-		endings_received.append(eid)
+	var on_ending_started := func() -> void:
+		endings_received.append(str((gs.get("active_ending") as Dictionary).get("ending_id", "")))
 		final_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
 		var mcards: Array = []
 		for card in (gs.get("hand") as Array):
@@ -220,7 +220,7 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 		final_madness_cards_box[0] = mcards
 		final_madness_cleared_box[0] = int(gs.get("madness_cards_cleared"))
 
-	gs.connect("run_ended", on_run_ended)
+	gs.connect("ending_started", on_ending_started)
 
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 	var last_ind_count := int(gs.get("indulgence_count"))
@@ -359,10 +359,10 @@ static func _run_first_round_sim(gs: Node, data_node: Node, strategy_type: Strin
 		last_ind_count = int(gs.get("indulgence_count"))
 		gs.advance_phase()
 
-	gs.disconnect("run_ended", on_run_ended)
+	gs.disconnect("ending_started", on_ending_started)
 
 	# P5-B：45 天走完不必然啟動結局（D45 coda 門檻要求先完成名冊比對），
-	# 終局數字改為走查結束時直接取一次；run_ended 只用來確認中途有沒有 BE。
+	# 終局數字改為走查結束時直接取一次；ending_started 只用來確認中途有沒有 BE。
 	if endings_received.is_empty():
 		final_markers_box[0] = (gs.get("night_locations_seen") as Dictionary).duplicate()
 		var end_mcards: Array = []
@@ -498,9 +498,9 @@ func _test_second_round_replay_and_five_paths(gs: Node, data_node: Node) -> int:
 
 	# P5-B：走查停在第 45 天 evening（本策略沒有完成 D45 coda 門檻，因此不會啟動結局）。
 	# 跨輪驗收沿用 legacy end_run() 收尾；P5-D 會換成正式的 complete_ending()。
-	gs.call("end_run", "test_loop_reset")
+	PlaythroughGreedy.start_fresh_run(gs)
 
-	# 驗證第 1 輪真實 end_run() 後的狀態
+	# 驗證第 1 輪真實 run_reset() 後的狀態
 	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
 		failed += _ok("第 1 輪結束後時間正確重置至第 1 天 morning")
 	else:
@@ -647,7 +647,7 @@ func _test_determinism_across_two_runs(gs: Node, data_node: Node) -> int:
 	# 跑完第一輪並取得存檔。P5-B：走查停在第 45 天 evening，第二輪必須從重置後的狀態起跑，
 	# 因此先以 legacy end_run() 收尾再取存檔（P5-D 換成正式的 complete_ending()）。
 	var res1 := _run_first_round_sim(gs, data_node, "path_efficiency_13")
-	gs.call("end_run", "test_loop_reset")
+	PlaythroughGreedy.start_fresh_run(gs)
 	res1["final_state"] = gs.call("serialize")
 	var checkpoint_state: Dictionary = res1.get("final_state", {}) as Dictionary
 

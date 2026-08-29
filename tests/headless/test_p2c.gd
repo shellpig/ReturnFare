@@ -5,6 +5,7 @@ extends SceneTree
 ##   Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p2c.gd
 ## 全綠 exit 0；任一失敗 exit 1。
 
+const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 const DataFacts := preload("res://scripts/core/data_facts.gd")
 const Indulgence := preload("res://scripts/core/indulgence.gd")
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
@@ -12,6 +13,7 @@ const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
 
 func _initialize() -> void:
 	var gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	gs.name = "GameState"
 	get_root().add_child(gs)
 	Engine.register_singleton("GameState", gs)
@@ -38,7 +40,7 @@ func _initialize() -> void:
 	failed += _test_location_agnostic(gs, data_node)
 	failed += _test_shared_indulgence_count(gs, data_node)
 	failed += _test_determinism(gs, data_node)
-	failed += _test_serialize_and_end_run_p2c(gs)
+	failed += _test_serialize_and_run_reset_p2c(gs)
 	failed += _test_forced_indulgence_debt_preservation_on_failure(gs, data_node)
 
 	Engine.unregister_singleton("Data")
@@ -67,7 +69,7 @@ func _fail(msg: String) -> int:
 func _test_single_card_forced_lifecycle(gs: Node, _data: Node) -> int:
 	print("--- 1. single card forced indulgence lifecycle (D6 night -> D13 morning) ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	gs.set("day", 6)
 	gs.set("phase", "night")
@@ -135,7 +137,7 @@ func _test_single_card_forced_lifecycle(gs: Node, _data: Node) -> int:
 func _test_first_time_is_light_with_warning_text(gs: Node, data: Node) -> int:
 	print("--- 2. first time indulgence is light with warning text ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	var lvl1: String = Indulgence.level_for(1, data.get("loader").tuning)
 	if lvl1 == "light":
@@ -171,7 +173,7 @@ func _test_first_time_is_light_with_warning_text(gs: Node, data: Node) -> int:
 func _test_same_day_two_cards_zero(gs: Node, _data: Node) -> int:
 	print("--- 3. two cards zeroing on the same day eat morning & afternoon ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# 模擬第 10 夜持有兩張剩餘 1 天的發狂卡
 	gs.set("day", 10)
@@ -220,7 +222,7 @@ func _test_same_day_two_cards_zero(gs: Node, _data: Node) -> int:
 func _test_same_day_three_cards_zero_postponed(gs: Node, _data: Node) -> int:
 	print("--- 4. three cards zeroing: eats two today, third postponed to next morning ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	gs.set("day", 19)
 	gs.set("phase", "night")
@@ -276,7 +278,7 @@ func _test_same_day_three_cards_zero_postponed(gs: Node, _data: Node) -> int:
 func _test_pick_exit_algorithms(gs: Node, data: Node) -> int:
 	print("--- 5. pick_exit algorithm (weights, conditions, tie-breaks) ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# 1. 第一章（D1-D15，無特殊關係）：食慾 (x_binge, weight 2) > 砸東西 (x_smash, weight 1)
 	gs.set("day", 5)
@@ -319,7 +321,7 @@ func _test_pick_exit_algorithms(gs: Node, data: Node) -> int:
 func _test_soak_never_picked(gs: Node, data: Node) -> int:
 	print("--- 6. auto == false slots (e.g. soak) are never picked by pick_exit ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	gs.set("day", 1)
 	gs.call("gain_card", "madness")
@@ -375,7 +377,7 @@ func _test_soak_never_picked(gs: Node, data: Node) -> int:
 func _test_location_agnostic(gs: Node, data: Node) -> int:
 	print("--- 7. forced indulgence executes end-to-end regardless of context ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# 1. pick_exit 跨時段（下午）挑選
 	gs.set("day", 8)
@@ -413,7 +415,7 @@ func _test_location_agnostic(gs: Node, data: Node) -> int:
 func _test_shared_indulgence_count(gs: Node, data: Node) -> int:
 	print("--- 8. active and forced indulgence share count and escalation curve ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# 主動縱慾 3 次
 	for i in range(3):
@@ -466,7 +468,7 @@ func _test_shared_indulgence_count(gs: Node, data: Node) -> int:
 func _test_determinism(gs: Node, data: Node) -> int:
 	print("--- 9. determinism in exit picking and execution ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	gs.set("day", 20)
 	gs.call("gain_card", "madness")
@@ -485,12 +487,12 @@ func _test_determinism(gs: Node, data: Node) -> int:
 	return failed
 
 
-# ── 10. 序列化與 end_run 重置 ────────────────────────────────────────────────
+# ── 10. 序列化與 run_reset 重置 ────────────────────────────────────────────────
 
-func _test_serialize_and_end_run_p2c(gs: Node) -> int:
-	print("--- 10. serialize roundtrip and end_run resets P2-C fields ---")
+func _test_serialize_and_run_reset_p2c(gs: Node) -> int:
+	print("--- 10. serialize roundtrip and run_reset resets P2-C fields ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	gs.set("day", 15)
 	gs.set("phase", "morning")
@@ -508,7 +510,7 @@ func _test_serialize_and_end_run_p2c(gs: Node) -> int:
 		failed += _fail("serialize 遺失 P2-C 欄位: %s" % str(run))
 
 	# 清空後 deserialize 還原
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.call("deserialize", s)
 
 	var restored_ind: int = gs.get("indulgence_count")
@@ -522,17 +524,17 @@ func _test_serialize_and_end_run_p2c(gs: Node) -> int:
 			restored_ind, restored_cleared, str(restored_pending)
 		])
 
-	# end_run 重置
-	gs.call("end_run")
+	# run_reset 重置
+	PlaythroughGreedy.start_fresh_run(gs)
 	var reset_ind: int = gs.get("indulgence_count")
 	var reset_cleared: int = gs.get("madness_cards_cleared")
 	var reset_pending: Array = gs.get("forced_pending")
 	var reset_lines: PackedStringArray = gs.get("last_forced_lines")
 
 	if reset_ind == 0 and reset_cleared == 0 and reset_pending.is_empty() and reset_lines.is_empty():
-		failed += _ok("end_run 成功重置 indulgence_count, madness_cards_cleared, forced_pending 與 last_forced_lines")
+		failed += _ok("run_reset 成功重置 indulgence_count, madness_cards_cleared, forced_pending 與 last_forced_lines")
 	else:
-		failed += _fail("end_run 重置 P2-C 欄位失敗 (ind=%d, cleared=%d, pending=%s, lines=%s)" % [
+		failed += _fail("run_reset 重置 P2-C 欄位失敗 (ind=%d, cleared=%d, pending=%s, lines=%s)" % [
 			reset_ind, reset_cleared, str(reset_pending), str(reset_lines)
 		])
 
@@ -544,7 +546,7 @@ func _test_serialize_and_end_run_p2c(gs: Node) -> int:
 func _test_forced_indulgence_debt_preservation_on_failure(gs: Node, _data: Node) -> int:
 	print("--- 11. debt preservation on forced indulgence failure (K-59) ---")
 	var failed := 0
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# GameState 內部一律讀裸全域 `Data`（/root/Data 那一份 loader）
 	var real_data: Node = get_root().get_node("Data")
@@ -606,7 +608,7 @@ func _test_forced_indulgence_debt_preservation_on_failure(gs: Node, _data: Node)
 		])
 
 	# 2. 情境 B：pick_exit 命中但 beat 內找不到對應 slot
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 5)
 	gs.set("phase", "morning")
 	gs.set("action_spent", false)

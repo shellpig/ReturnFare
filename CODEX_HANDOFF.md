@@ -4,6 +4,58 @@
 
 ## 目前狀態
 
+**P5-D（開局、歷輪摘要與跨輪重置）實作完成，待 verifier 驗收。** 開局三選項、唯一 `complete_ending()`、history、跨輪繼承、D29 逾期預設與 `advance_phase()` 七步固定順序全部落地；`end_run()`／`run_ended`／`resolve_night_advance()` 三個舊接線同批退場。
+
+### P5-D 實際改了什麼
+
+**`scripts/autoload/game_state.gd`**
+
+- fresh state 預設改為 `flow_mode = "opening"`；`signal run_ended` 與公開 `end_run()` 刪除。
+- 新增 `opening_view()`／`choose_opening()`／`complete_ending()`／`resolve_unfinished_choice_groups()`，以及私有 `_reset_run_state()`／`_apply_run_initialization()`／`_build_history_record()`／`_pending_default_groups()`／`_commit_choice_default_plan()`。
+- `advance_phase()` 重構為固定七步：mode gate → active encounter → 夜間停拍 → 逾期 default 純 preflight → `phase_exit` 門檻 → 目標與 ending 快照驗證 → 一次 commit。換時段那一段抽成 `_commit_phase_transition()`，是唯一改 day／phase 的地方。
+- `gain_card()` 遇 `loop_persistent:true` 同步寫 meta set；`lose_card(id, permanent := false)` 只有 `permanent:true` 才移除 meta set。
+- `deserialize()` 新增 `_parse_persistent_items()`：meta set 引用不存在或非 persistent 卡一律 `invalid_save_shape`，且與 flow 形狀一樣在任何 mutation 之前驗完。
+
+**`scripts/core/effect_apply.gd`**：`lose` op 帶上 `permanent`（新增 `_entry_permanent()`），commit 時轉給 `lose_card(id, permanent)`。
+
+**`scenes/main.gd`**：`run_ended` 接線換成 `ending_started`／`opening_started`；推進按鈕成為三種 mode 的唯一入口，夜間不再自己呼叫 sleep。**開局與結局畫面目前只有過渡 stub**（FlowText 列出選項、推進鍵確認第一個可選項；結局逐頁補完 → 翻頁 → 結算），正式面板是 P5-E 的工作。
+
+**測試**：新增 `tests/headless/test_p5d.gd`（16 組）並登記進 `tests/run_all_headless.ps1`。`playthrough_greedy.gd` 新增測試專用 `start_fresh_run()` 與 `advance_until_phase_changes()`；走查改為走到 D45 → 進 ending → 逐頁播完 → `complete_ending()` → 停在 opening → 明示選開局才開始下一輪，D29 的過渡接線刪除。既有 P1～P5 測試把 `end_run()` 換成 `start_fresh_run()`、`run_ended` 換成 `ending_started`；`tests/ui_sim/` 的三個「新局」案例先確認開局，`p1af_32`／`p1af_33` 改走正式結算。
+
+### P5-D 自跑證據（實作者，非驗收）
+
+- 32 套 headless 全數 exit 0（`run_all_headless.ps1`，含新增的 `test_p5d`）。
+- UI sim run `20260829-163054-101-p42092-3a277b06`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks。
+- 正式資料 `verify_data` 全綠：66 卡／48 地點／18 NPC／268 beat／4 ending／3 opening，引用 0 錯誤，lint 1～20 全 0 錯誤。
+- 45 天貪心走查端到端跑通 D29 逾期預設 → 凍結代付者 → D45 `ending_replaced` → `complete_ending()` → opening → 第二輪相簿開局。
+
+### P5-D 變異測試記錄
+
+八個變異各自套用後跑 `test_p5d` 與 `playthrough_greedy`，還原後全綠：
+
+| 變異 | 結果 |
+|---|---|
+| 拆掉逾期預設掃描 | 兩支都轉紅 |
+| `complete_ending()` 不加輪數 | 兩支都轉紅 |
+| 跨輪重置不清 `flags` | 兩支都轉紅 |
+| `lose_card()` 忽略 `permanent` | `test_p5d` 轉紅 |
+| `advance_phase()` 拿掉夜間停拍 | `test_p5d` 轉紅 |
+| `gain_card()` 不寫 persistent meta | `test_p5d` 轉紅 |
+| `lose` op 不帶 `permanent` | `test_p5d` 轉紅 |
+| 拆掉 proxy 後置條件 | **仍全綠（唯一未覆蓋分支）** |
+
+最後一列是已知且刻意保留的缺口：`resolve_unfinished_choice_groups()` 的「代付者必須非空且 eligible」後置條件，在 `EffectApply._resolve_festival_proxy()` 已擋掉非候選與已凍結兩種情形之後，沒有任何合法資料能讓它為真。程式碼註解已明寫這是擋 EffectApply 回歸用的第二道防線、且不宣稱已覆蓋。
+
+### P5-D 留給 verifier 的判斷點
+
+- `main.gd` 的開局／結局 stub 是過渡品，`測試指南.md > P5-D` 沒有 UI 條目；正式面板與逐字節奏屬 P5-E。
+- 測試工廠 `PlaythroughGreedy.setup_game_state()` 現在每個 process 正規化一次成 run mode（autoload 也可能已把 GameState 掛在 `/root` 底下），fresh boot 為 opening 這條由 `test_boot` 與 `test_p5d` 驗。
+- 「備用區」在 `測試指南.md > P5-D` 的逐欄清單裡有一項，但該系統目前不存在（P2 時移出範圍），因此 `_reset_run_state()` 沒有對應欄位可清。
+
+---
+
+## P5-C 目前狀態
+
 **P5-C（四類結局與組合後日談）已由 Verifier 完整複驗關門並轉 ✅。** 四類 ending、正常結局 4×3 生計／開關帶與組合後日談、首見／重見、逐頁門檻、resolver 壞資料與 snapshot/ref 一致性均完成；P5-C 已無已知 blocker 或非阻擋缺口。
 
 實作者第四輪修復與自跑證據（2026-08-29）：

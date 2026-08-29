@@ -30,7 +30,7 @@ func _initialize() -> void:
 
 	failed += _test_d17_19_four_character_states(gs, data_node)
 	failed += _test_encounter_matrix_derivation(gs, data_node)
-	failed += _test_end_run_cleanup_and_second_run_persistence(gs, data_node)
+	failed += _test_run_reset_cleanup_and_second_run_persistence(gs, data_node)
 	failed += _test_cross_run_determinism(gs, data_node)
 
 	if failed > 0:
@@ -52,7 +52,7 @@ func _fail(msg: String) -> int:
 
 
 static func _reset_gs(gs: Node) -> void:
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("night_locations_seen", {})
 	gs.set("night_once_beats_seen", {})
 	gs.set("knowledge", {})
@@ -410,7 +410,7 @@ func _test_encounter_matrix_derivation(gs: Node, data_node: Node) -> int:
 
 # ── 3. 跨輪重置與第二輪持久化驗證 ──────────────────────────────────────────
 
-func _test_end_run_cleanup_and_second_run_persistence(gs: Node, data_node: Node) -> int:
+func _test_run_reset_cleanup_and_second_run_persistence(gs: Node, data_node: Node) -> int:
 	print("--- 3. Loop Reset & Second Loop Persistence ---")
 	var failed := 0
 	_reset_gs(gs)
@@ -437,8 +437,8 @@ func _test_end_run_cleanup_and_second_run_persistence(gs: Node, data_node: Node)
 	var before_tutorial: bool = bool(gs.get("delegation_tutorial_seen"))
 	var before_night_once: Dictionary = (gs.get("night_once_beats_seen") as Dictionary).duplicate()
 
-	# 執行真實 end_run()
-	gs.call("end_run", "ending_default")
+	# 執行真實 run_reset()
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	# 2. 斷言 Meta 層完整保留（含 night_once_beats_seen，K-172）
 	if bool(gs.get("delegation_tutorial_seen")) == before_tutorial and before_tutorial == true:
@@ -532,7 +532,7 @@ func _test_cross_run_determinism(gs: Node, data_node: Node) -> int:
 	gs.escape_encounter(esc_pay_cross)
 
 	# 跑完第 1 輪重置
-	gs.call("end_run", "ending_default")
+	PlaythroughGreedy.start_fresh_run(gs)
 	var checkpoint: Dictionary = gs.call("serialize")
 
 	# 建立兩個獨立的 GameState 實例

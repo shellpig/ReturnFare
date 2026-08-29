@@ -8,6 +8,9 @@ const QAValidationClass := preload("res://tests/ui_sim/qa_validation.gd")
 const _MSG_DATA_ERROR := "資料載入失敗，詳情見 Output。"
 const _MSG_ENDING_STUB := "[結局 stub]"
 const _MSG_ENDING_MADNESS_BE := "[發瘋 BE]"
+const _MSG_OPENING_STUB := "[開局 stub] 出門前的十分鐘"
+const _MSG_ADVANCE_OPENING := "開始"
+const _MSG_ADVANCE_ENDING := "繼續"
 const _MSG_ADVANCE := "推進時段"
 const _MSG_ADVANCE_HINT := "推進時段（目前無可做動作）"
 const _MSG_ADVANCE_SLEEP := "直接睡"
@@ -52,7 +55,8 @@ func _ready() -> void:
 	GameState.phase_changed.connect(_on_phase_changed)
 	GameState.day_changed.connect(_on_day_changed)
 	GameState.chapter_changed.connect(_on_chapter_changed)
-	GameState.run_ended.connect(_on_run_ended)
+	GameState.ending_started.connect(_on_ending_started)
+	GameState.opening_started.connect(_on_opening_started)
 	GameState.delegation_tutorial_available.connect(_on_delegation_tutorial_available)
 
 	_map_list.location_selected.connect(_on_location_selected)
@@ -135,25 +139,29 @@ func _process_cli_args() -> void:
 		GameState.deserialize(json_val as Dictionary)
 
 
+## 推進按鈕：三種 flow mode 各只有一個規則層入口。
+## 夜間停拍已由 `advance_phase()` 內部吸收，UI 只負責渲染回傳的 lines 與 `phase_advanced`。
 func _on_advance_pressed() -> void:
-	if _is_showing_ending:
-		_is_showing_ending = false
-		_route_view()
-		return
-
-	if GameState.phase == "night":
-		var night_res: Dictionary = GameState.resolve_night_advance()
-		if not bool(night_res.get("advance", false)):
-			var lines: PackedStringArray = night_res.get("lines", PackedStringArray())
-			if lines.size() > 0:
-				_flow_text.clear()
-				_flow_text.append_lines(lines)
-				_flow_text.visible = true
-				_layout_with_flow(_map_list)
-			_refresh_advance_hint()
+	match GameState.flow_mode:
+		GameState.FLOW_OPENING:
+			_confirm_first_available_opening()
+			return
+		GameState.FLOW_ENDING:
+			_step_ending_stub()
 			return
 
-	GameState.advance_phase()
+	var res: Dictionary = GameState.advance_phase()
+	if not bool(res.get("ok", false)):
+		_refresh_advance_hint()
+		return
+	var lines: PackedStringArray = res.get("lines", PackedStringArray())
+	if not bool(res.get("phase_advanced", false)):
+		if lines.size() > 0:
+			_flow_text.clear()
+			_flow_text.append_lines(lines)
+			_flow_text.visible = true
+			_layout_with_flow(_map_list)
+		_refresh_advance_hint()
 
 
 func _on_phase_changed(_day: int, _phase: String) -> void:
@@ -170,9 +178,12 @@ func _on_chapter_changed(_chapter: int) -> void:
 	_refresh_status()
 
 
-func _on_run_ended(ending_id: String) -> void:
+## P5-D 過渡：正式的逐頁結局畫面在 P5-E 建 `ending_panel`，這裡只保留 stub，
+## 讓迴圈在引擎層走得完（結局 → 結算 → 回開局）。
+func _on_ending_started() -> void:
 	_is_showing_ending = true
 	_flow_text.clear()
+	var ending_id := str(GameState.active_ending.get("ending_id", ""))
 	if ending_id == "ending_madness_be":
 		_flow_text.append_line(_MSG_ENDING_MADNESS_BE)
 	else:
@@ -183,6 +194,61 @@ func _on_run_ended(ending_id: String) -> void:
 	_encounter_panel.visible = false
 	_advance_btn.visible = true
 	_advance_btn.disabled = false
+	_refresh_advance_hint()
+
+
+func _on_opening_started() -> void:
+	_is_showing_ending = false
+	_route_view()
+
+
+## P5-D 過渡：結局逐頁與跳過控制屬 P5-E。stub 只依規則層當下狀態走
+## 補完 → 翻頁 → 結算，不自己判斷頁數或跳過條件。
+func _step_ending_stub() -> void:
+	var view: Dictionary = GameState.ending_view()
+	if bool(view.get("can_complete", false)):
+		GameState.complete_ending()
+		return
+	if not bool(view.get("page_revealed", false)):
+		GameState.reveal_ending_page()
+	else:
+		GameState.advance_ending_page()
+	_render_ending_stub_page()
+
+
+func _render_ending_stub_page() -> void:
+	var view: Dictionary = GameState.ending_view()
+	_flow_text.clear()
+	_flow_text.append_line(str(view.get("page_text", "")))
+	_flow_text.visible = true
+	_layout_flow_full()
+	_refresh_advance_hint()
+
+
+## P5-D 過渡：正式的開局畫面（三個選項、預覽、取消）在 P5-E 建 `opening_panel`。
+## stub 只列出規則層給的可見文字，並用推進按鈕確認第一個可選項。
+func _show_opening_stub() -> void:
+	_is_showing_ending = false
+	_flow_text.clear()
+	_flow_text.append_line(_MSG_OPENING_STUB)
+	for choice: Dictionary in GameState.opening_view():
+		var suffix := "" if bool(choice.get("available", false)) else "（%s）" % str(choice.get("reason_text", ""))
+		_flow_text.append_line("- " + str(choice.get("label", "")) + suffix)
+	_flow_text.visible = true
+	_layout_flow_full()
+	_map_list.visible = false
+	_location_panel.visible = false
+	_encounter_panel.visible = false
+	_advance_btn.visible = true
+	_advance_btn.disabled = false
+	_refresh_advance_hint()
+
+
+func _confirm_first_available_opening() -> void:
+	for choice: Dictionary in GameState.opening_view():
+		if bool(choice.get("available", false)):
+			GameState.choose_opening(str(choice.get("id", "")))
+			return
 
 
 func _on_location_selected(loc_id: String) -> void:
@@ -261,6 +327,16 @@ func _refresh_status() -> void:
 
 
 func _refresh_advance_hint() -> void:
+	if GameState.flow_mode == GameState.FLOW_OPENING:
+		_advance_btn.text = _MSG_ADVANCE_OPENING
+		_advance_btn.disabled = false
+		_advance_btn.modulate = Color.WHITE
+		return
+	if GameState.flow_mode == GameState.FLOW_ENDING:
+		_advance_btn.text = _MSG_ADVANCE_ENDING
+		_advance_btn.disabled = false
+		_advance_btn.modulate = Color.WHITE
+		return
 	# P4-E：遭遇進行中推進按鈕 disabled
 	if not GameState.active_encounter.is_empty():
 		_advance_btn.text = _MSG_ADVANCE
@@ -286,6 +362,9 @@ func _refresh_advance_hint() -> void:
 
 func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> void:
 	_advance_btn.disabled = false
+	if GameState.flow_mode == GameState.FLOW_OPENING:
+		_show_opening_stub()
+		return
 	if _is_showing_ending:
 		_flow_text.visible = true
 		_layout_flow_full()

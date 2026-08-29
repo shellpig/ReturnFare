@@ -61,7 +61,10 @@ func _fail(msg: String) -> int:
 
 
 func _reset_gs(gs: Node) -> void:
-	gs.call("end_run")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	var hand: Array = gs.get("hand") as Array
 	hand.clear()
 	hand.append("protagonist")
@@ -264,12 +267,12 @@ func _test_tutorial_lifecycle(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("delegation_tutorial_seen 序列化往返遺失")
 
-	# (e) end_run() 不清空（meta 層，跨輪保留）
-	gs.call("end_run")
+	# (e) run_reset() 不清空（meta 層，跨輪保留）
+	PlaythroughGreedy.start_fresh_run(gs)
 	if bool(gs.get("delegation_tutorial_seen")):
-		_ok("end_run() 後 delegation_tutorial_seen 仍保留（meta 層跨輪不重置）")
+		_ok("run_reset() 後 delegation_tutorial_seen 仍保留（meta 層跨輪不重置）")
 	else:
-		failed += _fail("end_run() 錯誤清空了 delegation_tutorial_seen")
+		failed += _fail("run_reset() 錯誤清空了 delegation_tutorial_seen")
 
 	gs.disconnect("delegation_tutorial_available", handler)
 	return failed

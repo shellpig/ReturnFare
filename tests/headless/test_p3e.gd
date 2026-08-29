@@ -52,7 +52,10 @@ func _fail(msg: String) -> int:
 
 
 func _reset_gs(gs: Node) -> void:
-	gs.call("end_run")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("night_locations_seen", {})
 	gs.set("night_once_beats_seen", {})
 	gs.set("knowledge", {})

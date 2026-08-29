@@ -16,6 +16,7 @@ func _initialize() -> void:
 	# 手動建立兩個 singleton。
 	# get_root().add_child() 讓 _ready() 在第一幀執行，所以先等一幀再繼續。
 	var gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	gs.name = "GameState"
 	get_root().add_child(gs)
 	Engine.register_singleton("GameState", gs)
@@ -252,6 +253,9 @@ func _test_hand_overflow_warning(gs: Node) -> int:
 
 
 func _reset(gs: Node) -> void:
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
 	# Array[String] 不接受 set("hand", []) 替換，用 clear() 清空現有引用
 	(gs.get("hand") as Array).clear()
 	(gs.get("knowledge") as Dictionary).clear()

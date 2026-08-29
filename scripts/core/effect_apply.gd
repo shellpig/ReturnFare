@@ -91,7 +91,7 @@ static func _simulate_block(e: Dictionary, shadow: Node, ops: Array[Dictionary],
 
 	for entry: Variant in e.get("lose", []) as Array:
 		if _entry_passes(entry, shadow):
-			var op := { "op": "lose", "card": _entry_card_id(entry) }
+			var op := { "op": "lose", "card": _entry_card_id(entry), "permanent": _entry_permanent(entry) }
 			_apply_op(op, shadow)
 			ops.append(op)
 
@@ -164,7 +164,7 @@ static func _simulate_block(e: Dictionary, shadow: Node, ops: Array[Dictionary],
 static func _apply_op(op: Dictionary, gs: Node) -> void:
 	match str(op.get("op", "")):
 		"lose":
-			gs.call("lose_card", str(op.get("card", "")))
+			gs.call("lose_card", str(op.get("card", "")), bool(op.get("permanent", false)))
 		"gain":
 			# 上限由 plan 的 ending request 負責，這裡一律不重複觸發結局。
 			gs.call("gain_card", str(op.get("card", "")), false)
@@ -246,6 +246,14 @@ static func _reject(shadow: Node, code: String, text: String) -> Dictionary:
 
 static func _block_fail(code: String, text: String) -> Dictionary:
 	return { "ok": false, "reason_code": code, "reason_text": text, "ending_request": {} }
+
+
+## 卡片項目的永久旗標：只有物件形態的 `permanent:true` 才成立。
+## 語意由 GameState 執行——只有 `loop_persistent:true` 卡才真的從 meta set 移除。
+static func _entry_permanent(entry: Variant) -> bool:
+	if entry is Dictionary:
+		return (entry as Dictionary).get("permanent", false) == true
+	return false
 
 
 ## 卡片項目的 id：字串形態直接回傳，物件形態取 `card`。

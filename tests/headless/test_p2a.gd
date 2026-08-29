@@ -5,12 +5,14 @@ extends SceneTree
 ##   Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p2a.gd
 ## 全綠 exit 0；任一失敗 exit 1。
 
+const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 const LAST_DAY := 45
 const PHASES := ["morning", "afternoon", "evening", "night"]
 
 
 func _initialize() -> void:
 	var gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	gs.name = "GameState"
 	get_root().add_child(gs)
 	Engine.register_singleton("GameState", gs)
@@ -36,7 +38,7 @@ func _initialize() -> void:
 	failed += _test_free_location_no_madness(gs, data_node)
 	failed += _test_fixed_night_beat_no_marker_no_madness(gs, data_node)
 	failed += _test_serialize_roundtrip_p2a(gs)
-	failed += _test_end_run_resets_p2a(gs)
+	failed += _test_run_reset_resets_p2a(gs)
 	failed += _test_failure_text_precedence()
 
 	Engine.unregister_singleton("Data")
@@ -61,7 +63,10 @@ func _fail(msg: String) -> int:
 
 
 func _reset_gs(gs: Node) -> void:
-	gs.call("end_run")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("night_locations_seen", {})
 	gs.set("night_once_beats_seen", {})
 	gs.set("knowledge", {})
@@ -430,10 +435,10 @@ func _test_serialize_roundtrip_p2a(gs: Node) -> int:
 	return failed
 
 
-# ── 9. end_run 完整重置 P2-A 欄位 ───────────────────────────────────────────
+# ── 9. run_reset 完整重置 P2-A 欄位 ───────────────────────────────────────────
 
-func _test_end_run_resets_p2a(gs: Node) -> int:
-	print("--- 9. end_run resets P2-A state fields ---")
+func _test_run_reset_resets_p2a(gs: Node) -> int:
+	print("--- 9. run_reset resets P2-A state fields ---")
 	var failed := 0
 
 	gs.set("madness_clock", { "madness#1": 2 })
@@ -444,7 +449,7 @@ func _test_end_run_resets_p2a(gs: Node) -> int:
 	gs.set("indulgence_count", 4)
 	gs.set("forced_pending", ["madness#1"] as Array[String])
 
-	gs.call("end_run")
+	PlaythroughGreedy.start_fresh_run(gs)
 
 	var clock: Dictionary = gs.get("madness_clock")
 	var counter: int = int(gs.get("_madness_counter"))
@@ -455,9 +460,9 @@ func _test_end_run_resets_p2a(gs: Node) -> int:
 	var pending: Array = gs.get("forced_pending")
 
 	if clock.is_empty() and counter == 0 and seen.has("n_ahong_1") and chosen.is_empty() and not slept and ind_cnt == 0 and pending.is_empty():
-		failed += _ok("end_run 成功清空 madness_clock, _madness_counter, night_location_chosen, night_sleep_pending, indulgence_count, forced_pending，且保留 meta night_locations_seen")
+		failed += _ok("run_reset 成功清空 madness_clock, _madness_counter, night_location_chosen, night_sleep_pending, indulgence_count, forced_pending，且保留 meta night_locations_seen")
 	else:
-		failed += _fail("end_run 重置 P2 欄位異常 (clock=%s, counter=%d, seen=%s, chosen=%s, slept=%s, ind_cnt=%d, pending=%s)" % [
+		failed += _fail("run_reset 重置 P2 欄位異常 (clock=%s, counter=%d, seen=%s, chosen=%s, slept=%s, ind_cnt=%d, pending=%s)" % [
 			str(clock), counter, str(seen), chosen, str(slept), ind_cnt, str(pending)
 		])
 

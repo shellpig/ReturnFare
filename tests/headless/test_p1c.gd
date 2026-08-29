@@ -8,6 +8,7 @@ extends SceneTree
 
 func _initialize() -> void:
 	var gs: Node = load("res://scripts/autoload/game_state.gd").new()
+	gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 	gs.name = "GameState"
 	get_root().add_child(gs)
 	Engine.register_singleton("GameState", gs)
@@ -55,6 +56,9 @@ func _fail(msg: String) -> int:
 
 
 func _reset(gs: Node) -> void:
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
 	(gs.get("hand") as Array).clear()
 	(gs.get("knowledge") as Dictionary).clear()
 	(gs.get("madness_clock") as Dictionary).clear()

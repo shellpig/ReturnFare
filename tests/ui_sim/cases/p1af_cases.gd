@@ -346,7 +346,22 @@ class UiCase extends CaseBaseClass:
 		assert_true(status.text.contains("第 1 章"), "第一章狀態列")
 		return { "ok": errors.is_empty(), "errors": errors }
 
+	## P5-D：正式啟動路徑停在開局。以真實輸入（推進按鈕）確認第一個可選的開局選項，
+	## 這一輪才真的開始；已經在 run 裡就什麼都不做。
+	func _begin_run_if_opening(tree: SceneTree) -> void:
+		if str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")) == "opening":
+			await _advance(tree)
+
+	## 結局逐頁播完 → 正式結算 → 回開局 → 開始下一輪。全程只用推進按鈕這個唯一入口。
+	func _finish_ending_and_begin_next(tree: SceneTree) -> void:
+		var guard := 200
+		while guard > 0 and str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")) == "ending":
+			guard -= 1
+			await _advance(tree)
+		await _begin_run_if_opening(tree)
+
 	func _phase_cycle(tree: SceneTree) -> Dictionary:
+		await _begin_run_if_opening(tree)
 		var phases: Array[String] = ["morning", "afternoon", "evening", "night"]
 		for i in range(phases.size()):
 			var run := _run(tree)
@@ -897,6 +912,7 @@ class UiCase extends CaseBaseClass:
 		] } }
 
 	func _arrival(tree: SceneTree) -> Dictionary:
+		await _begin_run_if_opening(tree)
 		await _advance(tree)
 		await _advance(tree)
 		assert_eq(int(_run(tree).get("day", 0)), 1, "到站天數")
@@ -1246,6 +1262,7 @@ class UiCase extends CaseBaseClass:
 		}
 
 	func _night_resolution_d1(tree: SceneTree) -> Dictionary:
+		await _begin_run_if_opening(tree)
 		await _advance(tree)
 		await _advance(tree)
 		await _advance(tree)
@@ -1288,13 +1305,14 @@ class UiCase extends CaseBaseClass:
 		# P5-B：coda 門檻完成後由規則層啟動結局，day／phase 不動、run 不清。
 		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "ending", "D45 coda 完成後進入 ending mode")
 		assert_eq(int(_run(tree).get("day", 0)), 45, "結局啟動後 day 不動")
-		# 正式的 complete_ending() 與跨輪重置在 P5-D 落地；這裡先以 legacy end_run() 銜接。
-		CaseBaseClass.get_game_state(tree).call("end_run", "ending_replaced")
-		await _advance(tree)
+		# P5-D：逐頁播完後由 complete_ending() 正式結算，回開局再確認一次才開始下一輪。
+		await _finish_ending_and_begin_next(tree)
 		var after := _run(tree)
 		assert_eq(int(after.get("day", 0)), 1, "D45 結束回到第一天")
 		assert_eq(str(after.get("phase", "")), "morning", "D45 結束回到 morning")
-		assert_eq(JSON.stringify(after.get("hand", [])), JSON.stringify(["protagonist"]), "跨輪手牌重置")
+		assert_eq(JSON.stringify(after.get("hand", [])), JSON.stringify(["protagonist", "item_family_album"]),
+			"跨輪手牌只剩開局選項發的那些")
+		assert_eq(int((_state(tree).get("meta", {}) as Dictionary).get("run_number", 0)), 2, "跨輪後輪數加一")
 		assert_true((_state(tree).get("meta", {}) as Dictionary).get("knowledge", {}).has("k_already_on_list"), "跨輪保留知識")
 		var run_fields: Array[String] = ["flags", "switches", "switch_progress", "relations", "slots_placed", "choices", "beats_entered"]
 		for field in run_fields:
@@ -1319,6 +1337,7 @@ class UiCase extends CaseBaseClass:
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["run_fields_cleared", "reset_ui_state", "reset_flag_slots_locked"] } }
 
 	func _full_walk(tree: SceneTree) -> Dictionary:
+		await _begin_run_if_opening(tree)
 		var safety := 0
 		var first_round_done := false
 		var second_round_arrival := false
@@ -1330,11 +1349,10 @@ class UiCase extends CaseBaseClass:
 			if not first_round_done and day == 1 and phase == "morning" and safety > 1:
 				first_round_done = true
 				assert_true((_state(tree).get("meta", {}) as Dictionary).get("knowledge", {}).has("k_already_on_list"), "第一輪升級知識跨輪保留")
-				assert_eq(JSON.stringify(run.get("hand", [])), JSON.stringify(["protagonist"]), "第一輪結束手牌重置")
+				assert_eq(JSON.stringify(run.get("hand", [])), JSON.stringify(["protagonist", "item_family_album"]),
+					"第一輪結束後手牌只剩第二輪開局選項發的那些")
 				for reset_field in ["flags", "switches", "switch_progress", "relations", "slots_placed", "choices", "beats_entered"]:
 					assert_true((run.get(reset_field, {}) as Dictionary).is_empty(), "完整走查跨輪欄位清空: %s" % reset_field)
-				if _has_text(tree.get_root(), "[結局 stub]"):
-					await _advance(tree)
 				continue
 
 			if first_round_done and day == 1 and phase == "evening":
@@ -1364,11 +1382,8 @@ class UiCase extends CaseBaseClass:
 					await _click(tree, empty_ids[0])
 				await _close(tree)
 				await _advance(tree)
-				# P5-B：coda 門檻完成後進 ending mode，run 不清；正式結算在 P5-D 的
-				# complete_ending()，這裡先以 legacy end_run() 銜接第二輪。
-				if str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")) == "ending":
-					CaseBaseClass.get_game_state(tree).call("end_run", "ending_replaced")
-					await _advance(tree)
+				# P5-D：coda 門檻完成後進 ending，逐頁播完再正式結算並開始第二輪。
+				await _finish_ending_and_begin_next(tree)
 				continue
 
 			# P4-E: 遭遇處理（如 D8 夜間、D45 下午）
@@ -1440,11 +1455,6 @@ class UiCase extends CaseBaseClass:
 							break
 						if QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"):
 							await _close(tree)
-				# P5-B：D29 邀請組的逾期預設要到 P5-D 才由規則層自動結算。走查先呼叫同一個
-				# 原子入口凍結慶典代付者，否則第 45 天啟動正常結局會 data_conflict。
-				if day == 29 and phase == "afternoon" \
-						and not (_run(tree).get("choices", {}) as Dictionary).has("d29_pm_invitation::invitation"):
-					CaseBaseClass.get_game_state(tree).call("choose", "d29_pm_invitation", "invitation", "invite_none")
 				await _advance(tree)
 				continue
 

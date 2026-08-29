@@ -26,7 +26,7 @@ func _initialize() -> void:
 	failed += _test_night_sleep_resolution(gs, data_node)
 	failed += _test_night_protagonist_placement_no_action_cost(gs, data_node)
 	failed += _test_day45_ending_coda_and_loop_reset(gs, data_node)
-	failed += _test_run_ended_emitted_exactly_once(gs, data_node)
+	failed += _test_ending_started_emitted_exactly_once(gs, data_node)
 	failed += _test_second_loop_arrival_gain_idempotent(gs, data_node)
 	failed += _test_greedy_playthrough_45_days(gs, data_node)
 
@@ -62,6 +62,7 @@ func _setup_game_state(data_node: Node) -> Node:
 	var gs: Node = get_root().get_node_or_null("GameState")
 	if gs == null:
 		gs = load("res://scripts/autoload/game_state.gd").new()
+		gs.set("flow_mode", "run")  # P5-D：fresh state 是 opening，本檔驗的是 run 層
 		gs.name = "GameState"
 		gs.set("Data", data_node)
 		get_root().add_child(gs)
@@ -70,6 +71,9 @@ func _setup_game_state(data_node: Node) -> Node:
 
 
 func _reset_gs(gs: Node) -> void:
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
 	gs.set("day", 1)
 	gs.set("phase", "morning")
 	gs.set("action_spent", false)
@@ -406,11 +410,11 @@ func _test_day45_ending_coda_and_loop_reset(gs: Node, data_node: Node) -> int:
 		failed += _fail("coda 推進後狀態異常: mode=%s day=%d phase=%s" % [str(gs.get("flow_mode")), int(gs.get("day")), str(gs.get("phase"))])
 
 	# 走查層的跨輪重置沿用 legacy end_run()（P5-D 換成正式結算）
-	gs.call("end_run", "ending_replaced")
+	PlaythroughGreedy.start_fresh_run(gs)
 	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
-		failed += _ok("legacy end_run 後回到第 1 天 morning")
+		failed += _ok("legacy run_reset 後回到第 1 天 morning")
 	else:
-		failed += _fail("legacy end_run 後未回到第 1 天 morning")
+		failed += _fail("legacy run_reset 後未回到第 1 天 morning")
 
 	if gs.has_knowledge("k_already_on_list"):
 		failed += _ok("重置後 meta 層知識卡完整保留")
@@ -455,10 +459,10 @@ func _test_day45_ending_coda_and_loop_reset(gs: Node, data_node: Node) -> int:
 	return failed
 
 
-# ── 8. run_ended 一輪恰好發射一次 ────────────────────────────────────────────
+# ── 8. ending_started 一輪恰好發射一次 ────────────────────────────────────────────
 
-func _test_run_ended_emitted_exactly_once(gs: Node, data_node: Node) -> int:
-	print("--- 8. run_ended emitted exactly once ---")
+func _test_ending_started_emitted_exactly_once(gs: Node, data_node: Node) -> int:
+	print("--- 8. ending_started emitted exactly once ---")
 	var failed := 0
 
 	_reset_gs(gs)
@@ -471,15 +475,15 @@ func _test_run_ended_emitted_exactly_once(gs: Node, data_node: Node) -> int:
 	gs.set("selected_festival_proxy_npc", "ajie")
 
 	var emit_box := [0]
-	var cb := func(_eid: String): emit_box[0] += 1
-	gs.run_ended.connect(cb)
+	var cb := func(): emit_box[0] += 1
+	gs.ending_started.connect(cb)
 
-	# 第一次推進：coda 門檻已完成 → 啟動結局（P5-B 仍相容發 run_ended）
+	# 第一次推進：coda 門檻已完成 → 啟動結局
 	gs.advance_phase()
 	if emit_box[0] == 1:
-		failed += _ok("第 45 天 evening 推進：run_ended 成功發射 1 次")
+		failed += _ok("第 45 天 evening 推進：ending_started 成功發射 1 次")
 	else:
-		failed += _fail("第一次推進 run_ended 發射次數不為 1 (實際: %d)" % emit_box[0])
+		failed += _fail("第一次推進 ending_started 發射次數不為 1 (實際: %d)" % emit_box[0])
 
 	# 連按幾次推進：ending mode 一律回 not_run，不重發訊號、不推進時間
 	gs.advance_phase()
@@ -487,24 +491,23 @@ func _test_run_ended_emitted_exactly_once(gs: Node, data_node: Node) -> int:
 	gs.advance_phase()
 
 	if emit_box[0] == 1:
-		failed += _ok("ending mode 連續推進 3 次後 run_ended 計數仍為 1（無無窮迴圈）")
+		failed += _ok("ending mode 連續推進 3 次後 ending_started 計數仍為 1（無無窮迴圈）")
 	else:
-		failed += _fail("連續推進後 run_ended 被重複發射 (實際: %d 次)" % emit_box[0])
+		failed += _fail("連續推進後 ending_started 被重複發射 (實際: %d 次)" % emit_box[0])
 
 	if int(gs.get("day")) == 45 and str(gs.get("phase")) == "evening":
 		failed += _ok("ending mode 期間時間完全不動")
 	else:
 		failed += _fail("時間推進異常: 第 %d 天 %s" % [int(gs.get("day")), str(gs.get("phase"))])
 
-	# 回到 run 才能繼續下一輪（P5-D 由 complete_ending() 取代）。
-	# 先斷開計數器：legacy end_run 也會發相容用的 run_ended。
-	gs.run_ended.disconnect(cb)
-	gs.call("end_run", "ending_replaced")
+	# 回到 run 才能繼續下一輪。
+	gs.ending_started.disconnect(cb)
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.advance_phase()
 	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "afternoon":
-		failed += _ok("legacy end_run 後時間推進正常進行")
+		failed += _ok("重新開一輪後時間推進正常進行")
 	else:
-		failed += _fail("legacy end_run 後推進異常: 第 %d 天 %s" % [int(gs.get("day")), str(gs.get("phase"))])
+		failed += _fail("legacy run_reset 後推進異常: 第 %d 天 %s" % [int(gs.get("day")), str(gs.get("phase"))])
 
 	return failed
 
@@ -552,10 +555,10 @@ func _test_greedy_playthrough_45_days(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _ok("全 90 個行動時段均已完成合法性分類與驗證 (K-25)")
 
-	if int(res.get("run_ended_count", 0)) == 1:
-		failed += _ok("45 天走查結束且 run_ended 恰好發射 1 次 (K-36)")
+	if int(res.get("ending_started_count", 0)) == 1:
+		failed += _ok("45 天走查結束且 ending_started 恰好發射 1 次 (K-36)")
 	else:
-		failed += _fail("45 天走查 run_ended 發射次數不為 1 (實際: %d)" % int(res.get("run_ended_count", 0)))
+		failed += _fail("45 天走查 ending_started 發射次數不為 1 (實際: %d)" % int(res.get("ending_started_count", 0)))
 
 	if int(gs.get("day")) == 1 and str(gs.get("phase")) == "morning":
 		failed += _ok("45 天走查後成功回到第 1 天 morning")

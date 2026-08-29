@@ -19,7 +19,7 @@ func _initialize() -> void:
 	failed += _test_1_view_safety_and_non_leakage(gs, data_node)
 	failed += _test_2_d8_lifecycle(gs, data_node)
 	failed += _test_3_candidate_disabled_states(gs, data_node)
-	failed += _test_4_charge_first_visit_real_end_run(gs, data_node)
+	failed += _test_4_charge_first_visit_real_run_reset(gs, data_node)
 	failed += _test_5_three_round_paths(gs, data_node)
 	failed += _test_6_d8_escape(gs, data_node)
 	failed += _test_7_d8_discard(gs, data_node)
@@ -48,7 +48,10 @@ func _err(msg: String) -> int:
 	return 1
 
 func _reset_gs(gs: Node) -> void:
-	gs.end_run("test_reset")
+	# P5-D：fresh state 是 opening，本檔驗的是 run 層規則。
+	gs.set("flow_mode", "run")
+	(gs.get("active_ending") as Dictionary).clear()
+	PlaythroughGreedy.start_fresh_run(gs)
 	gs.day = 1
 	gs.phase = "morning"
 	gs.hand.clear()
@@ -188,7 +191,7 @@ func _test_3_candidate_disabled_states(gs: Node, _data_node: Node) -> int:
 		failed += _ok("Candidate disabled states (madness_blocked, already_attempted hand & knowledge) verified")
 	return failed
 
-func _test_4_charge_first_visit_real_end_run(gs: Node, _data_node: Node) -> int:
+func _test_4_charge_first_visit_real_run_reset(gs: Node, _data_node: Node) -> int:
 	var failed: int = 0
 	# 第一輪：走真實流程進 D8，收費 1 點瘋狂值並寫入 night_locations_seen
 	_reset_gs(gs)
@@ -202,10 +205,10 @@ func _test_4_charge_first_visit_real_end_run(gs: Node, _data_node: Node) -> int:
 	if madness_after_first - initial_madness != 1:
 		failed += _err("First visit should charge madness cost")
 		
-	# 走真實 end_run() 跨輪，不手動注入 seen
-	gs.end_run("truth")
+	# 走真實 run_reset() 跨輪，不手動注入 seen
+	PlaythroughGreedy.start_fresh_run(gs)
 	if not gs.night_locations_seen.has("n_manydoors"):
-		failed += _err("night_locations_seen should persist across end_run in meta")
+		failed += _err("night_locations_seen should persist across run_reset in meta")
 		
 	# 第二輪：推進至 D8 夜間，驗證 play_night_fixed() 不再重收費
 	gs.day = 8
@@ -215,10 +218,10 @@ func _test_4_charge_first_visit_real_end_run(gs: Node, _data_node: Node) -> int:
 	var madness_after_second = int(gs.get("_madness_counter"))
 	
 	if madness_after_second != madness_before_second:
-		failed += _err("Second run D8 visit should NOT charge madness cost via real end_run")
+		failed += _err("Second run D8 visit should NOT charge madness cost via real run_reset")
 		
 	if failed == 0:
-		failed += _ok("D8 charge_first_visit via real end_run verified")
+		failed += _ok("D8 charge_first_visit via real run_reset verified")
 	return failed
 
 func _test_5_three_round_paths(gs: Node, data_node: Node) -> int:
@@ -450,9 +453,6 @@ func _test_12_d8_night_actions_blocked_and_protagonist_not_consumed(gs: Node, _d
 	if bool(adv_intro_res.get("ok", true)) or str(adv_intro_res.get("reason_code", "")) != "encounter_active":
 		failed += _err("advance_phase during encounter intro should be rejected with 'encounter_active', got '%s'" % adv_intro_res.get("reason_code"))
 		
-	var rna_intro_res = gs.resolve_night_advance()
-	if bool(rna_intro_res.get("advance", true)) or str(rna_intro_res.get("reason_code", "")) != "encounter_active":
-		failed += _err("resolve_night_advance during intro should return encounter_active")
 		
 	var snap_after := JSON.stringify(gs.serialize())
 	if snap_after != snap_before:
@@ -592,12 +592,9 @@ func _test_15_d8_win_lose_return_to_night_end(gs: Node, _data_node: Node) -> int
 	if not gs.active_encounter.is_empty():
 		failed += _err("Active encounter should be empty after victory")
 		
-	var adv_win_res: Dictionary = gs.resolve_night_advance()
-	if not bool(adv_win_res.get("advance", false)):
-		adv_win_res = gs.resolve_night_advance()
-	if not bool(adv_win_res.get("advance", false)):
-		failed += _err("resolve_night_advance after D8 victory should return advance: true")
-	gs.advance_phase()
+	var adv_win_res: Dictionary = PlaythroughGreedy.advance_until_phase_changes(gs)
+	if not bool(adv_win_res.get("phase_advanced", false)):
+		failed += _err("night advance after D8 victory should reach the next phase")
 	if gs.day != 9 or gs.phase != "morning":
 		failed += _err("Night advance after D8 victory should advance to Day 9 Morning, got D%d %s" % [gs.day, gs.phase])
 		
@@ -613,12 +610,9 @@ func _test_15_d8_win_lose_return_to_night_end(gs: Node, _data_node: Node) -> int
 	if not gs.active_encounter.is_empty():
 		failed += _err("Active encounter should be empty after failure")
 		
-	var adv_fail_res: Dictionary = gs.resolve_night_advance()
-	if not bool(adv_fail_res.get("advance", false)):
-		adv_fail_res = gs.resolve_night_advance()
-	if not bool(adv_fail_res.get("advance", false)):
-		failed += _err("resolve_night_advance after D8 failure should return advance: true")
-	gs.advance_phase()
+	var adv_fail_res: Dictionary = PlaythroughGreedy.advance_until_phase_changes(gs)
+	if not bool(adv_fail_res.get("phase_advanced", false)):
+		failed += _err("night advance after D8 failure should reach the next phase")
 	if gs.day != 9 or gs.phase != "morning":
 		failed += _err("Night advance after D8 failure should advance to Day 9 Morning, got D%d %s" % [gs.day, gs.phase])
 		
