@@ -1,0 +1,25 @@
+[gd_scene load_steps=3 format=3 uid="uid://returnfare0ending"]
+
+[ext_resource type="Script" path="res://scenes/ui/ending_panel.gd" id="1_ending"]
+[ext_resource type="PackedScene" uid="uid://c8j7v6m5k4f3" path="res://scenes/ui/flow_text.tscn" id="2_flowtext"]
+
+[node name="EndingPanel" type="VBoxContainer"]
+script = ExtResource("1_ending")
+
+[node name="EndingFlowText" parent="." instance=ExtResource("2_flowtext")]
+size_flags_vertical = 3
+
+[node name="ControlsRow" type="HBoxContainer" parent="."]
+offset_top = 370.0
+offset_bottom = 400.0
+
+[node name="PageLabel" type="Label" parent="ControlsRow"]
+text = "第 1 / 1 頁"
+
+[node name="SkipButton" type="Button" parent="ControlsRow"]
+visible = false
+text = "跳過"
+
+[node name="AdvanceButton" type="Button" parent="ControlsRow"]
+size_flags_horizontal = 3
+text = "下一頁"

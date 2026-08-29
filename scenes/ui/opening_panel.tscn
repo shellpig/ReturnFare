@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3 uid="uid://returnfare0opening"]
+
+[ext_resource type="Script" path="res://scenes/ui/opening_panel.gd" id="1_opening"]
+
+[node name="OpeningPanel" type="VBoxContainer"]
+script = ExtResource("1_opening")
+
+[node name="TitleLabel" type="Label" parent="."]
+text = "出門前的十分鐘"
+
+[node name="PromptLabel" type="Label" parent="."]
+autowrap_mode = 3
+
+[node name="ChoicesContainer" type="VBoxContainer" parent="."]
+size_flags_horizontal = 3
+
+[node name="ReasonLabel" type="Label" parent="."]
+autowrap_mode = 3
+
+[node name="ConfirmDialog" type="ConfirmationDialog" parent="."]
+title = "確認選擇"

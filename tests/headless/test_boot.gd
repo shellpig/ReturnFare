@@ -114,17 +114,23 @@ func _test_main_scene_enters_normal_branch() -> int:
 	else:
 		failed += _ok("StatusLabel 可見")
 
-	if not advance_btn.visible:
-		failed += _fail("AdvanceButton 被藏起來，走的是錯誤分支")
-	else:
-		failed += _ok("AdvanceButton 可見")
+	# P5-E：fresh boot 處於 opening 模式，StatusLabel 為「出門前的十分鐘」，OpeningPanel 可見，AdvanceButton 隱藏
+	var opening_panel: Node = main.get_node_or_null("ContentView/OpeningPanel")
+	var ending_panel: Node = main.get_node_or_null("ContentView/EndingPanel")
+	if opening_panel == null or ending_panel == null:
+		failed += _fail("ContentView 少了 OpeningPanel 或 EndingPanel")
+		main.queue_free()
+		return failed
 
-	# _refresh_status() 只在正常分支跑。不能只驗「有字」——main.tscn 本身帶佔位字，
-	# 壞掉時那條斷言照樣過。驗開場狀態的實際內容才分得出來。
-	if not status_label.text.begins_with("第 1 天"):
-		failed += _fail("StatusLabel 不是開場狀態，_refresh_status() 沒跑到：「%s」" % status_label.text)
+	if not opening_panel.visible:
+		failed += _fail("OpeningPanel 未顯示")
 	else:
-		failed += _ok("StatusLabel 是 _refresh_status() 寫的：「%s」" % status_label.text)
+		failed += _ok("OpeningPanel 在開局模式下正確顯示")
+
+	if status_label.text != "出門前的十分鐘":
+		failed += _fail("StatusLabel 在開局模式下未顯示出門前的十分鐘：「%s」" % status_label.text)
+	else:
+		failed += _ok("StatusLabel 在開局模式下顯示「出門前的十分鐘」")
 
 	# 驗證 FlowText 節點在 main.tscn 存在 (K-28)
 	var flow_text: FlowText = main.get_node_or_null("ContentView/FlowText")
@@ -133,23 +139,30 @@ func _test_main_scene_enters_normal_branch() -> int:
 	else:
 		failed += _ok("ContentView/FlowText 存在")
 
-	# 驗證 Day 1 night fixed 演出 (n_corridor_ch1) 在 FlowText 顯示
 	var gs: Node = get_root().get_node("GameState")
 
-	# P5-D：正式啟動路徑一律從開局進場，run 畫面要先由 choose_opening() 建起來。
+	# P5-E：正式啟動路徑一律從開局進場，run 畫面要先由 choose_opening() 建起來。
 	if str(gs.get("flow_mode")) != "opening":
 		failed += _fail("fresh boot 的 flow.mode 不是 opening（實際：%s）" % str(gs.get("flow_mode")))
 	else:
 		failed += _ok("fresh boot 的 flow.mode 為 opening")
-	if not flow_text.visible or not flow_text.get_text().contains("出門前的十分鐘"):
-		failed += _fail("開局 stub 未寫入 FlowText")
-	else:
-		failed += _ok("開局 stub 成功寫入 FlowText")
+
 	var open_res: Dictionary = gs.call("choose_opening", "take_family_album")
 	if not bool(open_res.get("ok", false)) or str(gs.get("flow_mode")) != "run":
 		failed += _fail("choose_opening(take_family_album) 未能由正式啟動路徑建立 run")
 	else:
 		failed += _ok("choose_opening(take_family_album) 由正式啟動路徑建立 run")
+
+	main.call("_route_view")
+	if not advance_btn.visible:
+		failed += _fail("進入 run 模式後 AdvanceButton 未顯示")
+	else:
+		failed += _ok("進入 run 模式後 AdvanceButton 可見")
+
+	if not status_label.text.begins_with("第 1 天"):
+		failed += _fail("進入 run 模式後 StatusLabel 不是開場狀態：「%s」" % status_label.text)
+	else:
+		failed += _ok("進入 run 模式後 StatusLabel 正確顯示第 1 天狀態")
 
 	gs.set("day", 1)
 	gs.set("phase", "night")
@@ -254,12 +267,13 @@ func _test_main_scene_enters_normal_branch() -> int:
 				% [occupant_lines.size(), ", ".join(occupant_lines)])
 	main.call("_on_panel_closed")
 
-	# 驗證 ending_started 結局 stub 在 FlowText 顯示且保持可見
+	# 驗證 ending_started 結局面板在 EndingPanel 顯示且保持可見
+	gs.set("flow_mode", "ending")
 	main.call("_on_ending_started")
-	if not flow_text.visible or not flow_text.get_text().contains("[結局 stub]"):
-		failed += _fail("結局 stub 未能寫入 FlowText")
+	if not ending_panel.visible:
+		failed += _fail("EndingPanel 在結局開始後未能正確顯示")
 	else:
-		failed += _ok("結局 stub 成功寫入 FlowText 且保持可見")
+		failed += _ok("EndingPanel 成功在結局開始後顯示且保持可見")
 
 	main.queue_free()
 	return failed

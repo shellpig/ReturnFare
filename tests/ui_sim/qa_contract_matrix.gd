@@ -35,6 +35,10 @@ const CONTRACT_IDS := [
 	"p4c_07_indulge_hides_candidate",
 	"p4e_01_encounter_intro_ack", "p4e_02_respond_confirm_cancel",
 	"p4e_03_d45_no_escape_discard", "p4e_04_d45_respond_advance",
+	"p5e_01_boot_opening", "p5e_02_opening_confirm_cancel",
+	"p5e_03_ending_isolation", "p5e_04_ending_typewriter_and_advance",
+	"p5e_05_ending_skip_seen_only", "p5e_06_ending_complete_to_opening",
+	"p5e_07_no_internal_keys_leaked", "p5e_08_coda_choice_requires_card",
 ]
 
 const SPECIAL_EVIDENCE := {
@@ -94,6 +98,14 @@ const SPECIAL_EVIDENCE := {
 	"p4e_02_respond_confirm_cancel": ["madness_blocked_reason", "discard_cancel_ok", "escape_cancel_ok", "respond_cancel_ok", "advance_to_r2"],
 	"p4e_03_d45_no_escape_discard": ["d45_no_escape", "d45_no_discard", "d45_capacity_zero_blocked", "d45_knowledge_marked"],
 	"p4e_04_d45_respond_advance": ["d45_respond_success", "d45_phase_evening_after", "flow_text_exit_lines_preserved"],
+	"p5e_01_boot_opening": ["opening_title_visible", "opening_three_choices", "refuse_locked_with_reason", "run_controls_hidden"],
+	"p5e_02_opening_confirm_cancel": ["preview_dialog_shown", "cancel_zero_mutation", "confirm_starts_run", "hand_cards_received"],
+	"p5e_03_ending_isolation": ["ending_panel_visible", "run_controls_hidden", "advance_mutation_rejected"],
+	"p5e_04_ending_typewriter_and_advance": ["typewriter_reveal_same_page", "advance_to_next_page", "no_two_page_skip"],
+	"p5e_05_ending_skip_seen_only": ["first_seen_no_skip", "repeat_seen_skip_available", "skip_to_target_page"],
+	"p5e_06_ending_complete_to_opening": ["ending_complete_cleans_run", "refuse_unlocked_after_replaced", "refuse_ending_roundtrip"],
+	"p5e_07_no_internal_keys_leaked": ["ui_dump_clean_of_internal_keys"],
+	"p5e_08_coda_choice_requires_card": ["card_required_no_direct_choose", "empty_handed_choice_available"],
 }
 
 ## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。

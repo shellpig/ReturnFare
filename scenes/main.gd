@@ -1,16 +1,11 @@
 extends Control
 
-## 主場景。P1-F：白天/夜間地圖、晚間演出（fixed beats + 殘響）、夜間解析、結局迴圈與 FlowText 容器（K-28）。
+## 主場景。P1-F：白天/夜間地圖、晚間演出、夜間解析、P5-E 開局與結局 UI、遭遇與委託。
 
 const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 const QAValidationClass := preload("res://tests/ui_sim/qa_validation.gd")
 
 const _MSG_DATA_ERROR := "資料載入失敗，詳情見 Output。"
-const _MSG_ENDING_STUB := "[結局 stub]"
-const _MSG_ENDING_MADNESS_BE := "[發瘋 BE]"
-const _MSG_OPENING_STUB := "[開局 stub] 出門前的十分鐘"
-const _MSG_ADVANCE_OPENING := "開始"
-const _MSG_ADVANCE_ENDING := "繼續"
 const _MSG_ADVANCE := "推進時段"
 const _MSG_ADVANCE_HINT := "推進時段（目前無可做動作）"
 const _MSG_ADVANCE_SLEEP := "直接睡"
@@ -28,6 +23,8 @@ const _LAYOUT_GAP := 10.0
 @onready var _error_label: Label = $ErrorLabel
 @onready var _status_label: Label = $StatusLabel
 @onready var _advance_btn: Button = $AdvanceButton
+@onready var _opening_panel: Node = $ContentView/OpeningPanel
+@onready var _ending_panel: Node = $ContentView/EndingPanel
 @onready var _map_list: Node = $ContentView/MapList
 @onready var _location_panel: Node = $ContentView/LocationPanel
 @onready var _flow_text: FlowText = $ContentView/FlowText
@@ -35,7 +32,7 @@ const _LAYOUT_GAP := 10.0
 @onready var _encounter_panel: Node = $ContentView/EncounterPanel
 @onready var _delegation_tutorial_dialog: AcceptDialog = $DelegationTutorialDialog
 
-var _is_showing_ending := false
+var _is_showing_ending: bool = false
 
 
 func _enter_tree() -> void:
@@ -55,9 +52,13 @@ func _ready() -> void:
 	GameState.phase_changed.connect(_on_phase_changed)
 	GameState.day_changed.connect(_on_day_changed)
 	GameState.chapter_changed.connect(_on_chapter_changed)
+	GameState.flow_mode_changed.connect(_on_flow_mode_changed)
 	GameState.ending_started.connect(_on_ending_started)
 	GameState.opening_started.connect(_on_opening_started)
 	GameState.delegation_tutorial_available.connect(_on_delegation_tutorial_available)
+
+	_opening_panel.choice_selected.connect(_on_opening_choice_selected)
+	_ending_panel.completed.connect(_on_ending_completed)
 
 	_map_list.location_selected.connect(_on_location_selected)
 	_location_panel.closed.connect(_on_panel_closed)
@@ -139,16 +140,11 @@ func _process_cli_args() -> void:
 		GameState.deserialize(json_val as Dictionary)
 
 
-## 推進按鈕：三種 flow mode 各只有一個規則層入口。
+## 推進按鈕：RUN mode 下的唯一規則層入口。
 ## 夜間停拍已由 `advance_phase()` 內部吸收，UI 只負責渲染回傳的 lines 與 `phase_advanced`。
 func _on_advance_pressed() -> void:
-	match GameState.flow_mode:
-		GameState.FLOW_OPENING:
-			_confirm_first_available_opening()
-			return
-		GameState.FLOW_ENDING:
-			_step_ending_stub()
-			return
+	if GameState.flow_mode != GameState.FLOW_RUN:
+		return
 
 	var res: Dictionary = GameState.advance_phase()
 	if not bool(res.get("ok", false)):
@@ -169,7 +165,7 @@ func _on_advance_pressed() -> void:
 
 func _on_phase_changed(_day: int, _phase: String) -> void:
 	_refresh_status()
-	if not _is_showing_ending:
+	if GameState.flow_mode == GameState.FLOW_RUN:
 		_route_view()
 
 
@@ -181,81 +177,37 @@ func _on_chapter_changed(_chapter: int) -> void:
 	_refresh_status()
 
 
-## P5-D 過渡：正式的逐頁結局畫面在 P5-E 建 `ending_panel`，這裡只保留 stub，
-## 讓迴圈在引擎層走得完（結局 → 結算 → 回開局）。
-func _on_ending_started() -> void:
-	_is_showing_ending = true
-	_flow_text.clear()
-	var ending_id := str(GameState.active_ending.get("ending_id", ""))
-	if ending_id == "ending_madness_be":
-		_flow_text.append_line(_MSG_ENDING_MADNESS_BE)
-	else:
-		_flow_text.append_line(_MSG_ENDING_STUB)
-	_flow_text.visible = true
-	_map_list.visible = false
-	_location_panel.visible = false
-	_encounter_panel.visible = false
-	_advance_btn.visible = true
-	_advance_btn.disabled = false
-	_refresh_advance_hint()
-
-
-func _on_opening_started() -> void:
-	_is_showing_ending = false
+func _on_flow_mode_changed(_mode: String) -> void:
+	_refresh_status()
 	_route_view()
 
 
-## P5-D 過渡：結局逐頁與跳過控制屬 P5-E。stub 只依規則層當下狀態走
-## 補完 → 翻頁 → 結算，不自己判斷頁數或跳過條件。
-func _step_ending_stub() -> void:
-	var view: Dictionary = GameState.ending_view()
-	if bool(view.get("can_complete", false)):
-		GameState.complete_ending()
+func _on_ending_started() -> void:
+	_refresh_status()
+	_route_view()
+
+
+func _on_opening_started() -> void:
+	_refresh_status()
+	_route_view()
+
+
+func _on_opening_choice_selected(choice_id: String) -> void:
+	var res: Dictionary = GameState.choose_opening(choice_id)
+	if not bool(res.get("ok", false)):
+		printerr("選擇開局失敗: %s" % str(res.get("reason_text", "")))
 		return
-	if not bool(view.get("page_revealed", false)):
-		GameState.reveal_ending_page()
-	else:
-		GameState.advance_ending_page()
-	_render_ending_stub_page()
+	_refresh_status()
+	_route_view()
 
 
-func _render_ending_stub_page() -> void:
-	var view: Dictionary = GameState.ending_view()
-	_flow_text.clear()
-	_flow_text.append_line(str(view.get("page_text", "")))
-	_flow_text.visible = true
-	_layout_flow_full()
-	_refresh_advance_hint()
-
-
-## P5-D 過渡：正式的開局畫面（三個選項、預覽、取消）在 P5-E 建 `opening_panel`。
-## stub 只列出規則層給的可見文字，並用推進按鈕確認第一個可選項。
-func _show_opening_stub() -> void:
-	_is_showing_ending = false
-	_flow_text.clear()
-	_flow_text.append_line(_MSG_OPENING_STUB)
-	for choice: Dictionary in GameState.opening_view():
-		var suffix := "" if bool(choice.get("available", false)) else "（%s）" % str(choice.get("reason_text", ""))
-		_flow_text.append_line("- " + str(choice.get("label", "")) + suffix)
-	_flow_text.visible = true
-	_layout_flow_full()
-	_map_list.visible = false
-	_location_panel.visible = false
-	_encounter_panel.visible = false
-	_advance_btn.visible = true
-	_advance_btn.disabled = false
-	_refresh_advance_hint()
-
-
-func _confirm_first_available_opening() -> void:
-	for choice: Dictionary in GameState.opening_view():
-		if bool(choice.get("available", false)):
-			GameState.choose_opening(str(choice.get("id", "")))
-			return
+func _on_ending_completed() -> void:
+	_refresh_status()
+	_route_view()
 
 
 func _on_location_selected(loc_id: String) -> void:
-	if _is_showing_ending:
+	if GameState.flow_mode != GameState.FLOW_RUN:
 		return
 	_flow_text.visible = false
 	_map_list.visible = false
@@ -272,7 +224,7 @@ func _on_night_entry_requested(loc_id: String) -> void:
 	var entry_res: Dictionary = GameState.enter_night_location(loc_id)
 	if not bool(entry_res.get("ok", false)):
 		return
-	if _is_showing_ending:
+	if GameState.flow_mode != GameState.FLOW_RUN:
 		return
 	var extra_lines: PackedStringArray = entry_res.get("lines", PackedStringArray())
 	_location_panel.call("show_location", loc_id, extra_lines)
@@ -323,23 +275,23 @@ func _on_delegation_tutorial_dismissed() -> void:
 
 
 func _refresh_status() -> void:
-	_status_label.text = _FMT_STATUS % [
-		GameState.day, GameState.phase, GameState.chapter()
-	]
+	match GameState.flow_mode:
+		GameState.FLOW_OPENING:
+			_status_label.text = "出門前的十分鐘"
+		GameState.FLOW_ENDING:
+			_status_label.text = "結局"
+		_:
+			_status_label.text = _FMT_STATUS % [
+				GameState.day, GameState.phase, GameState.chapter()
+			]
 	_refresh_advance_hint()
 
 
 func _refresh_advance_hint() -> void:
-	if GameState.flow_mode == GameState.FLOW_OPENING:
-		_advance_btn.text = _MSG_ADVANCE_OPENING
-		_advance_btn.disabled = false
-		_advance_btn.modulate = Color.WHITE
+	if GameState.flow_mode == GameState.FLOW_OPENING or GameState.flow_mode == GameState.FLOW_ENDING:
+		_advance_btn.visible = false
 		return
-	if GameState.flow_mode == GameState.FLOW_ENDING:
-		_advance_btn.text = _MSG_ADVANCE_ENDING
-		_advance_btn.disabled = false
-		_advance_btn.modulate = Color.WHITE
-		return
+
 	# P4-E：遭遇進行中推進按鈕 disabled
 	if not GameState.active_encounter.is_empty():
 		_advance_btn.text = _MSG_ADVANCE
@@ -364,18 +316,40 @@ func _refresh_advance_hint() -> void:
 
 
 func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> void:
-	_advance_btn.disabled = false
+	_is_showing_ending = (GameState.flow_mode == GameState.FLOW_ENDING)
 	if GameState.flow_mode == GameState.FLOW_OPENING:
-		_show_opening_stub()
-		return
-	if _is_showing_ending:
-		_flow_text.visible = true
-		_layout_flow_full()
+		_opening_panel.visible = true
+		_opening_panel.call("refresh")
+		_ending_panel.visible = false
+		_ending_panel.call("reset")
 		_map_list.visible = false
 		_location_panel.visible = false
 		_encounter_panel.visible = false
-		_advance_btn.visible = true
+		_flow_text.visible = false
+		_hand_bar.visible = false
+		_advance_btn.visible = false
+		_refresh_status()
 		return
+
+	if GameState.flow_mode == GameState.FLOW_ENDING:
+		_ending_panel.visible = true
+		_ending_panel.call("refresh")
+		_opening_panel.visible = false
+		_map_list.visible = false
+		_location_panel.visible = false
+		_encounter_panel.visible = false
+		_flow_text.visible = false
+		_hand_bar.visible = false
+		_advance_btn.visible = false
+		_refresh_status()
+		return
+
+	# RUN 模式
+	_opening_panel.visible = false
+	_ending_panel.visible = false
+	_hand_bar.visible = true
+	_advance_btn.visible = true
+	_advance_btn.disabled = false
 
 	var phase: String = GameState.phase
 	match phase:
@@ -447,7 +421,7 @@ func _layout_with_flow(content: Node, flow_height: float = _LAYOUT_FLOW_SHORT) -
 		content.offset_bottom = _LAYOUT_BOTTOM
 
 
-## FlowText 獨佔整個 ContentView（結局、晚間演出、coda 完成）。
+## FlowText 獨佔整個 ContentView（晚間演出、coda 完成）。
 func _layout_flow_full() -> void:
 	_flow_text.offset_top = 0.0
 	_flow_text.offset_bottom = _LAYOUT_BOTTOM

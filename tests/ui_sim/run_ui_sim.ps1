@@ -602,7 +602,7 @@ $catalogContractCount = $matrixContractIds.Count
 $actualCatalogIds = @($allCaseDefs | ForEach-Object { [string]$_.contract_id } | Sort-Object -Unique)
 $missingCatalogIds = @($matrixContractIds | Where-Object { $_ -notin $actualCatalogIds })
 $unexpectedCatalogIds = @($actualCatalogIds | Where-Object { $_ -notin $matrixContractIds })
-if ($catalogContractCount -ne 85 -or $missingCatalogIds.Count -gt 0 -or $unexpectedCatalogIds.Count -gt 0) {
+if ($catalogContractCount -ne 93 -or $missingCatalogIds.Count -gt 0 -or $unexpectedCatalogIds.Count -gt 0) {
     Write-Host "ERROR: Contract matrix/catalog mismatch. matrix=$catalogContractCount missing=$($missingCatalogIds -join ',') unexpected=$($unexpectedCatalogIds -join ',')" -ForegroundColor Red
     exit 1
 }

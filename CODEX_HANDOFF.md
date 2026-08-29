@@ -4,6 +4,51 @@
 
 ## 目前狀態
 
+**P5-E（開局與結局 UI）實作完成，已通過全套 32 套 Headless 測試與 93 條 UI Sim 契約驗收，自跑全綠且通過變異測試，等待 Verifier 驗收關門。**
+
+### P5-E 實際改了什麼
+
+1. **`scenes/ui/flow_text.gd`**
+   - 擴充 typewriter 逐字播放機制：新增 `signal typewriter_completed`。
+   - 新增 API：`start_typewriter(text: String, speed: float = 0.03)`、`finish_typewriter()`、`is_typewriting() -> bool`、`show_text_instant(text: String)`。
+2. **`scenes/ui/opening_panel.gd` / `.tscn`（新增）**
+   - 呈現故事內開局「出門前的十分鐘」。
+   - 依 `GameState.opening_view()` 固定渲染 3 個選項按鈕（QA IDs: `opening_choice::take_family_album`, `opening_choice::return_missed_call`, `opening_choice::refuse_boarding`）。
+   - 鎖定選項（首輪不上車）呈現 disabled，並在 `ReasonLabel` 顯示不劇透的鎖定理由（「你還沒有理由放棄這趟路。」）。
+   - 點擊可用選項彈出 `ConfirmationDialog` 預覽效果（QA IDs: `dialog_confirm::opening`, `dialog_cancel::opening`），取消零副作用，確認後成功建立 run 並進入遊戲。
+3. **`scenes/ui/ending_panel.gd` / `.tscn`（新增）**
+   - 讀取 `GameState.ending_view()`，內嵌 `EndingFlowText` 逐字逐頁播映（節點名稱命名為 `EndingFlowText`，避免與主畫面 `FlowText` 發生全域搜尋衝突）。
+   - 推進按鈕（QA ID: `ending_advance`）及點擊/鍵盤（Space/Enter）支援：打字中按一次補完全文、已 revealed 按一次翻進下一頁、末頁且 ready 按一次呼叫 `complete_ending()`。
+   - 跳過按鈕（QA ID: `ending_skip`）：首見結局完全隱藏（visible=false）；重見同 ending id 且未 ready 時可見，點擊直接跳至資料指定的 skip 落點頁面。
+4. **`scenes/main.gd` / `.tscn`**
+   - 掛載 `OpeningPanel` 與 `EndingPanel`，移除舊的過渡 stub 函式。
+   - 依 `GameState.flow_mode` 動態掛載與切換（`FLOW_OPENING`, `FLOW_RUN`, `FLOW_ENDING`）。
+   - ending 模式下 HandBar、MapList、LocationPanel、EncounterPanel、AdvanceButton 等 run 控制項全部隱藏。
+5. **`scenes/ui/location_panel.gd`（K-195 修復）**
+   - `choice_requires_card: true` 的 slot 不再生成直接選取按鈕，強制玩家依持卡路徑或 fallback 選擇。
+6. **測試與 UI Sim 契約套件**
+   - 擴充 `tests/ui_sim/cases/p1af_cases.gd`，新增 P5-E 專屬 8 個驗收案例（`p5e_01` ~ `p5e_08`），UI 契約總數從 85 條擴充至 93 條（含 variants 共 116 種組合）。
+   - `tests/ui_sim/qa_contract_matrix.gd` 註冊 8 條 P5-E 契約及 Special Evidence tokens。
+   - `tests/ui_sim/run_ui_sim.ps1` 更新契約總數檢查為 93 條。
+   - 更新既有 headless 測試（`test_boot.gd`, `test_p2d.gd`, `test_p3b.gd`）適配 `EndingPanel` 與 `EndingFlowText` 節點結構。
+
+### P5-E 自跑證據（實作者，非驗收）
+
+- **Headless 測試套件**：全部 32 套測試全數 exit 0 通過（`tests/run_all_headless.ps1`），`ALL HEADLESS TESTS PASSED!`。
+- **UI Simulation 測試套件**：全套 93 條契約（116 variants）全數 exit 0 通過（`tests/ui_sim/run_ui_sim.ps1 -Background`），`completed contracts 93, failed checks 0`（Run ID: `20260829-221358-446-p31236-587b677e`）。
+- **45 天貪心走查（playthrough_greedy.gd）**：exit 0 通過，走查全程 46 次行動成功走完 45 天、結算 `ending_replaced`、回到 opening，第二輪相簿開局正常。
+
+### P5-E 變異測試記錄
+
+| 變異項目 | 變異內容 | 測試結果 |
+|---|---|---|
+| 變異 1：Skip 按鈕顯示條件反轉 | `_skip_btn.visible = not can_skip` | `p5e_05_ending_skip_seen_only` 確切轉紅（5 checks failed），還原後回綠 |
+| 變異 2：開局選項鎖定狀態反轉 | `btn.disabled = false` | `p5e_01_boot_opening` 確切轉紅（1 check failed），還原後回綠 |
+
+---
+
+## 歷史狀態
+
 **P5-D（開局、歷輪摘要與跨輪重置）已由 Verifier 完整複驗關門並轉 ✅。** 開局三選項、唯一 `complete_ending()`、history、跨輪繼承、D29 逾期預設與 `advance_phase()` 七步固定順序全部落地；`end_run()`／`run_ended`／`resolve_night_advance()` 三個舊接線同批退場。
 
 ### P5-D 實際改了什麼

@@ -416,12 +416,18 @@ func _test_main_scene_cap_be_screen(tree: SceneTree, gs: Node, _data_node: Node)
 	main.call("_on_night_entry_requested", "n_ahong_1")
 	await tree.process_frame
 
-	var flow_lines: PackedStringArray = flow_text.call("get_lines")
-	if bool(main.get("_is_showing_ending")) and flow_lines.has("[發瘋 BE]") and not loc_panel.visible and not map_list.visible and flow_text.visible:
-		failed += _ok("main.gd 真入口點擊夜間地點觸發 BE：畫面切換至 [發瘋 BE] 且未開啟 LocationPanel")
+	var ending_panel: Node = main.get_node("ContentView/EndingPanel")
+	var is_ending: bool = bool(main.get("_is_showing_ending")) or ending_panel.visible
+	var ending_flow: FlowText = ending_panel.get_node("FlowText")
+	var ending_text := ending_flow.get_text()
+	var view_be: Dictionary = gs.call("ending_view")
+	var page_text_be := str(view_be.get("page_text", ""))
+
+	if is_ending and ending_panel.visible and not loc_panel.visible and not map_list.visible and (ending_text.contains("扭曲") or page_text_be.contains("扭曲")):
+		failed += _ok("main.gd 真入口點擊夜間地點觸發 BE：畫面切換至 EndingPanel 顯示發狂 BE 且未開啟 LocationPanel")
 	else:
-		failed += _fail("main.gd BE 畫面狀態異常: ending=%s, flow=%s, panel_vis=%s" % [
-			str(main.get("_is_showing_ending")), str(flow_lines), str(loc_panel.visible)
+		failed += _fail("main.gd BE 畫面狀態異常: ending=%s, ending_vis=%s, panel_vis=%s" % [
+			str(is_ending), str(ending_panel.visible), str(loc_panel.visible)
 		])
 
 	# P5-B：結局啟動後 run 不清空，推進按鈕也不得偷推時間（正式結局畫面在 P5-E）。

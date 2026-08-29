@@ -312,34 +312,35 @@ func _test_be_flow_text_display() -> int:
 	get_root().add_child(main)
 	await process_frame
 
-	# 一般結局分支：直接發 ending_started（此時沒有 active ending），驗的是訊號接線本身。
+	# 一般結局分支：驗證 ending_started 訊號接線使 EndingPanel 顯示且地圖隱藏
 	PlaythroughGreedy.start_fresh_run(gs)
+	gs.set("flow_mode", "ending")
 	gs.ending_started.emit()
 	await process_frame
-	var flow_text: FlowText = main.get_node("ContentView/FlowText")
-	var text_default := flow_text.get_text() if flow_text.has_method("get_text") else ""
-	if text_default.is_empty() and flow_text.has_node("ScrollContainer/TextLabel"):
-		text_default = (flow_text.get_node("ScrollContainer/TextLabel") as RichTextLabel).text
+	var ending_panel: Node = main.get_node("ContentView/EndingPanel")
+	var map_list: Node = main.get_node("ContentView/MapList")
 
-	if "[結局 stub]" in text_default:
-		failed += _ok("一般結局訊號發射後顯示 [結局 stub]")
+	if ending_panel.visible and not map_list.visible:
+		failed += _ok("一般結局訊號發射後 EndingPanel 顯示且地圖隱藏")
 	else:
-		failed += _fail("一般結局未顯示 [結局 stub] (text=%s)" % text_default)
+		failed += _fail("一般結局訊號發射後 EndingPanel 未正確顯示")
 
 	# 透過真實規則層入口發卡衝破 cap 觸發發瘋 BE（K-67：驗證 GameState.ending_started 訊號接線）
+	PlaythroughGreedy.start_fresh_run(gs)
 	loader.tuning["madness_cap"] = 2
 	gs.call("gain_card", "madness")
 	gs.call("gain_card", "madness")
 	await process_frame
 
-	var text_be := flow_text.get_text() if flow_text.has_method("get_text") else ""
-	if text_be.is_empty() and flow_text.has_node("ScrollContainer/TextLabel"):
-		text_be = (flow_text.get_node("ScrollContainer/TextLabel") as RichTextLabel).text
+	var ending_flow_text: FlowText = ending_panel.get_node("EndingFlowText")
+	var text_be := ending_flow_text.get_text()
+	var view_be: Dictionary = gs.call("ending_view")
+	var page_text_be := str(view_be.get("page_text", ""))
 
-	if "[發瘋 BE]" in text_be and not ("[結局 stub]" in text_be):
-		failed += _ok("真實發卡達 cap 觸發發瘋 BE，經由訊號接線顯示 [發瘋 BE] 且不播一般結局骨架 (K-67)")
+	if ending_panel.visible and (text_be.contains("扭曲") or page_text_be.contains("扭曲")):
+		failed += _ok("真實發卡達 cap 觸發發瘋 BE，經由訊號接線顯示發瘋 BE 文字且 EndingPanel 可見 (K-67)")
 	else:
-		failed += _fail("發瘋 BE 文本展示錯誤 (text=%s)" % text_be)
+		failed += _fail("發瘋 BE 文本展示錯誤 (text=%s, page=%s)" % [text_be, page_text_be])
 
 	loader.tuning["madness_cap"] = orig_cap
 	main.queue_free()

@@ -376,7 +376,8 @@ func _render_slot(beat_id: String, slot_view: Dictionary) -> void:
 		return
 
 	var is_choice := bool(slot_view.get("is_choice", false))
-	if is_choice:
+	var requires_card := bool(slot.get("choice_requires_card", false))
+	if is_choice and not requires_card:
 		var choice_group := str(slot.get("choice_group", ""))
 		var choose_btn := Button.new()
 		choose_btn.text = _FMT_CHOOSE_BUTTON % label_text
