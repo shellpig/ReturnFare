@@ -70,6 +70,44 @@ GameState 新增 transient `last_choice_default_lines`（與既有三個 transie
 
 **本輪變異記錄**（各自套用後 `test_p5d` 轉紅，還原後全綠）：拿掉 due encounter 預檢、history 不重驗 snapshot、permanent lose 又看手牌、persistent set 收 false、`_settlement_lines()` 不含逾期預設、不含 auto_enter、`_play_evening()` 不含逾期預設。
 
+### P5-D 第二輪 review 修復（2026-08-29）
+
+Verifier 提一個 blocker、三條非阻擋，全部已修。
+
+**Blocker：`ending_history` 在 `deserialize()` 完全沒有驗證。**
+舊路徑只要元素是 Dictionary 就 `duplicate(true)` 收下，`{"ending_id":"ending_replaced"}` 這種殘缺紀錄足以讓 `has_seen_ending()` 解鎖不上車。修法是把「結局結果那十欄」抽成 `_parse_ending_result_fields()`，讓寫入端與讀檔端共用同一份判斷——寫得進去卻讀不回來（或反過來）就是規約分歧：
+
+- `_parse_ending_snapshot()` 改成先跑這一份，再驗它自己專屬的 `source_id`／`page_refs`／`page_index`／`page_revealed`／`ready_to_complete`。
+- 新增 `_parse_history_records()`：每筆精確十欄（不多不少）、四類 ending 的 nullable 矩陣、opening／variant／proxy 引用合法、當輪知識必須真的是 knowledge 卡（`slotless` ＋ `type`）、無重複且依 `cards.json` 順序、不上車一律為空。任一筆不合法整份回 `invalid_save_shape`，且與 flow／persistent 一樣在任何 mutation 之前驗完。
+- 順帶補齊寫入端：`_parse_ending_result_fields()` 現在也管 opening 引用存在與知識卡型別／順序，`_build_history_record()` 因此收斂成「驗完 → 取十欄」。
+
+**非阻擋 1：permanent lose 的正向案例仍吐 ERROR。**
+`lose_card()` 走完 permanent 分支但卡已不在手上時會落到 `push_error`。改成記下 `breaks_persistence`，在 push_error 之前 return——永久失去跨輪物品是可重演且冪等的合法終點。
+
+**非阻擋 2：opening 拒絕矩陣缺 `data_conflict`。**
+`test_p5d` 第 15 組補三例（同時有 `on_select` 與 `ending`、兩者都沒有、`on_select` 內藏 ending），各驗零變化，並在還原資料後驗同一個選項恢復可用。
+
+**非阻擋 3：D29 凍結後追加投入的直接反證。**
+第 11 組在凍結為阿薇之後把阿婕投入拉到 99，再驗 `selected_festival_proxy_npc`、D31、D39 與 ending 快照四處仍讀同一個 id。
+
+**新增測試**：第 21 組（讀檔的 `ending_history` 逐筆驗形狀）——對照組 round trip 逐字相同、16 種壞形狀各回 `invalid_save_shape` 且完整狀態零變化、殘缺紀錄不得解鎖不上車、一好一壞整份拒絕、`ending_history` 非陣列拒絕、缺欄的舊 checkpoint 仍可讀。
+
+**修復後自跑證據**：`test_p5d` 382 個 ok、exit 0 且 **stderr 全空**（修復前有 `lose_card: card ... not found in hand or knowledge`）；32 套 headless 全數 exit 0；UI sim run `20260829-205247-527-p3196-0dbb1b0e` 為 108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks。
+
+**本輪變異記錄**（各自套用後跑 `test_p5d`，還原後全綠）：
+
+| 變異 | 結果 |
+|---|---|
+| `deserialize()` 拿掉 history 驗證的 guard | 37 個斷言失敗，exit 1 |
+| 不驗 opening 引用是否存在 | 10 個斷言失敗，exit 1 |
+| 知識卡不驗資料順序與重複 | 3 個斷言失敗，exit 1 |
+| 知識卡不驗型別 | 5 個斷言失敗，exit 1 |
+| history 不驗欄位數 | 1 個斷言失敗，exit 1 |
+| 拿掉 opening 的 `on_select`／`ending` 形狀檢查 | 5 個斷言失敗，exit 1 |
+| `lose_card()` permanent 分支又落回 push_error | **仍 exit 0，但 stderr 重新出現 2 行 ERROR** |
+
+最後一列說明白：這條修的是 log 行為，GDScript 無法在同一個 process 內攔截 `push_error`，因此沒有斷言能守住它，證據是 stderr 的有無。D29 那條反證的靈敏度由既有第 10 組承擔（`{ajie:1, awei:5}` → 阿薇、`{ajie:3, awei:1}` → 阿婕，投入確實會改變結果）。
+
 ### P5-D 留給 verifier 的判斷點
 
 - `main.gd` 的開局／結局 stub 是過渡品，`測試指南.md > P5-D` 沒有 UI 條目；正式面板與逐字節奏屬 P5-E。

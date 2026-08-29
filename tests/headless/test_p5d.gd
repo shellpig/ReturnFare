@@ -8,7 +8,8 @@ extends SceneTree
 ## `choice_requires_card` 回歸與第二輪重入、
 ## 目標時段 due encounter 壞資料的 commit 前攔截、history append 前的 snapshot 完整重驗、
 ## persistent 邊界（先普通失去再永久失去、存檔 set 只收 true）、
-## 規則層結算文字真的走到畫面上（K-193）。
+## 規則層結算文字真的走到畫面上（K-193）、
+## 讀檔的 `ending_history` 逐筆驗形狀（殘缺紀錄不得解鎖不上車）。
 ## 跑法：Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p5d.gd
 
 const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
@@ -54,6 +55,7 @@ func _initialize() -> void:
 	_test_18_history_snapshot_revalidation(gs)
 	_test_19_persistent_boundaries(gs, data_node)
 	await _test_20_settlement_lines_reach_screen(gs)
+	_test_21_history_deserialize_validation(gs)
 
 	if _failed > 0:
 		push_error("test_p5d: %d 個斷言失敗" % _failed)
@@ -638,6 +640,11 @@ func _test_11_d29_conflict_and_frozen_reads(gs: Node, data_node: Node) -> void:
 	var frozen := str(gs.get("selected_festival_proxy_npc"))
 	_check(frozen == "awei", "離開 D29 afternoon 後代付者已凍結為 awei")
 
+	# 凍結後再加投入不得改變結果：這是「D29 當日凍結」的直接反證，
+	# 阿婕在這裡的投入遠高於阿薇，若下游任何一處重算就會翻成阿婕。
+	(gs.get("npc_action_counts") as Dictionary)["ajie"] = 99
+	_check(str(gs.get("selected_festival_proxy_npc")) == frozen, "凍結後追加投入不改變代付者")
+
 	gs.set("day", 31)
 	gs.set("phase", "afternoon")
 	_check(_visible_proxy_beat(gs, loader, 31) == "d31_proxy_awei", "D31 顯示的是凍結的那一位")
@@ -823,6 +830,30 @@ func _test_15_reject_matrix(gs: Node) -> void:
 		"未解鎖 choice → opening_choice_locked")
 	_check(_state_text(gs) == before_open, "opening 兩種拒絕後零變化")
 
+	# opening 的第四種拒絕：choice 通過鎖定檢查之後才發現資料形狀不合法。
+	var album: Dictionary = (gs.call("loader") as DataLoader).opening_choices_by_id["take_family_album"] as Dictionary
+	var orig_select: Variant = album["on_select"]
+	var data_conflict_cases := [
+		{ "label": "同時有 on_select 與 ending", "select": orig_select, "ending": "ending_madness_be" },
+		{ "label": "兩者都沒有", "select": {}, "ending": "" },
+		{ "label": "on_select 內藏 ending", "select": { "ending": "ending_madness_be" }, "ending": "" },
+	]
+	for c: Dictionary in data_conflict_cases:
+		album["on_select"] = c["select"]
+		if str(c["ending"]).is_empty():
+			album.erase("ending")
+		else:
+			album["ending"] = c["ending"]
+		var before_conflict := _state_text(gs)
+		_check(_reject_code(gs.call("choose_opening", "take_family_album")) == "data_conflict",
+			"開局選項%s → data_conflict" % str(c["label"]))
+		_check(_state_text(gs) == before_conflict, "data_conflict 拒絕後零變化（%s）" % str(c["label"]))
+	album.erase("ending")
+	album["on_select"] = orig_select
+	_check(bool((gs.call("choose_opening", "take_family_album") as Dictionary).get("ok", false)),
+		"還原資料後同一個開局選項恢復可用")
+	_fresh_opening(gs)
+
 	# complete_ending
 	_check(_reject_code(gs.call("complete_ending")) == "not_ending", "opening mode complete_ending → not_ending")
 	_fresh_run(gs, 45, "evening")
@@ -1007,6 +1038,10 @@ func _test_19_persistent_boundaries(gs: Node, data_node: Node) -> void:
 	gs.call("lose_card", magic_id, true)
 	_check(not (gs.get("loop_persistent_item_ids") as Dictionary).has(magic_id),
 		"卡不在手上時的 permanent lose 一樣移除 meta set")
+	# 永久失去是合法終點，不是資料錯誤：同一張再永久失去一次必須零變化。
+	var after_permanent := _state_text(gs)
+	gs.call("lose_card", magic_id, true)
+	_check(_state_text(gs) == after_permanent, "重複 permanent lose 冪等且零變化")
 	_complete_replaced(gs, "ajie")
 	gs.call("choose_opening", "take_family_album")
 	_check(not (gs.get("hand") as Array).has(magic_id), "先普通失去再永久失去之後，下一輪不復活")
@@ -1136,4 +1171,103 @@ func _test_20_settlement_lines_reach_screen(gs: Node) -> void:
 		"行動時段畫面也播得出逾期預設的文字（實際：%s）" % afternoon_text.substr(0, 60))
 
 	main.queue_free()
+
+
+# ── 21. 讀檔的 ending_history 逐筆驗形狀 ────────────────────────────────────
+
+func _test_21_history_deserialize_validation(gs: Node) -> void:
+	print("\n--- 21. 讀檔的 ending_history 逐筆驗形狀 ---")
+
+	# 對照組：一筆由正式結算寫出來的 history，round trip 之後必須原樣讀回。
+	_fresh_opening(gs)
+	gs.call("choose_opening", "take_family_album")
+	gs.call("gain_card", "k_forty_something")
+	gs.call("gain_card", "k_not_today")
+	_complete_replaced(gs, "ajie")
+	var saved: Dictionary = gs.call("serialize")
+	var good: Dictionary = JSON.parse_string(JSON.stringify(saved))
+	_check(bool((gs.call("deserialize", good) as Dictionary).get("ok", false)), "對照組：正式 history 讀得回來")
+	_check((gs.get("ending_history") as Array).size() == 1, "對照組：讀回後 history 恰一筆")
+	_check(bool(gs.call("has_seen_ending", "ending_replaced")), "對照組：讀回後不上車的解鎖條件成立")
+	var baseline := _state_text(gs)
+	_check(baseline == JSON.stringify(saved), "對照組：round trip 後完整序列化逐字相同")
+
+	var record: Dictionary = ((saved["meta"] as Dictionary)["ending_history"] as Array)[0] as Dictionary
+	_check((record["knowledge_gained_this_run"] as Array).size() == 2, "對照組：當輪知識恰兩張（供亂序／重複案例使用）")
+
+	# 每一種壞形狀都必須整份拒絕，而不是靜默丟掉那一筆或補欄位。
+	var bad_cases := [
+		{ "label": "只有 ending_id 的殘缺紀錄", "record": { "ending_id": "ending_replaced" } },
+		{ "label": "缺 knowledge_gained_this_run 一欄", "mutate": "drop_key" },
+		{ "label": "多帶 source_id 一欄", "mutate": "extra_key" },
+		{ "label": "非 Dictionary 的元素", "record": "ending_replaced" },
+		{ "label": "正常結局的 ended_day 為 null", "patch": { "ended_day": null, "ended_phase": null } },
+		{ "label": "正常結局的代付者為 null", "patch": { "festival_proxy_npc": null } },
+		{ "label": "代付者不是正式候選", "patch": { "festival_proxy_npc": "uncle" } },
+		{ "label": "非法的 partner_variant", "patch": { "partner_variant": "no_such_rule" } },
+		{ "label": "不存在的開局選項", "patch": { "opening_choice_id": "no_such_opening" } },
+		{ "label": "不存在的 ending_id", "patch": { "ending_id": "no_such_ending" } },
+		{ "label": "run_number 為 0", "patch": { "run_number": 0 } },
+		{ "label": "越界的 ended_day", "patch": { "ended_day": 46 } },
+		{ "label": "非法的 ended_phase", "patch": { "ended_phase": "dawn" } },
+		{ "label": "當輪知識含非 knowledge 卡", "mutate": "non_knowledge" },
+		{ "label": "當輪知識重複同一張", "mutate": "duplicate_knowledge" },
+		{ "label": "當輪知識不按卡表順序", "mutate": "unordered_knowledge" },
+	]
+	for c: Dictionary in bad_cases:
+		var bad: Dictionary = JSON.parse_string(JSON.stringify(saved))
+		var entry: Variant = ((bad["meta"] as Dictionary)["ending_history"] as Array)[0]
+		if c.has("record"):
+			entry = c["record"]
+		elif c.has("patch"):
+			for key: Variant in (c["patch"] as Dictionary).keys():
+				(entry as Dictionary)[str(key)] = (c["patch"] as Dictionary)[key]
+		else:
+			var gained: Array = (entry as Dictionary)["knowledge_gained_this_run"] as Array
+			match str(c["mutate"]):
+				"drop_key":
+					(entry as Dictionary).erase("knowledge_gained_this_run")
+				"extra_key":
+					(entry as Dictionary)["source_id"] = "d45_coda"
+				"non_knowledge":
+					gained.append("item_family_album")
+				"duplicate_knowledge":
+					gained.append(gained[0])
+				"unordered_knowledge":
+					gained.reverse()
+		((bad["meta"] as Dictionary)["ending_history"] as Array)[0] = entry
+
+		var res: Dictionary = gs.call("deserialize", bad)
+		_check(str(res.get("reason_code", "")) == "invalid_save_shape",
+			"history %s → invalid_save_shape" % str(c["label"]))
+		_check(_state_text(gs) == baseline, "history %s 拒絕後完整狀態零變化" % str(c["label"]))
+
+	# 殘缺紀錄不得成為不上車的解鎖條件：拒絕之後 history 仍是原來那一筆。
+	var stub_only: Dictionary = JSON.parse_string(JSON.stringify(saved))
+	(stub_only["meta"] as Dictionary)["ending_history"] = [{ "ending_id": "ending_replaced" }]
+	(stub_only["meta"] as Dictionary)["knowledge"] = {}
+	_check(str((gs.call("deserialize", stub_only) as Dictionary).get("reason_code", "")) == "invalid_save_shape",
+		"殘缺紀錄的存檔整份被拒")
+	_check(_state_text(gs) == baseline, "殘缺紀錄拒絕後不留下任何 history")
+
+	# 兩筆之中只要有一筆壞掉就整份拒絕，不接受「好的留下、壞的丟掉」。
+	var mixed: Dictionary = JSON.parse_string(JSON.stringify(saved))
+	var mixed_list: Array = (mixed["meta"] as Dictionary)["ending_history"] as Array
+	mixed_list.append({ "ending_id": "ending_madness_be" })
+	_check(str((gs.call("deserialize", mixed) as Dictionary).get("reason_code", "")) == "invalid_save_shape",
+		"一好一壞 → 整份 invalid_save_shape")
+	_check((gs.get("ending_history") as Array).size() == 1, "整份拒絕後不留下半套 history")
+
+	# ending_history 本身不是 Array 也一樣拒絕。
+	var not_array: Dictionary = JSON.parse_string(JSON.stringify(saved))
+	(not_array["meta"] as Dictionary)["ending_history"] = { "0": "x" }
+	_check(str((gs.call("deserialize", not_array) as Dictionary).get("reason_code", "")) == "invalid_save_shape",
+		"ending_history 非陣列 → invalid_save_shape")
+
+	# 舊 checkpoint 沒有這一欄仍可讀（缺欄＝空 history，不是壞形狀）。
+	var legacy: Dictionary = JSON.parse_string(JSON.stringify(saved))
+	(legacy["meta"] as Dictionary).erase("ending_history")
+	_check(bool((gs.call("deserialize", legacy) as Dictionary).get("ok", false)), "缺 ending_history 的舊 checkpoint 仍可讀")
+	_check((gs.get("ending_history") as Array).is_empty(), "缺欄時 history 為空")
+	_fresh_opening(gs)
 	await process_frame

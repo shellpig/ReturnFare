@@ -843,39 +843,15 @@ func _build_history_record(snapshot: Dictionary) -> Dictionary:
 	if Data == null or Data.loader == null:
 		return {}
 	# 先用讀檔那一份逐欄驗證重跑一次：ending 專屬 nullable 矩陣、variant 合法集合、
-	# page ref 一致性、日期／時段型別都在裡面。history 是 append-only，寧可在這裡擋下來。
-	if _parse_ending_snapshot(snapshot).is_empty():
+	# opening／proxy 引用、當輪知識、page ref 一致性、日期／時段型別都在裡面。
+	# history 是 append-only，寧可在這裡擋下來。
+	var parsed := _parse_ending_snapshot(snapshot)
+	if parsed.is_empty():
 		return {}
-
-	var opening_ref: Variant = snapshot.get("opening_choice_id")
-	if not _is_null_or_filled_string(opening_ref):
-		return {}
-	if opening_ref != null and not Data.loader.opening_choices_by_id.has(str(opening_ref)):
-		return {}
-
-	var proxy_ref: Variant = snapshot.get("festival_proxy_npc")
-	if not _is_null_or_filled_string(proxy_ref):
-		return {}
-	if proxy_ref != null and not _is_festival_candidate(str(proxy_ref)):
-		return {}
-
-	for key: String in ENDING_VARIANT_KEYS:
-		if not _is_null_or_filled_string(snapshot.get(key)):
-			return {}
-
-	var gained: Array[String] = []
-	for card_id: Variant in snapshot.get("knowledge_gained_this_run", []) as Array:
-		var cid := str(card_id)
-		if not Data.loader.cards.has(cid):
-			return {}
-		gained.append(cid)
 
 	var record: Dictionary = {}
 	for key: String in HISTORY_RECORD_KEYS:
-		if not snapshot.has(key):
-			return {}
-		record[key] = snapshot[key]
-	record["knowledge_gained_this_run"] = gained
+		record[key] = parsed[key]
 	return record
 
 
@@ -1650,7 +1626,8 @@ func lose_card(id: String, permanent: bool = false) -> void:
 
 	# 一般 lose 只令這一輪消失，下一輪照樣恢復；只有明示 permanent 才真的斷掉跨輪繼承。
 	# 這一步不看卡還在不在手上——「本輪先普通失去、之後才永久失去」也必須真的斷掉。
-	if permanent and card.get("loop_persistent", false) == true:
+	var breaks_persistence: bool = permanent and card.get("loop_persistent", false) == true
+	if breaks_persistence:
 		loop_persistent_item_ids.erase(base_id)
 
 	var idx := hand.find(id)
@@ -1665,6 +1642,11 @@ func lose_card(id: String, permanent: bool = false) -> void:
 	if knowledge.has(id):
 		knowledge.erase(id)
 		knowledge_changed.emit()
+		return
+
+	# 永久失去跨輪物品是冪等的：這一輪早就普通失去過、或同一張再永久失去一次，
+	# 手上找不到都是合法終點，不是資料錯誤。
+	if breaks_persistence:
 		return
 
 	push_error("lose_card: card '%s' not found in hand or knowledge" % id)
@@ -2947,6 +2929,10 @@ func deserialize(d: Dictionary) -> Dictionary:
 	if not bool(persistent_parsed.get("ok", false)):
 		return { "ok": false, "reason_code": "invalid_save_shape" }
 
+	var history_parsed := _parse_history_records(d)
+	if not bool(history_parsed.get("ok", false)):
+		return { "ok": false, "reason_code": "invalid_save_shape" }
+
 	var run: Dictionary = d.get("run", {})
 	day = int(run.get("day", 1))
 	phase = str(run.get("phase", "morning"))
@@ -3018,9 +3004,8 @@ func deserialize(d: Dictionary) -> Dictionary:
 	# ── P5 欄位（缺欄的舊 checkpoint 以規格初值補齊，這條相容路徑在 P5-D 後仍保留）──
 	run_number = int(meta.get("run_number", 1))
 	ending_history.clear()
-	for record: Variant in meta.get("ending_history", []) as Array:
-		if record is Dictionary:
-			ending_history.append((record as Dictionary).duplicate(true))
+	for record: Dictionary in history_parsed.get("records", []) as Array[Dictionary]:
+		ending_history.append(record)
 	loop_persistent_item_ids = persistent_parsed.get("ids", {}) as Dictionary
 
 	var opening_raw: Variant = run.get("opening_choice_id")
@@ -3100,23 +3085,16 @@ func _parse_flow_block(d: Dictionary) -> Dictionary:
 	return { "ok": true, "mode": mode, "active_ending": snapshot }
 
 
-## active_ending 快照的逐欄驗證。任何缺欄、多欄、錯型別、空字串代 null、
-## 失效 page ref 或越界 index 都回空字典（＝不合法）。
-func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
-	if raw.size() != ENDING_SNAPSHOT_KEYS.size():
-		return {}
-	for key: String in ENDING_SNAPSHOT_KEYS:
-		if not raw.has(key):
-			return {}
-
+## 結局「結果欄位」的逐欄驗證，也就是 `HISTORY_RECORD_KEYS` 那十欄。
+## active snapshot 與 history record 共用同一份判斷：兩邊記的是同一件事，
+## 寫得進去卻讀不回來（或反過來）就是規約分歧。任一不合法回空字典。
+## 回傳正規化後的十欄（`ended_day` 轉 int、知識卡陣列轉 `Array[String]`）。
+func _parse_ending_result_fields(raw: Dictionary) -> Dictionary:
 	if Data == null or Data.loader == null:
 		return {}
 
 	var ending_id: Variant = raw["ending_id"]
 	if typeof(ending_id) != TYPE_STRING or not Data.loader.endings_by_id.has(ending_id):
-		return {}
-	var source_id: Variant = raw["source_id"]
-	if typeof(source_id) != TYPE_STRING or str(ENDING_SOURCE_PAIRS.get(source_id, "")) != str(ending_id):
 		return {}
 
 	var run_no: Variant = _strict_int(raw["run_number"])
@@ -3133,20 +3111,15 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 	var ending_data: Dictionary = Data.loader.endings_by_id[str(ending_id)] as Dictionary
 	var is_refuse := str(ending_id) == ENDING_REFUSE_BOARDING
 
-	# 不上車必須由資料中指向它的那個開局選項進場；其餘結局不得偽稱不上車。
-	if is_refuse and str(raw["opening_choice_id"]) != _opening_choice_for_ending(str(ending_id)):
+	# 開局選項有值就必須真的存在；不上車另外要求正是資料中指向它的那一個。
+	var opening_ref: Variant = raw["opening_choice_id"]
+	if opening_ref != null and not Data.loader.opening_choices_by_id.has(str(opening_ref)):
+		return {}
+	if is_refuse and str(opening_ref) != _opening_choice_for_ending(str(ending_id)):
 		return {}
 
 	# variant 欄有值 ⇔ 這個 ending 真的有同名 variant group，且值必須是該 group 宣告的合法 rule id。
-	var valid_rules_by_group: Dictionary = {}
-	for group: Variant in ending_data.get("variant_groups", []) as Array:
-		if group is Dictionary:
-			var gid := str((group as Dictionary).get("id", ""))
-			var rules_dict := {}
-			for r: Variant in (group as Dictionary).get("rules", []) as Array:
-				if r is Dictionary:
-					rules_dict[str((r as Dictionary).get("id", ""))] = true
-			valid_rules_by_group[gid] = rules_dict
+	var valid_rules_by_group := _variant_rules_by_group(ending_data)
 
 	for variant_key: String in ENDING_VARIANT_KEYS:
 		var gid := variant_key.trim_suffix("_variant")
@@ -3184,13 +3157,89 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 		if typeof(ended_phase) != TYPE_STRING or not PHASES.has(ended_phase):
 			return {}
 
+	# 當輪知識：必須真的是知識卡、不重複，且與 `_knowledge_gained_since_start()`
+	# 一樣依 `cards.json` 順序排列，快照與 history 才逐字可比。不上車沒有 run，一律空。
 	if not raw["knowledge_gained_this_run"] is Array:
 		return {}
 	var gained: Array[String] = []
+	var last_order := -1
 	for item: Variant in raw["knowledge_gained_this_run"] as Array:
 		if typeof(item) != TYPE_STRING or str(item).is_empty():
 			return {}
-		gained.append(str(item))
+		var cid := str(item)
+		if gained.has(cid):
+			return {}
+		var order := _card_catalog_order(cid)
+		if order < 0 or order <= last_order:
+			return {}
+		var card_data: Dictionary = Data.loader.cards[cid] as Dictionary
+		if not bool(card_data.get("slotless", false)) or str(card_data.get("type", "")) != "knowledge":
+			return {}
+		last_order = order
+		gained.append(cid)
+	if is_refuse and not gained.is_empty():
+		return {}
+
+	return {
+		"run_number": int(run_no),
+		"ending_id": str(ending_id),
+		"opening_choice_id": opening_ref,
+		"ended_day": ended_day,
+		"ended_phase": ended_phase,
+		"partner_variant": raw["partner_variant"],
+		"livelihood_variant": raw["livelihood_variant"],
+		"inn_appearance_variant": raw["inn_appearance_variant"],
+		"festival_proxy_npc": proxy_raw,
+		"knowledge_gained_this_run": gained,
+	}
+
+
+## 某個 ending 的 variant group id → 合法 rule id 集合。
+func _variant_rules_by_group(ending_data: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for group: Variant in ending_data.get("variant_groups", []) as Array:
+		if group is Dictionary:
+			var gid := str((group as Dictionary).get("id", ""))
+			var rules_dict := {}
+			for r: Variant in (group as Dictionary).get("rules", []) as Array:
+				if r is Dictionary:
+					rules_dict[str((r as Dictionary).get("id", ""))] = true
+			out[gid] = rules_dict
+	return out
+
+
+## 卡片在 `cards.json` 中的位置；不存在回 -1。用來驗知識卡陣列的資料順序。
+func _card_catalog_order(card_id: String) -> int:
+	if Data == null or Data.loader == null:
+		return -1
+	return (Data.loader.cards.keys() as Array).find(card_id)
+
+
+## active_ending 快照的逐欄驗證。任何缺欄、多欄、錯型別、空字串代 null、
+## 失效 page ref 或越界 index 都回空字典（＝不合法）。
+func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
+	if raw.size() != ENDING_SNAPSHOT_KEYS.size():
+		return {}
+	for key: String in ENDING_SNAPSHOT_KEYS:
+		if not raw.has(key):
+			return {}
+
+	if Data == null or Data.loader == null:
+		return {}
+
+	var result := _parse_ending_result_fields(raw)
+	if result.is_empty():
+		return {}
+
+	var ending_id: Variant = result["ending_id"]
+	var source_id: Variant = raw["source_id"]
+	if typeof(source_id) != TYPE_STRING or str(ENDING_SOURCE_PAIRS.get(source_id, "")) != str(ending_id):
+		return {}
+
+	var ending_data: Dictionary = Data.loader.endings_by_id[str(ending_id)] as Dictionary
+	var ended_day: Variant = result["ended_day"]
+	var ended_phase: Variant = result["ended_phase"]
+	var gained: Array[String] = result["knowledge_gained_this_run"]
 
 	if not raw["page_refs"] is Array:
 		return {}
@@ -3253,20 +3302,53 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 	return {
 		"ending_id": str(ending_id),
 		"source_id": str(source_id),
-		"run_number": int(run_no),
-		"opening_choice_id": raw["opening_choice_id"],
+		"run_number": int(result["run_number"]),
+		"opening_choice_id": result["opening_choice_id"],
 		"ended_day": ended_day,
 		"ended_phase": ended_phase,
-		"partner_variant": raw["partner_variant"],
-		"livelihood_variant": raw["livelihood_variant"],
-		"inn_appearance_variant": raw["inn_appearance_variant"],
-		"festival_proxy_npc": raw["festival_proxy_npc"],
+		"partner_variant": result["partner_variant"],
+		"livelihood_variant": result["livelihood_variant"],
+		"inn_appearance_variant": result["inn_appearance_variant"],
+		"festival_proxy_npc": result["festival_proxy_npc"],
 		"knowledge_gained_this_run": gained,
 		"page_refs": refs,
 		"page_index": int(index_val),
 		"page_revealed": bool(raw["page_revealed"]),
 		"ready_to_complete": bool(raw["ready_to_complete"]),
 	}
+
+
+## meta `ending_history` 的原子驗證。每一筆都必須是 append 當下那個封閉形狀：
+## 精確十欄、四類 ending 的 nullable 矩陣、opening／variant／proxy 引用合法、
+## 當輪知識真的是知識卡且無重複、依資料順序。任一筆不合法就整份拒絕
+## （＝ `invalid_save_shape`），不靜默丟棄或修補。回傳 { ok, records }。
+func _parse_history_records(d: Dictionary) -> Dictionary:
+	var empty: Array[Dictionary] = []
+	var meta_raw: Variant = d.get("meta", {})
+	if not meta_raw is Dictionary:
+		return { "ok": true, "records": empty }
+	var raw: Variant = (meta_raw as Dictionary).get("ending_history", [])
+	if not raw is Array:
+		return { "ok": false, "records": empty }
+
+	var records: Array[Dictionary] = []
+	for item: Variant in raw as Array:
+		if not item is Dictionary:
+			return { "ok": false, "records": empty }
+		var entry := item as Dictionary
+		if entry.size() != HISTORY_RECORD_KEYS.size():
+			return { "ok": false, "records": empty }
+		for key: String in HISTORY_RECORD_KEYS:
+			if not entry.has(key):
+				return { "ok": false, "records": empty }
+		var parsed := _parse_ending_result_fields(entry)
+		if parsed.is_empty():
+			return { "ok": false, "records": empty }
+		var record: Dictionary = {}
+		for key: String in HISTORY_RECORD_KEYS:
+			record[key] = parsed[key]
+		records.append(record)
+	return { "ok": true, "records": records }
 
 
 ## 資料中宣告 `ending` 指向 `ending_id` 的開局選項 id；找不到回空字串。
