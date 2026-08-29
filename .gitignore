@@ -9,3 +9,4 @@
 /android/
 *.translation
 export_presets.cfg
+/tests/ui_sim/manifest.json

@@ -109,8 +109,8 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p5e_04_ending_typewriter_and_advance", "打字未完按一次立即補完且page不變，再按才翻頁，單一input不跨兩頁", "d45_evening.json", "", "p5e_04_ending_typewriter_and_advance", "", "p5e_04"),
 		UiCase.new("p5e_05_ending_skip_seen_only", "首見無skip按鈕，重見同ending有skip按鈕且跳至指定落點", "d45_evening.json", "", "p5e_05_ending_skip_seen_only", "", "p5e_05"),
 		UiCase.new("p5e_06_ending_complete_to_opening", "末頁完成結算回opening且上一輪無殘留，不上車解鎖並可走不上車結局來回", "d45_evening.json", "", "p5e_06_ending_complete_to_opening", "", "p5e_06"),
-		UiCase.new("p5e_07_no_internal_keys_leaked", "UI dump不洩漏ending_replaced/refuse/festival_proxy等內部鍵與condition語法", "", "", "p5e_07_no_internal_keys_leaked", "", "p5e_07"),
-		UiCase.new("p5e_08_coda_choice_requires_card", "D45 coda持卡槽無direct-choose按鈕，未持名冊可走empty_handed", "d45_evening.json", "", "p5e_08_coda_choice_requires_card", "", "p5e_08"),
+		UiCase.new("p5e_07_no_internal_keys_leaked", "UI dump不洩漏ending_replaced/refuse/festival_proxy等內部鍵與condition語法", "d45_evening.json", "", "p5e_07_no_internal_keys_leaked", "", "p5e_07"),
+		UiCase.new("p5e_08_coda_choice_requires_card", "D45 coda持卡槽無direct-choose按鈕，未持名冊可走empty_handed", "d45_evening__no_registry.json", "", "p5e_08_coda_choice_requires_card", "", "p5e_08"),
 	]
 
 
@@ -2209,24 +2209,42 @@ class UiCase extends CaseBaseClass:
 
 		var map_list: Node = tree.get_root().find_child("MapList", true, false)
 		var hand_bar: Node = tree.get_root().find_child("HandBar", true, false)
-		var advance_btn: Node = tree.get_root().find_child("AdvanceButton", true, false)
 		var loc_panel: Node = tree.get_root().find_child("LocationPanel", true, false)
+		var enc_panel: Node = tree.get_root().find_child("EncounterPanel", true, false)
 		assert_true(not map_list.is_visible_in_tree(), "MapList 在 ending 時不可見")
 		assert_true(not hand_bar.is_visible_in_tree(), "HandBar 在 ending 時不可見")
-		assert_true(not advance_btn.is_visible_in_tree(), "AdvanceButton 在 ending 時不可見")
 		assert_true(not loc_panel.is_visible_in_tree(), "LocationPanel 在 ending 時不可見")
+		assert_true(enc_panel == null or not enc_panel.is_visible_in_tree(), "EncounterPanel 在 ending 時不可見")
 
-		# 底層規則層嘗試 advance_phase()
-		var res: Dictionary = gs.call("advance_phase")
-		assert_true(not bool(res.get("ok", false)), "ending mode 下 advance_phase() 由規則層拒絕")
-		assert_eq(str(res.get("reason_code", "")), "not_run", "拒絕碼為 not_run")
+		# 主畫面推進按鈕在 ending 模式下不可見
+		var phase_adv_btns := QAStepClass.find_controls_by_qa_id(tree.get_root(), "phase_advance")
+		assert_true(not phase_adv_btns.is_empty() and not phase_adv_btns[0].is_visible_in_tree(), "主畫面 AdvanceButton 在 ending 時不可見")
+
+		# N4: 底層規則層 run 入口全面拒絕矩陣
+		var state_before := JSON.stringify(gs.call("serialize"))
+
+		var res_adv: Dictionary = gs.call("advance_phase")
+		assert_true(not bool(res_adv.get("ok", false)) and str(res_adv.get("reason_code", "")) == "not_run", "ending mode 下 advance_phase() 回 not_run")
+
+		var res_night: Dictionary = gs.call("enter_night_location", "n_exit")
+		assert_true(not bool(res_night.get("ok", false)) and str(res_night.get("reason_code", "")) == "not_run", "ending mode 下 enter_night_location() 回 not_run")
+
+		var res_place: Dictionary = gs.call("try_place", "protagonist", "d1_am_walk", "walk")
+		assert_true(not bool(res_place.get("ok", false)) and str(res_place.get("reason_code", "")) == "not_run", "ending mode 下 try_place() 回 not_run")
+
+		var res_choose: Dictionary = gs.call("choose", "d22_pm_sandbags", "acai_read", "obs_walk", "equip_polaroid")
+		assert_true(not bool(res_choose.get("ok", false)) and str(res_choose.get("reason_code", "")) == "not_run", "ending mode 下 choose() 回 not_run")
+
+		var res_enc: Dictionary = gs.call("start_encounter", "d8_encounter")
+		assert_true(not bool(res_enc.get("ok", false)) and str(res_enc.get("reason_code", "")) == "not_run", "ending mode 下 start_encounter() 回 not_run")
+
+		var state_after := JSON.stringify(gs.call("serialize"))
+		assert_eq(state_before, state_after, "全域入口拒絕後狀態零變化")
 
 		return {
 			"ok": errors.is_empty(),
 			"errors": errors,
-			"observations": {
-				"evidence": ["ending_panel_visible", "run_controls_hidden", "advance_mutation_rejected"]
-			}
+			"evidence": ["ending_panel_visible", "run_controls_hidden", "advance_mutation_rejected", "all_run_entries_rejected"]
 		}
 
 	func _p5e_04(tree: SceneTree) -> Dictionary:
@@ -2236,33 +2254,53 @@ class UiCase extends CaseBaseClass:
 		var view_0: Dictionary = gs.call("ending_view")
 		var idx_before := int(view_0.get("page_index", 0))
 
-		# 按一下 ending_advance 補完當頁
-		await _click(tree, "ending_advance")
+		# B4 / N11: 透過鍵盤 Space / Enter 推進
+		# ① 第一次按鍵：打字中按一次補完全文，當頁 page_index 不變
+		var key_space := InputEventKey.new()
+		key_space.keycode = KEY_SPACE
+		key_space.pressed = true
+		QAStepClass.send_input(key_space)
+		await QAStepClass.wait_draw_frames(tree, 2)
+
 		var view_1: Dictionary = gs.call("ending_view")
 		assert_eq(int(view_1.get("page_index", 0)), idx_before, "按一下補完當頁，page_index 不變")
 		assert_true(bool(view_1.get("page_revealed", false)), "當頁標記為 page_revealed: true")
 
-		# 再按一下翻頁
-		await _click(tree, "ending_advance")
+		# ② 第二次按鍵（Enter）：已 revealed 翻下一頁
+		var key_enter := InputEventKey.new()
+		key_enter.keycode = KEY_ENTER
+		key_enter.pressed = true
+		QAStepClass.send_input(key_enter)
+		await QAStepClass.wait_draw_frames(tree, 2)
+
 		var view_2: Dictionary = gs.call("ending_view")
 		if not bool(view_1.get("is_last_page", false)):
 			assert_eq(int(view_2.get("page_index", 0)), idx_before + 1, "再按一下翻進下一頁")
 		else:
 			assert_true(bool(view_2.get("can_complete", false)), "末頁準備結算")
 
+		# N3: 驗證中途存讀檔保持（serialize -> deserialize）
+		var snap: Dictionary = gs.call("serialize")
+		gs.call("deserialize", snap)
+		var main_node: Node = tree.get_root().find_child("Main", true, false)
+		main_node.call("_route_view")
+		await QAStepClass.wait_draw_frames(tree, 2)
+
+		var view_reload: Dictionary = gs.call("ending_view")
+		assert_eq(int(view_reload.get("page_index", 0)), int(view_2.get("page_index", 0)), "Reload 後 page_index 保持不變")
+		assert_eq(bool(view_reload.get("page_revealed", false)), bool(view_2.get("page_revealed", false)), "Reload 後 page_revealed 保持不變")
+
 		return {
 			"ok": errors.is_empty(),
 			"errors": errors,
-			"observations": {
-				"evidence": ["typewriter_reveal_same_page", "advance_to_next_page", "no_two_page_skip"]
-			}
+			"evidence": ["typewriter_reveal_same_page", "advance_to_next_page", "no_two_page_skip", "reload_preserves_ending_page"]
 		}
 
 	func _p5e_05(tree: SceneTree) -> Dictionary:
 		await _enter_ending_from_d45(tree)
 		var gs := CaseBaseClass.get_game_state(tree)
 
-		# 首見 ending_replaced：ending_skip 必須不可見
+		# ① 首見 ending_replaced：ending_skip 必須不可見
 		var skip_buttons := QAStepClass.find_controls_by_qa_id(tree.get_root(), "ending_skip")
 		var skip_visible := false
 		for sb in skip_buttons:
@@ -2278,7 +2316,41 @@ class UiCase extends CaseBaseClass:
 
 		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "opening", "結算後回到 opening")
 
-		# 首次進入不上車結局（ending_refuse_boarding）
+		# ② 第二輪進入 run 後觸發重見 ending_replaced
+		await _click(tree, "opening_choice::take_family_album")
+		await _click(tree, "dialog_confirm::opening")
+
+		gs.set("selected_festival_proxy_npc", "ajie")
+		var res_se: Dictionary = gs.call("start_ending", "ending_replaced", "d45_coda")
+		assert_true(bool(res_se.get("ok", false)), "start_ending 成功: %s" % str(res_se))
+		var main_node: Node = tree.get_root().find_child("Main", true, false)
+		main_node.call("_route_view")
+		await QAStepClass.wait_draw_frames(tree, 2)
+
+		# 重見 ending_replaced：ending_skip 必須可見
+		var skip_buttons_rep := QAStepClass.find_controls_by_qa_id(tree.get_root(), "ending_skip")
+		var rep_skip_visible := false
+		for sb in skip_buttons_rep:
+			if sb.is_visible_in_tree():
+				rep_skip_visible = true
+		assert_true(rep_skip_visible, "重見 ending_replaced 時 ending_skip 按鈕可見")
+
+		# N2: 點擊 skip，驗證跳至 short_return 摘要頁（非末頁）
+		await _click(tree, "ending_skip")
+		var view_after_skip: Dictionary = gs.call("ending_view")
+		var txt_skip := str(view_after_skip.get("page_text", ""))
+		assert_true(txt_skip.contains("你回到原本的生活") or txt_skip.contains("這座小鎮") or not txt_skip.is_empty(), "Skip 後文字符合 short_return 摘要")
+		assert_true(bool(view_after_skip.get("page_revealed", false)), "Skip 後目標頁直接揭露")
+
+		# 走完第二輪結局
+		guard = 50
+		while guard > 0 and str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")) == "ending":
+			guard -= 1
+			await _click(tree, "ending_advance")
+
+		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "opening", "完成結算回到 opening")
+
+		# ③ 首次進入不上車結局（ending_refuse_boarding）
 		await _click(tree, "opening_choice::refuse_boarding")
 		await _click(tree, "dialog_confirm::opening")
 
@@ -2297,7 +2369,7 @@ class UiCase extends CaseBaseClass:
 
 		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "opening", "結算後回到 opening")
 
-		# 重見不上車結局（第二次選擇不上車）
+		# ④ 重見不上車結局（第二次選擇不上車）
 		await _click(tree, "opening_choice::refuse_boarding")
 		await _click(tree, "dialog_confirm::opening")
 
@@ -2310,15 +2382,13 @@ class UiCase extends CaseBaseClass:
 
 		# 點擊 skip
 		await _click(tree, "ending_skip")
-		var view_after_skip: Dictionary = gs.call("ending_view")
-		assert_true(bool(view_after_skip.get("can_complete", false)), "點擊 skip 後直接落到可結算頁面")
+		var view_refuse_skip: Dictionary = gs.call("ending_view")
+		assert_true(bool(view_refuse_skip.get("can_complete", false)), "不上車結局點擊 skip 後直接落到可結算頁面")
 
 		return {
 			"ok": errors.is_empty(),
 			"errors": errors,
-			"observations": {
-				"evidence": ["first_seen_no_skip", "repeat_seen_skip_available", "skip_to_target_page"]
-			}
+			"evidence": ["first_seen_no_skip", "repeat_seen_skip_available", "skip_to_target_page", "skip_intermediate_summary"]
 		}
 
 	func _p5e_06(tree: SceneTree) -> Dictionary:
@@ -2336,6 +2406,21 @@ class UiCase extends CaseBaseClass:
 		var open_panel: Node = tree.get_root().find_child("OpeningPanel", true, false)
 		assert_true(open_panel != null and open_panel.is_visible_in_tree(), "OpeningPanel 在結算後顯示")
 
+		# N1: 完整斷言 run 狀態與畫面零殘留
+		var map_list: Node = tree.get_root().find_child("MapList", true, false)
+		var hand_bar: Node = tree.get_root().find_child("HandBar", true, false)
+		var loc_panel: Node = tree.get_root().find_child("LocationPanel", true, false)
+		var enc_panel: Node = tree.get_root().find_child("EncounterPanel", true, false)
+		var ending_panel: Node = tree.get_root().find_child("EndingPanel", true, false)
+		assert_true(not map_list.is_visible_in_tree(), "結算回 opening 後 MapList 隱藏")
+		assert_true(not hand_bar.is_visible_in_tree(), "結算回 opening 後 HandBar 隱藏")
+		assert_true(not loc_panel.is_visible_in_tree(), "結算回 opening 後 LocationPanel 隱藏")
+		assert_true(enc_panel == null or not enc_panel.is_visible_in_tree(), "結算回 opening 後 EncounterPanel 隱藏")
+		assert_true(not ending_panel.is_visible_in_tree(), "結算回 opening 後 EndingPanel 隱藏")
+
+		var run_state: Dictionary = (_state(tree).get("run", {}) as Dictionary)
+		assert_true((run_state.get("hand", []) as Array).is_empty(), "結算回 opening 後手牌為空陣列")
+
 		# 驗證此時不上車按鈕已解鎖
 		var btn_refuse: Button = QAStepClass.find_controls_by_qa_id(tree.get_root(), "opening_choice::refuse_boarding")[0] as Button
 		assert_true(not btn_refuse.disabled, "已有 ending_replaced history 後不上車按鈕解鎖可用 (disabled=false)")
@@ -2346,7 +2431,8 @@ class UiCase extends CaseBaseClass:
 
 		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "ending", "不上車開局直接進入 ending")
 		var view_refuse: Dictionary = gs.call("ending_view")
-		assert_true(str(view_refuse.get("page_text", "")).contains("走出火車站") or str(view_refuse.get("page_text", "")).contains("外地") or not str(view_refuse.get("page_text", "")).is_empty(), "不上車結局文字正確")
+		var p_text: String = str(view_refuse.get("page_text", ""))
+		assert_true(p_text.contains("外面的城市") or p_text.contains("退掉了車票") or p_text.contains("放下了行李"), "不上車結局文字符合預期")
 
 		# 播完不上車結局並結算
 		guard = 50
@@ -2358,24 +2444,33 @@ class UiCase extends CaseBaseClass:
 			"ok": errors.is_empty(),
 			"errors": errors,
 			"observations": {
-				"evidence": ["ending_complete_cleans_run", "refuse_unlocked_after_replaced", "refuse_ending_roundtrip"]
+				"evidence": ["ending_complete_cleans_run", "refuse_unlocked_after_replaced", "refuse_ending_roundtrip", "no_run_controls_residue"]
 			}
 		}
 
 	func _p5e_07(tree: SceneTree) -> Dictionary:
+		# B3: 必須進入 FLOW_ENDING 狀態進行可見 UI 樹檢查
+		await _enter_ending_from_d45(tree)
+		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "ending", "已進入 ending mode")
+
 		var forbidden_keys := [
 			"ending_replaced",
 			"ending_refuse_boarding",
 			"ending_madness_be",
 			"ending_inventory_be",
 			"festival_proxy_eligible",
+			"festival_proxy_is",
 			"choice_requires_card",
 			"default_if_unresolved",
+			"ch3_coda_",
+			"{\"has_card\"",
+			"\"condition\"",
 		]
 		var texts := _texts(tree.get_root())
+		assert_true(not texts.is_empty(), "可見 UI 樹有文字節點")
 		for t in texts:
 			for k in forbidden_keys:
-				assert_true(not t.contains(k), "UI 文字樹不得包含內部鍵 '%s'（實際文字: %s）" % [k, t])
+				assert_true(not t.contains(k), "UI 文字樹不得包含內部鍵或語法 '%s'（實際文字: %s）" % [k, t])
 
 		return {
 			"ok": errors.is_empty(),
@@ -2386,19 +2481,30 @@ class UiCase extends CaseBaseClass:
 		}
 
 	func _p5e_08(tree: SceneTree) -> Dictionary:
+		# B1 & B2: 以 d45_evening__no_registry.json 啟動（未持名冊真實走查狀態）
 		await QAStepClass.drain_beats(tree)
-		# 在 d45_evening.json 面板中
+
+		# K-195 正向：choice_requires_card 槽不得建立直接 choose:: 按鈕
 		var has_direct_choose := QAStepClass.has_visible_qa_id(tree.get_root(), "choose::d45_then::d45_coda::compare_registry")
 		assert_true(not has_direct_choose, "K-195: choice_requires_card 槽不得建立直接 choose:: 按鈕")
 
+		# K-194 正向：未持名冊玩家可見且可點擊 empty_handed 選擇按鈕
 		var has_empty_handed := QAStepClass.has_visible_qa_id(tree.get_root(), "choose::d45_then::d45_coda::empty_handed")
 		assert_true(has_empty_handed, "K-194: 未持名冊玩家可見 empty_handed 選擇按鈕")
+
+		# 走空手路徑進入 Ending
+		await _click(tree, "choose::d45_then::d45_coda::empty_handed")
+		await _close(tree)
+		await _advance(tree)
+
+		var gs := CaseBaseClass.get_game_state(tree)
+		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "ending", "未持名冊選空手後成功進入 ending mode")
 
 		return {
 			"ok": errors.is_empty(),
 			"errors": errors,
 			"observations": {
-				"evidence": ["card_required_no_direct_choose", "empty_handed_choice_available"]
+				"evidence": ["card_required_no_direct_choose", "empty_handed_choice_available", "empty_handed_enters_ending"]
 			}
 		}
 

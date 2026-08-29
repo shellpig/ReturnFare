@@ -32,8 +32,6 @@ const _LAYOUT_GAP := 10.0
 @onready var _encounter_panel: Node = $ContentView/EncounterPanel
 @onready var _delegation_tutorial_dialog: AcceptDialog = $DelegationTutorialDialog
 
-var _is_showing_ending: bool = false
-
 
 func _enter_tree() -> void:
 	_process_cli_args()
@@ -316,7 +314,6 @@ func _refresh_advance_hint() -> void:
 
 
 func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> void:
-	_is_showing_ending = (GameState.flow_mode == GameState.FLOW_ENDING)
 	if GameState.flow_mode == GameState.FLOW_OPENING:
 		_opening_panel.visible = true
 		_opening_panel.call("refresh")

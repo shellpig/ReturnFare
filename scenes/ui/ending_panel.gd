@@ -21,6 +21,7 @@ var _current_rendered_page_index: int = -1
 
 
 func _ready() -> void:
+	focus_mode = Control.FOCUS_ALL
 	_advance_btn.set_meta("qa_id", "ending_advance")
 	_skip_btn.set_meta("qa_id", "ending_skip")
 	_advance_btn.pressed.connect(_on_advance_pressed)
@@ -29,15 +30,20 @@ func _ready() -> void:
 	GameState.ending_page_changed.connect(_on_ending_page_changed)
 
 
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not is_visible_in_tree():
+		return
+	if event is InputEventKey:
+		var k := event as InputEventKey
+		if k.pressed and not k.echo and (k.keycode == KEY_SPACE or k.keycode == KEY_ENTER or k.keycode == KEY_RIGHT or k.keycode == KEY_DOWN):
+			get_viewport().set_input_as_handled()
+			_on_advance_pressed()
+
+
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			accept_event()
-			_on_advance_pressed()
-	elif event is InputEventKey:
-		var k := event as InputEventKey
-		if k.pressed and not k.echo and (k.keycode == KEY_SPACE or k.keycode == KEY_ENTER):
 			accept_event()
 			_on_advance_pressed()
 
@@ -107,6 +113,9 @@ func _on_advance_pressed() -> void:
 	# ① 逐字未跑完：按一次立即補完全文，當頁 index 不變
 	if _flow_text.is_typewriting() or not bool(view.get("page_revealed", false)):
 		_flow_text.finish_typewriter()
+		var v_now: Dictionary = GameState.ending_view()
+		if not bool(v_now.get("page_revealed", false)):
+			GameState.reveal_ending_page()
 		return
 
 	# ② 已揭露且非末頁：翻下一頁

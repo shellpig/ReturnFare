@@ -417,9 +417,9 @@ func _test_main_scene_cap_be_screen(tree: SceneTree, gs: Node, _data_node: Node)
 	await tree.process_frame
 
 	var ending_panel: Node = main.get_node("ContentView/EndingPanel")
-	var is_ending: bool = bool(main.get("_is_showing_ending")) or ending_panel.visible
-	var ending_flow: FlowText = ending_panel.get_node("FlowText")
-	var ending_text := ending_flow.get_text()
+	var is_ending: bool = str(gs.get("flow_mode")) == "ending" or ending_panel.visible
+	var ending_flow: FlowText = ending_panel.find_child("EndingFlowText", true, false) as FlowText
+	var ending_text := ending_flow.get_text() if ending_flow != null else ""
 	var view_be: Dictionary = gs.call("ending_view")
 	var page_text_be := str(view_be.get("page_text", ""))
 

@@ -31,6 +31,7 @@ func refresh() -> void:
 	_pending_choice_id = ""
 	_reason_label.text = ""
 	for child in _choices_container.get_children():
+		_choices_container.remove_child(child)
 		child.queue_free()
 
 	var choices: Array[Dictionary] = GameState.opening_view()
@@ -66,7 +67,10 @@ func _on_locked_focused(reason_text: String) -> void:
 func _on_choice_pressed(choice: Dictionary) -> void:
 	_pending_choice_id = str(choice.get("id", ""))
 	_confirm_dialog.title = str(choice.get("label", ""))
-	_confirm_dialog.dialog_text = str(choice.get("preview", ""))
+	var confirm_msg := str(choice.get("confirm_text", ""))
+	if confirm_msg.is_empty():
+		confirm_msg = str(choice.get("preview", ""))
+	_confirm_dialog.dialog_text = confirm_msg
 	_reason_label.text = ""
 	_confirm_dialog.popup_centered()
 

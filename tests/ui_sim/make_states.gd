@@ -480,6 +480,14 @@ static func generate_all_states(tree: SceneTree, output_dir: String, regen_p3a_b
 	if not _run_walk_with_checkpoints(tree, data_node, d43_decisions, d43_cp, output_dir):
 		return false
 
+	# 7b. 產生 D45 evening 未持名冊分流（D13 下午去老街未讀名冊，自然走到 D45 coda 空手選擇）
+	var d45_no_reg_decisions: Array[Dictionary] = [
+		{ "day": 13, "phase": "afternoon", "beat_id": "d13_pm_festival_business", "slot_id": "take", "card_id": "protagonist" }
+	]
+	var d45_no_reg_cp: Dictionary = { "d45_evening__no_registry": { "day": 45, "phase": "evening" } }
+	if not _run_walk_with_checkpoints(tree, data_node, d45_no_reg_decisions, d45_no_reg_cp, output_dir):
+		return false
+
 	# 8. P4-E：遭遇 UI 驗收情境
 	# ① p4e_d8_night: D8 夜間，遭遇已啟動（intro 階段）。
 	# 從既有 d8_evening 狀態推進一步至 night，並呼叫 play_night_fixed() 啟動 n_manydoors_ch1。
@@ -792,6 +800,9 @@ static func _verify_checkpoint_postcondition(cp_name: String, snapshot: Dictiona
 			return day == 43 and phase == "afternoon" and hand.has("info_acai_walk")
 		"d45_evening":
 			return day == 45 and phase == "evening" and hand.has("info_registry") \
+				and str((snapshot.get("run", {}) as Dictionary).get("selected_festival_proxy_npc", "")) != ""
+		"d45_evening__no_registry":
+			return day == 45 and phase == "evening" and not hand.has("info_registry") \
 				and str((snapshot.get("run", {}) as Dictionary).get("selected_festival_proxy_npc", "")) != ""
 		"d8_evening":
 			return day == 8 and phase == "evening"

@@ -4,14 +4,15 @@
 [ext_resource type="PackedScene" uid="uid://c8j7v6m5k4f3" path="res://scenes/ui/flow_text.tscn" id="2_flowtext"]
 
 [node name="EndingPanel" type="VBoxContainer"]
+focus_mode = 2
+mouse_filter = 0
 script = ExtResource("1_ending")
 
 [node name="EndingFlowText" parent="." instance=ExtResource("2_flowtext")]
+mouse_filter = 1
 size_flags_vertical = 3
 
 [node name="ControlsRow" type="HBoxContainer" parent="."]
-offset_top = 370.0
-offset_bottom = 400.0
 
 [node name="PageLabel" type="Label" parent="ControlsRow"]
 text = "第 1 / 1 頁"

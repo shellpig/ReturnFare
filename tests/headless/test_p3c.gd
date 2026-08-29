@@ -808,7 +808,6 @@ func _test_main_scene_advance_hint(tree: SceneTree, gs: Node, _data_node: Node) 
 
 	# 1. 夜間未選地點、無 pending -> 按鈕為「直接睡」
 	_reset_gs(gs)
-	main_scene.set("_is_showing_ending", false)
 	gs.set("day", 10)
 	gs.set("phase", "night")
 	main_scene.call("_refresh_status")
@@ -819,7 +818,6 @@ func _test_main_scene_advance_hint(tree: SceneTree, gs: Node, _data_node: Node) 
 
 	# 2. 觸發睡眠內容停拍 -> 按鈕變為「進入隔天」
 	_reset_gs(gs)
-	main_scene.set("_is_showing_ending", false)
 	gs.set("day", 24)
 	gs.set("phase", "night")
 	gs.call("set_flag", "boundary_bleeding", true)
@@ -847,7 +845,6 @@ func _test_main_scene_advance_hint(tree: SceneTree, gs: Node, _data_node: Node) 
 
 	# 3. 夜間選定地點後 -> 按鈕變為「結束今晚」
 	_reset_gs(gs)
-	main_scene.set("_is_showing_ending", false)
 	gs.set("day", 10)
 	gs.set("phase", "night")
 	gs.set("night_location_chosen", "n_landmark")
