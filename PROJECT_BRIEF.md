@@ -2,9 +2,9 @@
 
 本文件供新 session 快速了解專案全貌；需要細節時按下方文件索引深入。**本檔是唯一「隨進度持續更新」的文件**（每個 Phase 收尾更新一次）。
 
-最後更新：2026-08-28
+最後更新：2026-08-29
 
-> **當前進度**：第一輪資料層與四份關鍵文件完成；**Phase 1～2 全部實作，Phase 3～4 機器層完成**（P3-F／P4-F 各剩 4 項真人體感）；**P5-A 結局、開局與跨輪資料已由 verifier 關門並轉 ✅**——四 ending、三 opening、兩張新卡、D7／D11／D26／D29／D31／D39／D43／D45 正式映射、Lint 17～19 與 15 項變異安全網均完成。最新證據為 29 套 headless exit 0、`test_p5a` 80 個 ok、UI sim 108 variants／85 contracts／0 failed。**下一步 P5-B 頂層流程與結局狀態機。** P5-B～P5-F 規格已可實作。
+> **當前進度**：第一輪資料層與四份關鍵文件完成；**Phase 1～2 全部實作，Phase 3～4 機器層完成**（P3-F／P4-F 各剩 4 項真人體感）；**P5-A～P5-B 已由 verifier 關門並轉 ✅**。P5-B 的 opening／run／ending 頂層狀態、結局快照、逐頁狀態機、完整動作原子性、D45 自動生命週期與持卡／空手 coda 均完成；最新證據為 30 套 headless exit 0、`test_p5b` 12 組全綠、greedy 實際走空手 coda、UI sim 108 variants／85 contracts／0 failed。**下一步 P5-C 四類結局與組合後日談。**
 
 ---
 
@@ -37,7 +37,7 @@ Steam 買斷制、單人、敘事驅動的**卡牌經營／調查／迴圈敘事
 
 ## 資料層現況
 
-headless 實測（2026-08-28，`verify_data.gd`）：**66 張卡／48 個地點（白天 20＋夜間 28）／18 個 NPC／268 個 beat／4 個 ending／3 個 opening**；引用 0 錯誤；地點三分類 10／10／16；lint 1～19 全 0 錯誤（lint 3 為 4 筆已豁免警告）；第 1–45 天行動格全覆蓋（第 1 天上午下午、第 32 天下午為刻意留空，名單抽至 `scripts/core/data_facts.gd` 共用）。
+headless 實測（2026-08-29，`verify_data.gd`）：**66 張卡／48 個地點（白天 20＋夜間 28）／18 個 NPC／268 個 beat／4 個 ending／3 個 opening**；引用 0 錯誤；地點三分類 10／10／16；lint 1～20 全 0 錯誤（lint 3 為 4 筆已豁免警告）；第 1–45 天行動格全覆蓋（第 1 天上午下午、第 32 天下午為刻意留空，名單抽至 `scripts/core/data_facts.gd` 共用）。
 
 **貪心走查 90 個行動時段的分類（`playthrough_greedy.gd`，最新基準 2026-08-28，P4-F 實作後由 verifier 重跑）**：成功放置主角卡 46／強制縱慾消耗 12／全 fixed 敘事時段 1／純比對槽 22／刻意留空 3（名單內）／純選擇題 3（豁免名單）／條件未解鎖 HIDDEN 2／前置門檻未達 LOCKED 1 ＝ 90。夜間帳同時對上：14 個收費標記全開、發放 14 張發狂卡 ＝ 消除 12 張 ＋ 重置前留存 2 張。⚠️ **這組數字每次動 P2 規則或遭遇接線都要重記**：P2 之後強制縱慾會吃行動格（舊基準是 P1 期的「用掉 56 格、其餘 34 格分類」，已不適用）；P4-E／F 之後第 45 天下午由「放主角卡」改成「D45 遭遇結算」，所以放置由 47 掉到 46、另計 1 格 all_fixed（此格不是漏放，是遭遇佔掉該時段）。
 
@@ -77,7 +77,7 @@ headless 實測（2026-08-28，`verify_data.gd`）：**66 張卡／48 個地點�
 | P4-E 遭遇 UI 與 D8／D45 | ✅ | `encounter_panel` 純 view（demand／壓力 placeholder／候選／丟棄／逃離／確認彈窗）、`main.gd` 遭遇路由與推進守衛、D8 夜間與 D45 下午生命週期接線、CardDetail 重用。D45 改 `per_round_slot_cost:0` 讓滿手牌仍可作答（K-154）。27 套 headless exit 0（`test_p4e` 15 項）、UI sim 108 variants／85 contracts／0 failed；K-153～K-164 全數結案，verifier 變異驗證 10 點 9 紅（另立 K-165～K-168 低度殘留） |
 | P4-F 全流程與跨輪驗收 | 🟦 | 委託／遭遇 matrix 從正式資料衍生（D8 走 `responses[0].accepts[0]`＋`next_round`、D45 遍歷全部 responses、委託 slot id 由 `slots[].delegation` 反查）、第一輪四狀態走 D17～19、第二輪保留四筆 meta 清三筆 run state、greedy 跨 D8／D45 兩場遭遇、UI 契約全綠。**機器層七條驗收全打勾**（28 套 headless exit 0、UI sim 108 variants／85 contracts／0 failed，由 verifier 獨立重跑）；K-169～K-174 同日修復並經兩輪變異驗證結案。**剩 👤 人工四項體感待真人玩過落檔**；殘留 K-165 ①／K-175／K-176／K-177（皆低） |
 | P5-A 結局、開局與跨輪資料 | ✅ | `endings.json`／`opening_choices.json`、四 ending id、兩張新卡、D7／D11／D26／D29／D31／D39／D43／D45 映射、lint 17～19 均完成；K-178～K-189、K-192 結案。verifier 複驗：`test_p5a` 80 個 ok、29 套 headless exit 0、UI sim 108／85／0；15 項變異記錄逐條對上現行斷言。流程與 UI 仍依邊界留 P5-B～E |
-| P5-B 頂層流程與結局狀態機 | 📐 | `opening`／`run`／`ending`、ending snapshot、逐頁 reveal／advance／skip、跨 mode 封鎖與序列化 |
+| P5-B 頂層流程與結局狀態機 | ✅ | 三種 flow mode、ending snapshot、逐頁 reveal／advance／skip、跨 mode 封鎖、flow／active 序列化矩陣、EffectApply 完整動作原子性、D45 `auto_enter`＋Lint 20＋持卡／空手 coda 均完成。verifier 複驗：`test_p5b` 12 組、30 套 headless、greedy 空手路、UI sim 108／85／0 全綠；原五個 blocker 解除，K-193～K-198 為不擋關門殘留 |
 | P5-C 四類結局與組合後日談 | 📐 | 正常資料組合、兩種 BE、不上車、同 ending id 首見長版／重見摘要；不清 run |
 | P5-D 開局、歷輪摘要與跨輪重置 | 📐 | 三個 opening choice、唯一 `complete_ending()`、history、魔法物品例外、D29 逾期預設與第二輪重入 |
 | P5-E 開局與結局 UI | 📐 | 故事內開局、結局逐頁、按一下補整頁／再按翻頁、重見跳過；不做 title／save／history UI |
@@ -129,6 +129,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps
 - `.claude/` 是本機 tooling config，不 commit。
 
 ## 下一步
+- 2026-08-29：**P5-B 頂層流程與結局狀態機經 verifier 完整複驗關門並轉 ✅。** 第一版 review 的五個 blocker——D13 名冊鎖死 D45、可走到 day 46、四類完整動作非原子、active snapshot 矩陣不足、run 中可公開啟動不上車——已由 `0c82046` 全數修復。verifier 自跑 `test_p5b` 12 組、`test_p5a` 新增 phase-exit／Lint 20 負向、全套 30 套 headless、greedy 與完整 UI sim 全綠；正式資料為 66／48／18／268／4／3，引用與 Lint 1～20 全零。UI sim run `20260829-090655-957-p77948-d1e58860` 為 108 variants／85 contracts／0 failed。非阻擋殘留落 K-193～K-198。**下一步實作 P5-C 四類結局與組合後日談。**
 - 2026-08-28：**P5-A 結局、開局與跨輪資料經 verifier 完整複驗關門並轉 ✅。** 首次交付後三輪 review 先後修正 lint 巢狀掃描、D29／D43 正向形狀、慶典候選引用、ending `skip_to`／`when_group`／組裝路徑、K-186 回歸覆蓋與 K-187 負向類別；最後補回 D43 `info_zhou_job` 履歷門檻與 D7 `opening_choice` 單一真值。關門證據：`verify_data` 66 卡／48 地點／18 NPC／268 beat／4 ending／3 opening且引用與 Lint 1～19 全 0；`test_p5a` 80 個 ok；29 套 headless exit 0；UI sim run `20260828-210154-995-p31932-6d2f2785` 為 108 variants／85 contracts／0 failed；K-186 的 15 項變異記錄逐條對上現行斷言。K-184／K-186／K-187／K-188／K-192 同批結案；K-182、K-183 各留一項已知低度殘留，K-190／K-191 依原排程不擋關門。**下一步實作 P5-B 頂層流程與結局狀態機。**
 - 2026-08-28：**P4-F 全流程與跨輪驗收實作完成，經 verifier 複驗後機器層七條全打勾，P4-F 轉 🟦。** 首次交付（`6b6c0c8`）28 套 headless 與全套 UI sim 皆全綠，同批修掉 K-148（走查 `assert` 假綠地雷）與 K-165～K-168。verifier 獨立重跑後**注入 9 個變異點：7 個精確轉紅、1 個未轉紅、1 個變異點無效**（正式資料 `consume_card` 全為 false，該分支不可達）。未轉紅那點是遭遇候選**手牌分支**的 `already_attempted` 零覆蓋——關掉它 `test_p4e` 與 `p4e_02` 都仍全綠，代表 K-165 ② 宣稱的修法其實驗的是 `card_not_submittable`，另立 K-170。同輪另抓到 matrix 抄成硬編碼字面值且 `d45_responses` 是死變數（K-169，違反「不複製完整 mapping」）、`p4e_04` 的無殘留斷言在 D45 恆真（K-171）、跨輪 meta 少驗 `night_once_beats_seen`（K-172）、「一天一人一次」只驗旗標未驗拒絕碼（K-173）、UI 層冗餘 madness 判斷（K-174）。**六條於同日修畢（`c1904c7`）並通過第二輪變異驗證**：5 個變異點精確轉紅，K-169 另以「把 D8 R1 的 `accepts` 對調、測試改用另一張卡且仍 exit 0」做正向衍生證明。K-148、K-166、K-167、K-168、K-169～K-174 全數結案；剩 K-165 ①（鍵盤導航）、K-175（attempted fixture 不走真實入口）、K-176（三處硬編碼 slot id）、K-177（`already_attempted` 的 UI 文案零斷言）四條低度殘留。**下一步：先由真人補完 P3-F 與 P4-F 合計 8 項體感體驗記錄，再進 Phase 5（P5-A 結局、開局與跨輪資料）。**
 - 2026-08-27：**P4-E 遭遇 UI 與 D8／D45 實作完成，經 verifier 三輪複驗關門並轉 ✅。** 第一輪（`2f18013`）機器全綠但驗收條文 0／7 可打勾，verifier 提出 F1～F6：遭遇出口文字被 `_route_view()` 立刻沖掉（K-153）、D45 在自然滿手牌下必然容量失敗且以裁 fixture 迴避並覆寫 `d45_afternoon.json`（K-154）、`d10_night__knowledge.json` 補打卡片保住 expected（K-155）、`test_p4e` 汙染 loader 不還原（K-156）、六項 UI 特性零斷言（K-157）、未重用 CardDetail（K-158）。 第二輪（`bd56337`）六條全修，但帶進 N1～N6：兩檔整檔 CRLF（K-159）、router 被複製成兩份且已漂移（K-160）、容量兩套語意未同步方針（K-161）、知識標示斷言可靜默跳過（K-162）、`_coda_jump` 死碼（K-163）、變異證據不足（K-164）。 第三輪（`3ce1e70`）補齊規則層七條驗收（`test_p4e` 擴到 15 項）並清掉 N1～N5。 第三輪自附 2 個變異點，**verifier 再補做至 10 個，9 個精確轉紅**；未轉紅的兩點另立 K-166（`sleep_night()` 斷言不可證偽）與 K-167（推進按鈕守衛兩處冗餘，需同時反轉才紅），連同 K-165（三項 UI 覆蓋微缺）、K-168（滿手測試用重複 card id）共四條低度殘留留待 P4-F。 最終證據：27 套 headless exit 0、UI sim run `20260827-205101-408-p68728-f7688443` 為 108 variants／85 contracts／0 failed、11 條負向反證如期失敗。**下一步實作 P4-F 全流程與跨輪驗收。**
