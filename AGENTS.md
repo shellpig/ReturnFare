@@ -49,7 +49,7 @@ Report to user: current progress, and any issues with their scope of impact.
 | 需求不清、規格討論、要問釐清問題 | `grill-me` |
 | 前端／本機 web app 驗證、UI 行為除錯、瀏覽器截圖或 console log | `webapp-testing` |
 
-四個 skill 已於 2026-08-20 用 junction 掛進 `~/.claude/skills/`，**會出現在 session 的技能清單裡，直接用 skill 名字叫**。原始檔仍在 `C:\_work\AI_Work\Skills\`（改那邊就等於改這邊）；環境沒掛 junction 時退回讀檔：
+四個 skill 已用 junction 同時掛進 `~/.claude/skills/` 與 `~/.agents/skills/`。前者供 Claude 使用；後者供支援 Agent Skills 的其他 agent（包含 Codex）發現。**出現在 session 的技能清單時直接用 skill 名字叫**。原始檔仍在 `C:\_work\AI_Work\Skills\`（改那邊就等於改這邊）；環境沒掛 junction 時退回讀檔：
 
 - `gamestudio` → `Skills\gamestudio\SKILL.md`
 - `diagnose` → `Skills\engineering\diagnose\SKILL.md`
@@ -148,7 +148,7 @@ grep -n "P1-A" 實作規格書.md 開發設計方針.md 測試指南.md
 
 ### Project Skills
 
-原始檔住 `C:\_work\AI_Work\Skills\`；四個 skill 已用 junction 掛進 `~/.claude/skills/`（`gamestudio`、`diagnose`、`grill-me`、`webapp-testing`），改原始檔等於改掛進去的那份。
+原始檔住 `C:\_work\AI_Work\Skills\`；四個 skill 已用 junction 掛進 `~/.claude/skills/` 與 `~/.agents/skills/`（`gamestudio`、`diagnose`、`grill-me`、`webapp-testing`）。`.claude/skills` 供 Claude 使用；`.agents/skills` 供支援 Agent Skills 的其他 agent（包含 Codex）發現。改原始檔等於改兩邊掛進去的同一份。
 
 **觸發表已搬到 `New Conversation Opening Check > Layer 0`，本節不重複。**
 
