@@ -4,7 +4,14 @@
 
 ## 目前狀態
 
-**P5-C（四類結局與組合後日談）已由 implementer 實作完成，交付 verifier 進行複驗與關門。**
+**P5-C（四類結局與組合後日談）已完成第一輪 verifier 複驗，但未通過關門。** 現有機器基線全綠，仍有 **2 個 blocker＋2 個非阻擋契約／測試缺口**；修完並重新完整驗收前不得推進 P5-D。
+
+Verifier 複驗證據（2026-08-29，HEAD `6b7acf3`）：
+
+- `test_p5c.gd` 9 組全綠，exit 0
+- 31 套 headless 全數 exit 0；正式資料 66 卡／48 地點／18 NPC／268 beat／4 ending／3 opening，引用與 Lint 1～20 全 0
+- UI sim run `20260829-094723-369-p71620-084cb4df`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks
+- 工作樹在複驗結束時乾淨；上述全綠不能解除下方 P5C-V1／V2，因為現有資料、lint 與測試沒有覆蓋開關帶，結構版文字走查也只驗非空／無重頁，沒有驗敘事資訊與時間順序
 
 實作者自跑證據（打勾與落檔仍由 verifier 做）：
 
@@ -194,6 +201,42 @@ Verifier 關門證據（2026-08-29，HEAD `0c82046`）：`test_p5b` 12 組 exit 
 | M-C3 | `EndingResolver.resolve` 略過 lookup fragments 的 `when_group` 門控 | `test_p5c` (未邀代付片段啟用) | 轉紅（1 斷言失敗，exit 1） |
 | M-C4 | `GameState._build_ending_plan` 破壞不上車快照 `ended_day` 為 1 | `test_p5c` (不上車快照 null 斷言) | 轉紅（1 斷言失敗，exit 1） |
 
+## P5-C verifier 待修任務單（2026-08-29）
+
+### P5C-V1（blocker）生計完全漏掉六開關帶
+
+- **證據**：`data/endings.json` 的 livelihood 只有 `uncle`／`boss`／`zhou`／`none` 四條，只讀 `accepted_inn`／`accepted_outside_job`／`accepted_job`；沒有任何 `switch`、`switch_progress_at_least` 或 `count_at_least`。`test_p5c.gd` 同樣只排列四個生計旗標。
+- **違反契約**：`實作規格書.md > 十五、結局流程／P5-C`、`開發設計方針.md > P5-C`、`data/SCHEMA.md > endings.json` 與 `subdocs/故事線/故事線_第一輪_第三章.md > 槽二：生計` 都要求同一生計再分 0–1／2–3／4–6 三個開關帶，variant id／when 必須承載結果，不另存第四個 history 欄位。
+- **影響**：四條生計的 12 格人生結果被壓成 4 格。旅館應關閉／縮小／撐住／做起來，以及叔叔是否死在診所或主角手上，都不會反映本輪六個經營選擇；P5-F 的開關帶組合驗收也無法成立。
+- **建議修法**：用現有 `count_at_least` 計算六個條件（`s1`～`s5` 與 `switch_progress_at_least(s6, 3)`），把每條生計展開為 high（4–6）／mid（2–3）／low（0–1）的有序 rule 與穩定 variant id；保留「叔叔 → 前老闆 → 周先生 → 皆無」主優先序，文字逐格對齊第三章 4×3 表。
+- **必要反證**：測試至少各造 0、1、2、3、4、6 個開關，覆蓋四條生計共 12 格；同時成立多生計仍只取高優先者。暫時拿掉開關帶條件或把門檻反轉時，對應矩陣測試必須精確轉紅。
+
+### P5C-V2（blocker）正常首見長版提早揭露核心真相且時間順序倒置
+
+- **證據一**：`data/endings.json` 的首頁直接寫「你被留在了這裡，而另一個你……走出了山泉閣」，由旁白替玩家確認誰被留下、誰是另一個，違反企劃「第一輪只感到不對勁、不解釋替換；第二輪才知道後日談是別人的人生」。
+- **證據二**：現行組裝順序是 partner → livelihood → inn → suffix；阿婕／阿薇 partner 頁已先寫她四十出頭癌逝，後面才寫生計、旅館狀態與「二十年」，與第三章長版骨架「生計 → 婚姻 → 二十年 → 她先死 → 主角死亡」相反。
+- **影響**：首輪核心錯愕被直接解謎；有邀請的兩條長版後日談時間線不連貫，未通過 `測試指南.md > P5-C` 的真人閱讀條目。
+- **建議修法**：首見 prefix 改成只呈現可觀察畫面，不命名原件／替換者；重見摘要可保留較明示語氣。重新安排 group／page 內容，讓四條生計與旅館狀態先落地，再播婚姻、二十年與兩次死亡；若更動 group 順序，同步修正 `data/SCHEMA.md` 的單一事實來源。不得新增 lore 或改寫既定角色命運。
+- **必要驗收**：至少實播有邀阿婕、有邀阿薇、不邀三條正常長版並逐頁記錄；確認沒有「另一個你／替換者」等過早定論、沒有死亡後才倒回二十年前的順序，也沒有缺頁／重頁／空白頁。
+
+### P5C-V3（非阻擋）四類 ready-to-complete 測試實際只跑三類
+
+- **證據**：`test_p5c.gd::_test_8_lifecycle_ready_to_complete_and_atomicity()` 的 `cases` 只有 `ending_replaced`、`ending_madness_be`、`ending_inventory_be`；不上車只驗快照與文字，沒有走 reveal／advance／skip 到 `ready_to_complete`。
+- **建議修法**：opening mode 以私有 helper 建立首見與重見不上車快照，首見逐頁走到末頁才 ready，重見另驗合法 skip；揭露前與非末頁都必須 false。
+
+### P5C-V4（非阻擋）resolver 未完全兌現壞資料 `data_conflict` 防禦
+
+- **證據**：`EndingResolver._append_pages()` 把 `null` 當合法空陣列，故 composite 必填的 prefix／suffix／variant page 欄遺失時可能繼續組裝；`_pick_rule()` 遇多 fallback 只保留第一筆。正式 JSON 目前會被 lint 17 擋住，所以不是現行玩家路徑 blocker，但與方針「引用缺漏或零／多個最終選擇回 data error」不一致。
+- **建議修法**：由呼叫端區分選填容器與必填 page 陣列；必填欄缺失／錯型別直接 `data_conflict`。rule 掃描同時驗恰一個 fallback 與項目形狀，不靜默跳過壞項目。
+- **必要反證**：獨立合成 loader 分別刪 prefix、刪 suffix、刪 variant page 欄、建立多 fallback，四例都必須由 resolver 本身回 `data_conflict`，不能只靠 lint 測試代勞。
+
+### 修復後 verifier 重驗範圍
+
+1. `test_p5c.gd` 新增上述 4×3 開關帶矩陣、不上車完成門檻與 resolver 壞資料案例，並對關鍵接線做變異驗證。
+2. 逐頁閱讀正常三條代表路徑、兩種 BE 與不上車首見／重見，記錄資訊揭露與時間順序。
+3. 重跑 `verify_data`、`test_p5c`、31 套以上全 headless、greedy 與 UI sim；回報當時 catalog 實際數字。
+4. 全部通過後才由 verifier 更新 `測試指南.md`、`驗證後已知問題.md`、`PROJECT_BRIEF.md`，依固定流程同 turn commit＋push 關門 P5-C。
+
 ## 已知殘留
 
 - K-193：`last_auto_enter_lines` 尚未接進 `main.gd`；D45 邀請效果成立但文字可能看不到，歸 P5-D transition lines 接線。
@@ -211,7 +254,7 @@ Verifier 關門證據（2026-08-29，HEAD `0c82046`）：`test_p5b` 12 組 exit 
 
 ## 下一個最安全任務
 
-**交由 Verifier 進行 P5-C 複驗與關門。** 複驗通過後推進至 **P5-D 開局、歷輪摘要與跨輪重置**。
+**由 implementer 修復 P5C-V1～V4，先不要開工 P5-D。** 修復完成後交回 verifier 依上方範圍重驗；只有 P5-C 關門後才推進 **P5-D 開局、歷輪摘要與跨輪重置**。
 
 > 跑 UI 模擬一律加 `-Background`：
 > `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`
