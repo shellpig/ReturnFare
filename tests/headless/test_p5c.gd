@@ -1,11 +1,14 @@
 extends SceneTree
 
 ## P5-C 四類結局與組合後日談測試（實作規格書 P5-C、測試指南 P5-C）。
-## 涵蓋：4×3 生計開關帶矩陣、伴侶／生計／修繕優先序與時間軸順序、
-## uninvited_proxy 查表與防篡改、首見長版（可觀察敘事）vs 重見短版分支、
+## 涵蓋：4×3 生計開關帶矩陣與 s1～s6 獨立邊界測試（P5C-V6）、
+## 伴侶／生計／修繕優先序、客觀敘事與「她先死」完整後日談（P5C-V5）、
+## uninvited_proxy 查表與防篡改、首見長版 vs 重見短版分支、
 ## 兩種 BE 的後日談隔離與獨立首見計算、不上車外地人生快照與生命週期、
 ## 四類結局逐頁 ready_to_complete 門檻與動作原子性、
-## Resolver 壞資料 data_conflict 防禦、全排列結構版文字走查。
+## Resolver 壞資料 data_conflict 防禦、
+## Deserialize variant 與 page ref 一致性驗證（P5C-V7）、
+## 全 432 組全排列結構版文字走查（864 次求值）。
 ## 跑法：Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/test_p5c.gd
 
 const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
@@ -26,14 +29,16 @@ func _initialize() -> void:
 	print("=== P5-C 四類結局與組合後日談測試 ===")
 	_test_1_partner_variants(gs, data_node)
 	_test_2_livelihood_switch_matrix(gs, data_node)
-	_test_3_inn_appearance_variants(gs, data_node)
-	_test_4_uninvited_proxy_lookup(gs, data_node)
-	_test_5_first_seen_vs_repeat_and_chronology(gs, data_node)
-	_test_6_be_endings_independence(gs, data_node)
-	_test_7_refuse_boarding_ending(gs, data_node)
-	_test_8_lifecycle_ready_to_complete_all_four(gs, data_node)
-	_test_9_resolver_bad_data_defense(gs, data_node)
-	_test_10_structural_text_walkthrough(gs, data_node)
+	_test_3_switch_matrix_independent_boundaries(gs, data_node)
+	_test_4_inn_appearance_variants(gs, data_node)
+	_test_5_uninvited_proxy_lookup(gs, data_node)
+	_test_6_first_seen_vs_repeat_and_chronology(gs, data_node)
+	_test_7_be_endings_independence(gs, data_node)
+	_test_8_refuse_boarding_ending(gs, data_node)
+	_test_9_lifecycle_ready_to_complete_all_four(gs, data_node)
+	_test_10_resolver_bad_data_defense(gs, data_node)
+	_test_11_deserialize_variant_validation(gs, data_node)
+	_test_12_structural_text_walkthrough(gs, data_node)
 
 	if _failed > 0:
 		push_error("test_p5c: %d 個斷言失敗" % _failed)
@@ -251,10 +256,95 @@ func _test_2_livelihood_switch_matrix(gs: Node, data_node: Node) -> void:
 	_check(not _refs_contain(refs_dual, "zhou"), "周先生頁面未入頁（不拼裝互斥人生）")
 
 
-# ── 3. 旅館修繕 variants 涵蓋與排他 ───────────────────────────────────────────
+# ── 3. 六開關矩陣獨立 s1～s6 邊界與結構守門 (P5C-V6) ───────────────────────────
 
-func _test_3_inn_appearance_variants(gs: Node, data_node: Node) -> void:
-	print("\n--- 3. 旅館修繕 variants 覆蓋與互斥人生隔離 ---")
+func _test_3_switch_matrix_independent_boundaries(gs: Node, data_node: Node) -> void:
+	print("\n--- 3. 六開關矩陣獨立 s1～s6 邊界與結構守門 ---")
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+
+	var all_switches := ["s1", "s2", "s3", "s4", "s5", "s6"]
+
+	# 為 s1～s6 每一條開關建立獨立的 3→4 邊界測試
+	for tested_sw in all_switches:
+		_fresh_run(gs)
+		gs.set("selected_festival_proxy_npc", "ajie")
+		(gs.get("flags") as Dictionary)["accepted_inn"] = true
+
+		# 挑選其餘 5 個中的 3 個開關作為基準 (此時恰為 3 開關 -> mid band)
+		var other_switches := []
+		for sw in all_switches:
+			if sw != tested_sw:
+				other_switches.append(sw)
+		var base_3 := [other_switches[0], other_switches[1], other_switches[2]]
+
+		for sw_name in base_3:
+			if str(sw_name) == "s6":
+				(gs.get("switch_progress") as Dictionary)["s6"] = 3
+			else:
+				(gs.get("switches") as Dictionary)[str(sw_name)] = true
+
+		# (a) 僅 3 個其他開關：未達 4 門檻 -> uncle_mid
+		var res_mid := EndingResolver.resolve("ending_replaced", gs, loader)
+		_check(str((res_mid.get("variants") as Dictionary).get("livelihood_variant", "")) == "uncle_mid",
+			"開關邊界 [%s 缺] (base: %s) → uncle_mid" % [tested_sw, str(base_3)])
+
+		# (b) 加入被測開關：達到 4 門檻 -> uncle_high
+		if tested_sw == "s6":
+			(gs.get("switch_progress") as Dictionary)["s6"] = 3
+		else:
+			(gs.get("switches") as Dictionary)[tested_sw] = true
+
+		var res_high := EndingResolver.resolve("ending_replaced", gs, loader)
+		_check(str((res_high.get("variants") as Dictionary).get("livelihood_variant", "")) == "uncle_high",
+			"開關邊界 [%s 命中] (3+1=4 開關) → uncle_high" % tested_sw)
+		_check(_refs_contain(res_high.get("page_refs", []) as Array, "livelihood_uncle_high_long"),
+			"包含 livelihood_uncle_high_long")
+
+	# (c) 結構斷言：驗證 endings.json 中 4 條 high 生計規則的 of[] 恰好且精確包含 6 條條件
+	var end_rep: Dictionary = loader.endings_by_id["ending_replaced"] as Dictionary
+	var vgs: Array = end_rep.get("variant_groups", []) as Array
+	var livelihood_group := vgs[0] as Dictionary
+	var rules: Array = livelihood_group.get("rules", []) as Array
+	var high_rules := ["uncle_high", "boss_high", "zhou_high", "none_high"]
+
+	for hr_id in high_rules:
+		var hr_dict: Dictionary = {}
+		for r in rules:
+			if str((r as Dictionary).get("id", "")) == hr_id:
+				hr_dict = r as Dictionary
+				break
+		_check(not hr_dict.is_empty(), "找到 high rule: %s" % hr_id)
+		var when_dict: Dictionary = hr_dict.get("when", {}) as Dictionary
+		var all_arr: Array = when_dict.get("all", []) as Array
+		var count_cond: Dictionary = {}
+		if hr_id == "none_high":
+			count_cond = when_dict.get("count_at_least", {}) as Dictionary
+		else:
+			for item in all_arr:
+				if (item as Dictionary).has("count_at_least"):
+					count_cond = (item as Dictionary).get("count_at_least", {}) as Dictionary
+					break
+
+		_check(int(count_cond.get("n", 0)) == 4, "%s 門檻 n == 4" % hr_id)
+		var of_arr: Array = count_cond.get("of", []) as Array
+		_check(of_arr.size() == 6, "%s of[] 恰有 6 條條件" % hr_id)
+		var seen_sws := {}
+		for cond_item in of_arr:
+			var cdict := cond_item as Dictionary
+			if cdict.has("switch"):
+				seen_sws[str(cdict["switch"])] = true
+			elif cdict.has("switch_progress_at_least"):
+				var sp_dict := cdict["switch_progress_at_least"] as Dictionary
+				if str(sp_dict.get("switch", "")) == "s6" and int(sp_dict.get("n", 0)) == 3:
+					seen_sws["s6"] = true
+		_check(seen_sws.has("s1") and seen_sws.has("s2") and seen_sws.has("s3") and seen_sws.has("s4") and seen_sws.has("s5") and seen_sws.has("s6"),
+			"%s of[] 精確覆蓋 s1～s6 全開關條件" % hr_id)
+
+
+# ── 4. 旅館修繕 variants 涵蓋與排他 ───────────────────────────────────────────
+
+func _test_4_inn_appearance_variants(gs: Node, data_node: Node) -> void:
+	print("\n--- 4. 旅館修繕 variants 覆蓋與互斥人生隔離 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
 	# (a) repaired_sign -> sign
@@ -301,10 +391,10 @@ func _test_3_inn_appearance_variants(gs: Node, data_node: Node) -> void:
 	_check(not _refs_contain(refs_multi, "inn_pipes_long") and not _refs_contain(refs_multi, "inn_windows_long"), "互斥修繕不拼在一起")
 
 
-# ── 4. uninvited_proxy 查表與防篡改 ──────────────────────────────────────────
+# ── 5. uninvited_proxy 查表與防篡改 ──────────────────────────────────────────
 
-func _test_4_uninvited_proxy_lookup(gs: Node, data_node: Node) -> void:
-	print("\n--- 4. uninvited_proxy 查表與後續動作計數防篡改 ---")
+func _test_5_uninvited_proxy_lookup(gs: Node, data_node: Node) -> void:
+	print("\n--- 5. uninvited_proxy 查表與後續動作計數防篡改 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
 	# (a) partner: none + proxy: acai -> proxy_acai_long
@@ -348,44 +438,88 @@ func _test_4_uninvited_proxy_lookup(gs: Node, data_node: Node) -> void:
 		"邀阿婕時 uninvited_proxy 查表片段不啟用")
 
 
-# ── 5. 首見長版 vs 重見短版分支與時間軸順序 (P5C-V2) ───────────────────────────
+# ── 6. 首見長版 vs 重見短版分支、時間軸順序與「她先死」承重 (P5C-V5) ─────────────
 
-func _test_5_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> void:
-	print("\n--- 5. 首見長版 vs 重見短版分支與時間軸順序 ---")
+func _test_6_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> void:
+	print("\n--- 6. 首見長版 vs 重見短版分支、時間軸順序與「她先死」承重 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
-	# (a) history 為空但 run_number > 1 (如第 5 輪) -> 首見長版
+	# (a) 邀阿婕首見長版：prefix (走出山泉閣) -> 生計 -> 旅館修繕 -> 伴侶(婚姻/二十年/她先/然後是他) -> suffix(庇佑回歸)
 	_fresh_run(gs)
-	gs.set("run_number", 5)
+	gs.set("run_number", 1)
 	gs.set("selected_festival_proxy_npc", "ajie")
 	(gs.get("flags") as Dictionary)["invited_ajie"] = true
 	(gs.get("flags") as Dictionary)["accepted_inn"] = true
 	(gs.get("flags") as Dictionary)["repaired_sign"] = true
 	_set_switches(gs, 6)
 
-	var res_first := EndingResolver.resolve("ending_replaced", gs, loader)
-	_check(str(res_first.get("branch", "")) == "first_seen", "history 為空但 run_number > 1 時仍為 first_seen")
-	var refs_first: Array = res_first.get("page_refs", []) as Array
-	_check(_refs_contain(refs_first, "replacement") and _refs_contain(refs_first, "long_return"), "首見包含長版 prefix/suffix")
-	_check(not _refs_contain(refs_first, "again_replaced") and not _refs_contain(refs_first, "short_return"), "首見不包含短版 prefix/suffix")
+	var res_ajie := EndingResolver.resolve("ending_replaced", gs, loader)
+	_check(str(res_ajie.get("branch", "")) == "first_seen", "初次正常結局為 first_seen")
+	var refs_ajie: Array = res_ajie.get("page_refs", []) as Array
+	_check(refs_ajie.size() == 5, "邀阿婕首見長版恰 5 頁 (page_count=%d)" % refs_ajie.size())
 
-	# 驗證敘事順序：prefix (走出山泉閣) -> 生計 -> 旅館修繕 -> 伴侶婚姻 -> suffix (二十年) -> suffix (四十出頭死亡回歸)
-	var p_prefix := EndingResolver.resolve_ref(str(refs_first[0]), loader)
-	var text_prefix := str(p_prefix.get("text", ""))
-	_check("穿上外套" in text_prefix and "走出了山泉閣" in text_prefix, "首見 prefix 呈現可觀察畫面")
-	_check(not ("另一個你" in text_prefix) and not ("替換" in text_prefix), "首見 prefix 不過早揭露替換真相")
+	# 第 1 頁：prefix 可觀察畫面
+	var p0 := EndingResolver.resolve_ref(str(refs_ajie[0]), loader)
+	var t0 := str(p0.get("text", ""))
+	_check("穿上外套" in t0 and "走出了山泉閣" in t0, "首見 prefix 呈現可觀察畫面")
+	_check(not ("另一個你" in t0) and not ("替換" in t0), "首見 prefix 不過早揭露替換真相")
 
-	_check("livelihood" in str(refs_first[1]), "第 2 頁為生計落地")
-	_check("inn_appearance" in str(refs_first[2]), "第 3 頁為旅館修繕")
-	_check("partner" in str(refs_first[3]), "第 4 頁為伴侶婚姻")
-	_check("years_passed" in str(refs_first[4]), "第 5 頁為二十年過去")
-	_check("long_return" in str(refs_first[5]), "第 6 頁為四十出頭死亡與庇佑回歸")
+	# 第 2 頁：生計
+	_check("livelihood" in str(refs_ajie[1]), "第 2 頁為生計落地")
 
-	var p_partner := EndingResolver.resolve_ref(str(refs_first[3]), loader)
-	var text_partner := str(p_partner.get("text", ""))
-	_check("結婚" in text_partner and "沒有小孩" in text_partner, "伴侶頁描述婚姻與無小孩")
+	# 第 3 頁：旅館
+	_check("inn_appearance" in str(refs_ajie[2]), "第 3 頁為旅館修繕")
 
-	# (b) history 只有 BE 結局 -> 首見長版
+	# 第 4 頁：伴侶（婚姻 → 二十年 → 她先癌逝 → 主角同病死亡）
+	_check("partner" in str(refs_ajie[3]), "第 4 頁為伴侶婚姻與死亡順序")
+	var p3_ajie := EndingResolver.resolve_ref(str(refs_ajie[3]), loader)
+	var t3_ajie := str(p3_ajie.get("text", ""))
+	_check("結婚" in t3_ajie and "沒有小孩" in t3_ajie, "伴侶頁包含婚姻與無小孩")
+	_check("二十年過去" in t3_ajie and "四十出頭" in t3_ajie, "伴侶頁包含二十年與四十出頭時間軸")
+	_check("她先" in t3_ajie and "癌症" in t3_ajie and "走得很快" in t3_ajie, "伴侶頁包含「她先」與癌症")
+	_check("然後是他" in t3_ajie and "同一個病" in t3_ajie and "一樣快" in t3_ajie, "伴侶頁包含主角同病死亡（承重線索）")
+
+	# 第 5 頁：suffix 黑畫面與庇佑發動
+	_check("long_return" in str(refs_ajie[4]), "第 5 頁為庇佑回歸")
+	var p4 := EndingResolver.resolve_ref(str(refs_ajie[4]), loader)
+	var t4 := str(p4.get("text", ""))
+	_check("然後是黑" in t4 and "庇佑再次發動" in t4, "suffix 呈現黑畫面與庇佑回歸")
+
+	# (b) 邀阿薇首見長版：同樣包含「她先」與同病死亡
+	_fresh_run(gs)
+	gs.set("selected_festival_proxy_npc", "awei")
+	(gs.get("flags") as Dictionary)["invited_awei"] = true
+	(gs.get("flags") as Dictionary)["accepted_inn"] = true
+	(gs.get("flags") as Dictionary)["repaired_sign"] = true
+	_set_switches(gs, 6)
+
+	var res_awei := EndingResolver.resolve("ending_replaced", gs, loader)
+	var refs_awei: Array = res_awei.get("page_refs", []) as Array
+	var p3_awei := EndingResolver.resolve_ref(str(refs_awei[3]), loader)
+	var t3_awei := str(p3_awei.get("text", ""))
+	_check("阿薇" in t3_awei and "她先" in t3_awei and "然後是他" in t3_awei and "同一個病" in t3_awei,
+		"阿薇長版包含婚姻、她先走與主角同病死亡")
+
+	# (c) 不邀首見長版：獨身二十年，不誤播「她先」
+	_fresh_run(gs)
+	gs.set("selected_festival_proxy_npc", "acai")
+	(gs.get("flags") as Dictionary)["invited_none"] = true
+	(gs.get("flags") as Dictionary)["accepted_inn"] = true
+	(gs.get("flags") as Dictionary)["repaired_sign"] = true
+	_set_switches(gs, 6)
+
+	var res_none := EndingResolver.resolve("ending_replaced", gs, loader)
+	var refs_none: Array = res_none.get("page_refs", []) as Array
+	_check(refs_none.size() == 6, "不邀首見長版（含 proxy 照片）恰 6 頁 (page_count=%d)" % refs_none.size())
+	var p3_none := EndingResolver.resolve_ref(str(refs_none[3]), loader)
+	var t3_none := str(p3_none.get("text", ""))
+	_check("沒有結婚" in t3_none and "一個人過完二十年" in t3_none and "四十出頭" in t3_none and "癌症" in t3_none,
+		"無伴侶長版包含獨身二十年與四十出頭癌症")
+	_check(not ("她先" in t3_none) and not ("然後是他" in t3_none), "無伴侶長版不得誤播「她先」或「然後是他」")
+	_check("proxy_acai_long" in str(refs_none[4]), "第 5 頁為代付者阿財照片")
+	_check("long_return" in str(refs_none[5]), "第 6 頁為庇佑回歸")
+
+	# (d) history 只有 BE 結局 -> 正常結局仍為 first_seen
 	_fresh_run(gs)
 	gs.set("selected_festival_proxy_npc", "ajie")
 	(gs.get("ending_history") as Array[Dictionary]).append({ "ending_id": "ending_madness_be", "run_number": 1 })
@@ -393,7 +527,7 @@ func _test_5_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 	var res_be_hist := EndingResolver.resolve("ending_replaced", gs, loader)
 	_check(str(res_be_hist.get("branch", "")) == "first_seen", "只有 BE history 時正常結局仍為 first_seen")
 
-	# (c) history 已有 ending_replaced -> 重見短版
+	# (e) history 已有 ending_replaced -> 重見短版
 	_fresh_run(gs)
 	gs.set("selected_festival_proxy_npc", "ajie")
 	(gs.get("flags") as Dictionary)["invited_ajie"] = true
@@ -408,13 +542,16 @@ func _test_5_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 	_check(_refs_contain(refs_rep, "partner_ajie_short"), "重見包含 partner_ajie_short")
 	_check(_refs_contain(refs_rep, "livelihood_uncle_high_short"), "重見包含 livelihood_uncle_high_short")
 	_check(_refs_contain(refs_rep, "inn_sign_short"), "重見包含 inn_sign_short")
+	var p_rep_ajie := EndingResolver.resolve_ref(str(refs_rep[3]), loader)
+	var t_rep_ajie := str(p_rep_ajie.get("text", ""))
+	_check("她先離世" in t_rep_ajie and "同病而終" in t_rep_ajie, "重見短版亦保留她先離世與同病線索")
 	_check(EndingResolver.skip_target("ending_replaced", loader) == "short_return", "正常結局 skip_to 指向 short_return")
 
 
-# ── 6. 兩種 BE 結局獨立性 ────────────────────────────────────────────────────
+# ── 7. 兩種 BE 結局獨立性 ────────────────────────────────────────────────────
 
-func _test_6_be_endings_independence(gs: Node, data_node: Node) -> void:
-	print("\n--- 6. 兩種 BE 結局隔離與獨立首見計算 ---")
+func _test_7_be_endings_independence(gs: Node, data_node: Node) -> void:
+	print("\n--- 7. 兩種 BE 結局隔離與獨立首見計算 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
 	# (a) ending_madness_be
@@ -448,10 +585,10 @@ func _test_6_be_endings_independence(gs: Node, data_node: Node) -> void:
 	_check(str(res_inv_still_first.get("branch", "")) == "first_seen", "inventory BE 仍為 first_seen（狀態彼此獨立）")
 
 
-# ── 7. 不上車 ending_refuse_boarding ──────────────────────────────────────────
+# ── 8. 不上車 ending_refuse_boarding ──────────────────────────────────────────
 
-func _test_7_refuse_boarding_ending(gs: Node, data_node: Node) -> void:
-	print("\n--- 7. 不上車外地人生與快照規格 ---")
+func _test_8_refuse_boarding_ending(gs: Node, data_node: Node) -> void:
+	print("\n--- 8. 不上車外地人生與快照規格 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
 	# (a) opening mode 下啟動 ending_refuse_boarding
@@ -495,10 +632,10 @@ func _test_7_refuse_boarding_ending(gs: Node, data_node: Node) -> void:
 	_check(EndingResolver.skip_target("ending_refuse_boarding", loader) == "complete", "不上車 skip_to 指向 complete")
 
 
-# ── 8. 四類結局逐頁 ready_to_complete 門檻與動作原子性 (P5C-V3) ───────────────
+# ── 9. 四類結局逐頁 ready_to_complete 門檻與動作原子性 (P5C-V3) ───────────────
 
-func _test_8_lifecycle_ready_to_complete_all_four(gs: Node, data_node: Node) -> void:
-	print("\n--- 8. 四類結局逐頁 ready_to_complete 門檻與動作原子性 ---")
+func _test_9_lifecycle_ready_to_complete_all_four(gs: Node, data_node: Node) -> void:
+	print("\n--- 9. 四類結局逐頁 ready_to_complete 門檻與動作原子性 ---")
 
 	# (a) 三類 run 結局在末頁揭露前 ready_to_complete 恆為 false
 	var run_cases := [
@@ -586,10 +723,10 @@ func _test_8_lifecycle_ready_to_complete_all_four(gs: Node, data_node: Node) -> 
 	_check(JSON.stringify(gs.get("active_ending")) == snap_before, "重複呼叫不產生第二份快照，active_ending 零變化")
 
 
-# ── 9. Resolver 壞資料 data_conflict 防禦 (P5C-V4) ────────────────────────────
+# ── 10. Resolver 壞資料 data_conflict 防禦 (P5C-V4) ───────────────────────────
 
-func _test_9_resolver_bad_data_defense(gs: Node, data_node: Node) -> void:
-	print("\n--- 9. Resolver 壞資料 data_conflict 防禦 ---")
+func _test_10_resolver_bad_data_defense(gs: Node, data_node: Node) -> void:
+	print("\n--- 10. Resolver 壞資料 data_conflict 防禦 ---")
 	var base_loader: DataLoader = data_node.get("loader") as DataLoader
 
 	_fresh_run(gs)
@@ -677,10 +814,73 @@ func _test_9_resolver_bad_data_defense(gs: Node, data_node: Node) -> void:
 		"0 個 fallback 回 data_conflict")
 
 
-# ── 10. 全 432 組排列與全結局結構版文字走查 ────────────────────────────────────
+# ── 11. Deserialize Variant 集合與 Page Ref 一致性驗證 (P5C-V7) ───────────────
 
-func _test_10_structural_text_walkthrough(gs: Node, data_node: Node) -> void:
-	print("\n--- 10. 全 432 組 normal composite 與全結局結構版文字走查 ---")
+func _test_11_deserialize_variant_validation(gs: Node, _data_node: Node) -> void:
+	print("\n--- 11. Deserialize Variant 集合與 Page Ref 一致性驗證 ---")
+
+	# 取得基準合法的 composite ending 快照
+	_fresh_run(gs, 45, "evening")
+	gs.set("selected_festival_proxy_npc", "ajie")
+	(gs.get("flags") as Dictionary)["invited_ajie"] = true
+	(gs.get("flags") as Dictionary)["accepted_inn"] = true
+	(gs.get("flags") as Dictionary)["repaired_sign"] = true
+	_set_switches(gs, 6)
+	gs.call("start_ending", "ending_replaced", "d45_coda")
+	gs.call("reveal_ending_page")
+
+	var good_save: Dictionary = gs.call("serialize")
+	var baseline_text := _state_text(gs)
+	var roundtrip_res: Dictionary = gs.call("deserialize", JSON.parse_string(baseline_text) as Dictionary)
+	_check(bool(roundtrip_res.get("ok", false)), "基準 composite 快照 deserialize 成功")
+	_check(_state_text(gs) == baseline_text, "基準快照往返序列化字串完全相同")
+
+	# (a) 未知 livelihood_variant (例如舊版 "uncle" 或任意非 12 格字串) -> invalid_save_shape
+	var bad_var_cases := [
+		["livelihood_variant: uncle (舊版未帶開關帶)", "livelihood_variant", "uncle"],
+		["livelihood_variant: nonexistent", "livelihood_variant", "nonexistent"],
+		["partner_variant: nonexistent", "partner_variant", "nonexistent"],
+		["inn_appearance_variant: nonexistent", "inn_appearance_variant", "nonexistent"],
+	]
+	for bvc in bad_var_cases:
+		var label: String = bvc[0]
+		var field: String = bvc[1]
+		var val: String = bvc[2]
+		var broken: Dictionary = JSON.parse_string(baseline_text) as Dictionary
+		((broken["flow"] as Dictionary)["active_ending"] as Dictionary)[field] = val
+		var before := _state_text(gs)
+		var res: Dictionary = gs.call("deserialize", broken)
+		_check(not bool(res.get("ok", true)) and str(res.get("reason_code", "")) == "invalid_save_shape",
+			"壞 variant「%s」→ invalid_save_shape" % label)
+		_check(_state_text(gs) == before, "壞 variant 拒絕後狀態零變化")
+
+	# (b) variant 與 page_refs 矛盾 (快照標 livelihood_variant=uncle_low，但 refs 包含 uncle_high)
+	var broken_ref_mismatch: Dictionary = JSON.parse_string(baseline_text) as Dictionary
+	((broken_ref_mismatch["flow"] as Dictionary)["active_ending"] as Dictionary)["livelihood_variant"] = "uncle_low"
+	var before_mismatch := _state_text(gs)
+	var res_mismatch: Dictionary = gs.call("deserialize", broken_ref_mismatch)
+	_check(not bool(res_mismatch.get("ok", true)) and str(res_mismatch.get("reason_code", "")) == "invalid_save_shape",
+		"variant 與 page_refs 矛盾 → invalid_save_shape")
+	_check(_state_text(gs) == before_mismatch, "矛盾快照拒絕後狀態零變化")
+
+	# (c) linear ending 偽帶 variant 欄位 -> invalid_save_shape
+	_fresh_run(gs, 20, "morning")
+	gs.call("start_ending", "ending_madness_be", "madness_cap")
+	var madness_save: Dictionary = gs.call("serialize")
+	var madness_text := _state_text(gs)
+	var broken_linear: Dictionary = JSON.parse_string(madness_text) as Dictionary
+	((broken_linear["flow"] as Dictionary)["active_ending"] as Dictionary)["partner_variant"] = "ajie"
+	var before_linear := _state_text(gs)
+	var res_linear: Dictionary = gs.call("deserialize", broken_linear)
+	_check(not bool(res_linear.get("ok", true)) and str(res_linear.get("reason_code", "")) == "invalid_save_shape",
+		"linear ending 偽帶 partner_variant → invalid_save_shape")
+	_check(_state_text(gs) == before_linear, "linear 偽帶 variant 拒絕後狀態零變化")
+
+
+# ── 12. 全 432 組排列與全結局結構版文字走查 ────────────────────────────────────
+
+func _test_12_structural_text_walkthrough(gs: Node, data_node: Node) -> void:
+	print("\n--- 12. 全 432 組 normal composite 與全結局結構版文字走查 ---")
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 
 	var partners := ["invited_ajie", "invited_awei", "invited_none"]

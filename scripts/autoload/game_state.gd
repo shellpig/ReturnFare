@@ -2583,9 +2583,18 @@ func deserialize(d: Dictionary) -> Dictionary:
 	choices = run.get("choices", {}).duplicate()
 	flags = run.get("flags", {}).duplicate()
 	switches = run.get("switches", {}).duplicate()
-	switch_progress = run.get("switch_progress", {}).duplicate()
-	relations = run.get("relations", {}).duplicate()
-	npc_action_counts = run.get("npc_action_counts", {}).duplicate()
+	switch_progress.clear()
+	var sp: Dictionary = run.get("switch_progress", {})
+	for k in sp.keys():
+		switch_progress[str(k)] = int(sp[k])
+	relations.clear()
+	var rel: Dictionary = run.get("relations", {})
+	for k in rel.keys():
+		relations[str(k)] = int(rel[k])
+	npc_action_counts.clear()
+	var nac: Dictionary = run.get("npc_action_counts", {})
+	for k in nac.keys():
+		npc_action_counts[str(k)] = int(nac[k])
 	night_location_chosen = str(run.get("night_location_chosen", ""))
 	night_sleep_pending = bool(run.get("night_sleep_pending", false))
 	indulgence_count = int(run.get("indulgence_count", 0))
@@ -2725,14 +2734,26 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 	if is_refuse and str(raw["opening_choice_id"]) != _opening_choice_for_ending(str(ending_id)):
 		return {}
 
-	# variant 欄有值 ⇔ 這個 ending 真的有同名 variant group（只有 composite 有）。
-	var group_ids := {}
+	# variant 欄有值 ⇔ 這個 ending 真的有同名 variant group，且值必須是該 group 宣告的合法 rule id。
+	var valid_rules_by_group: Dictionary = {}
 	for group: Variant in ending_data.get("variant_groups", []) as Array:
 		if group is Dictionary:
-			group_ids[str((group as Dictionary).get("id", ""))] = true
+			var gid := str((group as Dictionary).get("id", ""))
+			var rules_dict := {}
+			for r: Variant in (group as Dictionary).get("rules", []) as Array:
+				if r is Dictionary:
+					rules_dict[str((r as Dictionary).get("id", ""))] = true
+			valid_rules_by_group[gid] = rules_dict
+
 	for variant_key: String in ENDING_VARIANT_KEYS:
-		if group_ids.has(variant_key.trim_suffix("_variant")) == (raw[variant_key] == null):
-			return {}
+		var gid := variant_key.trim_suffix("_variant")
+		var val: Variant = raw[variant_key]
+		if valid_rules_by_group.has(gid):
+			if typeof(val) != TYPE_STRING or not (valid_rules_by_group[gid] as Dictionary).has(str(val)):
+				return {}
+		else:
+			if val != null:
+				return {}
 
 	# 代付者：正常結局必須是已凍結的正式候選；不上車一律 null；BE 有值就得是候選。
 	var proxy_raw: Variant = raw["festival_proxy_npc"]
@@ -2785,6 +2806,13 @@ func _parse_ending_snapshot(raw: Dictionary) -> Dictionary:
 			branch_seen = parts[1]
 		elif parts[1] != branch_seen:
 			return {}
+		# 驗證 variant_groups 的 page ref rule id 與 snapshot 欄位完全一致
+		if parts.size() >= 5 and parts[2] == "variant_groups":
+			var group_id := parts[3]
+			var rule_id := parts[4]
+			var snapshot_val := str(raw.get(group_id + "_variant", ""))
+			if snapshot_val != rule_id:
+				return {}
 		refs.append(str(item))
 	if refs.is_empty():
 		return {}

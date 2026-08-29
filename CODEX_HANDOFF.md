@@ -4,17 +4,16 @@
 
 ## 目前狀態
 
-**P5-C（四類結局與組合後日談）已由 implementer 完成 P5C-V1～V4 全部修復並交付複驗。**
+**P5-C（四類結局與組合後日談）第三輪實作者修復完成（P5C-V5、P5C-V6、P5C-V7 全數落地並通過變異保真驗證）。** 待 Verifier 複驗關門。
 
-實作者修復與自跑證據（2026-08-29 第二輪交付）：
+實作者第三輪修復與自跑證據（2026-08-29）：
 
-- **P5C-V1（Blocker 已修復）**：`data/endings.json` 展開 livelihood 為 4 條路線 × 3 開關帶（high: 4–6, mid: 2–3, low: 0–1）共 12 筆有序 rule（`uncle_high/mid/low`, `boss_high/mid/low`, `zhou_high/mid/low`, `none_high/mid/low`），以 `count_at_least` 精確判定 `s1`～`s5` 及 `switch_progress_at_least(s6, 3)`；文字逐格對齊第三章 4×3 矩陣。
-- **P5C-V2（Blocker 已修復）**：修正 `ending_replaced` 首見 prefix 為純客觀可觀察行為（「穿上外套，走出了山泉閣」，不提「另一個你」或提早解謎）；重排 `variant_groups` 順序為 `livelihood` → `inn_appearance` → `partner`，對齊「生計 → 旅館狀態 → 婚姻 → 二十年 → 死亡回歸」敘事骨架；`data/SCHEMA.md` 與 `scripts/data_loader.gd` 順序同步收斂。
-- **P5C-V3（非阻擋已修復）**：`test_p5c.gd` 補齊 `ending_refuse_boarding` 完整生命週期（首見 2 頁逐頁 reveal/advance 門檻，末頁揭露後才 ready；重見 skip_seen_ending 直接 ready）。
-- **P5C-V4（非阻擋已修復）**：`EndingResolver._append_pages` 嚴格要求 `pages_raw is Array` 且 page 具備非空 id 與 text；`_pick_rule` 嚴格要求恰 1 個 fallback 且結構合法（多 fallback、0 fallback、fallback 帶 when、非 fallback 缺 when 皆回 empty/data_conflict）。
-- **測試與矩陣覆蓋**：`test_p5c.gd` 10 組全綠（12 格生計開關帶矩陣、敘事時間順序、四類結局 ready_to_complete、Resolver 壞資料合成防禦、全 432 組排列 × 首見/重見共 864 次求值 walk）。
-- **全套迴歸**：31 套 headless 全數 exit 0；`verify_data.gd` 引用 0 錯誤、Lint 1～20 全 0 錯誤；UI sim run `20260829-105340-880-p70696-6fb0004e`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks。
-- **變異驗證**：新增 M-C5（開關門檻反轉）、M-C6（fallback_count 防禦關閉）確認精確轉紅。
+- **P5C-V5（Blocker 已修復）**：`data/endings.json` 移除共用 `years_passed`；在 `partner_ajie_long` / `partner_awei_long` 補入「二十年過去。四十出頭，她先。癌症，走得很快。\n然後是他。同一個病，一樣快。」；在 `partner_none_long` 補入「他沒有結婚，一個人過完二十年。\n四十出頭。癌症，走得很快。」（不誤播「她先」）；共用 `long_return` 只播黑畫面與庇佑發動。短版同步保留「她先離世，隨後他也因同病而終」。
+- **P5C-V6（關門測試缺口已修復）**：`tests/headless/test_p5c.gd` 新增 `_test_3_switch_matrix_independent_boundaries()`，為 `s1`～`s6` 每一條開關建立獨立的 3→4 邊界測試（3 個其他開關為 `uncle_mid`，加上該開關後必為 `uncle_high`，其中 `s6` 精確以 `switch_progress.s6 = 3` 參與）；並新增對 `endings.json` 4 條 high 生計規則 `count_at_least.of` 的 6 條件結構斷言。
+- **P5C-V7（非阻擋已修復）**：`scripts/autoload/game_state.gd` 的 `_parse_ending_snapshot()` 嚴格校驗 composite 的 3 個 variant 值必須存在於對應 group 宣告的 rules id 集合中；並解析 `page_refs` 中所有 variant group 頁面之 rule id，確保與 snapshot 欄位值嚴格一致；若有不符回 `invalid_save_shape` 且狀態零變化。`deserialize()` 亦針對 `switch_progress`、`relations`、`npc_action_counts` 數值字典做 integer normalization，確保往返序列化逐字一致。
+- **測試與矩陣覆蓋**：`test_p5c.gd` 12 組全綠（exit 0）。
+- **全套迴歸**：31 套 headless 全數 exit 0；UI sim run `20260829-134502-666-p60712-2e8f89dc`：108 variants／85 catalog contracts／85 executed／85 completed／0 failed checks。
+- **變異驗證**：暫時從 `uncle_high` 移除 `s5` 條件，`test_p5c.gd` 精確轉紅（4 個斷言失敗，exit 1），還原後重回 exit 0。
 
 ## P5-B 實際改了什麼
 
@@ -195,9 +194,9 @@
 | M-C5 | `data/endings.json` 反轉 uncle_high 開關門檻為 n: 7 | `test_p5c` (12 格生計開關帶矩陣) | 轉紅（6 斷言失敗，exit 1） |
 | M-C6 | `EndingResolver._pick_rule` 移除多 fallback 防禦檢查 | `test_p5c` (Resolver 壞資料防禦) | 轉紅（1 斷言失敗，exit 1） |
 
-## P5-C verifier 待修任務單（2026-08-29）
+## P5-C 第一輪 verifier 待修任務單（P5C-V1～V4）
 
-### P5C-V1（blocker）生計完全漏掉六開關帶
+### P5C-V1（blocker，已修）生計完全漏掉六開關帶
 
 - **證據**：`data/endings.json` 的 livelihood 只有 `uncle`／`boss`／`zhou`／`none` 四條，只讀 `accepted_inn`／`accepted_outside_job`／`accepted_job`；沒有任何 `switch`、`switch_progress_at_least` 或 `count_at_least`。`test_p5c.gd` 同樣只排列四個生計旗標。
 - **違反契約**：`實作規格書.md > 十五、結局流程／P5-C`、`開發設計方針.md > P5-C`、`data/SCHEMA.md > endings.json` 與 `subdocs/故事線/故事線_第一輪_第三章.md > 槽二：生計` 都要求同一生計再分 0–1／2–3／4–6 三個開關帶，variant id／when 必須承載結果，不另存第四個 history 欄位。
@@ -205,7 +204,7 @@
 - **建議修法**：用現有 `count_at_least` 計算六個條件（`s1`～`s5` 與 `switch_progress_at_least(s6, 3)`），把每條生計展開為 high（4–6）／mid（2–3）／low（0–1）的有序 rule 與穩定 variant id；保留「叔叔 → 前老闆 → 周先生 → 皆無」主優先序，文字逐格對齊第三章 4×3 表。
 - **必要反證**：測試至少各造 0、1、2、3、4、6 個開關，覆蓋四條生計共 12 格；同時成立多生計仍只取高優先者。暫時拿掉開關帶條件或把門檻反轉時，對應矩陣測試必須精確轉紅。
 
-### P5C-V2（blocker）正常首見長版提早揭露核心真相且時間順序倒置
+### P5C-V2（blocker，部分修復；殘留轉 P5C-V5）正常首見長版提早揭露核心真相且時間順序倒置
 
 - **證據一**：`data/endings.json` 的首頁直接寫「你被留在了這裡，而另一個你……走出了山泉閣」，由旁白替玩家確認誰被留下、誰是另一個，違反企劃「第一輪只感到不對勁、不解釋替換；第二輪才知道後日談是別人的人生」。
 - **證據二**：現行組裝順序是 partner → livelihood → inn → suffix；阿婕／阿薇 partner 頁已先寫她四十出頭癌逝，後面才寫生計、旅館狀態與「二十年」，與第三章長版骨架「生計 → 婚姻 → 二十年 → 她先死 → 主角死亡」相反。
@@ -213,12 +212,12 @@
 - **建議修法**：首見 prefix 改成只呈現可觀察畫面，不命名原件／替換者；重見摘要可保留較明示語氣。重新安排 group／page 內容，讓四條生計與旅館狀態先落地，再播婚姻、二十年與兩次死亡；若更動 group 順序，同步修正 `data/SCHEMA.md` 的單一事實來源。不得新增 lore 或改寫既定角色命運。
 - **必要驗收**：至少實播有邀阿婕、有邀阿薇、不邀三條正常長版並逐頁記錄；確認沒有「另一個你／替換者」等過早定論、沒有死亡後才倒回二十年前的順序，也沒有缺頁／重頁／空白頁。
 
-### P5C-V3（非阻擋）四類 ready-to-complete 測試實際只跑三類
+### P5C-V3（非阻擋，已修）四類 ready-to-complete 測試實際只跑三類
 
 - **證據**：`test_p5c.gd::_test_8_lifecycle_ready_to_complete_and_atomicity()` 的 `cases` 只有 `ending_replaced`、`ending_madness_be`、`ending_inventory_be`；不上車只驗快照與文字，沒有走 reveal／advance／skip 到 `ready_to_complete`。
 - **建議修法**：opening mode 以私有 helper 建立首見與重見不上車快照，首見逐頁走到末頁才 ready，重見另驗合法 skip；揭露前與非末頁都必須 false。
 
-### P5C-V4（非阻擋）resolver 未完全兌現壞資料 `data_conflict` 防禦
+### P5C-V4（非阻擋，已修）resolver 未完全兌現壞資料 `data_conflict` 防禦
 
 - **證據**：`EndingResolver._append_pages()` 把 `null` 當合法空陣列，故 composite 必填的 prefix／suffix／variant page 欄遺失時可能繼續組裝；`_pick_rule()` 遇多 fallback 只保留第一筆。正式 JSON 目前會被 lint 17 擋住，所以不是現行玩家路徑 blocker，但與方針「引用缺漏或零／多個最終選擇回 data error」不一致。
 - **建議修法**：由呼叫端區分選填容器與必填 page 陣列；必填欄缺失／錯型別直接 `data_conflict`。rule 掃描同時驗恰一個 fallback 與項目形狀，不靜默跳過壞項目。
@@ -230,6 +229,29 @@
 2. 逐頁閱讀正常三條代表路徑、兩種 BE 與不上車首見／重見，記錄資訊揭露與時間順序。
 3. 重跑 `verify_data`、`test_p5c`、31 套以上全 headless、greedy 與 UI sim；回報當時 catalog 實際數字。
 4. 全部通過後才由 verifier 更新 `測試指南.md`、`驗證後已知問題.md`、`PROJECT_BRIEF.md`，依固定流程同 turn commit＋push 關門 P5-C。
+
+## P5-C 第二輪 verifier 待修任務單（P5C-V5～V7，2026-08-29）
+
+### P5C-V5（blocker）阿婕／阿薇長版漏掉「她先死」的既定結果
+
+- **證據**：`data/endings.json` 的 `partner_ajie_long`／`partner_awei_long` 現在只剩結婚與沒有小孩；共用 suffix 只寫主角四十出頭癌逝。`subdocs/故事線/故事線_第一輪_第三章.md > 尾巴：四十幾歲` 明定邀請路徑必須先播「她先，癌症」，再播「然後是他，同一個病」。
+- **影響**：有邀阿婕／阿薇的兩條正常長版少掉承重線索——取走順序就是死亡順序；第三章明列的既定角色結果被省略，P5C-V2 仍未完整關閉。
+- **建議修法**：維持目前 livelihood → inn → partner 的前半順序；把「二十年＋她先死」放入阿婕／阿薇的 long partner 內容，無伴侶 long 則放「二十年獨居」，移除共用 `years_passed`；共用 `long_return` 只接主角因同一病死亡與庇佑回歸。也可採其他資料形狀，但不得重新提早揭露替換真相或改角色命運。
+- **必要驗收**：逐頁走阿婕、阿薇、無伴侶三條首見長版；兩條有邀請路徑都必須依序包含婚姻／無子 → 二十年 → 她先癌逝 → 主角同病死亡，無伴侶路徑不得誤播「她先」。對應文字或條件暫時拿掉時，測試必須轉紅。
+
+### P5C-V6（關門測試缺口）六開關矩陣沒有獨立守住 s5／s6
+
+- **證據**：`test_p5c.gd::_set_switches()` 只建立 s1 → s6 的連續集合；所有 high 邊界案例在 count=4 時已靠 s1～s4 達標。若從 livelihood rules 的 `of[]` 刪除 s5 或 s6，count=4／6 仍是 high，count=2／3 仍是 mid，count=0／1 仍是 low，現有矩陣與 M-C5 都不會證明這兩條接線。
+- **影響**：正式資料目前六個條件都在，但回歸測試允許第 17 天開關或叔叔累計開關日後靜默失效；不符合專案「每條關鍵接線移除時對應測試必須轉紅」的變異保真規則。
+- **建議修法**：為 s1～s6 各造一個獨立的 3→4 邊界案例——三個其他開關時為 mid，加上被測開關後必為 high；s6 必須真的以 `switch_progress.s6 = 3` 參與。可另加正式 livelihood rule 的 `of[]` 精確六條結構斷言作第二層。
+- **必要反證**：分別暫時刪除 s5、刪除 s6 條件，兩次都必須讓各自專屬測試精確轉紅；還原後 targeted 與全套重回 exit 0。
+
+### P5C-V7（非阻擋，P5-D 前置）deserialize 不驗 variant 值與 page refs 是否一致
+
+- **證據**：`GameState._parse_ending_snapshot()` 只驗 composite 的三個 variant 欄非 null，沒有確認值是對應 `variant_groups[].rules[].id`。`livelihood_variant: "uncle"` 或任意字串可以搭配 `uncle_high` page refs 通過；P5-D 若直接寫 history，會保存互相矛盾的摘要。
+- **影響**：目前沒有正式存檔 UI，正常 runtime 產出的 snapshot 正確，因此不阻擋 P5-C 玩家路徑；但 P5-D 即將把 snapshot 寫進 append-only history，屆時壞值會永久進 meta。
+- **建議修法**：deserialize 由 ending 資料建立 group → rule id 集合，驗三個 variant 值存在；再驗 page refs 中各 variant group 的 rule id 與 snapshot 欄位一致。linear ending 維持三欄 null。
+- **必要反證**：未知 variant id、合法但與 page refs 不同的 variant id 各回 `invalid_save_shape`，完整 serialize 零變化；合法快照往返仍逐字相同。
 
 ## 已知殘留
 
@@ -248,7 +270,7 @@
 
 ## 下一個最安全任務
 
-**由 implementer 修復 P5C-V1～V4，先不要開工 P5-D。** 修復完成後交回 verifier 依上方範圍重驗；只有 P5-C 關門後才推進 **P5-D 開局、歷輪摘要與跨輪重置**。
+**由 implementer 修復 P5C-V5／V6，並建議同批處理 P5C-V7；先不要開工 P5-D。** 修復完成後交回 verifier 做 P5-C 最終複驗；只有 V5／V6 關閉、P5-C 文件關門後才推進 **P5-D 開局、歷輪摘要與跨輪重置**，V7 最遲必須在 P5-D 寫 history 前完成。
 
 > 跑 UI 模擬一律加 `-Background`：
 > `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`
