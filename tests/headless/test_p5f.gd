@@ -582,10 +582,12 @@ func _test_4_d29_six_proxy_paths(gs: Node, data_node: Node) -> void:
 		_check(not frozen_proxy.is_empty(), "路徑 %s: D29 結束後 selected_festival_proxy_npc 已凍結（實際: %s）" % [path_name, frozen_proxy])
 		_check(frozen_proxy == expected_proxy, "路徑 %s: 凍結值符合預期 (%s)" % [path_name, expected_proxy])
 
-		# B2: D31 afternoon 真實 beat 讀取點驗證
+		# B2 & R3: D31 afternoon 真實 beat 讀取點與目標條件成立斷言
 		gs.set("day", 31)
 		gs.set("phase", "afternoon")
 		var target_d31_beat := "d31_proxy_%s" % expected_proxy
+		var target_d31_def: Dictionary = loader.beats_by_id.get(target_d31_beat, {}) as Dictionary
+		_check(ConditionEval.eval(target_d31_def.get("condition"), gs), "路徑 %s: D31 目標 proxy beat (%s) 條件成立" % [path_name, target_d31_beat])
 		var lines_d31 := gs.call("play_beat", target_d31_beat) as PackedStringArray
 		_check(lines_d31.size() > 0, "路徑 %s: D31 成功演出目標 proxy beat (%s)" % [path_name, target_d31_beat])
 		for other_npc in ["ajie", "awei", "acai"]:
@@ -595,10 +597,12 @@ func _test_4_d29_six_proxy_paths(gs: Node, data_node: Node) -> void:
 				var cond_met: bool = ConditionEval.eval(other_def.get("condition"), gs)
 				_check(not cond_met, "路徑 %s: D31 非目標 proxy beat (%s) 條件不成立" % [path_name, other_beat])
 
-		# B2: D39 afternoon 真實 beat 讀取點驗證
+		# B2 & R3: D39 afternoon 真實 beat 讀取點與目標條件成立斷言
 		gs.set("day", 39)
 		gs.set("phase", "afternoon")
 		var target_d39_beat := "d39_proxy_%s" % expected_proxy
+		var target_d39_def: Dictionary = loader.beats_by_id.get(target_d39_beat, {}) as Dictionary
+		_check(ConditionEval.eval(target_d39_def.get("condition"), gs), "路徑 %s: D39 目標 proxy beat (%s) 條件成立" % [path_name, target_d39_beat])
 		var lines_d39 := gs.call("play_beat", target_d39_beat) as PackedStringArray
 		_check(lines_d39.size() > 0, "路徑 %s: D39 成功演出目標 proxy beat (%s)" % [path_name, target_d39_beat])
 		for other_npc in ["ajie", "awei", "acai"]:
@@ -739,14 +743,28 @@ func _test_6_checkpoint_reload_skip_vs_reveal_and_idempotency(gs: Node, data_nod
 	_check(bool(gs.call("ending_view").get("can_complete", false)), "逐頁播完達到 ready_to_complete")
 	var ready_checkpoint := gs.call("serialize") as Dictionary
 
-	# N6: 第一次 complete_ending 成功
+	# N6 & R1: 第一次 complete_ending 成功
 	var comp1: Dictionary = gs.call("complete_ending")
 	_check(bool(comp1.get("ok", false)), "第一次 complete_ending 成功")
 	_check(str(gs.get("flow_mode")) == "opening", "完成後回到 opening 模式")
+	_check(int(gs.get("run_number")) == 3, "第一次完成後 run_number = 3")
+	_check((gs.get("ending_history") as Array).size() == 2, "第一次完成後 ending_history 筆數 = 2")
 
-	# N6: 同一狀態第二次呼叫 complete_ending 被拒絕 (not_ending)，history 筆數不增加
+	# N6 & R1: 同一狀態未重載時第二次呼叫 complete_ending 被拒絕 (not_ending)，筆數不變
 	var comp2: Dictionary = gs.call("complete_ending")
 	_check(not bool(comp2.get("ok", false)) and str(comp2.get("reason_code", "")) == "not_ending", "同狀態第二次 complete_ending 被拒絕 (not_ending)")
+	_check(int(gs.get("run_number")) == 3, "被拒後 run_number 不再加")
+	_check((gs.get("ending_history") as Array).size() == 2, "被拒後 ending_history 筆數不增加")
+
+	# R1: 重新載入 ready_checkpoint 快照，再次執行 complete_ending，斷言確定性收斂與無額外 history
+	var des_ready: Dictionary = gs.call("deserialize", ready_checkpoint)
+	_check(bool(des_ready.get("ok", false)), "重新載入 ready checkpoint 成功")
+	var comp_reloaded: Dictionary = gs.call("complete_ending")
+	_check(bool(comp_reloaded.get("ok", false)), "重載 ready checkpoint 後完成成功")
+	_check(int(gs.get("run_number")) == 3, "重載完成後 run_number 仍為 3（不疊加成 4）")
+	_check((gs.get("ending_history") as Array).size() == 2, "重載完成後 ending_history 筆數仍為 2（不產生多餘歷輪記錄）")
+	var comp_reloaded_dup: Dictionary = gs.call("complete_ending")
+	_check(not bool(comp_reloaded_dup.get("ok", false)) and str(comp_reloaded_dup.get("reason_code", "")) == "not_ending", "重載完成後未再重載時重複呼叫再次被拒 (not_ending)")
 
 	var history_a := (gs.get("ending_history") as Array).duplicate(true)
 	var record_a: Dictionary = history_a[history_a.size() - 1] as Dictionary
@@ -861,6 +879,8 @@ func _test_8_greedy_and_no_legacy_end_run(gs: Node, data_node: Node) -> void:
 
 
 # ── 9. K-198 preflight null 防禦反例與狀態零變化斷言 ──────────────────────────
+# 註：本組測試刻意注入損毀狀態以驗證 K-198 preflight null 防禦，執行時 stderr 會輸出
+# 8 行預期的 ERROR: clone_for_preflight: deserialize 失敗，屬預期行為。
 
 func _test_9_preflight_null_counterexample(gs: Node, data_node: Node) -> void:
 	print("\n--- 9. K-198 preflight null 防禦反例與狀態零變化斷言 ---")
@@ -875,19 +895,26 @@ func _test_9_preflight_null_counterexample(gs: Node, data_node: Node) -> void:
 	var probe: Node = gs.call("clone_for_preflight")
 	_check(probe == null, "注入壞 history 後 clone_for_preflight 返回 null")
 
-	var snap_before := JSON.stringify(gs.call("serialize"))
-
 	# 1. choose_opening
+	var snap1_before := JSON.stringify(gs.call("serialize"))
 	var op_res: Dictionary = gs.call("choose_opening", "take_family_album")
 	_check(not bool(op_res.get("ok", false)) and str(op_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 choose_opening 回傳 data_conflict")
+	var snap1_after := JSON.stringify(gs.call("serialize"))
+	_check(snap1_before == snap1_after, "choose_opening 被拒後狀態逐字無變化")
 
 	# 2. _settle_effects
+	var snap2_before := JSON.stringify(gs.call("serialize"))
 	var eff_res: Dictionary = gs.call("_settle_effects", [{"gain": ["protagonist"]}], {}, {"lose_cards": ["protagonist"]})
 	_check(not bool(eff_res.get("ok", false)) and str(eff_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 _settle_effects 回傳 data_conflict")
+	var snap2_after := JSON.stringify(gs.call("serialize"))
+	_check(snap2_before == snap2_after, "_settle_effects 被拒後狀態逐字無變化")
 
 	# 3. EffectApply.preflight
+	var snap3_before := JSON.stringify(gs.call("serialize"))
 	var pf_res: Dictionary = EffectApply.preflight([{"gain": ["protagonist"]}], gs)
 	_check(not bool(pf_res.get("ok", false)) and str(pf_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 EffectApply.preflight 回傳 data_conflict")
+	var snap3_after := JSON.stringify(gs.call("serialize"))
+	_check(snap3_before == snap3_after, "EffectApply.preflight 被拒後狀態逐字無變化")
 
 	# 設置 run 狀態與遭遇以測試 encounter preflight callers
 	gs.set("flow_mode", "run")
@@ -905,8 +932,11 @@ func _test_9_preflight_null_counterexample(gs: Node, data_node: Node) -> void:
 		"attempted_card_ids": [],
 		"visited_round_ids": []
 	})
+	var snap4_before := JSON.stringify(gs.call("serialize"))
 	var ack_res: Dictionary = gs.call("acknowledge_encounter_intro")
 	_check(not bool(ack_res.get("ok", false)) and str(ack_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 acknowledge_encounter_intro 回傳 data_conflict")
+	var snap4_after := JSON.stringify(gs.call("serialize"))
+	_check(snap4_before == snap4_after, "acknowledge_encounter_intro 被拒後狀態逐字無變化")
 
 	# 5. respond_to_encounter
 	gs.set("active_encounter", {
@@ -917,19 +947,28 @@ func _test_9_preflight_null_counterexample(gs: Node, data_node: Node) -> void:
 		"attempted_card_ids": [],
 		"visited_round_ids": []
 	})
+	var snap5_before := JSON.stringify(gs.call("serialize"))
 	var resp_res: Dictionary = gs.call("respond_to_encounter", "info_forty_something")
 	_check(not bool(resp_res.get("ok", false)) and str(resp_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 respond_to_encounter 回傳 data_conflict")
+	var snap5_after := JSON.stringify(gs.call("serialize"))
+	_check(snap5_before == snap5_after, "respond_to_encounter 被拒後狀態逐字無變化")
 
 	# 6. discard_in_encounter
+	var snap6_before := JSON.stringify(gs.call("serialize"))
 	var disc_res: Dictionary = gs.call("discard_in_encounter", "info_forty_something")
 	_check(not bool(disc_res.get("ok", false)) and str(disc_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 discard_in_encounter 回傳 data_conflict")
+	var snap6_after := JSON.stringify(gs.call("serialize"))
+	_check(snap6_before == snap6_after, "discard_in_encounter 被拒後狀態逐字無變化")
 
 	# 7. resolve_unfinished_choice_groups
 	gs.set("day", 29)
 	gs.set("phase", "afternoon")
 	(gs.get("active_encounter") as Dictionary).clear()
+	var snap7_before := JSON.stringify(gs.call("serialize"))
 	var res_groups: Dictionary = gs.call("resolve_unfinished_choice_groups")
 	_check(not bool(res_groups.get("ok", false)) and str(res_groups.get("reason_code", "")) == "data_conflict", "preflight 失敗時 resolve_unfinished_choice_groups 回傳 data_conflict")
+	var snap7_after := JSON.stringify(gs.call("serialize"))
+	_check(snap7_before == snap7_after, "resolve_unfinished_choice_groups 被拒後狀態逐字無變化")
 
 	# 完整還原 fixture
 	(gs.get("ending_history") as Array).pop_back()

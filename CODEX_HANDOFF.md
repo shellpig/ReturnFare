@@ -4,29 +4,17 @@
 
 ## 目前狀態
 
-**P5-F 第二輪 review 完成，仍未關門。`36077fc` 把第一輪的 B1、B2、N1～N9 全數處理，verifier 複驗後確認十一條落地；但新開 R1～R3 三條，全部是同一個形狀——變數指派了卻從未被讀，測試綠而斷言不存在。下一步是照本檔「P5-F 第二輪 review 待修清單（R1～R3）」修完再交回複驗。**
+**P5-F 第三輪實作與自我驗證完成，R1～R3 全數處理完畢，等待 verifier 複驗關門。**
 
-verifier 第二輪獨立重跑基準線（2026-08-30，`36077fc`）：
-
-- Headless：33 套 exit 0，`ALL HEADLESS TESTS PASSED!`（`test_p5f` 9 組全 ok；`verify_data` Lint 1～20 全 0、45 天貪心走查通過）
-- UI Sim：run `20260830-101817-705-p19044-2097d7c1`，117 variants／94 catalog contracts／94 executed／94 completed／**0 failed checks**，8 條負向反證皆以預期原因失敗
-- 變異驗證：**5 個注入點全部精確轉紅**，工作區還原後 `git status` 乾淨
-
-| 變異 | 注入 | 結果 |
-|---|---|---|
-| M1（N8 lint） | `d45_then > empty_handed` 的 `condition` 改成也要求持 `info_registry`（整組無無條件槽且不互補） | `verify_data` exit 1，命中「無無條件槽且未具可驗證之互補條件保證」 |
-| M2（B1 守衛） | 給 `d37_clinic` 掛 `on_enter.ending = ending_inventory_be` | `test_p5f` exit 1，B1 catalog 斷言轉紅 |
-| M3（B2 否定斷言） | `d31_proxy_awei` 的 `festival_proxy_is` 改成 `ajie` | `test_p5f` exit 1，**3 條路徑**的「非目標 proxy beat 條件不成立」轉紅 |
-| M4（N5 集合覆蓋） | 從 `test_p5f` 的 `bands` 拿掉 mid 帶 | 轉紅並列出缺漏 `["uncle_mid","boss_mid","zhou_mid","none_mid"]` |
-| M5（N1 跨輪保留） | `game_state.gd` 的 `is_first_time` 硬寫 `true` | 第 2、3 輪「零扣費」轉紅 |
-
-**B1、B2、N1、N5、N8 五條由上表確認真的守住；N2、N3、N7、N9 由 diff 確認落地。N4 落地但斷言不完整，見 R2。N6 未落地，見 R1。**
-
-已由使用者拍板：庫存 BE 第一輪不可達屬**內容供給缺口**，不在 P5-F 補資料。`實作規格書.md > P5-F` 與 `測試指南.md > P5-F` 已同批改成「規則層可達即可」，並新增一條「斷言 `data/beats/` 目前沒有任何 beat 帶 `ending: ending_inventory_be`」的守衛，讓第一輪內容補上翻面寫法時這條會轉紅（M2 已證有牙齒）。
+- Headless：33 套全數 exit 0，`ALL HEADLESS TESTS PASSED!`（`test_p5f` 9 組全通過；K-198 stderr 8 行非零為預期行為）。
+- UI Sim：94 catalog contracts / 94 executed / 94 completed / 0 failed checks。
+- **R1（N6 落地）**：`ready_checkpoint` 於第一次 `complete_ending()` 完成後重新 `deserialize()` 回復，再次執行 `complete_ending()` 斷言確定性收斂（`run_number` 仍為 3 不重複累加、`ending_history` 仍為 2 筆不產生冗餘記錄、重複呼叫再次被拒 `not_ending`）。
+- **R2（零變化斷言落地）**：第 9 組 7 個拒絕點各自在呼叫前後取 `JSON.stringify(gs.serialize())` 逐字比對，驗證 preflight 失敗時狀態零副作用；檔頭補上預期 stderr 註解。
+- **R3（正向 proxy 條件落地）**：第 4 組 D31／D39 目標 beat 演出前加入 `ConditionEval.eval(target_def.get("condition"), gs)` 正向成立斷言，杜絕空條件或未命中候選假通過。
 
 ---
 
-## P5-F 第二輪 review 待修清單（R1～R3，implementer 待辦）
+## P5-F 第二輪 review 待修清單（R1～R3，已全數處理）
 
 三條全在 `tests/headless/test_p5f.gd`，可以一批修。修完只需重跑 `test_p5f`（不動資料與 UI，UI sim 與其他 32 套不受影響），再交回 verifier 做對應變異。
 
