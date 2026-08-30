@@ -4,13 +4,66 @@
 
 ## 目前狀態
 
-**P5-F 第三輪實作與自我驗證完成，R1～R3 全數處理完畢，等待 verifier 複驗關門。**
+**P5-F 機器層已由 verifier 關門（2026-08-30），`PROJECT_BRIEF.md` 轉 🟦。三輪 review 的 B1／B2、N1～N9、R1～R3 共十七條全數處理，已落檔為 K-223～K-236。P5-F 是 P5 的最後一個子階段，沒有 P5-G。**
 
-- Headless：33 套全數 exit 0，`ALL HEADLESS TESTS PASSED!`（`test_p5f` 9 組全通過；K-198 stderr 8 行非零為預期行為）。
-- UI Sim：94 catalog contracts / 94 executed / 94 completed / 0 failed checks。
-- **R1（N6 落地）**：`ready_checkpoint` 於第一次 `complete_ending()` 完成後重新 `deserialize()` 回復，再次執行 `complete_ending()` 斷言確定性收斂（`run_number` 仍為 3 不重複累加、`ending_history` 仍為 2 筆不產生冗餘記錄、重複呼叫再次被拒 `not_ending`）。
-- **R2（零變化斷言落地）**：第 9 組 7 個拒絕點各自在呼叫前後取 `JSON.stringify(gs.serialize())` 逐字比對，驗證 preflight 失敗時狀態零副作用；檔頭補上預期 stderr 註解。
-- **R3（正向 proxy 條件落地）**：第 4 組 D31／D39 目標 beat 演出前加入 `ConditionEval.eval(target_def.get("condition"), gs)` 正向成立斷言，杜絕空條件或未命中候選假通過。
+**唯一未完成的是 `測試指南.md > P5-F` 最後一條 👤 人工驗收**——首輪三種 ending、正常長／短版、不上車 locked／unlocked／重見摘要、相簿／電話開局、逐字補完與翻頁、至少一次完整跨輪回場，每項附當下輪數與路徑。與 P3-F／P4-F 同狀態，只有真人玩過才能落檔。人工那條過了之後 P5 整段轉 ✅，接 i18n 管線與 P6 存檔 UI。
+
+### verifier 關門證據（`69158c5`）
+
+- Headless：**33 套 exit 0**，`ALL HEADLESS TESTS PASSED!`（`test_p5f` 9 組全通過；`verify_data` Lint 1～20 全 0、45 天貪心走查通過）
+- UI Sim：run `20260830-101817-705-p19044-2097d7c1`，117 variants／94 catalog contracts／94 executed／94 completed／**0 failed checks**，8 條負向反證皆以預期原因失敗
+  - 此 run 取自 `36077fc`；`69158c5` 只動 `test_p5f.gd` 與本檔，UI sim 不載入這兩個檔，故未重跑。**這是依 diff 做的判斷，不是省略。**
+- **K-198 的 8 行 `ERROR: clone_for_preflight: deserialize 失敗` 是第 9 組刻意注入的預期輸出**，不是回歸。P5-D 對 `test_p5d` 立的「stderr 全空」慣例不適用於本檔，`test_p5f.gd` 第 9 組檔頭已註明。
+
+### 變異驗證（append-only，不得刪除）
+
+> 這一節是 verifier 的證據，記錄哪些斷言真的有牙齒。**implementer 更新本檔時只增不刪。**
+
+**第一輪（對 `36077fc`）**
+
+| 變異 | 注入 | 結果 |
+|---|---|---|
+| M1（K-224 lint） | `d45_then > empty_handed` 的 `condition` 改成也要求持 `info_registry`（整組無無條件槽且不互補） | `verify_data` exit 1，命中「無無條件槽且未具可驗證之互補條件保證」 |
+| M2（K-225 守衛） | 給 `d37_clinic` 掛 `on_enter.ending = ending_inventory_be` | `test_p5f` exit 1，catalog 斷言轉紅 |
+| M3（K-226 否定斷言） | `d31_proxy_awei` 的 `festival_proxy_is` 改成 `ajie` | `test_p5f` exit 1，**3 條路徑**的「非目標 proxy beat 條件不成立」轉紅 |
+| M4（K-230 集合覆蓋） | 從 `test_p5f` 的 `bands` 拿掉 mid 帶 | 轉紅並列出缺漏 `["uncle_mid","boss_mid","zhou_mid","none_mid"]` |
+| M5（K-227 跨輪保留） | `game_state.gd` 的 `is_first_time` 硬寫 `true` | 第 2、3 輪「零扣費」轉紅 |
+
+**第二輪（對 `69158c5`）**
+
+| 變異 | 注入 | 結果 |
+|---|---|---|
+| MR1（K-231） | `deserialize()` 拿掉 `ending_history.clear()`，讓重載後殘留舊紀錄 | 「重載完成後 `ending_history` 筆數仍為 2」轉紅 |
+| MR2（K-234） | `choose_opening` 的 preflight 拒絕前偷加 `run_number += 1` | 「`choose_opening` 被拒後狀態逐字無變化」轉紅 |
+| MR3（K-235） | `d31_proxy_ajie` 的 `festival_proxy_is` 改成 `acai` | 3 條 ajie 路徑的**正向**斷言＋1 條 acai 路徑的**否定**斷言，四條精確對位轉紅 |
+
+> 第一次 MR3 用了不存在的 NPC `nobody`，被 loader 的「`festival_proxy_is` 引用不存在的 NPC」lint 擋在載入階段——那條防線本身也是有效的。
+>
+> 八個變異每次都以 `git checkout` 還原，事後 `git status` 乾淨。
+
+### 使用者拍板（append-only，不得刪除）
+
+- **2026-08-30，庫存 BE（選項 b）**：`ending_inventory_be` 在 `data/beats/` 完全沒有觸發點（全 11 檔 grep 為 0），因為「被盯上」翻面成「療養通知」的資料寫法尚未存在——`cards.json` 的 `mood_watched` note 與 `ch3_d39_d45.json` D40 曝光槽的 note 都已自標。使用者拍板：**屬內容供給缺口（待決 25／26），不在 P5-F 補資料。** `實作規格書.md > P5-F` 與 `測試指南.md > P5-F` 已改成「規則層可達即可」，並新增一條「斷言 `data/beats/` 目前沒有任何 beat 帶 `ending: ending_inventory_be`」的守衛，第一輪內容補上翻面寫法時這條會轉紅提醒把資料層走通那一條加回驗收（M2 已證有牙齒）。
+
+### 流程規則（K-236）
+
+`69158c5` 的狀態更新曾把上面兩節整段刪除。往後：
+
+1. implementer 更新本檔時**只增不刪 verifier 區塊與使用者拍板**；狀態改寫只動「目前狀態」開頭那段。
+2. 回報 UI sim 一律附 `_qa/runs/<run_id>`，沒有 run id 的數字不可查核、不算證據。
+
+### 三輪 review 的收斂形狀（供下一階段參考）
+
+十七條裡有八條是同一個病：**測試是綠的，但斷言不存在、恆真、或證的不是那件事。**
+
+- 用 `start_ending()` 直呼冒充「第一輪走通」（K-225）
+- `gs.set("day",31)` 之後讀同一個欄位比自己（K-226）
+- 同一圈迴圈裡自己先寫 `night_locations_seen` 再驗「不重收」（K-227）
+- 自稱動態衍生、實為手抄對照表（K-230）
+- `ready_checkpoint`、`snap_before` 兩個變數指派後從未被讀（K-231、K-234）
+- `play_beat()` 不檢查 `condition`，正向斷言對任何值都會過（K-235）
+
+**下一階段開工前先過這張清單**：新增斷言時問「把被驗的那段程式整個拿掉，這條會不會紅？」；宣稱「零副作用／不重收／一致」時，正向對照與前後快照比對缺一不可。
 
 ---
 
