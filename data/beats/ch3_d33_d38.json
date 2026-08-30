@@ -1,24 +1,38 @@
 {
   "_comment": "第三章第 33-38 天（餘光＋那兩天）。欄位說明見 data/SCHEMA.md。已進行全量文學性重寫。第三章刻意不擴張地圖，四件事搶兩格：照顧叔叔／顧旅館／盯著她／查真相。",
-
   "beats": [
     {
       "id": "d33_morning_after",
       "location": "temple",
-      "when": { "day": 33, "phase": "morning" },
+      "when": {
+        "day": 33,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "大典殘局",
       "text": "巡暗大典後的清晨，狂歡退潮。廟埕上遍地都是燃盡的香腳、碎紙錢與凌亂的燈架。金伯正揮動著竹掃帚默默清掃，神情中透著一股大石落地的如釋重負。",
       "slots": [
-        { "id": "jinbo", "occupant": "npc_jinbo", "label": "金伯", "accepts": [] }
+        {
+          "id": "jinbo",
+          "occupant": "npc_jinbo",
+          "label": "金伯",
+          "accepts": []
+        }
       ],
-      "on_enter": { "flag": { "chapter3_start": true } },
+      "on_enter": {
+        "flag": {
+          "chapter3_start": true
+        }
+      },
       "note": "若第 32 天玩家鬆了手：金伯會多看主角一眼，什麼都不說"
     },
     {
       "id": "d33_pm_cleanup",
       "location": "temple",
-      "when": { "day": 33, "phase": "afternoon" },
+      "when": {
+        "day": 33,
+        "phase": "afternoon"
+      },
       "title": "廟埕清掃",
       "text": "金伯一邊收攏著殘破的祭壇，一邊反覆喃喃自語：「今年……辦得很順，真的很順。」",
       "slots": [
@@ -26,17 +40,31 @@
           "id": "help",
           "occupant": "npc_jinbo",
           "label": "留下來收",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "他將『很順』這兩個字在半小時內重複了三遍，聲音乾澀而機械，彷彿是在向神明祈禱，又像是在竭力說服他自己。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "他把『很順』這兩個字重複了三次，語氣乾乾的，像是說給神明聽，也像是說給自己聽。"
+          }
         }
       ]
     },
     {
       "id": "d33_pm_her",
       "location": "sanquan",
-      "when": { "day": 33, "phase": "afternoon" },
+      "when": {
+        "day": 33,
+        "phase": "afternoon"
+      },
       "condition": {
-        "any": [{ "flag": "invited_ajie" }, { "flag": "invited_awei" }]
+        "any": [
+          {
+            "flag": "invited_ajie"
+          },
+          {
+            "flag": "invited_awei"
+          }
+        ]
       },
       "title": "伴她午後",
       "text": "慶典過後的午後，她的氣色出奇地紅潤，眼神裡閃爍著昨夜未散的興奮與喜悅。",
@@ -45,26 +73,40 @@
           "id": "with_her",
           "occupant": null,
           "label": "陪她一個下午",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "她眉飛色舞地向你回憶著昨晚夜市的熱鬧、神轎的流光與絢爛的煙火。你靜靜坐在她身側聆聽著，陽光灑在她含笑的側臉上，歲月靜好得如同幻夢。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "她眉飛色舞地向你回憶著昨晚夜市的熱鬧、神轎的流光與絢爛的煙火。你靜靜坐在她身側聆聽著，陽光灑在她含笑的側臉上，歲月靜好得如同幻夢。"
+          }
         }
       ]
     },
     {
       "id": "d33_pm_photo",
       "location": "sanquan",
-      "when": { "day": 33, "phase": "afternoon" },
+      "when": {
+        "day": 33,
+        "phase": "afternoon"
+      },
       "fixed": true,
       "title": "定格的相片",
       "text": "雜貨店老闆將昨夜巡暗前在廟埕拍攝的合照洗了出來送至前台。相紙上，你們兩人並肩站在昏黃的燈籠下，笑容清晰而真實。",
       "slots": [],
-      "on_enter": { "gain": ["item_festival_photo"] },
+      "on_enter": {
+        "gain": [
+          "item_festival_photo"
+        ]
+      },
       "note": "雜訊，不吃格。第 39 天客觀路線的入口之一"
     },
     {
       "id": "d33_pm_jinghe",
       "location": "jinghe",
-      "when": { "day": 33, "phase": "afternoon" },
+      "when": {
+        "day": 33,
+        "phase": "afternoon"
+      },
       "title": "靜和園的交接",
       "text": "對面靜和園的大門前車水馬龍，第一批慶典貴賓陸續結帳下山，林姐正拿著對講機在廊下穿梭調度。",
       "slots": [
@@ -72,16 +114,22 @@
           "id": "watch",
           "occupant": "npc_linjie",
           "label": "看她忙",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "林姐一邊核對著手中的退房名冊，一邊壓低聲音對電話那頭交代：「後棟那邊的深層清理……等這兩天客人全走光了再徹底封閉。」" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "林姐一邊核對著手中的退房名冊，一邊壓低聲音對電話那頭交代：「後棟那邊的深層清理……等這兩天客人全走光了再徹底封閉。」"
+          }
         }
       ]
     },
-
     {
       "id": "d34_morning_normal",
       "location": "sanquan",
-      "when": { "day": 34, "phase": "morning" },
+      "when": {
+        "day": 34,
+        "phase": "morning"
+      },
       "title": "前台的餘溫",
       "text": "喧囂散盡，山泉閣重新回歸了平淡的日常，老掛鐘在前台單調而沉重地擺動著。",
       "slots": [
@@ -89,15 +137,22 @@
           "id": "desk",
           "occupant": null,
           "label": "顧前台",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "你獨自整理著散落的帳單。一切看似恢復如初，但你心底清楚，在這個輪迴之中，如此寧靜祥和的日常已然所剩無幾。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你獨自整理著散落的帳單。一切看似恢復如初，但你心底清楚，在這個輪迴之中，如此寧靜祥和的日常已然所剩無幾。"
+          }
         }
       ]
     },
     {
       "id": "d34_pm_acai",
       "location": "sanquan",
-      "when": { "day": 34, "phase": "afternoon" },
+      "when": {
+        "day": 34,
+        "phase": "afternoon"
+      },
       "title": "與阿財同工",
       "text": "阿財依舊精神抖擻地在後院劈柴搬瓦，動作敏捷俐落得毫無瑕疵。",
       "slots": [
@@ -105,8 +160,12 @@
           "id": "work",
           "occupant": "npc_acai",
           "label": "跟他做一個下午",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "他搬運重物的速度依舊快得驚人。你看著他那副毫無疲態與傷痕的嶄新身軀，心頭再也無法將這一切單純歸結為年輕力壯。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "他搬運重物的速度依舊快得驚人。你看著他那副毫無疲態與傷痕的嶄新身軀，心頭再也無法將這一切單純歸結為年輕力壯。"
+          }
         }
       ],
       "note": "他是活的參考答案。第 39 天要靠他形成「兩個案例才是模式」"
@@ -114,7 +173,10 @@
     {
       "id": "d34_pm_zhou",
       "location": "riverside",
-      "when": { "day": 34, "phase": "afternoon" },
+      "when": {
+        "day": 34,
+        "phase": "afternoon"
+      },
       "title": "河畔的周先生",
       "text": "老街河畔的涼亭裡，那位外地來的周先生依然坐在石凳上凝望水流，氣色比第一章初見時精神了許多。",
       "slots": [
@@ -122,96 +184,223 @@
           "id": "talk",
           "occupant": "npc_zhou",
           "label": "跟他講話",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "「快了……我的那樁私事，這兩天就快徹底辦妥了。」他轉過頭對你微微一笑，語氣中帶著一種如願以償的詭異輕鬆。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "「快了……我的那樁私事，這兩天就快徹底辦妥了。」他轉過頭對你微微一笑，語氣中帶著一種如願以償的詭異輕鬆。"
+          }
         }
       ]
     },
-
     {
       "id": "d35_morning_inherit_high",
       "location": "clinic",
-      "when": { "day": 35, "phase": "morning" },
+      "when": {
+        "day": 35,
+        "phase": "morning"
+      },
       "fixed": true,
       "condition": {
-        "count_at_least": { "n": 4, "of": [
-          { "switch": "s1" },
-          { "switch": "s2" },
-          { "switch": "s3" },
-          { "switch": "s4" },
-          { "switch": "s5" },
-          { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
-        ] }
+        "count_at_least": {
+          "n": 4,
+          "of": [
+            {
+              "switch": "s1"
+            },
+            {
+              "switch": "s2"
+            },
+            {
+              "switch": "s3"
+            },
+            {
+              "switch": "s4"
+            },
+            {
+              "switch": "s5"
+            },
+            {
+              "switch_progress_at_least": {
+                "switch": "s6",
+                "n": 3
+              }
+            }
+          ]
+        }
       },
       "title": "叔父的託付（坦然）",
       "text": "病房內，阿源叔第一次主動將話挑明。\n\n「這把老骨頭……終究是撐不動這座山泉閣了。」\n\n他甚至沒有詢問你的意願，便已經滿懷期待地開始交代起所有核心細節——哪一本暗帳該交由誰審閱、後棟湯屋的閥門在寒冬該如何洩壓、慶典旺季又該提前備妥多少物資。\n他語速飛快，枯槁的臉上泛著罕見的欣慰笑容：\n「孩子，你這陣子做得……比我當年強上太多了。」",
       "slots": [
-        { "id": "uncle", "occupant": "npc_uncle", "label": "叔叔", "accepts": [] }
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "叔叔",
+          "accepts": []
+        }
       ],
-      "on_enter": { "flag": { "inheritance_offered": true, "inherit_version": "high" } },
+      "on_enter": {
+        "flag": {
+          "inheritance_offered": true,
+          "inherit_version": "high"
+        }
+      },
       "note": "四到六個開關。他把旅館交出來，他很高興——而那是最難受的版本"
     },
     {
       "id": "d35_morning_inherit_mid",
       "location": "clinic",
-      "when": { "day": 35, "phase": "morning" },
+      "when": {
+        "day": 35,
+        "phase": "morning"
+      },
       "fixed": true,
       "condition": {
         "all": [
-          { "count_at_least": { "n": 2, "of": [
-            { "switch": "s1" },
-            { "switch": "s2" },
-            { "switch": "s3" },
-            { "switch": "s4" },
-            { "switch": "s5" },
-            { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
-          ] } },
-          { "not": { "count_at_least": { "n": 4, "of": [
-            { "switch": "s1" },
-            { "switch": "s2" },
-            { "switch": "s3" },
-            { "switch": "s4" },
-            { "switch": "s5" },
-            { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
-          ] } } }
+          {
+            "count_at_least": {
+              "n": 2,
+              "of": [
+                {
+                  "switch": "s1"
+                },
+                {
+                  "switch": "s2"
+                },
+                {
+                  "switch": "s3"
+                },
+                {
+                  "switch": "s4"
+                },
+                {
+                  "switch": "s5"
+                },
+                {
+                  "switch_progress_at_least": {
+                    "switch": "s6",
+                    "n": 3
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "not": {
+              "count_at_least": {
+                "n": 4,
+                "of": [
+                  {
+                    "switch": "s1"
+                  },
+                  {
+                    "switch": "s2"
+                  },
+                  {
+                    "switch": "s3"
+                  },
+                  {
+                    "switch": "s4"
+                  },
+                  {
+                    "switch": "s5"
+                  },
+                  {
+                    "switch_progress_at_least": {
+                      "switch": "s6",
+                      "n": 3
+                    }
+                  }
+                ]
+              }
+            }
+          }
         ]
       },
       "title": "叔父的託付（試探）",
-      "text": "病房內，阿源叔第一次主動將話挑明。\n\n「這把老骨頭……終究是撐不動這座山泉閣了。」\n\n說到這裡，他長長地停頓了下來，渾濁的眼睛望向窗外飄落的枯葉：\n「如果你心裡志不在此……也千萬不用勉強自己留在這座深山裡。」\n他說得極輕極淡，彷彿這句嘆息只是說給他自己聽的。",
+      "text": "病房裡，阿源叔第一次把話挑明。\n\n「這把老骨頭……終究是撐不動山泉閣了。」\n\n他停了下來，看著窗外的樹葉：\n「要是你志不在此……也別勉強自己留在山裡。」\n他說得很輕，像是在自言自語。",
       "slots": [
-        { "id": "uncle", "occupant": "npc_uncle", "label": "叔叔", "accepts": [] }
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "叔叔",
+          "accepts": []
+        }
       ],
-      "on_enter": { "flag": { "inheritance_offered": true, "inherit_version": "mid" } },
+      "on_enter": {
+        "flag": {
+          "inheritance_offered": true,
+          "inherit_version": "mid"
+        }
+      },
       "note": "兩到三個開關"
     },
     {
       "id": "d35_morning_inherit_low",
       "location": "clinic",
-      "when": { "day": 35, "phase": "morning" },
+      "when": {
+        "day": 35,
+        "phase": "morning"
+      },
       "fixed": true,
       "condition": {
-        "not": { "count_at_least": { "n": 2, "of": [
-          { "switch": "s1" },
-          { "switch": "s2" },
-          { "switch": "s3" },
-          { "switch": "s4" },
-          { "switch": "s5" },
-          { "switch_progress_at_least": { "switch": "s6", "n": 3 } }
-        ] } }
+        "not": {
+          "count_at_least": {
+            "n": 2,
+            "of": [
+              {
+                "switch": "s1"
+              },
+              {
+                "switch": "s2"
+              },
+              {
+                "switch": "s3"
+              },
+              {
+                "switch": "s4"
+              },
+              {
+                "switch": "s5"
+              },
+              {
+                "switch_progress_at_least": {
+                  "switch": "s6",
+                  "n": 3
+                }
+              }
+            ]
+          }
+        }
       },
       "title": "叔父的託付（愧疚）",
       "text": "病房內，阿源叔第一次主動將話挑明。\n\n「這把老骨頭……終究是撐不動這座山泉閣了。」\n\n他沒有提起旅館的半點經營，只是久久凝視著虛空，眼眶微紅地低喃：\n「是我沒用……我對不起你早逝的爸媽。」\n他痛苦地閉上了眼睛，你站在病榻旁，亦不知該如何接話。",
       "slots": [
-        { "id": "uncle", "occupant": "npc_uncle", "label": "叔叔", "accepts": [] }
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "叔叔",
+          "accepts": []
+        }
       ],
-      "on_enter": { "flag": { "inheritance_offered": true, "inherit_version": "low" } },
+      "on_enter": {
+        "flag": {
+          "inheritance_offered": true,
+          "inherit_version": "low"
+        }
+      },
       "note": "零到一個開關。一個整輪都在跑診所的玩家不能聽到這一句——那是這三個版本存在的理由"
     },
     {
       "id": "d35_pm_answer",
       "location": "clinic",
-      "when": { "day": 35, "phase": "afternoon" },
-      "condition": { "flag": "inheritance_offered" },
+      "when": {
+        "day": 35,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "inheritance_offered"
+      },
       "title": "去留之擇",
       "text": "阿源叔靠在病床上，靜靜等候著你對這份家族宿命的最終回答。",
       "slots": [
@@ -221,8 +410,10 @@
           "label": "答應他",
           "choice_group": "inheritance",
           "on_place": {
-            "text": "阿源叔身形微顫，長長舒了一口氣，連聲說道「那我就徹底放心了」——他說得如此急促，彷彿這句台詞已經在心底反覆演練了數十年。",
-            "flag": { "accepted_inn": true }
+            "text": "阿源叔鬆了口氣，連說了兩句「那就好」——他說得很急，像是這句話在心裡放了很久。",
+            "flag": {
+              "accepted_inn": true
+            }
           }
         },
         {
@@ -232,19 +423,30 @@
           "choice_group": "inheritance",
           "on_place": {
             "text": "「好……好好想想也好。」阿源叔輕輕點了點頭，沒有再追問半句，只是轉頭望向了天花板的陰影。",
-            "flag": { "deferred_inn": true }
+            "flag": {
+              "deferred_inn": true
+            }
           }
         }
       ],
       "note": "第三個選項「不回答，去做別的」＝不選，走開就是。從這一格開始，兩張互斥的未來每天都在互相擠——周先生的履歷仍在玩家手上"
     },
-
     {
       "id": "d36_morning_her",
       "location": "sanquan",
-      "when": { "day": 36, "phase": "morning" },
+      "when": {
+        "day": 36,
+        "phase": "morning"
+      },
       "condition": {
-        "any": [{ "flag": "invited_ajie" }, { "flag": "invited_awei" }]
+        "any": [
+          {
+            "flag": "invited_ajie"
+          },
+          {
+            "flag": "invited_awei"
+          }
+        ]
       },
       "title": "前台的細節",
       "text": "晨光熹微，她坐在前台專注地處理著手頭的事務。",
@@ -253,10 +455,14 @@
           "id": "watch",
           "occupant": null,
           "label": "跟她待一個上午",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "若那是阿婕：她一邊焦慮地接聽訂房電話，一邊下意識地神經質撕咬著短禿的指甲，前台那支圓珠筆桿上布滿了她深陷的齒痕。\n若那是阿薇：她被你的笑話逗樂，轉身掩嘴輕笑的瞬間，那一顆缺了一角的微凸門牙在晨光中靈動而真實。",
-            "flag": { "saw_her_tell": true }
+            "flag": {
+              "saw_her_tell": true
+            }
           }
         }
       ],
@@ -265,9 +471,19 @@
     {
       "id": "d36_pm_date",
       "location": "oldstreet",
-      "when": { "day": 36, "phase": "afternoon" },
+      "when": {
+        "day": 36,
+        "phase": "afternoon"
+      },
       "condition": {
-        "any": [{ "flag": "invited_ajie" }, { "flag": "invited_awei" }]
+        "any": [
+          {
+            "flag": "invited_ajie"
+          },
+          {
+            "flag": "invited_awei"
+          }
+        ]
       },
       "title": "最後的漫步",
       "text": "沒有任何複雜的理由，只是在深秋的午後，兩人並肩走出山泉閣，漫無目的地沿著老街緩步前行。",
@@ -276,11 +492,18 @@
           "id": "go",
           "occupant": null,
           "label": "跟她出去",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "你們沿著河畔一直走到了溪谷的盡頭才依依不捨地折返。夕陽拉長了兩人的影子，她向你傾訴了許多童年最隱秘的往事與心願。那是她留在這個世界裡，最真切的溫度。",
-            "relation": { "npc": "awei", "delta": 1 },
-            "flag": { "went_out_with_her": true }
+            "relation": {
+              "npc": "awei",
+              "delta": 1
+            },
+            "flag": {
+              "went_out_with_her": true
+            }
           }
         }
       ],
@@ -289,48 +512,83 @@
     {
       "id": "d36_notice",
       "location": "jinghe",
-      "when": { "day": 36, "phase": "afternoon" },
+      "when": {
+        "day": 36,
+        "phase": "afternoon"
+      },
       "fixed": true,
       "title": "靜和園的告示",
-      "text": "對面靜和園的大門前悄然張貼了一張白色告示：後棟專屬溫泉區將於明後兩天進行年度深度管線清掃，期間全面暫停對外接待。",
+      "text": "對面靜和園門口貼了一張告示：後棟溫泉明後兩天清洗管線，暫停對外開放。",
       "slots": [],
-      "on_enter": { "flag": { "back_wing_window": true } },
+      "on_enter": {
+        "flag": {
+          "back_wing_window": true
+        }
+      },
       "note": "不吃格。讓玩家有一整晚可以排程，同時是誘餌——玩家會為那扇門排明天的行程，而那正是她去向無法講圓的兩天"
     },
-
     {
       "id": "d37_morning_absent",
       "location": "sanquan",
-      "when": { "day": 37, "phase": "morning" },
+      "when": {
+        "day": 37,
+        "phase": "morning"
+      },
       "fixed": true,
       "condition": {
-        "any": [{ "flag": "invited_ajie" }, { "flag": "invited_awei" }]
+        "any": [
+          {
+            "flag": "invited_ajie"
+          },
+          {
+            "flag": "invited_awei"
+          }
+        ]
       },
       "title": "空缺的身影",
       "text": "清晨的前台空空蕩蕩，她並未如期前來上工。\n若是阿婕：阿姨打來電話，聲稱她昨夜突然感冒高燒，一早便獨自去鎮外就醫。\n若是阿薇：靜和園前台客氣地告知她臨時請了事假，回老街專心照顧阿嬤。",
       "slots": [],
-      "on_enter": { "flag": { "she_is_gone": true } },
+      "on_enter": {
+        "flag": {
+          "she_is_gone": true
+        }
+      },
       "note": "不邀路徑沒有這場固定事件。系統取走的仍是本輪投入最多格子的那個人，但主角不在場，也沒有理由立刻注意"
     },
     {
       "id": "d37_back_wing",
       "location": "jinghe_back",
-      "when": { "day": 37, "phase": "afternoon" },
-      "condition": { "flag": "back_wing_window" },
-      "requires": { "not": { "flag": "seen_back_wing" } },
+      "when": {
+        "day": 37,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "back_wing_window"
+      },
+      "requires": {
+        "not": {
+          "flag": "seen_back_wing"
+        }
+      },
       "reject_reason": "（你已經去過後棟了。）",
       "title": "靜和園後棟（深處）",
-      "text": "藉著清掃的空檔，你悄悄推開了靜和園後棟虛掩的木側門。\n眼前是一條漫長幽深的日式長廊，兩側是一扇扇沒有編號的緊閉拉門——與你在第 1 夜夢魘中所見的景象分毫不差。\n你顫抖著拉開其中一扇和室：矮几上赫然擺著一副吃到一半的飯菜，然而這一次，碗裡的飯菜早已冰冷發硬。\n長廊盡頭是通向下層的幽暗階梯。大浴池中蒸氣濃稠滾燙，水面正劇烈翻湧著。在黏稠的黑泉中央，隱約有一個人影正背對著你靜靜浸泡……\n你試圖邁步走近，身後卻忽然傳來林姐極其優雅溫和的聲音：「這位客人，後棟目前是非公開的私人療養區喔。」",
+      "text": "趁著打掃的空檔，你推開了靜和園後棟虛掩的側門。\n前面是一條長長的木走廊，兩邊全是一扇扇沒編號的拉門——和夢裡見到的一模一樣。\n你拉開其中一扇和室門：矮几上擺著吃了一半的飯菜，早就涼透發硬了。\n走廊盡頭是往下的石階。大浴池裡蒸氣很濃，黑水在池子裡翻動著。池子中央有個人影背對著你在泡湯……\n你往前走了一步，身後傳來林姐溫和的聲音：「這位客人，後棟是私人療養區喔。」",
       "slots": [
         {
           "id": "go_in",
           "occupant": null,
           "label": "從側門進去",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
-            "text": "當你被迫退出側門時，滾燙刺鼻的硫磺白霧依舊透過門縫悄然蔓延。那水中的背影，成了揮之不去的夢魘。",
-            "gain": ["info_jinghe_pool"],
-            "flag": { "seen_back_wing": true }
+            "text": "你退回門外，硫磺熱氣還在從門縫裡往外漫。水池裡那個背影，留在腦子裡揮之不去。",
+            "gain": [
+              "info_jinghe_pool"
+            ],
+            "flag": {
+              "seen_back_wing": true
+            }
           }
         }
       ],
@@ -339,9 +597,18 @@
     {
       "id": "d37_look_for_her",
       "location": "oldstreet",
-      "when": { "day": 37, "phase": "afternoon" },
-      "condition": { "flag": "she_is_gone" },
-      "requires": { "not": { "has_card": "info_stories_dont_match" } },
+      "when": {
+        "day": 37,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "she_is_gone"
+      },
+      "requires": {
+        "not": {
+          "has_card": "info_stories_dont_match"
+        }
+      },
       "reject_reason": "（你已經把能問的地方都問過一輪了。）",
       "title": "奔波尋覓",
       "text": "整個下午，你心急如焚地跑遍了小鎮上所有她平日可能出現的角落。",
@@ -350,10 +617,14 @@
           "id": "search",
           "occupant": null,
           "label": "去問",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
-            "text": "三個地方，卻給出了完全無法拼湊的三套說辭：有人說她昨早便已出門、有人說她整天都在診所、診所卻堅稱今日從未見過她的身影。那幾套天衣無縫的謊言，在時間軸上赫然撕裂開了一道巨大的鴻溝。",
-            "gain": ["info_stories_dont_match"]
+            "text": "問了三個地方，得到三種說法：有人說她昨早出門了、有人說她在診所、診所卻說今天沒見過她。三邊的話對在一起，時間全錯開了。",
+            "gain": [
+              "info_stories_dont_match"
+            ]
           }
         }
       ],
@@ -362,7 +633,10 @@
     {
       "id": "d37_clinic",
       "location": "clinic",
-      "when": { "day": 37, "phase": "afternoon" },
+      "when": {
+        "day": 37,
+        "phase": "afternoon"
+      },
       "title": "病榻前的冷清",
       "text": "午後的診所病房內，阿源叔的呼吸愈發沉重微弱，整個人陷入了半昏睡狀態。",
       "slots": [
@@ -370,10 +644,14 @@
           "id": "visit",
           "occupant": "npc_uncle",
           "label": "去看他",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "阿珠護士在走廊交接班時，望著空蕩蕩的病房嘆了口氣低語：「這兩天……除了你，根本就沒人來看過他。」這句無心的感嘆，比任何指責都更刺痛你的內心。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         }
       ]
@@ -381,7 +659,10 @@
     {
       "id": "d37_inn",
       "location": "sanquan",
-      "when": { "day": 37, "phase": "afternoon" },
+      "when": {
+        "day": 37,
+        "phase": "afternoon"
+      },
       "title": "獨撐大局",
       "text": "山泉閣前台堆滿了退房結算的單據與待洗的床單，阿財一個人默不作聲地在前廳與後廚之間飛速穿梭。",
       "slots": [
@@ -389,21 +670,37 @@
           "id": "work",
           "occupant": "npc_acai",
           "label": "去幫他",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "你上前幫忙分擔雜務。阿財抹了一把臉，依舊掛著憨厚無比的笑容，自始至終沒有發出一句怨言。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你上前幫忙分擔雜務。阿財抹了一把臉，依舊掛著憨厚無比的笑容，自始至終沒有發出一句怨言。"
+          }
         }
       ]
     },
-
     {
       "id": "d38_back_wing",
       "location": "jinghe_back",
-      "when": { "day": 38, "phase": "afternoon" },
-      "condition": { "flag": "back_wing_window" },
+      "when": {
+        "day": 38,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "back_wing_window"
+      },
       "requires": {
         "all": [
-          { "not": { "flag": "seen_back_wing" } },
-          { "not": { "has_card": "info_stories_dont_match" } }
+          {
+            "not": {
+              "flag": "seen_back_wing"
+            }
+          },
+          {
+            "not": {
+              "has_card": "info_stories_dont_match"
+            }
+          }
         ]
       },
       "reject_reason": "（兩天，兩個下午。你已經用掉一個。）",
@@ -414,11 +711,17 @@
           "id": "go_in",
           "occupant": null,
           "label": "從側門進去",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "無號碼的幽長走廊、冷硬的殘羹剩飯、蒸氣翻湧的下層黑泉，以及水池中那道背對著你的孤寂身影。林姐依舊在最後一刻帶著無懈可擊的笑容出現，客氣而堅決地將你請出了門外。",
-            "gain": ["info_jinghe_pool"],
-            "flag": { "seen_back_wing": true }
+            "gain": [
+              "info_jinghe_pool"
+            ],
+            "flag": {
+              "seen_back_wing": true
+            }
           }
         }
       ]
@@ -426,12 +729,25 @@
     {
       "id": "d38_look_for_her",
       "location": "oldstreet",
-      "when": { "day": 38, "phase": "afternoon" },
-      "condition": { "flag": "she_is_gone" },
+      "when": {
+        "day": 38,
+        "phase": "afternoon"
+      },
+      "condition": {
+        "flag": "she_is_gone"
+      },
       "requires": {
         "all": [
-          { "not": { "has_card": "info_stories_dont_match" } },
-          { "not": { "flag": "seen_back_wing" } }
+          {
+            "not": {
+              "has_card": "info_stories_dont_match"
+            }
+          },
+          {
+            "not": {
+              "flag": "seen_back_wing"
+            }
+          }
         ]
       },
       "reject_reason": "（兩天，兩個下午。你已經用掉一個。）",
@@ -442,10 +758,14 @@
           "id": "search",
           "occupant": null,
           "label": "再去問一次",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "同樣的三個地點，眾人依舊堅定地重複著各自的版本，甚至比昨日更加言之鑿鑿——那種眾口一詞的自信，反而愈發坐實了這是一場精心編排的集體掩蓋。",
-            "gain": ["info_stories_dont_match"]
+            "gain": [
+              "info_stories_dont_match"
+            ]
           }
         }
       ]
@@ -453,7 +773,10 @@
     {
       "id": "d38_clinic",
       "location": "clinic",
-      "when": { "day": 38, "phase": "afternoon" },
+      "when": {
+        "day": 38,
+        "phase": "afternoon"
+      },
       "title": "深沉的長眠",
       "text": "病房裡的阿源叔今天幾乎完全沒有清醒過，心電監護儀發出單調而微弱的嘀嗒聲。",
       "slots": [
@@ -461,10 +784,14 @@
           "id": "visit",
           "occupant": "npc_uncle",
           "label": "去看他",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "你在病榻旁的木椅上默默坐了整整一個下午，握著他冰涼乾枯的手掌。阿珠護士低著頭進來換藥，整整半小時內沒有說一句話。",
-            "switch_progress": { "s6": 1 }
+            "switch_progress": {
+              "s6": 1
+            }
           }
         }
       ],
@@ -473,11 +800,18 @@
     {
       "id": "d38_ask_around",
       "location": "jinghe",
-      "when": { "day": 38, "phase": "morning" },
+      "when": {
+        "day": 38,
+        "phase": "morning"
+      },
       "condition": {
         "any": [
-          { "has_card": "info_jinghe_pool" },
-          { "has_card": "info_stories_dont_match" }
+          {
+            "has_card": "info_jinghe_pool"
+          },
+          {
+            "has_card": "info_stories_dont_match"
+          }
         ]
       },
       "title": "四處對質",
@@ -487,22 +821,34 @@
           "id": "ask_linjie",
           "occupant": "npc_linjie",
           "label": "問林姐",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "林姐優雅地微笑著否認：「後棟這兩天一直在封閉大掃除，連一隻蒼蠅都飛不進去，怎麼可能會有客人在裡頭泡湯呢？」" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "林姐優雅地微笑著否認：「後棟這兩天一直在封閉大掃除，連一隻蒼蠅都飛不進去，怎麼可能會有客人在裡頭泡湯呢？」"
+          }
         },
         {
           "id": "ask_chen",
           "occupant": "npc_chen",
           "label": "問陳醫師",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "陳醫師扶了扶眼鏡，給出了一套合情合理、醫學邏輯嚴密的解釋，語氣平靜得讓你當場甚至挑不出半點破綻。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "陳醫師扶了扶眼鏡，給出了一套合情合理、醫學邏輯嚴密的解釋，語氣平靜得讓你當場甚至挑不出半點破綻。"
+          }
         },
         {
           "id": "ask_acai",
           "occupant": "npc_acai",
           "label": "問阿財",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "阿財愣了一秒，隨後抓了抓頭髮咧嘴笑道：「嗨，她們女孩子的事我哪裡搞得清楚！」說完便扛起瓦斯桶轉身大步離去。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "阿財愣了一秒，隨後抓了抓頭髮咧嘴笑道：「嗨，她們女孩子的事我哪裡搞得清楚！」說完便扛起瓦斯桶轉身大步離去。"
+          }
         }
       ],
       "note": "每個人都能補一個合理解釋，但沒有人能把三句話對成同一條時間線。卡不升級，也不直接指向後棟"
@@ -510,13 +856,22 @@
     {
       "id": "d38_evening_back_tomorrow",
       "location": "sanquan",
-      "when": { "day": 38, "phase": "evening" },
+      "when": {
+        "day": 38,
+        "phase": "evening"
+      },
       "fixed": true,
-      "condition": { "flag": "she_is_gone" },
+      "condition": {
+        "flag": "she_is_gone"
+      },
       "title": "有人說，她明天就回來",
       "text": "暮色降臨，不知由誰在老街口輕描淡寫地傳出一句話：『放心吧，她明早就會回來上工了。』整座小鎮波瀾不驚，似乎沒有任何人覺得這場憑空消失的兩天需要給出任何合理的解釋。",
       "slots": [],
-      "on_enter": { "flag": { "she_returns_tomorrow": true } }
+      "on_enter": {
+        "flag": {
+          "she_returns_tomorrow": true
+        }
+      }
     }
   ]
 }

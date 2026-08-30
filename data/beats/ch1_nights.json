@@ -1,12 +1,14 @@
 {
   "_comment": "第一章 15 個夜晚的內容 beat。標記定義（最早可開、價碼）在 data/locations.json，這裡是打開之後看到什麼。全部標 chapter:1，第二、三章變體待寫。已進行全量文學性重寫。",
-
   "beats": [
     {
       "id": "n_corridor_ch1",
       "location": "n_corridor",
       "chapter": 1,
-      "when": { "day": 1, "phase": "night" },
+      "when": {
+        "day": 1,
+        "phase": "night"
+      },
       "fixed": true,
       "meta_once": true,
       "title": "無盡的長廊",
@@ -18,11 +20,14 @@
       "id": "n_exit_ch1",
       "location": "n_exit",
       "chapter": 1,
-      "when": { "day": 2, "phase": "night" },
+      "when": {
+        "day": 2,
+        "phase": "night"
+      },
       "fixed": true,
       "meta_once": true,
       "title": "石階與空鎮",
-      "text": "同一條長廊的盡頭，悄然多出了一扇虛掩的木門。推門而出，眼前是一道依山而建的陡峭石階，俯瞰下去是一座完整的山間聚落——然而建築的方位全數錯亂顛倒，整座城鎮沒有亮起半盞燈火。\n遠處的黑霧中，隱約有一群人提著昏黃的紙燈籠無聲行進。你快步試圖追趕上去，卻在轉角處徹底跟丟了蹤影。",
+      "text": "走廊盡頭多了一扇虛掩的木門。推門出去，石階一路往下延伸，底下是一座順著山勢建的聚落——但房子的朝向全是反的，整座鎮子沒有一盞燈。\n遠處有幾個人提著紙燈籠往前走。你快步想追上去，轉過巷口人就不見了。",
       "slots": []
     },
     {
@@ -39,7 +44,7 @@
       "location": "n_litwindow",
       "chapter": 1,
       "title": "深巷的明窗",
-      "text": "漆黑死寂的巷弄深處，唯有一扇木窗透出暖黃的燈火。屋內圍坐著一家人正在默默用餐。你上前輕叩玻璃，他們卻彷彿置身於另一個世界，對你的存在毫無察覺。桌旁端正地空著一個位置，碗筷整整齊齊地擺放著，像是在等待某個永遠無法歸來的家人。",
+      "text": "巷子深處有一扇木窗亮著黃光。屋裡圍坐著一家人正在吃飯。你敲了敲玻璃，裡面的人頭也沒抬。桌邊空著一個位子，碗筷擺得很齊，像是在等誰回來。",
       "slots": [],
       "note": "真相：那家人在等一個沒回來的人。第三章版本要寫成他們全部轉過頭來"
     },
@@ -58,7 +63,11 @@
       "title": "林道殘跡",
       "text": "在一條從未在地圖上標記過的荒僻泥徑上，你發現了清晰的新鮮泥印。鞋底的紋路與阿宏平時穿的工作雨鞋完全吻合，路旁的芒草叢裡還落著他常隨身攜帶的那柄舊打火機。遠處濃霧中隱約晃過一個高大的背影，但當你撥開草叢追趕過去時，前方只剩下一片死寂的荒林。",
       "slots": [],
-      "on_enter": { "gain": ["info_ahong_traces"] },
+      "on_enter": {
+        "gain": [
+          "info_ahong_traces"
+        ]
+      },
       "note": "阿宏鏈第一級。第一輪要給的感覺是「我差一點就摸到他了」，不是「這條支線已經解完」"
     },
     {
@@ -66,7 +75,7 @@
       "location": "n_woodtags",
       "chapter": 1,
       "title": "數木牌的屋舍",
-      "text": "破敗的木屋中央擺著一張巨大的長桌，桌面上整齊碼放著數以百計的長條形木牌。一個枯瘦的身影背對著門口，正神經質地反覆清點著木牌。每數到一半，他便會痛苦地抓著頭髮停頓下來，隨後將木牌全部推倒、重新開始——彷彿帳目上的數字永遠無法對齊。",
+      "text": "木屋中央擺著一張長桌，上面排滿了長條木牌。一個枯瘦的人影背對著門口，正低頭數著木牌。數到一半，他停下來抓著頭髮，接著把木牌全部推亂重來——帳目上的數目怎麼也對不上。",
       "slots": [],
       "note": "名冊規則的載體（待決 4 結案）：他在數簿子上的名字，而有些人的那一格是空的。這是克蘇魯線與名冊機制唯一的接點——不需要任何人「忘記」，是簿子本身在出錯"
     },
@@ -75,14 +84,17 @@
       "location": "n_source",
       "chapter": 1,
       "title": "黑泉源頭",
-      "text": "沿著陡峭潮濕的石階攀爬許久，山頂正是溫泉的最深源頭。泉池中翻滾著漆黑黏稠的泉水，散發出令人作嘔的滾燙硫磺惡臭。\n池水中央，有一個人影正背對著你靜靜浸泡。當你試圖走近時，那人緩緩轉過身來——水霧散去，那張臉赫然正是你自己。\n你猛然驚醒，渾身冷汗。",
+      "text": "順著潮濕的石階走到頂，是溫泉的源頭。池子裡的黑水冒著熱氣，硫磺味刺鼻。\n池子中間有個人背對著你泡在水裡。你走上前，那個人轉過頭來——水霧散開，那是你自己的臉。\n你醒了過來，出了一身冷汗。",
       "slots": [],
       "note": "真相：那是第 2 天那次泡湯留下的備份，五天前才放進去的。不是本尊——第一輪的主角就是本尊。第 45 天他會再看到同一個畫面，而那次他沒有醒"
     },
     {
       "id": "n_manydoors_ch1",
       "location": "n_manydoors",
-      "when": { "day": 8, "phase": "night" },
+      "when": {
+        "day": 8,
+        "phase": "night"
+      },
       "fixed": true,
       "title": "萬門深巷",
       "text": "這是一條兩側排滿了數百扇緊閉木門的幽深死巷。一個身形飄忽的人影正逐一叩響每一扇門扉，然而門內從無回應。他是這座夜鎮中唯一開口說話的存在。\n「你叫什麼名字？」\n你報出了自己的名字。那人僵硬地沉吟片刻，聲音冰冷：「不對。那個名字……早就已經有人在用了。」\n他停下了腳步，緩緩轉向你。",
@@ -100,16 +112,23 @@
             "responses": [
               {
                 "id": "answer_not_today",
-                "accepts": ["k_not_today", "k_already_on_list"],
+                "accepts": [
+                  "k_not_today",
+                  "k_already_on_list"
+                ],
                 "consume_card": false,
                 "next_round": "who_remembers",
-                "on_resolve": { "text": "他停頓了一下。這個超乎常理的回答顯然脫離了他的預想。" }
+                "on_resolve": {
+                  "text": "他停頓了一下。這個超乎常理的回答顯然脫離了他的預想。"
+                }
               }
             ],
             "fallback": {
               "requires_discardable": true,
               "next_round": "who_remembers",
-              "on_resolve": { "text": "他伸出枯槁的手，將你的這段記憶與痕跡徹底抽走。" }
+              "on_resolve": {
+                "text": "他伸出枯槁的手，將你的這段記憶與痕跡徹底抽走。"
+              }
             }
           },
           {
@@ -118,16 +137,23 @@
             "responses": [
               {
                 "id": "answer_who",
-                "accepts": ["info_chunama_pause", "info_ahong_private"],
+                "accepts": [
+                  "info_chunama_pause",
+                  "info_ahong_private"
+                ],
                 "consume_card": false,
                 "next_round": "what_remains",
-                "on_resolve": { "text": "他身形一顫，不由自主地向後退了半步。" }
+                "on_resolve": {
+                  "text": "他身形一顫，不由自主地向後退了半步。"
+                }
               }
             ],
             "fallback": {
               "requires_discardable": true,
               "next_round": "what_remains",
-              "on_resolve": { "text": "「他們記憶中的那個人……並不是你。」他冷笑著收走了你的所有物。" }
+              "on_resolve": {
+                "text": "「他們記憶中的那個人……並不是你。」他冷笑著收走了你的所有物。"
+              }
             }
           },
           {
@@ -136,22 +162,45 @@
             "responses": [
               {
                 "id": "answer_remains",
-                "accepts": ["routine_debt", "equip_polaroid", "item_gradphoto"],
+                "accepts": [
+                  "routine_debt",
+                  "equip_polaroid",
+                  "item_gradphoto"
+                ],
                 "consume_card": false,
                 "next_round": null,
-                "on_resolve": { "text": "他陷入了長久的沉默，身形漸漸隱沒在濃霧之中。" }
+                "on_resolve": {
+                  "text": "他陷入了長久的沉默，身形漸漸隱沒在濃霧之中。"
+                }
               }
             ],
             "fallback": {
               "requires_discardable": true,
               "next_round": null,
-              "on_resolve": { "text": "他不再言語，冰冷的壓迫感如潮水般向你席捲而來。" }
+              "on_resolve": {
+                "text": "他不再言語，冰冷的壓迫感如潮水般向你席捲而來。"
+              }
             }
           }
         ],
-        "on_victory": { "text": "那道人影退回門後的黑暗之中。你喘著粗氣逃出了深巷。", "flag": { "d8_encounter_victory": true } },
-        "on_failure": { "text": "你的心智再也無法支撐重壓。他伸出手，硬生生剝離了你身上的一縷痕跡。", "flag": { "d8_encounter_failure": true } },
-        "on_escape": { "text": "你付出了沉重的代價，狼狽不堪地逃離了這條死寂的巷道。", "flag": { "d8_encounter_escaped": true } }
+        "on_victory": {
+          "text": "那道人影退回門後的黑暗之中。你喘著粗氣逃出了深巷。",
+          "flag": {
+            "d8_encounter_victory": true
+          }
+        },
+        "on_failure": {
+          "text": "你的心智再也無法支撐重壓。他伸出手，硬生生剝離了你身上的一縷痕跡。",
+          "flag": {
+            "d8_encounter_failure": true
+          }
+        },
+        "on_escape": {
+          "text": "你付出了沉重的代價，狼狽不堪地逃離了這條死寂的巷道。",
+          "flag": {
+            "d8_encounter_escaped": true
+          }
+        }
       },
       "slots": [],
       "note": "第一場遭遇（第 8 夜，dated night fixed encounter，repeat_each_run + charge_first_visit，非 meta_once）。三回合 response matrix 見 subdocs/故事線/故事線_第一輪_第一章.md > D8 response matrix。第一輪拿不到 k_not_today／k_already_on_list，所以第一題無正解，只要手上有可丟棄卡就必須失去或支付一張。真相：在用那個名字的是源頭裡的那一份"
@@ -168,12 +217,37 @@
     {
       "id": "n_take_something",
       "location": "n_landmark",
-      "condition": { "day_at_least": 10 },
+      "condition": {
+        "day_at_least": 10
+      },
       "title": "留存之物",
       "text": "在一處長滿青苔的石壇上，突兀地擺放著一件泛著微光的舊物——也許是一個磨損的玩具、一張泛黃的合照，或是一枚生鏽的古舊硬幣。",
       "slots": [
-        { "id": "take", "occupant": null, "label": "伸手取走", "accepts": ["protagonist"], "on_place": { "text": "你將那件冰冷的小物件收入口袋。清晨醒來時，指尖觸碰到的口袋裡，赫然沉甸甸地留著那樣東西。", "flag": { "took_from_night": true } } },
-        { "id": "leave", "occupant": null, "label": "留在原處", "accepts": ["protagonist"], "on_place": { "text": "你收回了手，任由那件遺落的信物靜靜沉眠在夜色的陰影之中。" } }
+        {
+          "id": "take",
+          "occupant": null,
+          "label": "伸手取走",
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你把那件冰冷的小東西收進口袋。早晨醒來時，外套口袋裡沉甸甸的，東西真的在。",
+            "flag": {
+              "took_from_night": true
+            }
+          }
+        },
+        {
+          "id": "leave",
+          "occupant": null,
+          "label": "留在原處",
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你收回了手，任由那件遺落的信物靜靜沉眠在夜色的陰影之中。"
+          }
+        }
       ],
       "note": "翻轉，由玩家觸發，最早第 10 夜。第 8 夜是被拿走（被動、恐怖），這一夜是自己拿（主動、共犯）。順序不能反。有些玩家第 6 夜就會拿，有些拖到第 12 夜"
     },
@@ -182,9 +256,13 @@
       "location": "n_lockedhouse",
       "chapter": 1,
       "title": "鏡像老宅",
-      "text": "夜霧中赫然矗立著一棟與你童年老家完全一致的宅院。然而在白晝被阿源叔嚴密反鎖的那間父母臥房，在此處的門扉卻大敞著。從破損的窗框望進去，屋內一片幽暗混沌；當你試圖推開老宅前門時，大鎖卻沉重地將你阻隔在外。",
+      "text": "霧裡立著一棟老宅，和你家當年的院子一模一樣。白天被叔叔鎖著的父母房間，在這裡門卻是大開的。透過窗子看進去裡面黑沉沉一片；當你想推開前門時，鎖卻牢牢扣著。",
       "slots": [],
-      "on_enter": { "flag": { "night_key_goal": true } },
+      "on_enter": {
+        "flag": {
+          "night_key_goal": true
+        }
+      },
       "note": "給玩家一個明確的目標：白天要拿到鑰匙"
     },
     {
@@ -192,12 +270,16 @@
       "location": "n_ahong_2",
       "chapter": 1,
       "title": "未乾的血跡",
-      "text": "泥地上赫然殘留著一灘猩紅的血跡，甚至尚未完全凝固——其形狀與位置，分明與阿宏前天切肉時手背上的傷口一模一樣。身側的黑霧中反覆迴盪著鐵箱搬運與粗重喘息的聲音，同一段聲響如同壞掉的唱片般無休無止地重複著。",
+      "text": "泥地上留著一灘還沒乾透的血跡——形狀和位置，就跟阿宏前幾天切肉劃傷手背時一模一樣。身邊的霧裡反覆傳來搬鐵箱和喘氣的聲音，同一段聲響一遍又一遍地重播著。",
       "slots": [],
       "requires": {
         "all": [
-          { "night_seen": "n_ahong_1" },
-          { "has_card": "info_ahong_private" }
+          {
+            "night_seen": "n_ahong_1"
+          },
+          {
+            "has_card": "info_ahong_private"
+          }
         ]
       },
       "reject_reason": "（你手上沒有只有你們兩個人知道的事。）",
@@ -208,7 +290,7 @@
       "location": "n_nodoor",
       "chapter": 1,
       "title": "無門之樓",
-      "text": "在白天靜和園所座落的位置，此刻赫然聳立著一座通體由青黑巨石砌成的龐大建築。外牆平整冰冷，沒有任何窗戶，更找不到任何一扇可供出入的門扉。",
+      "text": "在白天靜和園的位置，立著一座青黑石塊砌成的大房子。外牆平整，沒有窗戶，也找不到任何門。",
       "slots": []
     },
     {
@@ -216,9 +298,13 @@
       "location": "n_landmark",
       "chapter": 1,
       "title": "夜中地標",
-      "text": "在一處僻靜的轉角，你注意到了一處極為奇異的景觀：一棵扭曲盤旋的老枯樹，樹幹旁立著半截斷裂的古老石碑。",
+      "text": "轉角處立著一棵歪扭的枯樹，樹幹旁靠著半截斷掉的舊石碑。",
       "slots": [],
-      "on_enter": { "flag": { "landmark_seen": true } },
+      "on_enter": {
+        "flag": {
+          "landmark_seen": true
+        }
+      },
       "note": "隔天白天在鎮上走，會看到同一個東西。這是「夜鎮就是同一個鎮」的證明，而且是玩家自己算出來的"
     },
     {
@@ -226,7 +312,7 @@
       "location": "n_plaza",
       "chapter": 1,
       "title": "夜鎮中心",
-      "text": "寬闊的石板廣場上肅立著數十道沉默的人影，所有人都直挺挺地面朝著同一個方向。當你穿過人群時，人影緩緩向兩側分開一條通路。\n盡頭的石台上攤著一本巨大厚重的簿冊。你上前翻閱——紙頁上密密麻麻全是熟悉的小鎮人名，有些被硃砂狠狠劃去，旁邊補上了詭異的符號。你找到了自己的名字，旁邊赫然有著相同的血紅印記。\n當你心驚膽顫地轉身準備離開時，赫然在人群中看見了阿源叔的身影。他也面無表情地佇立在那裡，目光空洞地凝視著前方。你急切地呼喊他的名字，他卻恍若未聞，紋絲不動。",
+      "text": "石板廣場上站著幾十個人影，全朝著同一個方向。你穿過人群，人影無聲退到兩旁。\n盡頭的石台上放著一本厚簿子。你走過去翻開——上面寫滿了鎮民的名字，有些被紅筆劃掉，旁邊補了記號。你找到了自己的名字，旁邊也畫著同樣的紅圈。\n你轉身要走，在人群裡看見了阿源叔。他站在那裡看著前方。你叫他的名字，他一動不動。",
       "slots": [],
       "note": "第一章最重的一夜。規則上它是地形，但簿子是夜間層裡最重要的一個物件，所以收費"
     },
@@ -237,20 +323,29 @@
       "title": "霧中呼名",
       "text": "荒野的濃霧深處，忽然傳來一聲清晰而微弱的呼喚，呼喊的正是你本人的名字。那聲音聽起來像極了阿宏，但聲源傳來的方向卻是一堵陡峭光滑的絕壁，根本沒有任何通行的道路。",
       "slots": [],
-      "requires": { "night_seen": "n_ahong_2" },
+      "requires": {
+        "night_seen": "n_ahong_2"
+      },
       "reject_reason": "（你還沒找到上一處痕跡。）",
-      "on_enter": { "gain": ["info_ahong_not_normal"] },
+      "on_enter": {
+        "gain": [
+          "info_ahong_not_normal"
+        ]
+      },
       "note": "阿宏鏈第三級，第一輪的高投入上限。結論仍只到「他跟夜裡有關」——不能定義他被困在哪裡、是否活著、能否救回"
     },
     {
       "id": "n15_everyone",
       "location": "n_plaza",
       "chapter": 1,
-      "when": { "day": 15, "phase": "night" },
+      "when": {
+        "day": 15,
+        "phase": "night"
+      },
       "fixed": true,
       "meta_once": true,
       "title": "空缺的身影",
-      "text": "廣場上的人影依舊佇立在黑霧之中。在其中一角，你認出了那個穿著搬運工背心的高大背影，姿勢與輪廓與阿宏分毫不差。\n然而原本阿源叔站立的位置，此刻卻只剩下一片空蕩蕩的陰影。",
+      "text": "廣場上的人影還在霧裡站著。在角落那邊，那個穿搬運背心的高大身影，背影就是阿宏。\n阿源叔原本站的地方，現在空了。",
       "slots": [],
       "note": "章末。白天他躺在診所，夜裡他不在夜鎮——兩邊都不在的那個部分去哪了"
     }

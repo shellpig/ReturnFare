@@ -1,6 +1,5 @@
 {
   "_comment": "六個縱慾出口與泡湯特例。欄位說明見 data/SCHEMA.md > 縱慾出口。已去除副詞堆疊與過度煽情。",
-
   "beats": [
     {
       "id": "exit_sanquan",
@@ -8,9 +7,14 @@
       "when": {
         "day_from": 1,
         "day_to": 45,
-        "phase": ["morning", "afternoon"]
+        "phase": [
+          "morning",
+          "afternoon"
+        ]
       },
-      "condition": { "madness_at_least": 1 },
+      "condition": {
+        "madness_at_least": 1
+      },
       "fixed": false,
       "title": "山泉閣縱慾出口",
       "text": "壓抑不住的燥意在胸口翻湧。你可以在這裡發洩出來，或是設法讓腦袋清醒一點。",
@@ -18,94 +22,162 @@
         {
           "id": "x_smash",
           "label": "砸東西",
-          "accepts": ["madness"],
-          "condition": { "madness_at_least": 1 },
-          "indulgence": { "weight": 1 },
+          "accepts": [
+            "madness"
+          ],
+          "condition": {
+            "madness_at_least": 1
+          },
+          "indulgence": {
+            "weight": 1
+          },
           "on_place": {
             "text": "你把房間裡能摔的東西全砸了。碎瓷片濺了一地，胸口那股快要窒息的悶脹感才稍微散開。",
-            "flag": { "inn_damaged": true }
+            "flag": {
+              "inn_damaged": true
+            }
           },
           "on_place_by_level": {
             "light": {
               "text": "短暫的失控過去了。看著地上的狼藉，你知道這只是個開頭。"
             },
             "normal": {
-              "relation": { "npc": "uncle", "delta": -1 }
+              "relation": {
+                "npc": "uncle",
+                "delta": -1
+              }
             },
             "heavy": {
-              "relation": { "npc": "uncle", "delta": -2 }
+              "relation": {
+                "npc": "uncle",
+                "delta": -2
+              }
             }
           }
         },
         {
           "id": "x_binge",
           "label": "暴食",
-          "accepts": ["madness"],
-          "condition": { "madness_at_least": 1 },
-          "indulgence": { "weight": 2 },
+          "accepts": [
+            "madness"
+          ],
+          "condition": {
+            "madness_at_least": 1
+          },
+          "indulgence": {
+            "weight": 2
+          },
           "on_place": {
             "text": "你衝進廚房，把看得到的冷飯剩菜大口塞進嘴裡。直到胃部脹得發痛，耳邊嗡嗡的雜音才安靜下來。",
-            "flag": { "binge_eaten": true }
+            "flag": {
+              "binge_eaten": true
+            }
           },
           "on_place_by_level": {
             "light": {
               "text": "胃裡的飽脹感暫時壓住了心慌。但下一次恐怕沒這麼管用。"
             },
             "normal": {
-              "relation": { "npc": "uncle", "delta": -1 }
+              "relation": {
+                "npc": "uncle",
+                "delta": -1
+              }
             },
             "heavy": {
-              "relation": { "npc": "uncle", "delta": -2 }
+              "relation": {
+                "npc": "uncle",
+                "delta": -2
+              }
             }
           }
         },
         {
           "id": "x_violence",
           "label": "暴力對人",
-          "accepts": ["madness"],
+          "accepts": [
+            "madness"
+          ],
           "condition": {
             "all": [
-              { "madness_at_least": 1 },
-              { "day_at_least": 16 }
+              {
+                "madness_at_least": 1
+              },
+              {
+                "day_at_least": 16
+              }
             ]
           },
-          "indulgence": { "weight": 4 },
+          "indulgence": {
+            "weight": 4
+          },
           "on_place": {
-            "text": "焦躁徹底失控，你沒能克制住手腳，對身邊的人動了粗。",
-            "relation": { "npc": "uncle", "delta": -2 }
+            "text": "焦躁徹底失控。你猛地掀翻了茶几，一把推開上前勸阻的阿源叔。他撞在門框上，捂著肋骨咳嗽。",
+            "relation": {
+              "npc": "uncle",
+              "delta": -2
+            }
           },
           "on_place_by_level": {
             "light": {
-              "text": "動手後的空氣冷了下來，對方眼裡的驚愕讓你想找地方躲起來。"
+              "text": "看著叔叔扶著牆喘氣的樣子，你的手抖得停不下來。"
             },
             "normal": {
-              "relation": { "npc": "uncle", "delta": -1 }
+              "relation": {
+                "npc": "uncle",
+                "delta": -1
+              }
             },
             "heavy": {
-              "relation": { "npc": "uncle", "delta": -2 }
+              "relation": {
+                "npc": "uncle",
+                "delta": -2
+              }
             }
           }
         },
         {
           "id": "x_lust_ajie",
           "label": "宣洩慾望（阿婕）",
-          "accepts": ["madness"],
+          "accepts": [
+            "madness"
+          ],
           "condition": {
             "all": [
-              { "madness_at_least": 1 },
-              { "relation_at_least": { "npc": "ajie", "state": "疑似" } }
+              {
+                "madness_at_least": 1
+              },
+              {
+                "relation_at_least": {
+                  "npc": "ajie",
+                  "state": "疑似"
+                }
+              }
             ]
           },
-          "indulgence": { "weight": 5 },
+          "indulgence": {
+            "weight": 5
+          },
           "on_place": {
-            "text": "在昏暗的走廊裡，你抓著阿婕不放。衝動和恐懼交織在一起，理智被撕開了一道口子。",
-            "relation": { "npc": "ajie", "delta": 1 },
-            "flag": { "ajie_trust_broken": true },
-            "lose": [{ "card": "npc_ajie", "if": { "has_card": "npc_ajie" } }]
+            "text": "在穿堂的暗處，你一把拉住阿婕的手腕把她按在牆邊。她手裡的帳本掉在地上，驚慌地去推你的肩膀。",
+            "relation": {
+              "npc": "ajie",
+              "delta": 1
+            },
+            "flag": {
+              "ajie_trust_broken": true
+            },
+            "lose": [
+              {
+                "card": "npc_ajie",
+                "if": {
+                  "has_card": "npc_ajie"
+                }
+              }
+            ]
           },
           "on_place_by_level": {
             "light": {
-              "text": "安靜下來之後，兩人之間的信任已經有了裂痕。"
+              "text": "她蹲下身一張張撿起散落的單據，一句話也沒跟你說。"
             }
           },
           "note": "P4-A：對阿婕使用縱慾卡破壞委託資格。設 ajie_trust_broken=true 為阿婕資格的唯一真值；若已持有人物卡則同時 lose。D16 d16_pm_sanquan::repair_ajie_trust 是明示修復接點"
@@ -113,8 +185,12 @@
         {
           "id": "x_soak",
           "label": "長時間泡湯",
-          "accepts": ["madness"],
-          "condition": { "madness_at_least": 1 },
+          "accepts": [
+            "madness"
+          ],
+          "condition": {
+            "madness_at_least": 1
+          },
           "indulgence": {
             "auto": false,
             "soak": true
@@ -131,9 +207,14 @@
       "when": {
         "day_from": 1,
         "day_to": 45,
-        "phase": ["morning", "afternoon"]
+        "phase": [
+          "morning",
+          "afternoon"
+        ]
       },
-      "condition": { "madness_at_least": 1 },
+      "condition": {
+        "madness_at_least": 1
+      },
       "fixed": false,
       "title": "老街縱慾出口",
       "text": "老街嘈雜的人聲與油煙味，刺激著緊繃的神經。",
@@ -141,11 +222,19 @@
         {
           "id": "x_splurge",
           "label": "奢侈揮霍",
-          "accepts": ["madness"],
-          "condition": { "madness_at_least": 1 },
-          "requires": { "has_card": "card_money" },
+          "accepts": [
+            "madness"
+          ],
+          "condition": {
+            "madness_at_least": 1
+          },
+          "requires": {
+            "has_card": "card_money"
+          },
           "reject_reason": "（身上沒有足夠的錢）",
-          "indulgence": { "weight": 3 },
+          "indulgence": {
+            "weight": 3
+          },
           "on_place": {
             "text": "你走進老街最貴的店鋪，把身上的錢花在不必要的東西上。"
           },
@@ -163,9 +252,14 @@
       "when": {
         "day_from": 1,
         "day_to": 45,
-        "phase": ["morning", "afternoon"]
+        "phase": [
+          "morning",
+          "afternoon"
+        ]
       },
-      "condition": { "madness_at_least": 1 },
+      "condition": {
+        "madness_at_least": 1
+      },
       "fixed": false,
       "title": "靜和園縱慾出口",
       "text": "靜和園安靜的庭院角落，掩蓋著蠢蠢欲動的燥意。",
@@ -173,21 +267,35 @@
         {
           "id": "x_lust_awei",
           "label": "宣洩慾望（阿薇）",
-          "accepts": ["madness"],
+          "accepts": [
+            "madness"
+          ],
           "condition": {
             "all": [
-              { "madness_at_least": 1 },
-              { "relation_at_least": { "npc": "awei", "state": "疑似" } }
+              {
+                "madness_at_least": 1
+              },
+              {
+                "relation_at_least": {
+                  "npc": "awei",
+                  "state": "疑似"
+                }
+              }
             ]
           },
-          "indulgence": { "weight": 5 },
+          "indulgence": {
+            "weight": 5
+          },
           "on_place": {
-            "text": "在無人的長廊拐角，你拉住了阿薇。在失控的情緒中，你只想抓住一點能確認自己還活著的溫度。",
-            "relation": { "npc": "awei", "delta": 1 }
+            "text": "在靜和園後廊的拐角，你從身後抓住了阿薇的衣袖。她回過頭，被你眼裡的血絲嚇得退了半步。",
+            "relation": {
+              "npc": "awei",
+              "delta": 1
+            }
           },
           "on_place_by_level": {
             "light": {
-              "text": "喘息平復後，她靠在牆邊看著你，眼神裡滿是困惑與無措。"
+              "text": "她整了整被扯皺的袖口，低著頭快步走開了。"
             }
           }
         }

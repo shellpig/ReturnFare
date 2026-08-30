@@ -1,29 +1,51 @@
 {
   "_comment": "第一章第 1-3 天。欄位說明見 data/SCHEMA.md。已進行全量文學性重寫。",
-
   "beats": [
     {
       "id": "d1_arrival",
       "location": "busstop",
-      "when": { "day": 1, "phase": "evening" },
+      "when": {
+        "day": 1,
+        "phase": "evening"
+      },
       "fixed": true,
       "title": "到了",
-      "text": "幾經輾轉，暮色在破舊的客運車窗外沉澱成濃重的青黑。車胎輾過碎石路，引擎在最後一段盤山彎道上沉悶地喘息。司機始終一言不發，唯有在後照鏡中意味深長地瞥了你一眼。雨霧瀰漫的站牌下，阿源叔裹著舊夾克，正朝著車燈揮手。",
+      "text": "幾經輾轉，暮色在破舊的客運車窗外沉成一片青黑。車胎輾過碎石路，引擎在最後一段盤山彎道上沉悶地響著。司機始終沒說話，只在後照鏡裡看了你一眼。雨霧裡的站牌下，阿源叔裹著舊夾克，正朝著車燈揮手。",
       "slots": [
-        { "id": "driver", "occupant": "npc_driver", "label": "司機", "accepts": [] },
-        { "id": "ajie", "occupant": "npc_ajie", "label": "阿婕", "accepts": [] },
-        { "id": "uncle", "occupant": "npc_uncle", "label": "阿源叔", "accepts": [] }
+        {
+          "id": "driver",
+          "occupant": "npc_driver",
+          "label": "司機",
+          "accepts": []
+        },
+        {
+          "id": "ajie",
+          "occupant": "npc_ajie",
+          "label": "阿婕",
+          "accepts": []
+        },
+        {
+          "id": "uncle",
+          "occupant": "npc_uncle",
+          "label": "阿源叔",
+          "accepts": []
+        }
       ],
       "on_enter": {
         "text": "晚飯是熱騰騰的醬筍排骨湯，阿源叔盛了一大碗遞給你，隨口笑道：「你小時候你爸媽常帶你來泡這源頭湯的，那時候你瘦得像隻猴子，大概全不記得了。」\n阿婕咬著免洗竹筷的邊緣，撇嘴道：「我阿姨幾個月前就天天打電話叫我回來看看，山路這麼顛我本來根本懶得動。後來聽說你也答應要回來幫忙，我想著……那就順道一起吧。」",
-        "gain": ["protagonist"]
+        "gain": [
+          "protagonist"
+        ]
       },
       "note": "司機那一眼＝超脫輪迴者提案（待決 7）。第一輪只要他在畫面裡出現過就夠。叔叔那句講的是主角小時候那次取樣——遊戲在第一天就講出來了。"
     },
     {
       "id": "d1_ambient_couple",
       "location": "sanquan",
-      "when": { "day": 1, "phase": "evening" },
+      "when": {
+        "day": 1,
+        "phase": "evening"
+      },
       "fixed": true,
       "title": "隔壁房的低語",
       "text": "走廊盡頭那對中年夫妻已經住進來一整天了。隔著潮濕的木板隔間，偶爾能聽見低聲的說笑與行李拉鍊聲，客氣得像是在扮演一對新婚燕爾。",
@@ -32,19 +54,35 @@
     {
       "id": "d2_morning_intro",
       "location": "sanquan",
-      "when": { "day": 2, "phase": "morning" },
+      "when": {
+        "day": 2,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "清晨分工",
       "text": "晨霧未散，整座山泉閣瀰漫著濃烈的硫磺氣味。阿源叔站在櫃檯前揉著腰，將前台鑰匙與登記冊交給阿婕，又把湯屋的長柄竹刷塞進你手裡。那對中年夫妻早早就下樓用早點，先生特地壓低嗓音，交代要在傍晚前準備好一個小蛋糕。",
       "slots": [
-        { "id": "ajie", "occupant": "npc_ajie", "label": "阿婕（前台）", "accepts": [] },
-        { "id": "couple", "occupant": "npc_couple", "label": "中年夫妻", "accepts": [] }
+        {
+          "id": "ajie",
+          "occupant": "npc_ajie",
+          "label": "阿婕（前台）",
+          "accepts": []
+        },
+        {
+          "id": "couple",
+          "occupant": "npc_couple",
+          "label": "中年夫妻",
+          "accepts": []
+        }
       ]
     },
     {
       "id": "d2_pm_work",
       "location": "sanquan",
-      "when": { "day": 2, "phase": "afternoon" },
+      "when": {
+        "day": 2,
+        "phase": "afternoon"
+      },
       "fixed": false,
       "title": "熟悉工作",
       "text": "在木造老旅館裡打掃，腳步聲在空曠的走廊上格外清晰。換床單與擦拭格窗時，你先後撞見了那對夫妻各自在拐角壓低聲音打電話——並非刻意偷聽，但在這逼仄潮濕的木結構裡，嘆息聲根本無處可藏。",
@@ -53,10 +91,15 @@
           "id": "work",
           "occupant": null,
           "label": "把下午花在旅館裡",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "兩段說法都言之鑿鑿，彼此卻微妙地錯位。最耐人尋味的是，兩個人都真心以為這趟破鏡重圓的溫泉之旅，是自己先開口提議的。",
-            "gain": ["info_husband_version", "info_wife_version"]
+            "gain": [
+              "info_husband_version",
+              "info_wife_version"
+            ]
           }
         }
       ]
@@ -64,7 +107,10 @@
     {
       "id": "d2_pm_oldstreet",
       "location": "oldstreet",
-      "when": { "day": 2, "phase": "afternoon" },
+      "when": {
+        "day": 2,
+        "phase": "afternoon"
+      },
       "fixed": false,
       "title": "老街斜陽",
       "text": "午後的老街空空蕩蕩，雜貨店門口的遮雨棚褪了色。春阿嬤坐在藤椅上挑著乾香菇，渾濁的眼睛看著你和阿婕走近，手裡的動作慢慢停了下來。",
@@ -73,10 +119,14 @@
           "id": "chunama",
           "occupant": "npc_chunama",
           "label": "春阿嬤",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "她拉著阿婕的手，細數你們小時候在溪邊摸蜆仔的往事，話說得又快又順。可當話題不經意繞到你母親當年搬走前的神情時，阿嬤的聲音突然像被剪斷的線一樣，突兀地懸在了半空中。",
-            "gain": ["info_chunama_pause"]
+            "gain": [
+              "info_chunama_pause"
+            ]
           }
         }
       ]
@@ -84,7 +134,10 @@
     {
       "id": "d2_pm_oldschool",
       "location": "oldschool",
-      "when": { "day": 2, "phase": "afternoon" },
+      "when": {
+        "day": 2,
+        "phase": "afternoon"
+      },
       "fixed": false,
       "title": "廢棄國小",
       "text": "穿過長滿芒草的操場，木造校舍的走廊積滿枯葉與灰塵。走廊盡頭的榮譽榜前，整齊懸掛著幾十個木製相框，裡頭是一屆又一屆在陽光下瞇著眼笑的黑白與彩色畢業照。",
@@ -93,10 +146,14 @@
           "id": "photos",
           "occupant": null,
           "label": "看畢業照",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
-            "text": "你找到了自己當年的照片，也找到了阿婕的。然而順著年份往下看，阿婕那一屆同班的十幾張面孔，在幾年後的名冊與相片牆上竟突兀地全數消失，彷彿整座小鎮的那一代孩子在一夜之間都被抹去了一般。",
-            "gain": ["info_ajie_class"]
+            "text": "你找到了自己當年的照片，也找到了阿婕的。順著年份往下看，阿婕那一屆同班的十幾張面孔，在幾年後的名冊與相片牆上全都不見了，整座小鎮的那一代孩子像是一下子全搬走了一樣。",
+            "gain": [
+              "info_ajie_class"
+            ]
           }
         }
       ],
@@ -105,44 +162,72 @@
     {
       "id": "d2_evening_bath",
       "location": "sanquan",
-      "when": { "day": 2, "phase": "evening" },
+      "when": {
+        "day": 2,
+        "phase": "evening"
+      },
       "fixed": true,
       "title": "暮色湯屋",
       "text": "收工後的山泉閣靜了下來。你和阿婕各拿了一條舊毛巾來到後棟的露天湯屋。她把雙腳浸入白濁溫熱的泉水裡，長長舒了一口氣，笑著抱怨在自家溫泉旅館待了兩天居然連泉水都沒碰過太委屈。四周只有竹管滴水的輕響，水氣氤氳間，兩人有一搭沒一搭地聊著這些年在台北的零工與生活的狼狽。",
       "slots": [
-        { "id": "ajie", "occupant": "npc_ajie", "label": "阿婕", "accepts": [] }
+        {
+          "id": "ajie",
+          "occupant": "npc_ajie",
+          "label": "阿婕",
+          "accepts": []
+        }
       ],
       "on_enter": {
         "text": "阿婕的雙手撐在長滿青苔的池邊石階上。在溫熱泉水的浸潤下，她的指甲顯得格外短禿，邊緣坑坑窪窪，滿是焦慮時反覆撕咬留下的粗糙痕跡。",
-        "flag": { "ajie_sampled": true }
+        "flag": {
+          "ajie_sampled": true
+        }
       },
       "note": "這就是取樣，而且山泉閣直接引源頭水所以有效。第一章最溫暖的十分鐘，也是玩家親手做的第二步。全程沒有任何異常演出。指甲＝第三章破綻的種。"
     },
     {
       "id": "d2_ambient_debt",
       "location": "sanquan",
-      "when": { "day": 2, "phase": "evening" },
+      "when": {
+        "day": 2,
+        "phase": "evening"
+      },
       "fixed": true,
       "title": "螢幕微光",
       "text": "夜深人靜時，放在榻榻米上的手機在被褥旁微弱地震動了一下。螢幕亮起，冰冷地彈出一則學貸與信用卡的扣款逾期催繳通知。",
       "slots": [],
-      "on_enter": { "gain": ["routine_debt"] }
+      "on_enter": {
+        "gain": [
+          "routine_debt"
+        ]
+      }
     },
     {
       "id": "d3_morning_ahong",
       "location": "sanquan",
-      "when": { "day": 3, "phase": "morning" },
+      "when": {
+        "day": 3,
+        "phase": "morning"
+      },
       "fixed": true,
       "title": "清晨送貨",
       "text": "一陣刺耳的野狼機車聲在山泉閣後門熄火。身材結實的阿宏扛著兩箱新鮮蔬果快步走進廚房，右手手背上貼著一塊扎眼的防水 OK 繃，他大大咧咧地笑說是昨晚切肉不小心劃到的。阿婕端著手機在前台對著晨光伸懶腰，順手給阿宏拍了一張打卡工作照。",
       "slots": [
-        { "id": "ahong", "occupant": "npc_ahong", "label": "阿宏", "accepts": [] }
+        {
+          "id": "ahong",
+          "occupant": "npc_ahong",
+          "label": "阿宏",
+          "accepts": []
+        }
       ]
     },
     {
       "id": "d3_pm_sanquan",
       "location": "sanquan",
-      "when": { "day": 3, "phase": "afternoon" },
+      "when": {
+        "day": 3,
+        "phase": "afternoon"
+      },
       "fixed": false,
       "title": "山泉閣的午後",
       "text": "阿宏在後院雜物間揮汗如雨地搬運瓦斯桶與備品；大廳那對即將退房的中年夫妻卻爆發了劇烈的爭執，聲音幾乎要掀翻天花板；唯有深處的男湯空無一人，溫熱的泉水正靜靜地翻滾著白沫。",
@@ -151,28 +236,40 @@
           "id": "help_ahong",
           "occupant": "npc_ahong",
           "label": "陪阿宏搬貨",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "你走過去幫阿宏搭手抬起沉重的鐵箱。歇息抹汗時，他望著遠處青鬱的山頭，神祕兮兮地和你聊起一件極其私密的小事——語氣平常，但那份只有你們兩人共享的秘密，卻在彼此間悄悄紮下了一根無形的錨。",
-            "gain": ["info_ahong_private"],
-            "flag": { "ahong_last_normal_contact": true }
+            "gain": [
+              "info_ahong_private"
+            ],
+            "flag": {
+              "ahong_last_normal_contact": true
+            }
           }
         },
         {
           "id": "handle_couple",
           "occupant": "npc_couple",
           "label": "出面處理吵架的夫妻",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
-            "text": "兩人一路爭吵拉扯到旅館門口，太太眼眶泛紅，率先摔上車門。他們最終帶著滿腔未能化解的怨懟倉皇離去——收拾房間時，你發現沙發縫隙裡落了一台沾著指紋的舊拍立得相機。",
-            "gain": ["equip_polaroid"]
+            "text": "兩人一路爭吵拉扯到旅館門口，太太摔上車門。他們帶著滿腔怨氣開車離去——收拾房間時，你發現沙發縫隙裡落了一台舊拍立得相機。",
+            "gain": [
+              "equip_polaroid"
+            ]
           }
         },
         {
           "id": "ledger",
           "occupant": "npc_uncle",
           "label": "叔叔教你看帳本",
-          "accepts": ["protagonist"],
+          "accepts": [
+            "protagonist"
+          ],
           "on_place": {
             "text": "阿源叔在櫃檯後攤開一本邊角磨損起毛的深藍色登記冊，枯瘦的手指一欄欄劃過紙頁：哪個房號住著誰、付了多少押金，以及旁邊那些只有他自己才看得懂的奇異硃砂符號。「把這本簿子摸透了，這間老店的命脈你就抓得住了。」他咳嗽著說。",
             "switch": "s1"
@@ -182,62 +279,110 @@
           "id": "show_version",
           "occupant": null,
           "label": "把你聽到的那一段講出來",
-          "accepts": ["info_husband_version", "info_wife_version"],
-          "requires": { "any": [
-            { "has_card": "info_husband_version" },
-            { "has_card": "info_wife_version" }
-          ] },
+          "accepts": [
+            "info_husband_version",
+            "info_wife_version"
+          ],
+          "requires": {
+            "any": [
+              {
+                "has_card": "info_husband_version"
+              },
+              {
+                "has_card": "info_wife_version"
+              }
+            ]
+          },
           "reject_reason": "（你不知道他們兩個私下說了什麼。）",
           "on_place": {
             "text": "你平靜地將昨日聽見的那段話挑明，空氣頓時凝固。夫妻倆像是被戳破了某種假象，臉色煞白地停止了爭吵，各自默默回房打包行李。離店結帳時，兩人都客氣得近乎疏離——而那種無懈可擊的客氣，恰恰是裂痕最深的證明。",
-            "flag": { "couple_softened": true }
+            "flag": {
+              "couple_softened": true
+            }
           }
         },
         {
           "id": "soak",
           "occupant": null,
           "label": "泡湯",
-          "accepts": ["protagonist"],
-          "on_place": { "text": "滾燙的泉水淹過胸口，濃稠的硫磺氣味刺激著鼻腔。你在深邃幽靜的池子裡一動不動地泡著，直到指尖的皮膚泛起深白且皺縮的紋理。" }
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "滾燙的泉水淹過胸口，濃稠的硫磺氣味刺激著鼻腔。你在深邃幽靜的池子裡一動不動地泡著，直到指尖的皮膚泛起深白且皺縮的紋理。"
+          }
         }
       ],
       "note": "現行做法：開關 1 已從夫妻那一格拆出來，改掛在「叔叔教你看帳本」（待決 5 結案）。夫妻那一格專心當教學——拍立得＋情報卡用法。這是主角最後一次正常見到阿宏，而第一輪玩家在這一格完全不知道。待決 2 已結案：阿宏那張私人情報的第一輪兌現點在夜間層，是阿宏鏈第二級（n_ahong_2_ch1）的門檻，所以三個選項在第一輪都給東西。",
       "echo": {
         "day": 5,
         "text": "旁邊有人提起第 3 天下午發生過的一件小事。你接不上話，而現在也沒有人可以問了。",
-        "condition": { "not": { "flag": "ahong_last_normal_contact" } }
+        "condition": {
+          "not": {
+            "flag": "ahong_last_normal_contact"
+          }
+        }
       }
     },
     {
       "id": "d3_pm_oldstreet",
       "location": "oldstreet",
-      "when": { "day": 3, "phase": "afternoon" },
+      "when": {
+        "day": 3,
+        "phase": "afternoon"
+      },
       "fixed": false,
       "title": "老街漫步",
       "text": "午後的老街陽光斜照，麵攤老闆正無聲地擦拭油膩的摺疊桌，招牌在風中吱呀作響。",
       "slots": [
-        { "id": "wander", "occupant": null, "label": "在老街走走", "accepts": ["protagonist"], "on_place": { "text": "你在狹窄的石板路上漫無目的地走著。這裡的一切依稀仍是童年的模樣，但不知為何，街景的長度在你的感知裡比記憶中縮短了大半。" } }
+        {
+          "id": "wander",
+          "occupant": null,
+          "label": "在老街走走",
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "你在狹窄的石板路上漫無目的地走著。這裡的一切依稀仍是童年的模樣，但不知為何，街景的長度在你的感知裡比記憶中縮短了大半。"
+          }
+        }
       ]
     },
     {
       "id": "d3_pm_temple",
       "location": "temple",
-      "when": { "day": 3, "phase": "afternoon" },
+      "when": {
+        "day": 3,
+        "phase": "afternoon"
+      },
       "fixed": false,
       "title": "廟埕殘陽",
       "text": "大樹下的廟埕靜謐無聲，香爐裡飄散著檀香的青煙。金伯蹲在側殿走廊上，正專注地清點並擦拭著慶典要用的儀仗器物。",
       "slots": [
-        { "id": "jinbo", "occupant": "npc_jinbo", "label": "與金伯搭話", "accepts": ["protagonist"], "on_place": { "text": "金伯用粗布將一面銅鑼擦拭得鋥亮，小心翼翼地擺回原位。「祭典還早呢。」他頭也不抬地低聲說，「但每年都是這樣，早一天準備，到時候才不會出岔子……有些事，是萬萬不能出錯的。」" } }
+        {
+          "id": "jinbo",
+          "occupant": "npc_jinbo",
+          "label": "與金伯搭話",
+          "accepts": [
+            "protagonist"
+          ],
+          "on_place": {
+            "text": "金伯用粗布將一面銅鑼擦拭得鋥亮，小心翼翼地擺回原位。「祭典還早呢。」他頭也不抬地低聲說，「但每年都是這樣，早一天準備，到時候才不會出岔子……有些事，是萬萬不能出錯的。」"
+          }
+        }
       ]
     },
     {
       "id": "n3_map_opens",
       "location": "sanquan",
-      "when": { "day": 3, "phase": "night" },
+      "when": {
+        "day": 3,
+        "phase": "night"
+      },
       "fixed": true,
       "meta_once": true,
       "title": "夜幕降臨",
-      "text": "當山鎮徹底沉入黑暗時，周遭的空氣似乎變得比白晝更加沉重。三個隱沒在深巷與林道中的幽暗標記悄然浮現。從這一夜開始，每一次向那些未知地帶踏出步伐，你的意識深處便會多生出一縷難以名狀的焦躁與嗡鳴。",
+      "text": "鎮子入夜之後，周圍安靜得發沉。三個在巷子和林道裡的暗處標記亮了起來。從這一夜開始，每一次往那些地方走，心裡就會多出一股莫名的發慌。",
       "slots": [],
       "note": "真相：排隊那個是名單，他不用排因為他已經在上面了（第 43 夜這句話會改口）。亮著的窗那家人在等一個沒回來的人。三個標記的價碼先全填 1，見待決 38。"
     }
