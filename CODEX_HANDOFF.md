@@ -19,6 +19,202 @@
 
 **另一件未完成的是 `測試指南.md > P5-F` 最後一條 👤 人工驗收**——首輪三種 ending、正常長／短版、不上車 locked／unlocked／重見摘要、相簿／電話開局、逐字補完與翻頁、至少一次完整跨輪回場，每項附當下輪數與路徑。與 P3-F／P4-F 同狀態，只有真人玩過才能落檔。人工那條過了之後 P5 整段轉 ✅，接 i18n 管線與 P6 存檔 UI。
 
+**T-02 已完成並驗收（`bf7d20f`，2026-08-30）**：全 12 檔套語清理完成，密度從 2.70 降到 0.06／千字。本檔下方的 T-02 工單保留原文不動（歷史紀錄），但它描述的「12 個檔只改了 3 個」現況已經過期。
+
+**第 1 天上午／下午改為純演出時段（`f40fb4c`，2026-08-30 晚）**：新增三個 beat（電話演出、出城與邀阿婕、山路與老家回想），五個接線點讓純演出時段成立。結構契約住 `開發設計方針.md > 純演出時段（narration-only phase）`；驗收住 `測試指南.md > 純演出時段`。headless 34 套 exit 0、四個變異點如期轉紅。**UI sim 未跑**（當時 Godot 編輯器開著，runner preflight 擋下），已開 **K-241** 追蹤——下次跑 UI sim 時順手收掉。
+
+**下一輪做 T-03（白天地圖的空點問題與地點簡介）**，工單在下面，三件事、三步、含使用者已拍板的三個決定。**T-03 第三步與上面文案三步順序的第三步是同一件事**（補 `locations.json` 的空 `desc`），做 T-03 就等於把那一條也收了。
+
+---
+
+# T-03 白天地圖的空點問題與地點簡介工單（verifier，2026-08-30，對 `f40fb4c` 之後）
+
+## 背景：三件事，同一個根
+
+使用者實玩第 2 天上午回報三件事：
+
+1. 推進按鈕寫「推進時段（目前無可做動作）」，但那一格其實可以去山泉閣看演出——玩家會誤會而直接按掉，錯過內容。
+2. 點進山泉閣，畫面只有標題，要再按一次「繼續演出」才出現第一段。
+3. 那個時段地圖列出九個地點，其他八個點進去完全是空的。
+
+三件事的共同根是：**UI 只有「能不能放主角卡」這個概念，沒有「這裡有沒有東西可看」。** 三處各自缺一塊，湊起來就是玩家看到的樣子。
+
+以下根因均已查證（純讀檔與探針，未動程式）。
+
+---
+
+## 一、三件事的根因
+
+### 1. 推進按鈕的提示是錯的
+
+`scenes/main.gd > _refresh_advance_hint()` 用 `GameState.has_any_legal_action()` 決定顯示 `_MSG_ADVANCE` 還是 `_MSG_ADVANCE_HINT`。
+
+`has_any_legal_action()` 只算兩件事：**可放主角卡的 OPEN 槽**、**未結算的選擇題**。第 2 天上午 `d2_morning_intro` 是 `fixed` beat，三個槽全是 NPC 佔位（`occupant` 已填、`accepts: []`），一張卡都放不了，所以回 `false`。
+
+演出本身不在這個函式的視野裡。
+
+### 2. 進地點要按一下才有內容
+
+`scenes/ui/location_panel.gd > show_location()` 的順序是：清空 → `_queue_open_beats()` 排隊 → `_is_playing = not _pending_beat_ids.is_empty()` → `_rebuild()`。
+
+問題在 `_rebuild()` 的 `_is_playing` 分支：它只在 `_current_beat_id` 非空時 render 內容，而 `show_location()` 剛把 `_current_beat_id` 設成空字串、還沒 pop 過任何一個 beat。所以第一次進面板時**什麼都不 render**，只留下「繼續演出」按鈕。第一段要等第一次 `_on_advance_beat_pressed()` 才播。
+
+### 3. 空地點按鈕
+
+`scripts/core/panel_builder.gd > available_locations()` 的白天分支只按 `layer` / `chapter` / `phases` 篩，**不看那個地點在當下時段有沒有內容**。
+
+實測（探針走開局後的真實狀態，數字可信）：
+
+| 時段 | 地圖列出 | 真的有內容 |
+|---|---|---|
+| 第 2 天 上午 | 9 | **1**（`sanquan`） |
+| 第 2 天 下午 | 12 | 3（`sanquan`、`oldstreet`、`oldschool`） |
+| 第 3 天 上午 | 9 | **1**（`sanquan`） |
+| 第 3 天 下午 | 12 | 3（`sanquan`、`oldstreet`、`temple`） |
+
+> ⚠️ **不要引用「全 90 個時段 1156 個按鈕裡 1025 個是空的」那個數字。** 那是用 `gs.set("day", d)` 直接跳天量出來的，flags／knowledge／switches 都不成立，大量 beat 被判成 HIDDEN，嚴重高估。上表四格才是可信的。要全域真數字得走完整流程逐格記錄。
+
+判斷「有沒有內容」不需要新函式：`GameState.build_panel(loc).beats` 為空就是完全沒內容——`PanelBuilder.build()` 在 `beat_tri == TriState.HIDDEN` 時 `continue`，所以回傳的陣列裡只會有 OPEN 與 LOCKED。
+
+---
+
+## 二、使用者已拍板的三個決定
+
+寫在前面，實作時不要重新辯論。
+
+### A. 「曾經有過事件」＝ 玩家真的在那裡看過至少一個 beat
+
+**不是**「那個地點曾經有過 OPEN beat（不管玩家去沒去）」。
+
+理由：後者會讓玩家沒去過的地點也解鎖，而他不知道那裡發生了什麼，這個解鎖對他沒有意義；而且引擎每天要掃全部地點才算得出來。前者掛在 `play_beat()` 上，規則層一處記錄，UI 不用管。
+
+接受的副作用：玩家永遠不去的地點就永遠灰著。這與「你只能在場一次」的題目一致，是特性不是缺陷。
+
+### B. 存 meta 層，跨輪保留
+
+與 `night_locations_seen` 一致（`game_state.gd:56`，meta 層，`end_run()` 不清）。
+
+理由：第二輪玩家已經認得這座鎮，讓他重新解鎖是倒退，也跟知識卡跨輪保留的設定打架。
+
+接受的代價：第二輪第 2 天上午又會是九個可按的按鈕，其中八個只有簡介——使用者要解決的「煩躁」在第二輪部分回來。判斷是第二輪玩家有目的性，不會亂點。
+
+### C. LOCKED 的地點仍然可按
+
+灰色只用在「今天完全沒內容 **且** 從沒去過」。完整判斷式：
+
+| 情況 | 按鈕狀態 |
+|---|---|
+| 今天有任何非 HIDDEN beat（OPEN **或** LOCKED） | **可按**（不管去過沒） |
+| 今天沒內容，但去過 | **可按**，進去看簡介 |
+| 今天沒內容，也沒去過 | **灰色**（可見、不可按） |
+
+理由：「這裡有事，但你還不夠格」是個鉤子，全灰掉會把它埋了。夜間層已經是「列出並標 LOCKED ＋ 理由」（`location_summary()`），白天照這個一致。
+
+---
+
+## 三、實作契約（三步，照順序）
+
+**這樣切的理由**：第一步跟第三點無關，可以馬上收；第二步做完就能驗機制對不對，不用等文案；第三步是一批獨立的文案工。**不要把三步擠進一個 commit。**
+
+### 第一步：推進按鈕文字 ＋ 進地點立刻播第一段
+
+**動的檔**：`scenes/main.gd`、`scenes/ui/location_panel.gd`，可能加一個 `GameState` 查詢。
+
+1. 加一個「當下時段還有沒進過的 OPEN beat」的查詢。放 `GameState`，與 `has_any_legal_action()` 並列，命名建議 `has_unseen_content()`。判斷依據是 `beats_entered`——已經進過的不算。**不要在 UI 層自己掃 beat**（K-14／K-30 收過三次同型問題）。
+2. `_refresh_advance_hint()` 改成看兩個訊號。三種文字：可放卡 → `_MSG_ADVANCE`；不可放卡但有沒看過的演出 → 新字串（建議「推進時段（還有演出沒看）」）；兩者皆無 → 現行 `_MSG_ADVANCE_HINT`。**新字串進 `main.gd` 的常數區**，與既有兩條同一處，不要散寫。
+3. `location_panel.gd` 把 `_on_advance_beat_pressed()` 裡的 pop ＋ `play_beat` ＋ `state_changed.emit()` 抽成 `_play_next()`；`show_location()` 在 `_is_playing` 為真時立刻呼叫一次，按鈕沿用同一個函式。
+
+⚠️ **第 3 點有時序副作用**：`on_enter` 的結算會從「按第一下」提前到「進入地點的瞬間」。那才是 SCHEMA 寫的語意（`on_enter` ＝「beat 首次呈現給玩家時結算一次」），所以方向是對的——**但 UI sim 可能有契約依賴現行時序**。改之前先 grep `tests/ui_sim/cases/` 找 `beat_advance` 這個 qa_id 的用例，逐條確認。
+
+### 第二步：解鎖機制（先不填 `desc`）
+
+**動的檔**：`scripts/autoload/game_state.gd`、`scenes/ui/map_list.gd`、`data/SCHEMA.md`。
+
+1. 新欄位 `day_locations_visited: Dictionary`（`location_id -> true`），**meta 層**。照 `night_locations_seen` 的既有做法：`_reset_run_state()` 不清、`serialize()` 放 `meta`、`deserialize()` 逐筆驗形狀。
+   - **不要合併進 `night_locations_seen`**：那個欄位綁著夜間標記的費用與終身首次邏輯（`game_state.gd:1404` 一帶），混進白天地點會污染它。
+2. 記錄點掛在 `play_beat()`：成功結算時把該 beat 的 `location` 寫進 set。一處記錄，UI 不參與。
+3. `map_list.gd > refresh()` 的白天分支設 `btn.disabled`，依上面 C 的三行判斷式。**灰掉的按鈕仍要 `add_child`**（使用者要「可以看見」），且 `qa_id` 照舊掛上，否則 UI sim 定位不到。
+4. `SCHEMA.md` 登記新欄位。
+
+⚠️ **第 1 天的公車站會順帶解鎖**：D1 三段演出都掛 `busstop`（`d1_morning_phone`／`d1_morning_departure`／`d1_pm_mountain_road`），走 `auto_enter` 時一樣經過 `play_beat()`。所以公車站在第 2 天就是亮的。**這是預期行為**——主角確實在那裡下的車——不要為它加特例。
+
+此時空地點進去只顯示地點名（`location_panel.gd` 缺 `desc` 時的既有退路），跟現在一樣。機制對不對這一步就驗得出來。
+
+### 第三步：補 `locations.json` 的 `desc`
+
+**這一步等於把 handoff 開頭「文案三步順序」的第三步一起收掉**（順手收 K-238：`SCHEMA.md` 的可翻譯欄位清單漏了 `locations.json > reject_reason`）。
+
+**先確認讀者**：
+
+| 層 | 數量 | 現在有讀者嗎 |
+|---|---|---|
+| 白天／both | **20** | ✅ `location_panel.gd > _rebuild()` 的非 `_is_playing` 分支已經在讀 `location.get("desc")` |
+| 夜間 | 28 | ❌ `show_night_details()` 明確設 `_description_label.visible = false` |
+
+**所以這一步只要寫白天那 20 段。** 夜間 28 段目前沒有任何顯示路徑，寫了沒人看——要嘛先給夜間詳情面板接上 `desc`（那是新需求，另開），要嘛就先不寫。**不要因為 SCHEMA 寫「48 個地點的 desc 尚未填」就一口氣寫 48 段。**
+
+20 個白天地點：`sanquan`、`jinghe`、`oldstreet`、`temple`、`clinic`、`riverside`、`columbarium`、`oldschool`、`bathhouse`、`busstop`、`communitycenter`、`oldhouse`、`police`、`clinic_back`、`registry_office`、`upstream`、`old_bathhouse`、`jinghe_back`、`oldhouse_room`、`temple_back`。
+
+**寫作要求**（這批文案與 beat 文案的性質不同，照這幾條）：
+
+- **會被反覆讀。** 玩家每次進空地點都看到同一段。要短、要耐讀。
+- **不能有一次性的時間感。** 沒有「今天」「此刻」「這時候」——那會讓常駐文字讀起來像事件。
+- **不能有事件感。** 寫得像有事發生，玩家會以為自己漏掉了什麼。簡介是背景，讀起來要像那個地方本來就長那樣。
+- **不要洩漏後面章節的東西。** 第一章就看得到的地點，簡介不能提第三章才揭露的事。
+- **不要重複 beat 已經講過的話。** 簡介與該地點的 beat 文字放在一起讀不能互相打架。
+- **長度**：建議 30～60 字，兩三句。`title` 與 `label` 一律不動（T-02 的線，chrome 沒有版面風險就是靠這條守的）。
+
+**注意 `desc` 是常駐顯示，不是「沒事件才顯示」**——`location_panel.gd` 現行語意是「beat 依序演出結束後常駐顯示」，`SCHEMA.md` 第 395 行一帶也這樣寫。**照現有語意走，不要加「只在沒事件時顯示」的特判。** 有事件的地點演完也會看到簡介，那是對的。
+
+---
+
+## 四、驗收方式
+
+### 第一步
+
+- [ ] headless：`has_unseen_content()` 在第 2 天上午（未進山泉閣）為真、進過之後為假；`has_any_legal_action()` 同時為假。三種按鈕文字各有一個對得上的狀態。
+- [ ] headless：`show_location()` 之後不必再呼叫任何東西，面板就已經有第一段的文字與 `beats_entered` 記錄。
+- [ ] 變異：拿掉 `show_location()` 裡的 `_play_next()` 呼叫 → 對應測試轉紅。
+- [ ] 🤖 UI：第 2 天上午點進山泉閣，第一段文字立刻在畫面上；有第二段時「繼續演出」仍然出現且能翻。
+- [ ] UI sim 全綠，附 run id。**特別確認 `beat_advance` 相關用例沒有依賴舊時序。**
+
+### 第二步
+
+- [ ] headless：四種狀態各有一個對得上的 fixture——今天有 OPEN／今天只有 LOCKED／今天沒內容但去過／今天沒內容也沒去過。前三種可按、第四種灰。
+- [ ] headless：`day_locations_visited` 在 `end_run()` 之後仍然保留，`_reset_run_state()` 不清；`serialize()` → `deserialize()` 往返逐字相同；壞形狀（非 Dictionary、值不是 true）被 `invalid_save_shape` 擋下。
+- [ ] headless：第 1 天走完之後 `busstop` 已在 set 裡（`auto_enter` 也經過 `play_beat()`）。
+- [ ] 變異：拿掉 `play_beat()` 的記錄 → 解鎖測試轉紅；把欄位改成 run 層（`_reset_run_state()` 裡 clear）→ 跨輪保留測試轉紅。
+- [ ] 🤖 UI：第 2 天上午九個按鈕中，山泉閣可按、其餘八個灰但可見；灰掉的按鈕仍有 `qa_id`。
+- [ ] UI sim 全綠，附 run id。
+
+### 第三步
+
+- [ ] 20 個白天地點的 `desc` 全部非空；`verify_data` 全綠。
+- [ ] 照 T-02 的掃描口徑量新文案密度，**目標 1.5 以下**（T-02 收完是 0.06，不要在這裡把它拉回去）。
+- [ ] headless：`build_panel()` 回傳的 `location.desc` 有值；缺欄位的退路仍然成立（拿掉一個 `desc` 應該退回只顯示 `name`，不是崩）。
+- [ ] 🤖 UI：進一個「去過但今天沒事件」的地點，看得到簡介；進一個有事件的地點，演完之後簡介也在。
+- [ ] 👤 人工：連續進五、六個空地點，確認簡介讀起來不煩、不像有事發生。
+
+---
+
+## 五、不能踩的線
+
+- **不要在 UI 層自己掃 beat 或自己判 `when`。** K-14／K-30 收過三次同型問題，規則層要有唯一入口。
+- **不要合併 `day_locations_visited` 與 `night_locations_seen`。** 後者綁著夜間費用與終身首次邏輯。
+- **不要把灰掉的地點從 `available_locations()` 裡拿掉。** 使用者明確要「可以看見」；那個函式是規則層的可達性，不是 UI 的可按性——`map_list.gd` 才是設 `disabled` 的地方。走查腳本與 `has_any_legal_action()` 都吃 `available_locations()`，動它會連帶改變走查分類。
+- **不要為第 1 天加特例。** D1 上午下午已經是純演出時段、沒有地圖（`DataFacts.NARRATION_ONLY_PHASES`），這個機制天然不影響它。
+- **`title` 與 `label` 不動。**
+- **`desc` 是常駐顯示**，不要加「只在沒事件時顯示」的特判。
+
+---
+
+## 六、與既有工單的關係
+
+- **文案三步順序的第三步 ＝ T-03 第三步。** 做完 T-03 就把那條收了。
+- **K-238**（`SCHEMA.md` 可翻譯欄位清單漏了 `locations.json > reject_reason`）在第三步順手收——反正都要動那一段。
+- **K-241**（純演出時段的 UI 層零覆蓋）與 T-03 無關，但三步各自都要跑 UI sim，**第一次跑的時候順手把 K-241 收掉**。
+- **K-240**（長文案的版面沒有自動覆蓋）：第三步新增 20 段常駐文字會擴大這個風險面。寫的時候守住 30～60 字就不會惡化。
+
 ---
 
 # T-02 文案套語清理工單（verifier，2026-08-30，對 `fe72d7f`）
