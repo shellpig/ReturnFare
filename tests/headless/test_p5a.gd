@@ -45,6 +45,7 @@ func _errs_contain(errs: PackedStringArray, needle: String) -> bool:
 
 func _make_loader_for_p5(endings: Array, opening: Array, beats: Array, cards: Dictionary, npcs: Dictionary, locations: Dictionary = {}) -> DataLoader:
 	var loader := DataLoader.new()
+	loader.opening_screen = { "title": "測試開局", "prompt": "測試提示" }
 	loader.endings.clear()
 	loader.endings_by_id.clear()
 	for end in endings:
@@ -385,9 +386,26 @@ func _test_lint18_negative() -> void:
 	var base_loader := DataLoader.new()
 	base_loader.load_all()
 
+	# 0. opening screen 共用文案缺漏
+	var l_no_title := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
+	l_no_title.opening_screen["title"] = ""
+	var errs := DataLoader.lint_opening_and_defaults(l_no_title)
+	if _errs_contain(errs, "screen.title"):
+		_ok("18.0a 抓到 opening screen title 為空")
+	else:
+		_fail("18.0a 未抓到 opening screen title 為空: " + str(errs))
+
+	var l_no_prompt := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices, base_loader.beats, base_loader.cards, base_loader.npcs)
+	l_no_prompt.opening_screen["prompt"] = "   "
+	errs = DataLoader.lint_opening_and_defaults(l_no_prompt)
+	if _errs_contain(errs, "screen.prompt"):
+		_ok("18.0b 抓到 opening screen prompt 為空")
+	else:
+		_fail("18.0b 未抓到 opening screen prompt 為空: " + str(errs))
+
 	# 1. opening choices 缺選項
 	var l_missing_oc := _make_loader_for_p5(base_loader.endings, base_loader.opening_choices.slice(0, 2), base_loader.beats, base_loader.cards, base_loader.npcs)
-	var errs := DataLoader.lint_opening_and_defaults(l_missing_oc)
+	errs = DataLoader.lint_opening_and_defaults(l_missing_oc)
 	if _errs_contain(errs, "順序或項目不符預期"):
 		_ok("18.1 抓到 opening choices 缺少選項")
 	else:

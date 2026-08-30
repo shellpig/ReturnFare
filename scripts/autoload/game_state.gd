@@ -711,6 +711,16 @@ const HISTORY_RECORD_KEYS := [
 ]
 
 
+## 開局畫面的故事文案 view model。UI 不讀 raw JSON，也不在腳本複製故事字串。
+func opening_screen_view() -> Dictionary:
+	if Data == null or Data.loader == null:
+		return {}
+	return {
+		"title": str(Data.loader.opening_screen.get("title", "")),
+		"prompt": str(Data.loader.opening_screen.get("prompt", "")),
+	}
+
+
 ## 開局畫面的唯一查詢入口。依 `opening_choices.json` 資料順序回傳，
 ## 只給玩家看得到的字串與鎖定理由，不洩漏 unlock condition 或 `on_select`。
 func opening_view() -> Array[Dictionary]:

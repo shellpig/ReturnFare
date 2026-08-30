@@ -25,6 +25,7 @@ var beats: Array[Dictionary] = []
 var beats_by_id: Dictionary = {}
 var endings: Array[Dictionary] = []
 var endings_by_id: Dictionary = {}
+var opening_screen: Dictionary = {}
 var opening_choices: Array[Dictionary] = []
 var opening_choices_by_id: Dictionary = {}
 
@@ -96,7 +97,10 @@ func load_all() -> bool:
 
 	opening_choices.clear()
 	opening_choices_by_id.clear()
-	var opening_arr := _read_json_array(DATA_DIR + "opening_choices.json")
+	var opening_file := _read_opening_data(DATA_DIR + "opening_choices.json")
+	var opening_screen_raw: Variant = opening_file.get("screen")
+	opening_screen = (opening_screen_raw as Dictionary).duplicate() if opening_screen_raw is Dictionary else {}
+	var opening_arr: Array = opening_file.get("opening_choices", []) as Array
 	for oc: Variant in opening_arr:
 		if oc is Dictionary:
 			var oc_dict := oc as Dictionary
@@ -1363,6 +1367,26 @@ func _read_json_array(path: String) -> Array:
 	return []
 
 
+## opening_choices.json 在 P5-E 增加畫面文案容器；舊 fixture 的頂層 Array 仍相容。
+func _read_opening_data(path: String) -> Dictionary:
+	var text := FileAccess.get_file_as_string(path)
+	if text.is_empty():
+		errors.append("讀不到或是空的：%s" % path)
+		return {}
+	var parsed: Variant = JSON.parse_string(text)
+	if parsed == null:
+		errors.append("JSON 解析失敗：%s" % path)
+		return {}
+	if parsed is Array:
+		return { "screen": {}, "opening_choices": parsed }
+	if parsed is Dictionary:
+		var d := parsed as Dictionary
+		if d.get("opening_choices") is Array:
+			return d
+	errors.append("JSON 格式錯誤（預期含 opening_choices Array）：%s" % path)
+	return {}
+
+
 ## lint 17：結局資料完整性（規格書第十七節 lint 17）。
 ## 驗證 4 筆 ending、linear/composite 結構、必填 pages、唯一 fallback、skip_to 指向、when_group 指向、組裝路徑覆蓋、source ↔ ending 配對與 phase_exit。
 static func lint_endings(loader: DataLoader) -> PackedStringArray:
@@ -1745,6 +1769,11 @@ static func lint_opening_and_defaults(loader: DataLoader) -> PackedStringArray:
 	var problems: PackedStringArray = []
 	var expected_order := ["take_family_album", "return_missed_call", "refuse_boarding"]
 	var actual_order := []
+
+	for field: String in ["title", "prompt"]:
+		var screen_text: Variant = loader.opening_screen.get(field)
+		if typeof(screen_text) != TYPE_STRING or str(screen_text).strip_edges().is_empty():
+			problems.append("opening_choices.json [screen.%s]：必須為非空字串" % field)
 
 	for oc in loader.opening_choices:
 		var ocid := str(oc.get("id", ""))

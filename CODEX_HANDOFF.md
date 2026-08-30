@@ -4,26 +4,27 @@
 
 ## 目前狀態
 
-**P5-E（開局與結局 UI）程式碼層通過 verifier 複驗，四個 blocker 全數解除；尚未關門，卡在兩件文件／證據工作（K-213、K-214）。**
+**P5-E（開局與結局 UI）implementer 待辦 K-213～K-219 已全部處理，程式、資料、測試與交接基準線全綠；待 verifier 最終覆驗與文件關門。**
 
-複驗證據（verifier 於 2026-08-30 於 `311200f` 獨立重跑）：
+最新 implementer 基準線（2026-08-30，尚未提交）：
 
 - Headless：32 套 exit 0，`ALL HEADLESS TESTS PASSED!`
-- UI Sim：run `20260830-074157-585-p14592-0bd1cddb`，116 variants／93 catalog contracts／93 executed／93 completed／**0 failed checks**
+- UI Sim：run `20260830-082633-494-p16984-bc987c65`，116 variants／93 catalog contracts／93 executed／93 completed／**0 failed checks**
+- Greedy：90 個行動時段完整分類、46 次主角放置、14 張發狂卡帳相符，結局後第二輪相簿開局成功
 
-## ⚠️ implementer 待辦（P5-E 關門前必做）
+## P5-E implementer 待辦完成（K-213～K-219）
 
-以下兩條是關門條件，其餘為非阻擋殘留。完整條目見 `驗證後已知問題.md > K-213 ~ K-219`。
+完整條目仍由 verifier 管理於 `驗證後已知問題.md > K-213 ~ K-219`；本節只交付修正與可重跑證據，不替 verifier 改狀態。
 
-| 條目 | 要做什麼 |
+| 條目 | 完成內容 |
 |---|---|
-| **K-213（關門）** | `p5e_03`／`p5e_04`／`p5e_06`／`p5e_07`／`p5e_08` 五條契約沒有任何變異證據，違反 `AGENTS.md` 實作守則 5。逐條反轉接線驗紅（例：ending mode 下讓 `advance_phase()` 放行、`_route_view()` 在 ending 時不隱藏 HandBar、ending page 文字換成 `ending_replaced` 字面、`empty_handed` 未持卡時不建立），確認精確轉紅後還原重跑全綠，並把結果補進下方變異表。`p5e_07` 尤其不能略過——它上一輪就是空跑，「現在能轉紅」正是這次修的重點 |
-| **K-214（關門）** | 更新本檔：`311200f` 改了什麼、新的複驗 run ID、**移除下方第 5 點的「K-195 修復」字樣**（實際只修了前半） |
-| K-215 | `p1af_cases.gd` 的 skip 落點斷言含 `or not txt_skip.is_empty()` 而恆真；改成由 `repeat.skip_to` 反查 page index 再比對 `ending_view().page_index` |
-| K-216 | 測試指南 P5-E 要求的「滑鼠連點」「Enter key repeat（echo）」零覆蓋，`not k.echo` 無反證；`p5e_06` 未驗委託狀態殘留 |
-| K-217 | `opening_panel.gd` 的 `_MSG_TITLE`／`_MSG_PROMPT` 是故事散文卻硬寫在腳本，不在 `SCHEMA.md` 可翻譯欄位清單內；標題另在 `.tscn` 與 `main.gd` 重複共三份 |
-| K-218 | `p5e_04` 假設按鍵當下逐字仍在播；先斷言 `is_typewriting()` 為真再送鍵，否則字速或幀率一變就會因錯誤原因轉紅 |
-| K-219 | `開發設計方針.md > P5-E` 寫「mode 改變即卸載前一個 panel」，實作是常駐切 `visible`。改方針或改實作，二擇一 |
+| **K-213（關門）** | `p5e_03`／`04`／`06`／`07`／`08` 五條各完成一次單點變異驗紅，詳見下方變異表；全部還原後全套 UI 93／93／0 |
+| **K-214（關門）** | 本檔已改為 2026-08-30 現況、補 `311200f` review 修正與最新 run；第 5 點不再把 K-195 整條寫成已修 |
+| K-215 | `p5e_05` 改從 `endings.json > repeat.skip_to` 反查 active `page_refs` 的精確 index，再與 `ending_view().page_index` 比對；恆真文字斷言退場 |
+| K-216 | `p5e_04` 新增 Enter `echo=true` 零變化與真實滑鼠連點只前進一頁；`p5e_06` 新增 delegation daily／pending 清空斷言，special evidence 同步列為必填 |
+| K-217 | `opening_choices.json` 新增 `screen.title`／`screen.prompt`；DataLoader＋Lint 18＋SCHEMA＋GameState view model 接線，`opening_panel.gd`／`.tscn`／`main.gd` 的故事文案複本移除 |
+| K-218 | `p5e_04` 在第一次 Space 前明示斷言 `EndingFlowText.is_typewriting()`，使失敗原因鎖定在逐字契約 |
+| K-219 | implementer-owned `開發設計方針.md > P5-E` 改寫為現況：OpeningPanel／EndingPanel 常駐，依 mode 切 `visible`，離開 ending 呼叫 `reset()` |
 
 **K-194 已由 verifier 結案**（`311200f` 的 `d45_evening__no_registry` 自然走查狀態＋`p5e_08` 真實輸入）。**K-195 只有前半結案**（card-required 槽不再建直選按鈕）；後半（`empty_handed` 無「未持 `info_registry`」條件，持卡玩家仍看得到「你手上什麼都沒有」）未動，且 `311200f` 之後持卡狀態連斷言都沒有，已改列 P5-F。
 
@@ -46,7 +47,7 @@
    - 掛載 `OpeningPanel` 與 `EndingPanel`，移除舊的過渡 stub 函式。
    - 依 `GameState.flow_mode` 動態掛載與切換（`FLOW_OPENING`, `FLOW_RUN`, `FLOW_ENDING`）。
    - ending 模式下 HandBar、MapList、LocationPanel、EncounterPanel、AdvanceButton 等 run 控制項全部隱藏。
-5. **`scenes/ui/location_panel.gd`（K-195 **前半**修復）**
+5. **`scenes/ui/location_panel.gd`**
    - `choice_requires_card: true` 的 slot 不再生成直接選取按鈕，強制玩家依持卡路徑或 fallback 選擇。
    - ⚠️ K-195 後半（`empty_handed` 無「未持 `info_registry`」條件，持卡玩家仍看得到）**未修**，已改列 P5-F。
 6. **測試與 UI Sim 契約套件**
@@ -79,8 +80,13 @@ verifier 第一輪 review 開四個 blocker 與 N1～N12，`311200f` 處理如�
 |---|---|---|
 | 變異 1：Skip 按鈕顯示條件反轉 | `_skip_btn.visible = not can_skip` | `p5e_05_ending_skip_seen_only` 確切轉紅（5 checks failed），還原後回綠 |
 | 變異 2：開局選項鎖定狀態反轉 | `btn.disabled = false` | `p5e_01_boot_opening` 確切轉紅（1 check failed），還原後回綠 |
+| 變異 3：ending 顯示 HandBar | `_route_view()` ending 分支令 `_hand_bar.visible = true` | `p5e_03_ending_isolation` 轉紅：`HandBar 在 ending 時不可見`（run `20260830-082134-376-p36380-d27d3f3b`） |
+| 變異 4：補完當頁後不 return | `_on_advance_pressed()` 第一分支拿掉 `return` | `p5e_04_ending_typewriter_and_advance` 轉紅：首次輸入由 page 0 跨到 1，四個直接斷言失敗（run `20260830-082224-834-p13324-236d6fee`） |
+| 變異 5：回 opening 仍顯示 EndingPanel | opening 分支令 `_ending_panel.visible = true` | `p5e_06_ending_complete_to_opening` 轉紅：EndingPanel 未隱藏並攔截後續開局操作（run `20260830-082316-177-p20032-567f50ca`） |
+| 變異 6：玩家 UI 注入內部 ending id | `_MSG_ADVANCE_REVEAL = "ending_replaced"` | `p5e_07_no_internal_keys_leaked` 精確轉紅並指出該字串（run `20260830-082405-568-p68044-c7397c05`） |
+| 變異 7：card-required choice 重建直選按鈕 | `if is_choice and not requires_card` 退回 `if is_choice` | `p5e_08_coda_choice_requires_card` 精確轉紅：出現禁止的 direct choose（run `20260830-082456-045-p46300-03d43432`） |
 
-⚠️ **只有這兩條，對應 `p5e_05` 與 `p5e_01`。`p5e_03`／`p5e_04`／`p5e_06`／`p5e_07`／`p5e_08` 尚無變異證據——這就是 K-213，關門前必補。**
+五個 K-213 變異皆已逐一還原；`rg "MUTATION K-213|DEBUG-"` 無殘留，最終全套 UI 基準為 `20260830-082633-494-p16984-bc987c65`（116 variants／93 contracts／0 failed）。
 
 ---
 

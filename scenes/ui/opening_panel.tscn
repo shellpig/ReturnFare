@@ -6,7 +6,6 @@
 script = ExtResource("1_opening")
 
 [node name="TitleLabel" type="Label" parent="."]
-text = "出門前的十分鐘"
 
 [node name="PromptLabel" type="Label" parent="."]
 autowrap_mode = 3

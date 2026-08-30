@@ -101,9 +101,9 @@ const SPECIAL_EVIDENCE := {
 	"p5e_01_boot_opening": ["opening_title_visible", "opening_three_choices", "refuse_locked_with_reason", "run_controls_hidden"],
 	"p5e_02_opening_confirm_cancel": ["preview_dialog_shown", "cancel_zero_mutation", "confirm_starts_run", "hand_cards_received"],
 	"p5e_03_ending_isolation": ["ending_panel_visible", "run_controls_hidden", "advance_mutation_rejected", "all_run_entries_rejected"],
-	"p5e_04_ending_typewriter_and_advance": ["typewriter_reveal_same_page", "advance_to_next_page", "no_two_page_skip", "reload_preserves_ending_page"],
+	"p5e_04_ending_typewriter_and_advance": ["typewriter_reveal_same_page", "advance_to_next_page", "no_two_page_skip", "key_echo_ignored", "mouse_double_click_single_page", "reload_preserves_ending_page"],
 	"p5e_05_ending_skip_seen_only": ["first_seen_no_skip", "repeat_seen_skip_available", "skip_to_target_page", "skip_intermediate_summary"],
-	"p5e_06_ending_complete_to_opening": ["ending_complete_cleans_run", "refuse_unlocked_after_replaced", "refuse_ending_roundtrip", "no_run_controls_residue"],
+	"p5e_06_ending_complete_to_opening": ["ending_complete_cleans_run", "delegation_state_cleared", "refuse_unlocked_after_replaced", "refuse_ending_roundtrip", "no_run_controls_residue"],
 	"p5e_07_no_internal_keys_leaked": ["ui_dump_clean_of_internal_keys"],
 	"p5e_08_coda_choice_requires_card": ["card_required_no_direct_choose", "empty_handed_choice_available", "empty_handed_enters_ending"],
 }

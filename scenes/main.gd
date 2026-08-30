@@ -275,7 +275,7 @@ func _on_delegation_tutorial_dismissed() -> void:
 func _refresh_status() -> void:
 	match GameState.flow_mode:
 		GameState.FLOW_OPENING:
-			_status_label.text = "出門前的十分鐘"
+			_status_label.text = str(GameState.opening_screen_view().get("title", ""))
 		GameState.FLOW_ENDING:
 			_status_label.text = "結局"
 		_:

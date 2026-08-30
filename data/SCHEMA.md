@@ -28,7 +28,7 @@
 | `npcs.json` | `name`、`locked_name` |
 | `card_types.json` | `name` |
 | `beats/*.json` | `title`、`text`、`slots[].label`、`slots[].reject_reason`、`reject_reason`、`echo.text`、`on_enter.text`、`on_place.text`、`slots[].delegation.preview`、`slots[].delegation.tendency`、`slots[].delegation.report.text`、`encounter.rounds[].demand`、`encounter.rounds[].responses[].on_resolve.text`、`encounter.rounds[].fallback.on_resolve.text`、`encounter.on_victory.text`／`on_failure.text`／`on_escape.text` |
-| `opening_choices.json` | `label`、`preview`、`confirm_text`、`reject_reason`、`on_select.text` |
+| `opening_choices.json` | `screen.title`、`screen.prompt`、`opening_choices[].label`、`opening_choices[].preview`、`opening_choices[].confirm_text`、`opening_choices[].reject_reason`、`opening_choices[].on_select.text` |
 | `endings.json` | 所有 `pages[]`／`*_pages[]` 內的 `text` |
 
 `note` 與 `_comment` 是給開發者看的，**不翻譯、不抽取**。
@@ -180,10 +180,15 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 
 ## `opening_choices.json`（P5）
 
-故事內「出門前的十分鐘」選項，頂層是**有序陣列**。正式資料恰三筆，順序本身就是 UI 順序：
+故事內「出門前的十分鐘」選項。頂層是物件：`screen` 保存畫面共用故事文案，`opening_choices` 是有序陣列。正式選項恰三筆，順序本身就是 UI 順序：
 
 ```json
-[
+{
+  "screen": {
+    "title": "出門前的十分鐘",
+    "prompt": "……"
+  },
+  "opening_choices": [
   {
     "id": "take_family_album",
     "label": "帶上父母留下的舊相簿",
@@ -207,11 +212,13 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
     "reject_reason": "你還沒有理由放棄這趟路。",
     "ending": "ending_refuse_boarding"
   }
-]
+  ]
+}
 ```
 
 | 欄位 | 規約 |
 |---|---|
+| `screen.title`／`screen.prompt` | 必填非空字串；開局標題與提示的唯一資料來源 |
 | `id` | 全檔唯一。正式三 id 與順序如上 |
 | `label` | 選項列文字 |
 | `preview` | 確認前的故事預覽，不揭露完整結果 |

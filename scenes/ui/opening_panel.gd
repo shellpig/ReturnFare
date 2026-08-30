@@ -5,9 +5,6 @@ extends Control
 
 signal choice_selected(choice_id: String)
 
-const _MSG_TITLE := "出門前的十分鐘"
-const _MSG_PROMPT := "雨還在下。玄關放著那幾樣東西，你打算拿哪一樣？"
-
 @onready var _title_label: Label = $TitleLabel
 @onready var _prompt_label: Label = $PromptLabel
 @onready var _choices_container: VBoxContainer = $ChoicesContainer
@@ -18,8 +15,6 @@ var _pending_choice_id: String = ""
 
 
 func _ready() -> void:
-	_title_label.text = _MSG_TITLE
-	_prompt_label.text = _MSG_PROMPT
 	_confirm_dialog.confirmed.connect(_on_dialog_confirmed)
 	_confirm_dialog.canceled.connect(_on_dialog_canceled)
 	_confirm_dialog.get_ok_button().set_meta("qa_id", "dialog_confirm::opening")
@@ -30,6 +25,9 @@ func _ready() -> void:
 func refresh() -> void:
 	_pending_choice_id = ""
 	_reason_label.text = ""
+	var screen: Dictionary = GameState.opening_screen_view()
+	_title_label.text = str(screen.get("title", ""))
+	_prompt_label.text = str(screen.get("prompt", ""))
 	for child in _choices_container.get_children():
 		_choices_container.remove_child(child)
 		child.queue_free()

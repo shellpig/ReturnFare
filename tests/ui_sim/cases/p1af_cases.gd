@@ -2250,6 +2250,8 @@ class UiCase extends CaseBaseClass:
 	func _p5e_04(tree: SceneTree) -> Dictionary:
 		await _enter_ending_from_d45(tree)
 		var gs := CaseBaseClass.get_game_state(tree)
+		var ending_flow: Node = tree.get_root().find_child("EndingFlowText", true, false)
+		assert_true(ending_flow != null and bool(ending_flow.call("is_typewriting")), "送出第一次按鍵前逐字播放仍在進行")
 
 		var view_0: Dictionary = gs.call("ending_view")
 		var idx_before := int(view_0.get("page_index", 0))
@@ -2279,6 +2281,38 @@ class UiCase extends CaseBaseClass:
 		else:
 			assert_true(bool(view_2.get("can_complete", false)), "末頁準備結算")
 
+		# ③ key repeat / echo 必須完全忽略，不補完、不翻頁。
+		assert_true(bool(ending_flow.call("is_typewriting")), "Enter 翻頁後新頁正在逐字播放")
+		var before_echo := JSON.stringify(gs.call("serialize"))
+		var key_echo := InputEventKey.new()
+		key_echo.keycode = KEY_ENTER
+		key_echo.pressed = true
+		key_echo.echo = true
+		QAStepClass.send_input(key_echo)
+		await QAStepClass.wait_draw_frames(tree, 2)
+		assert_eq(JSON.stringify(gs.call("serialize")), before_echo, "Enter echo 事件不改變頁面或揭露狀態")
+
+		# ④ 真實滑鼠連點：第一下補完當頁、第二下只前進一頁，不得跨兩頁。
+		var ending_panel: Control = tree.get_root().find_child("EndingPanel", true, false) as Control
+		var click_pos := ending_panel.get_global_rect().get_center()
+		var mouse_start_index := int((gs.call("ending_view") as Dictionary).get("page_index", 0))
+		for _i in range(2):
+			var press := InputEventMouseButton.new()
+			press.button_index = MOUSE_BUTTON_LEFT
+			press.pressed = true
+			press.position = click_pos
+			press.global_position = click_pos
+			QAStepClass.send_input(press)
+			var release := InputEventMouseButton.new()
+			release.button_index = MOUSE_BUTTON_LEFT
+			release.pressed = false
+			release.position = click_pos
+			release.global_position = click_pos
+			QAStepClass.send_input(release)
+		await QAStepClass.wait_draw_frames(tree, 2)
+		var view_mouse: Dictionary = gs.call("ending_view")
+		assert_eq(int(view_mouse.get("page_index", 0)), mouse_start_index + 1, "滑鼠連點兩次只前進一頁")
+
 		# N3: 驗證中途存讀檔保持（serialize -> deserialize）
 		var snap: Dictionary = gs.call("serialize")
 		gs.call("deserialize", snap)
@@ -2287,13 +2321,13 @@ class UiCase extends CaseBaseClass:
 		await QAStepClass.wait_draw_frames(tree, 2)
 
 		var view_reload: Dictionary = gs.call("ending_view")
-		assert_eq(int(view_reload.get("page_index", 0)), int(view_2.get("page_index", 0)), "Reload 後 page_index 保持不變")
-		assert_eq(bool(view_reload.get("page_revealed", false)), bool(view_2.get("page_revealed", false)), "Reload 後 page_revealed 保持不變")
+		assert_eq(int(view_reload.get("page_index", 0)), int(view_mouse.get("page_index", 0)), "Reload 後 page_index 保持不變")
+		assert_eq(bool(view_reload.get("page_revealed", false)), bool(view_mouse.get("page_revealed", false)), "Reload 後 page_revealed 保持不變")
 
 		return {
 			"ok": errors.is_empty(),
 			"errors": errors,
-			"evidence": ["typewriter_reveal_same_page", "advance_to_next_page", "no_two_page_skip", "reload_preserves_ending_page"]
+			"evidence": ["typewriter_reveal_same_page", "advance_to_next_page", "no_two_page_skip", "key_echo_ignored", "mouse_double_click_single_page", "reload_preserves_ending_page"]
 		}
 
 	func _p5e_05(tree: SceneTree) -> Dictionary:
@@ -2338,8 +2372,17 @@ class UiCase extends CaseBaseClass:
 		# N2: 點擊 skip，驗證跳至 short_return 摘要頁（非末頁）
 		await _click(tree, "ending_skip")
 		var view_after_skip: Dictionary = gs.call("ending_view")
-		var txt_skip := str(view_after_skip.get("page_text", ""))
-		assert_true(txt_skip.contains("你回到原本的生活") or txt_skip.contains("這座小鎮") or not txt_skip.is_empty(), "Skip 後文字符合 short_return 摘要")
+		var loader: DataLoader = gs.call("loader")
+		var ending_data: Dictionary = loader.endings_by_id["ending_replaced"] as Dictionary
+		var skip_to := str((ending_data.get("repeat", {}) as Dictionary).get("skip_to", ""))
+		var page_refs: Array = (gs.get("active_ending") as Dictionary).get("page_refs", []) as Array
+		var expected_skip_index := -1
+		for i in range(page_refs.size()):
+			if EndingResolver.page_id_of(str(page_refs[i])) == skip_to:
+				expected_skip_index = i
+				break
+		assert_true(expected_skip_index >= 0, "repeat.skip_to 可反查到本次 page_refs")
+		assert_eq(int(view_after_skip.get("page_index", -1)), expected_skip_index, "Skip 落到 repeat.skip_to 指定頁")
 		assert_true(bool(view_after_skip.get("page_revealed", false)), "Skip 後目標頁直接揭露")
 
 		# 走完第二輪結局
@@ -2420,6 +2463,8 @@ class UiCase extends CaseBaseClass:
 
 		var run_state: Dictionary = (_state(tree).get("run", {}) as Dictionary)
 		assert_true((run_state.get("hand", []) as Array).is_empty(), "結算回 opening 後手牌為空陣列")
+		assert_true((run_state.get("delegates_used_today", {}) as Dictionary).is_empty(), "結算回 opening 後委託 daily 狀態清空")
+		assert_true((run_state.get("pending_delegation_reports", []) as Array).is_empty(), "結算回 opening 後委託 pending 狀態清空")
 
 		# 驗證此時不上車按鈕已解鎖
 		var btn_refuse: Button = QAStepClass.find_controls_by_qa_id(tree.get_root(), "opening_choice::refuse_boarding")[0] as Button
@@ -2444,7 +2489,7 @@ class UiCase extends CaseBaseClass:
 			"ok": errors.is_empty(),
 			"errors": errors,
 			"observations": {
-				"evidence": ["ending_complete_cleans_run", "refuse_unlocked_after_replaced", "refuse_ending_roundtrip", "no_run_controls_residue"]
+				"evidence": ["ending_complete_cleans_run", "delegation_state_cleared", "refuse_unlocked_after_replaced", "refuse_ending_roundtrip", "no_run_controls_residue"]
 			}
 		}
 
