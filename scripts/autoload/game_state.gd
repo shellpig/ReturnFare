@@ -181,6 +181,8 @@ func advance_phase() -> Dictionary:
 	var ending_snapshot: Dictionary = {}
 	if not gate_ending.is_empty():
 		var ending_shadow := clone_for_preflight()
+		if ending_shadow == null:
+			return _advance_reject("data_conflict", "preflight 複本建立失敗")
 		_commit_choice_default_plan(default_plan, ending_shadow)
 		var plan := _build_ending_plan(gate_ending, str(gate.get("source", "")), ending_shadow)
 		ending_shadow.free()
@@ -446,7 +448,11 @@ func set_festival_proxy(npc_id: String) -> void:
 ## 建立 preflight 用的複本：同一份序列化狀態、simulation_mode 打開。**呼叫端負責 free()**。
 func clone_for_preflight() -> Node:
 	var shadow: Node = (get_script() as GDScript).new()
-	shadow.call("deserialize", serialize())
+	var res: Dictionary = shadow.call("deserialize", serialize())
+	if not bool(res.get("ok", false)):
+		push_error("clone_for_preflight: deserialize 失敗 (%s)" % str(res.get("reason_code", "unknown")))
+		shadow.free()
+		return null
 	shadow.set("simulation_mode", true)
 	shadow.set("pending_ending_request", {})
 	return shadow
@@ -774,6 +780,8 @@ func choose_opening(choice_id: String) -> Dictionary:
 ## `on_select` 才在真正的開局初態上求值，避免上一輪殘留讓效果誤過或誤擋。
 func _start_run_from_opening(choice_id: String, on_select: Dictionary) -> Dictionary:
 	var probe := clone_for_preflight()
+	if probe == null:
+		return _mutation_reject("data_conflict", "preflight 複本建立失敗")
 	_apply_run_initialization(probe)
 	var pf := EffectApply.preflight([on_select], probe)
 	probe.free()
@@ -876,6 +884,8 @@ func resolve_unfinished_choice_groups() -> Dictionary:
 		return { "ok": true, "reason_code": "", "reason_text": "", "lines": PackedStringArray(), "plan": {} }
 
 	var shadow := clone_for_preflight()
+	if shadow == null:
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "preflight 複本建立失敗", "lines": PackedStringArray(), "plan": {} }
 	var steps: Array[Dictionary] = []
 	var lines := PackedStringArray()
 	var expects_proxy := false
@@ -1040,6 +1050,8 @@ func _settle_effects(blocks: Array, bookkeeping: Dictionary = {}, pre_bookkeepin
 	var pre_shadow: Node = null
 	if not pre_bookkeeping.is_empty():
 		pre_shadow = clone_for_preflight()
+		if pre_shadow == null:
+			return _mutation_reject("data_conflict", "preflight 複本建立失敗")
 		_apply_bookkeeping(pre_shadow, pre_bookkeeping)
 		source = pre_shadow
 
@@ -2529,6 +2541,8 @@ func acknowledge_encounter_intro() -> Dictionary:
 
 	# 進場與「開場就結束」的失敗出口屬同一個動作：先在複本推演，再一次落地。
 	var sh: Node = clone_for_preflight()
+	if sh == null:
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "preflight 複本建立失敗", "lines": PackedStringArray() }
 	var sh_enc: Dictionary = sh.get("active_encounter") as Dictionary
 	var entered_round := true
 	var outcome := ""
@@ -2644,6 +2658,8 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 ## 回傳：{ blocks, pre, advance_after }
 func _plan_encounter_response(card_id: String, base_id: String, enc: Dictionary, round_data: Dictionary, is_discardable: bool) -> Dictionary:
 	var sh: Node = clone_for_preflight()
+	if sh == null:
+		return { "blocks": [], "pre": {}, "advance_after": false }
 	var sh_enc: Dictionary = sh.get("active_encounter") as Dictionary
 	var lose_cards: Array[String] = []
 	var blocks: Array = []
@@ -2780,6 +2796,8 @@ func discard_in_encounter(card_id: String) -> Dictionary:
 
 	# 丟棄與「丟完沒棋可走」的失敗出口屬同一個動作：先在複本判定，再一次落地。
 	var sh: Node = clone_for_preflight()
+	if sh == null:
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "preflight 複本建立失敗", "lines": PackedStringArray() }
 	sh.call("lose_card", card_id)
 	var round_id := str(active_encounter.get("round_id", ""))
 	var round_data := Encounter.get_round(enc, round_id)

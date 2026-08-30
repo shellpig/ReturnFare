@@ -38,7 +38,7 @@ const CONTRACT_IDS := [
 	"p5e_01_boot_opening", "p5e_02_opening_confirm_cancel",
 	"p5e_03_ending_isolation", "p5e_04_ending_typewriter_and_advance",
 	"p5e_05_ending_skip_seen_only", "p5e_06_ending_complete_to_opening",
-	"p5e_07_no_internal_keys_leaked", "p5e_08_coda_choice_requires_card",
+	"p5e_07_no_internal_keys_leaked", "p5e_08a_no_registry", "p5e_08b_with_registry",
 ]
 
 const SPECIAL_EVIDENCE := {
@@ -105,7 +105,8 @@ const SPECIAL_EVIDENCE := {
 	"p5e_05_ending_skip_seen_only": ["first_seen_no_skip", "repeat_seen_skip_available", "skip_to_target_page", "skip_intermediate_summary"],
 	"p5e_06_ending_complete_to_opening": ["ending_complete_cleans_run", "delegation_state_cleared", "refuse_unlocked_after_replaced", "refuse_ending_roundtrip", "no_run_controls_residue"],
 	"p5e_07_no_internal_keys_leaked": ["ui_dump_clean_of_internal_keys"],
-	"p5e_08_coda_choice_requires_card": ["card_required_no_direct_choose", "empty_handed_choice_available", "empty_handed_enters_ending"],
+	"p5e_08a_no_registry": ["card_required_no_direct_choose", "empty_handed_choice_available", "empty_handed_enters_ending"],
+	"p5e_08b_with_registry": ["empty_handed_hidden_when_holding_registry", "compare_registry_place_available", "compare_registry_enters_ending"],
 }
 
 ## 契約的 token 由多個變體分頭提供時，逐變體列出各自該證明的那幾個。

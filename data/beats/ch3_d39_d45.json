@@ -1219,6 +1219,11 @@
           "occupant": null,
           "label": "你手上什麼都沒有",
           "accepts": [],
+          "condition": {
+            "not": {
+              "has_card": "info_registry"
+            }
+          },
           "choice_group": "d45_coda",
           "on_place": {
             "text": "你沒有那本名冊。你只是又想了一遍那句話。\n蒸氣沒有散。水裡那個人也沒有再轉頭。"

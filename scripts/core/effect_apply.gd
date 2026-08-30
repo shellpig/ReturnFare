@@ -33,6 +33,8 @@ const EFFECT_ENDING_SOURCE := "ending_effect"
 ## `shadow` 是模擬後的複本節點，**呼叫端負責 free()**；成功時可據以驗證 bookkeeping 與結局快照。
 static func preflight(blocks: Array, gs: Node) -> Dictionary:
 	var shadow: Node = gs.call("clone_for_preflight")
+	if shadow == null:
+		return _reject(null, "data_conflict", "preflight 複本建立失敗")
 	var ops: Array[Dictionary] = []
 	var lines := PackedStringArray()
 	var ending_request: Dictionary = {}

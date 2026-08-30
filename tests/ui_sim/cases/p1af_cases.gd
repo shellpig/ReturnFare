@@ -110,7 +110,8 @@ static func get_all_cases() -> Array[CaseBase]:
 		UiCase.new("p5e_05_ending_skip_seen_only", "首見無skip按鈕，重見同ending有skip按鈕且跳至指定落點", "d45_evening.json", "", "p5e_05_ending_skip_seen_only", "", "p5e_05"),
 		UiCase.new("p5e_06_ending_complete_to_opening", "末頁完成結算回opening且上一輪無殘留，不上車解鎖並可走不上車結局來回", "d45_evening.json", "", "p5e_06_ending_complete_to_opening", "", "p5e_06"),
 		UiCase.new("p5e_07_no_internal_keys_leaked", "UI dump不洩漏ending_replaced/refuse/festival_proxy等內部鍵與condition語法", "d45_evening.json", "", "p5e_07_no_internal_keys_leaked", "", "p5e_07"),
-		UiCase.new("p5e_08_coda_choice_requires_card", "D45 coda持卡槽無direct-choose按鈕，未持名冊可走empty_handed", "d45_evening__no_registry.json", "", "p5e_08_coda_choice_requires_card", "", "p5e_08"),
+		UiCase.new("p5e_08a_no_registry", "D45 coda未持名冊：compare_registry無直接choose按鈕，可走empty_handed進ending", "d45_evening__no_registry.json", "", "p5e_08a_no_registry", "", "p5e_08a"),
+		UiCase.new("p5e_08b_with_registry", "D45 coda持名冊：empty_handed隱藏，比對槽可放卡進ending", "d45_evening.json", "", "p5e_08b_with_registry", "", "p5e_08b"),
 	]
 
 
@@ -139,8 +140,10 @@ class UiCase extends CaseBaseClass:
 				return await _p5e_06(tree)
 			"p5e_07":
 				return await _p5e_07(tree)
-			"p5e_08":
-				return await _p5e_08(tree)
+			"p5e_08a":
+				return await _p5e_08a(tree)
+			"p5e_08b":
+				return await _p5e_08b(tree)
 			"phase_cycle":
 				return await _phase_cycle(tree)
 			"chapter_d15", "chapter_d32":
@@ -2525,7 +2528,7 @@ class UiCase extends CaseBaseClass:
 			}
 		}
 
-	func _p5e_08(tree: SceneTree) -> Dictionary:
+	func _p5e_08a(tree: SceneTree) -> Dictionary:
 		# B1 & B2: 以 d45_evening__no_registry.json 啟動（未持名冊真實走查狀態）
 		await QAStepClass.drain_beats(tree)
 
@@ -2542,7 +2545,6 @@ class UiCase extends CaseBaseClass:
 		await _close(tree)
 		await _advance(tree)
 
-		var gs := CaseBaseClass.get_game_state(tree)
 		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "ending", "未持名冊選空手後成功進入 ending mode")
 
 		return {
@@ -2550,6 +2552,33 @@ class UiCase extends CaseBaseClass:
 			"errors": errors,
 			"observations": {
 				"evidence": ["card_required_no_direct_choose", "empty_handed_choice_available", "empty_handed_enters_ending"]
+			}
+		}
+
+	func _p5e_08b(tree: SceneTree) -> Dictionary:
+		# 以 d45_evening.json 啟動（持名冊真實走查狀態）
+		await QAStepClass.drain_beats(tree)
+
+		# K-195 後半：持名冊時 empty_handed 條件不符，不得出現 choose:: 按鈕
+		var has_empty_handed := QAStepClass.has_visible_qa_id(tree.get_root(), "choose::d45_then::d45_coda::empty_handed")
+		assert_true(not has_empty_handed, "K-195: 持名冊時 empty_handed 隱藏 (not has_card 守衛成立)")
+
+		# compare_registry 為可放置槽，放入 info_registry
+		var place_ids := _visible_ids(tree, "place::d45_then::compare_registry::")
+		assert_true(not place_ids.is_empty(), "K-195: 持名冊時 compare_registry 比對槽可放置")
+		if not place_ids.is_empty():
+			await _click(tree, place_ids[0])
+
+		await _close(tree)
+		await _advance(tree)
+
+		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "ending", "持名冊比對後成功進入 ending mode")
+
+		return {
+			"ok": errors.is_empty(),
+			"errors": errors,
+			"observations": {
+				"evidence": ["empty_handed_hidden_when_holding_registry", "compare_registry_place_available", "compare_registry_enters_ending"]
 			}
 		}
 

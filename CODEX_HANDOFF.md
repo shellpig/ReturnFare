@@ -4,31 +4,39 @@
 
 ## 目前狀態
 
-**P5-E（開局與結局 UI）implementer 待辦 K-213～K-219 已全部處理，程式、資料、測試與交接基準線全綠；待 verifier 最終覆驗與文件關門。**
+**P5-F（多結局與跨輪全流程驗收）implementer 實作與全套驗收測試已全部完成，全套程式、資料、33 套 Headless 測試、94 條 UI Sim 契約全綠；交付 verifier 進行驗收與文件關門。**
 
-最新 implementer 基準線（2026-08-30，尚未提交）：
+最新 implementer 基準線（2026-08-30）：
 
-- Headless：32 套 exit 0，`ALL HEADLESS TESTS PASSED!`
-- UI Sim：run `20260830-082633-494-p16984-bc987c65`，116 variants／93 catalog contracts／93 executed／93 completed／**0 failed checks**
+- Headless：33 套 exit 0，`ALL HEADLESS TESTS PASSED!`（含新增 `tests/headless/test_p5f.gd`）
+- UI Sim：run `20260830-091109-496-p28404-17026623`，117 variants／94 catalog contracts／94 executed／94 completed／**0 failed checks**（`p5e_08` 拆分為 `p5e_08a_no_registry` 與 `p5e_08b_with_registry`，K-195 雙態驗收完成）
 - Greedy：90 個行動時段完整分類、46 次主角放置、14 張發狂卡帳相符，結局後第二輪相簿開局成功
 
-## P5-E implementer 待辦完成（K-213～K-219）
+## P5-F 實作與驗收完成項目
 
-完整條目仍由 verifier 管理於 `驗證後已知問題.md > K-213 ~ K-219`；本節只交付修正與可重跑證據，不替 verifier 改狀態。
+1. **K-195 後半修復（`data/beats/ch3_d39_d45.json`）**
+   - 在 `d45_then > empty_handed` slot 補上 `"condition": { "not": { "has_card": "info_registry" } }`，持名冊玩家不再看到「你手上什麼都沒有」。
+   - UI Sim 契約拆分為 `p5e_08a_no_registry`（無名冊走 empty_handed）與 `p5e_08b_with_registry`（有名冊 empty_handed 隱藏且比對槽可放卡），兩條皆通過。
+2. **K-198 preflight null 防禦修復（`scripts/core/effect_apply.gd` & `scripts/autoload/game_state.gd`）**
+   - `EffectApply.preflight()` 與 `GameState.clone_for_preflight()` 在 preflight 複本建立為 null 時回傳 `data_conflict`，防止崩潰。
+3. **P5-F 專屬 Headless 整合測試（`tests/headless/test_p5f.gd`，8 組測試全通過）**
+   - **Group 1（第一輪具名策略與不上車解鎖差異）**：驗證正常替換結局（`ending_replaced`）、發狂 BE（`ending_madness_be`）、庫存 BE（`ending_inventory_be`）。正常結局後不上車解鎖（`available: true`），兩種 BE 結算後不上車仍鎖定（`available: false`），皆取得知識卡 `k_i_returned`。
+   - **Group 2（連續四次結算）**：走「BE → 正常長版（首次，不可跳過） → 不上車（直接進結局，不建 run） → 正常短版（重見，可 skip 且呼叫 `skip_seen_ending()`）」。驗證 run number 遞增（1→2→3→4→5）、history 累積 4 筆、知識卡保留、opening 模式下 `complete_ending()` 冪等被拒。
+   - **Group 3（正常 ending matrix 動態衍生）**：從 `endings.json` 動態求值。生計優先序 `uncle > boss > zhou > none`；驗證 4 生計 × 3 開關帶（12 種組合）全部正確映射；驗證旅館外觀 4 種狀態（sign/pipes/windows/none）；驗證伴侶 3 種狀態（ajie/awei/none）。
+   - **Group 4（D29 慶典代付者六條路徑）**：驗證邀阿婕（`invite_ajie`）、邀阿薇（`invite_awei`）、不邀且阿柴最高（`invite_none_acai`）、逾期同分（`timeout_tie`）、未進面板（`unvisited_panel`）、全零 fallback（`zero_fallback`）。6 條路徑在 D29 結束後均凍結合法代付者，D31／D39／D45 ending snapshot 讀取值皆完全一致。
+   - **Group 5（連續至少三輪 town run 狀態清洗與持久化保留）**：驗證跨 3 輪 run 層狀態（`delegates_used_today`, `pending_delegation_reports`, `active_encounter`, run flags）清空；meta 層狀態（`knowledge`, `night_locations_seen`, `night_once_beats_seen`, `delegation_tutorial_seen`）跨 3 輪完整保留；D8 重演不重收首次 madness cost。
+   - **Group 6（Ending 快照載入續播與非法跨 mode 呼叫拒絕）**：同一 ending checkpoint 分別以「逐頁補完」與「skip 重載」完成，產生的 history 記錄欄位完全一致；在 opening 模式下呼叫 `try_place` 與 `advance_phase` 均被規則層原子拒絕（`not_run`）。
+   - **Group 7（loop_persistent 魔法物品生命週期）**：正式卡片庫斷言 `loop_persistent: true` 數量為 0；以動態合成卡 `magic_ring` 驗證取得 → 跨輪恢復 → 普通 lose 下輪再現 → permanent lose 次輪不再恢復的完整生命週期。
+   - **Group 8（代碼庫無舊 API 殘留）**：GameState 無舊 `end_run()`、`resolve_night_advance()`、`run_ended`；`flow_mode` 嚴格限制於 `opening`／`run`／`ending`。
+4. **測試套件更新**
+   - `tests/run_all_headless.ps1` 納入 `test_p5f.gd`（共 33 套 headless 測試）。
+   - `tests/ui_sim/cases/p1af_cases.gd`、`tests/ui_sim/qa_contract_matrix.gd`、`tests/ui_sim/run_ui_sim.ps1` 更新為 94 條契約。
 
-| 條目 | 完成內容 |
-|---|---|
-| **K-213（關門）** | `p5e_03`／`04`／`06`／`07`／`08` 五條各完成一次單點變異驗紅，詳見下方變異表；全部還原後全套 UI 93／93／0 |
-| **K-214（關門）** | 本檔已改為 2026-08-30 現況、補 `311200f` review 修正與最新 run；第 5 點不再把 K-195 整條寫成已修 |
-| K-215 | `p5e_05` 改從 `endings.json > repeat.skip_to` 反查 active `page_refs` 的精確 index，再與 `ending_view().page_index` 比對；恆真文字斷言退場 |
-| K-216 | `p5e_04` 新增 Enter `echo=true` 零變化與真實滑鼠連點只前進一頁；`p5e_06` 新增 delegation daily／pending 清空斷言，special evidence 同步列為必填 |
-| K-217 | `opening_choices.json` 新增 `screen.title`／`screen.prompt`；DataLoader＋Lint 18＋SCHEMA＋GameState view model 接線，`opening_panel.gd`／`.tscn`／`main.gd` 的故事文案複本移除 |
-| K-218 | `p5e_04` 在第一次 Space 前明示斷言 `EndingFlowText.is_typewriting()`，使失敗原因鎖定在逐字契約 |
-| K-219 | implementer-owned `開發設計方針.md > P5-E` 改寫為現況：OpeningPanel／EndingPanel 常駐，依 mode 切 `visible`，離開 ending 呼叫 `reset()` |
+---
 
-**K-194 已由 verifier 結案**（`311200f` 的 `d45_evening__no_registry` 自然走查狀態＋`p5e_08` 真實輸入）。**K-195 只有前半結案**（card-required 槽不再建直選按鈕）；後半（`empty_handed` 無「未持 `info_registry`」條件，持卡玩家仍看得到「你手上什麼都沒有」）未動，且 `311200f` 之後持卡狀態連斷言都沒有，已改列 P5-F。
+## 歷史狀態
 
-### P5-E 實際改了什麼
+**P5-E（開局與結局 UI）已完成實作與覆驗。**
 
 1. **`scenes/ui/flow_text.gd`**
    - 擴充 typewriter 逐字播放機制：新增 `signal typewriter_completed`。
