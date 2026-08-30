@@ -532,16 +532,25 @@ func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
 		panel_a.call("_on_advance_beat_pressed")
 		await process_frame
 
+	var data_node: Node = get_root().get_node("Data")
+	var exp_obs_walk_label := ""
+	var d22_beat := (data_node.get("loader") as DataLoader).beats_by_id.get("d22_pm_sandbags", {}) as Dictionary
+	for s_entry in d22_beat.get("slots", []):
+		if str((s_entry as Dictionary).get("id", "")) == "obs_walk":
+			exp_obs_walk_label = str((s_entry as Dictionary).get("label", ""))
+			break
+	assert(not exp_obs_walk_label.is_empty(), "fixture 前提：obs_walk 有 label")
+
 	var beat_container_a: Node = panel_a.find_child("BeatContainer", true, false)
 	var direct_btn: Button = null
 	for child in beat_container_a.get_children():
-		if child is Button and (child as Button).text.contains("選擇：① 他走路的方式"):
+		if child is Button and (child as Button).text.contains(exp_obs_walk_label):
 			direct_btn = child as Button
 			break
 
 	if direct_btn == null:
 		panel_a.queue_free()
-		return _fail("direct choice button '選擇：① 他走路的方式' not found")
+		return _fail("direct choice button containing '%s' not found" % exp_obs_walk_label)
 
 	direct_btn.emit_signal("pressed")
 	await process_frame
@@ -572,14 +581,8 @@ func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
 		panel_b.call("_on_advance_beat_pressed")
 		await process_frame
 
-	var exp_obs_walk_label := ""
-	var data_node: Node = get_root().get_node("Data")
-	var d22_beat_b := (data_node.get("loader") as DataLoader).beats_by_id.get("d22_pm_sandbags", {}) as Dictionary
-	for s_entry in d22_beat_b.get("slots", []):
-		if str((s_entry as Dictionary).get("id", "")) == "obs_walk":
-			exp_obs_walk_label = str((s_entry as Dictionary).get("label", ""))
-			break
-	assert(not exp_obs_walk_label.is_empty(), "fixture 前提：obs_walk 有 label")
+	var exp_polaroid_name := str((data_node.get("loader") as DataLoader).cards.get("equip_polaroid", {}).get("name", ""))
+	assert(not exp_polaroid_name.is_empty(), "fixture 前提：equip_polaroid 有 name")
 
 	var beat_container_b: Node = panel_b.find_child("BeatContainer", true, false)
 	var found_obs_walk_label := false
@@ -588,13 +591,13 @@ func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
 		if child is Label and (child as Label).text.contains(exp_obs_walk_label):
 			found_obs_walk_label = true
 			continue
-		if found_obs_walk_label and child is Button and (child as Button).text.contains("拍立得"):
+		if found_obs_walk_label and child is Button and (child as Button).text.contains(exp_polaroid_name):
 			card_btn = child as Button
 			break
 
 	if card_btn == null:
 		panel_b.queue_free()
-		return _fail("card choice button for obs_walk containing '拍立得' not found")
+		return _fail("card choice button for obs_walk containing '%s' not found" % exp_polaroid_name)
 
 	card_btn.emit_signal("pressed")
 	await process_frame

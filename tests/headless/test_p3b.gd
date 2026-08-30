@@ -425,7 +425,16 @@ func _test_main_scene_cap_be_screen(tree: SceneTree, gs: Node, _data_node: Node)
 	var view_be: Dictionary = gs.call("ending_view")
 	var page_text_be := str(view_be.get("page_text", ""))
 
-	if is_ending and ending_panel.visible and not loc_panel.visible and not map_list.visible and (ending_text.contains("扭曲") or page_text_be.contains("扭曲")):
+	var exp_be_text := ""
+	var data_node: Node = tree.get_root().get_node("Data")
+	var madness_ending: Dictionary = data_node.loader.endings_by_id.get("ending_madness_be", {}) as Dictionary
+	for p in (madness_ending.get("first_seen", {}) as Dictionary).get("pages", []):
+		exp_be_text = str((p as Dictionary).get("text", "")).substr(0, 5)
+		if not exp_be_text.is_empty():
+			break
+	assert(not exp_be_text.is_empty(), "fixture 前提：ending_madness_be 有 page text")
+
+	if is_ending and ending_panel.visible and not loc_panel.visible and not map_list.visible and (ending_text.contains(exp_be_text) or page_text_be.contains(exp_be_text)):
 		failed += _ok("main.gd 真入口點擊夜間地點觸發 BE：畫面切換至 EndingPanel 顯示發狂 BE 且未開啟 LocationPanel")
 	else:
 		failed += _fail("main.gd BE 畫面狀態異常: ending=%s, ending_vis=%s, panel_vis=%s" % [

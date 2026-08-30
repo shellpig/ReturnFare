@@ -116,7 +116,15 @@ func _test_status_text_and_display_name_rules(gs: Node, data_node: Node) -> int:
 	gs.set("phase", "night")
 
 	var exp_n_exit_name := str((data_node.loader.locations.get("n_exit", {}) as Dictionary).get("name", ""))
+	var exp_n_landmark_name := str((data_node.loader.locations.get("n_landmark", {}) as Dictionary).get("name", ""))
+	var exp_sanquan_name := str((data_node.loader.locations.get("sanquan", {}) as Dictionary).get("name", ""))
+	var exp_jinghe_back_name := str((data_node.loader.locations.get("jinghe_back", {}) as Dictionary).get("name", ""))
+	var exp_n_corridor_name := str((data_node.loader.locations.get("n_corridor", {}) as Dictionary).get("name", ""))
 	assert(not exp_n_exit_name.is_empty(), "fixture 前提：n_exit 有 name")
+	assert(not exp_n_landmark_name.is_empty(), "fixture 前提：n_landmark 有 name")
+	assert(not exp_sanquan_name.is_empty(), "fixture 前提：sanquan 有 name")
+	assert(not exp_jinghe_back_name.is_empty(), "fixture 前提：jinghe_back 有 name")
+	assert(not exp_n_corridor_name.is_empty(), "fixture 前提：n_corridor 有 name")
 
 	# 1. 未到訪可對位 row (n_exit -> day_counterpart: sanquan, 引子名: 石階外的鎮)
 	var s_unseen_cp := PanelBuilder.location_summary("n_exit", gs, data_node)
@@ -127,7 +135,7 @@ func _test_status_text_and_display_name_rules(gs: Node, data_node: Node) -> int:
 
 	# 2. 未到訪夜間限定 row (n_landmark -> day_counterpart: null, 引子名: 地標)
 	var s_unseen_no_cp := PanelBuilder.location_summary("n_landmark", gs, data_node)
-	if str(s_unseen_no_cp.get("status_text")) == "[尚未到訪]" and str(s_unseen_no_cp.get("display_name")) == "地標":
+	if str(s_unseen_no_cp.get("status_text")) == "[尚未到訪]" and str(s_unseen_no_cp.get("display_name")) == exp_n_landmark_name:
 		failed += _ok("未到訪夜間限定 row 顯示引子名與 [尚未到訪]")
 	else:
 		failed += _fail("未到訪夜間限定 row 狀態文字異常: %s" % str(s_unseen_no_cp))
@@ -143,7 +151,7 @@ func _test_status_text_and_display_name_rules(gs: Node, data_node: Node) -> int:
 	# 4. 已到訪夜間限定 row (n_landmark seen, day_counterpart == null)
 	(gs.get("night_locations_seen") as Dictionary)["n_landmark"] = true
 	var s_seen_night_only := PanelBuilder.location_summary("n_landmark", gs, data_node)
-	if str(s_seen_night_only.get("status_text")) == "[已到訪]" and str(s_seen_night_only.get("display_name")) == "地標":
+	if str(s_seen_night_only.get("status_text")) == "[已到訪]" and str(s_seen_night_only.get("display_name")) == exp_n_landmark_name:
 		failed += _ok("已到訪夜間限定 row 顯示 [已到訪]（無尚未對位）")
 	else:
 		failed += _fail("已到訪夜間限定 row 狀態文字異常: %s" % str(s_seen_night_only))
@@ -151,7 +159,7 @@ func _test_status_text_and_display_name_rules(gs: Node, data_node: Node) -> int:
 	# 5. 已對位一對一 row (n_exit -> sanquan, 僅一筆 night row 指向 sanquan)
 	(gs.get("knowledge") as Dictionary)["k_night_sanquan"] = true
 	var s_aligned_1to1 := PanelBuilder.location_summary("n_exit", gs, data_node)
-	if str(s_aligned_1to1.get("status_text")) == "[已對位]" and str(s_aligned_1to1.get("display_name")) == "山泉閣":
+	if str(s_aligned_1to1.get("status_text")) == "[已對位]" and str(s_aligned_1to1.get("display_name")) == exp_sanquan_name:
 		failed += _ok("已對位一對一 row 顯示白天地點名『山泉閣』與 [已對位]")
 	else:
 		failed += _fail("已對位一對一 row 狀態文字或名稱異常: %s" % str(s_aligned_1to1))
@@ -160,7 +168,7 @@ func _test_status_text_and_display_name_rules(gs: Node, data_node: Node) -> int:
 	(gs.get("night_locations_seen") as Dictionary)["n_corridor"] = true
 	(gs.get("knowledge") as Dictionary)["k_night_jinghe_back"] = true
 	var s_aligned_multi := PanelBuilder.location_summary("n_corridor", gs, data_node)
-	var expected_multi_name := "靜和園後棟・很長的走廊"
+	var expected_multi_name := "%s・%s" % [exp_jinghe_back_name, exp_n_corridor_name]
 	if str(s_aligned_multi.get("status_text")) == "[已對位]" and str(s_aligned_multi.get("display_name")) == expected_multi_name:
 		failed += _ok("已對位多對一 row 顯示『白天地點名・夜間引子名』與 [已對位]")
 	else:

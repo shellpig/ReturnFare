@@ -337,10 +337,18 @@ func _test_be_flow_text_display() -> int:
 	var view_be: Dictionary = gs.call("ending_view")
 	var page_text_be := str(view_be.get("page_text", ""))
 
-	if ending_panel.visible and (text_be.contains("扭曲") or page_text_be.contains("扭曲")):
+	var exp_be_text := ""
+	var madness_ending: Dictionary = loader.endings_by_id.get("ending_madness_be", {}) as Dictionary
+	for p in (madness_ending.get("first_seen", {}) as Dictionary).get("pages", []):
+		exp_be_text = str((p as Dictionary).get("text", "")).substr(0, 5)
+		if not exp_be_text.is_empty():
+			break
+	assert(not exp_be_text.is_empty(), "fixture 前提：ending_madness_be 有 page text")
+
+	if ending_panel.visible and (text_be.contains(exp_be_text) or page_text_be.contains(exp_be_text)):
 		failed += _ok("真實發卡達 cap 觸發發瘋 BE，經由訊號接線顯示發瘋 BE 文字且 EndingPanel 可見 (K-67)")
 	else:
-		failed += _fail("發瘋 BE 文本展示錯誤 (text=%s, page=%s)" % [text_be, page_text_be])
+		failed += _fail("發瘋 BE 文本展示錯誤 (text=%s, page=%s, expected=%s)" % [text_be, page_text_be, exp_be_text])
 
 	loader.tuning["madness_cap"] = orig_cap
 	main.queue_free()
