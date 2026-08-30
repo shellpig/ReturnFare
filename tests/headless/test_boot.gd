@@ -127,10 +127,13 @@ func _test_main_scene_enters_normal_branch() -> int:
 	else:
 		failed += _ok("OpeningPanel 在開局模式下正確顯示")
 
-	if status_label.text != "出門前的十分鐘":
-		failed += _fail("StatusLabel 在開局模式下未顯示出門前的十分鐘：「%s」" % status_label.text)
+	var data_node: Node = get_root().get_node("Data")
+	var expected_title := str((data_node.loader.opening_screen as Dictionary).get("title", ""))
+	assert(not expected_title.is_empty(), "fixture 前提：opening_screen.title 非空")
+	if status_label.text != expected_title:
+		failed += _fail("StatusLabel 在開局模式下未顯示開局標題：「%s」（預期：「%s」）" % [status_label.text, expected_title])
 	else:
-		failed += _ok("StatusLabel 在開局模式下顯示「出門前的十分鐘」")
+		failed += _ok("StatusLabel 在開局模式下顯示開局標題")
 
 	# 驗證 FlowText 節點在 main.tscn 存在 (K-28)
 	var flow_text: FlowText = main.get_node_or_null("ContentView/FlowText")

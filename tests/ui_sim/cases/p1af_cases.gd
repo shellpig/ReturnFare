@@ -685,7 +685,10 @@ class UiCase extends CaseBaseClass:
 		# 「不是灰掉，是不存在」——assert_no_qa_id 連隱藏節點都會抓到。
 		for slot_qa_id in _EXIT_SLOT_IDS:
 			assert_no_qa_id(tree, slot_qa_id, "0 張發狂卡時出口槽不得存在於節點樹")
-		assert_false(_has_text(tree.get_root(), "壓抑不住的衝動"), "出口 beat 的文字也不得播出")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_exit_text := str((loader.beats_by_id.get("exit_sanquan", {}) as Dictionary).get("text", "")).substr(0, 7)
+		assert_true(not exp_exit_text.is_empty(), "fixture 前提：exit_sanquan 有 text")
+		assert_false(_has_text(tree.get_root(), exp_exit_text), "出口 beat 的文字也不得播出")
 		# 不比對整份 state：開面板本來就會結算該面板的 on_enter（P1-C 契約），
 		# beats_entered 會合法變動。這裡只釘住「逛過沒有出口槽的面板不會動到縱慾帳」。
 		var after := _run(tree)
@@ -714,7 +717,14 @@ class UiCase extends CaseBaseClass:
 
 		await _click(tree, "place::exit_sanquan::x_smash::madness#1")
 		var after := _run(tree)
-		assert_true(_has_text(tree.get_root(), "碎片散了一地"), "on_place 效果文字必須在 UI 顯示")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_smash_text := ""
+		for s in (loader.beats_by_id.get("exit_sanquan", {}) as Dictionary).get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "x_smash":
+				exp_smash_text = str((s as Dictionary).get("on_place", {}).get("text", "")).substr(0, 6)
+				break
+		assert_true(not exp_smash_text.is_empty(), "fixture 前提：x_smash 有 on_place.text")
+		assert_true(_has_text(tree.get_root(), exp_smash_text), "on_place 效果文字必須在 UI 顯示")
 		assert_false((after.get("hand", []) as Array).has("madness#1"), "縱慾掉的那張卡從手牌消失")
 		assert_true((after.get("hand", []) as Array).has("madness#2"), "只消掉玩家挑的那一張")
 		assert_true(bool(after.get("action_spent", false)), "縱慾吃掉該時段行動格")
@@ -736,7 +746,14 @@ class UiCase extends CaseBaseClass:
 		# 效果文字看得到，推進鈕沒有被鎖死。
 		assert_eq(str(after.get("phase", "")), "morning", "泡湯不跳時段")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"), "泡湯後地點面板仍在畫面上")
-		assert_true(_has_text(tree.get_root(), "溫泉池裡浸泡"), "泡湯效果文字必須在 UI 顯示")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_soak_text := ""
+		for s in (loader.beats_by_id.get("exit_sanquan", {}) as Dictionary).get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "x_soak":
+				exp_soak_text = str((s as Dictionary).get("on_place", {}).get("text", "")).substr(0, 6)
+				break
+		assert_true(not exp_soak_text.is_empty(), "fixture 前提：x_soak 有 on_place.text")
+		assert_true(_has_text(tree.get_root(), exp_soak_text), "泡湯效果文字必須在 UI 顯示")
 		assert_false((after.get("hand", []) as Array).has("madness#1"), "泡湯清掉指定的那張")
 		assert_true((after.get("hand", []) as Array).has("madness#2"), "只清 soak_cards_cleared 張，不是全清")
 
@@ -783,7 +800,14 @@ class UiCase extends CaseBaseClass:
 		# 奢侈出口：錢卡尚未建檔（待決 22），恆呈灰附理由——這是正確行為，不是 bug。
 		await _enter(tree, "oldstreet")
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::exit_oldstreet::x_splurge"), "奢侈槽應顯示")
-		assert_true(_has_text(tree.get_root(), "身上沒有足夠的錢"), "奢侈槽必須附資料寫的理由")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_splurge_reason := ""
+		for s in (loader.beats_by_id.get("exit_oldstreet", {}) as Dictionary).get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "x_splurge":
+				exp_splurge_reason = str((s as Dictionary).get("reject_reason", "")).replace("（", "").replace("）", "").strip_edges()
+				break
+		assert_true(not exp_splurge_reason.is_empty(), "fixture 前提：x_splurge 有 reject_reason")
+		assert_true(_has_text(tree.get_root(), exp_splurge_reason), "奢侈槽必須附資料寫的理由")
 		assert_true(_visible_ids(tree, "place::exit_oldstreet::x_splurge::").is_empty(), "呈灰的奢侈槽不得提供放入入口")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["violence_day_gate_after", "splurge_locked_reason"] } }
 
@@ -816,11 +840,21 @@ class UiCase extends CaseBaseClass:
 	func _p2c_01(tree: SceneTree) -> Dictionary:
 		var run := await _forced_to_d11_morning(tree)
 		assert_eq(int(run.get("indulgence_count", 0)), 1, "強制縱慾自動執行一次")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_binge_text := ""
+		var exp_binge_light := ""
+		for s in (loader.beats_by_id.get("exit_sanquan", {}) as Dictionary).get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "x_binge":
+				exp_binge_text = str((s as Dictionary).get("on_place", {}).get("text", "")).substr(0, 10)
+				exp_binge_light = str((s as Dictionary).get("on_place_by_level", {}).get("light", {}).get("text", "")).substr(0, 8)
+				break
+		assert_true(not exp_binge_text.is_empty(), "fixture 前提：x_binge 有 on_place.text")
+		assert_true(not exp_binge_light.is_empty(), "fixture 前提：x_binge 有 light text")
 		# 效果文字必須真的畫在地圖上方，不是只存在 GameState 裡。
-		assert_true(_has_text(tree.get_root(), "你把廚房裡能找到的食物"),
+		assert_true(_has_text(tree.get_root(), exp_binge_text),
 			"強制縱慾的 on_place 文字必須在畫面上")
 		# 第一次是輕的，而且文字明講下次更重（規格書 P2-C：一張帳單，也是一則預告）。
-		assert_true(_has_text(tree.get_root(), "下一次恐怕沒這麼容易"),
+		assert_true(_has_text(tree.get_root(), exp_binge_light),
 			"第一次強制縱慾必須播出輕度預告文字")
 
 		# 開發設計方針 > P2-C 的契約：文字整個時段留存，關掉地點面板回到地圖仍看得到。
@@ -828,7 +862,7 @@ class UiCase extends CaseBaseClass:
 		assert_false(locs.is_empty(), "第 11 天上午地圖上必須有可進的地點")
 		await _enter(tree, locs[0])
 		await _close(tree)
-		assert_true(_has_text(tree.get_root(), "你把廚房裡能找到的食物"),
+		assert_true(_has_text(tree.get_root(), exp_binge_text),
 			"關掉地點面板回到地圖，強制縱慾文字仍須留存")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
 			"forced_text_visible", "forced_text_persists_in_phase",
@@ -885,7 +919,10 @@ class UiCase extends CaseBaseClass:
 		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "睡眠前 awei_heard_it 為 false")
 		await _click(tree, "phase_advance")
 		assert_eq(int(_run(tree).get("day", 0)), 25, "無睡眠內容直接推進至 D25")
-		assert_false(_has_text(tree.get_root(), "二樓有人在走"), "2 張發狂卡時畫面上看不到二樓有人在走")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_d24_bleed_title := str((loader.beats_by_id.get("d24_night_bleed", {}) as Dictionary).get("title", ""))
+		assert_true(not exp_d24_bleed_title.is_empty(), "fixture 前提：d24_night_bleed 有 title")
+		assert_false(_has_text(tree.get_root(), exp_d24_bleed_title), "2 張發狂卡時畫面上看不到二樓有人在走")
 		assert_false((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "2 張發狂卡時二樓有人在走未達門檻，不得落帳")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": [
 			"vision_hidden_at_2",
@@ -904,7 +941,10 @@ class UiCase extends CaseBaseClass:
 		await _click(tree, "phase_advance")
 		assert_eq(int(_run(tree).get("day", 0)), 24, "有睡眠內容時第 1 次點擊停在 D24 供玩家閱讀")
 		assert_true(bool(_run(tree).get("night_sleep_pending", false)), "第 1 次點擊設定 night_sleep_pending 為 true")
-		assert_true(_has_text(tree.get_root(), "二樓有人在走"), "3 張發狂卡時二樓有人在走達視野門檻，畫面文字可見 (K-68)")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_d24_bleed_title := str((loader.beats_by_id.get("d24_night_bleed", {}) as Dictionary).get("title", ""))
+		assert_true(not exp_d24_bleed_title.is_empty(), "fixture 前提：d24_night_bleed 有 title")
+		assert_true(_has_text(tree.get_root(), exp_d24_bleed_title), "3 張發狂卡時二樓有人在走達視野門檻，畫面文字可見 (K-68)")
 		assert_true((_run(tree).get("flags", {}) as Dictionary).get("awei_heard_it", false), "3 張發狂卡時二樓有人在走達視野門檻，成功落帳")
 
 		# K-123 斷言：停拍期間按鈕變為『進入隔天』
@@ -934,7 +974,14 @@ class UiCase extends CaseBaseClass:
 		var mcards := (run_before.get("hand", []) as Array).filter(func(c: String) -> bool: return c.begins_with("madness"))
 		assert_eq(mcards.size(), 6, "啟動時手上 6 張發狂卡")
 		await _enter(tree, "n_ahong_1")
-		assert_true(_has_text(tree.get_root(), "扭曲") or _has_text(tree.get_root(), "景象開始扭曲"), "達到 cap 7 必須呈現發瘋 BE 文本")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_be_text := "景象開始扭曲"
+		for e in loader.endings:
+			if str((e as Dictionary).get("id", "")) == "ending_insanity_be":
+				exp_be_text = str((e as Dictionary).get("title", ""))
+				break
+		assert_true(not exp_be_text.is_empty(), "fixture 前提：ending_insanity_be 有 title")
+		assert_true(_has_text(tree.get_root(), exp_be_text) or _has_text(tree.get_root(), "扭曲"), "達到 cap 7 必須呈現發瘋 BE 文本")
 		assert_false(_has_text(tree.get_root(), "[結局 stub]"), "發瘋 BE 不得播出一般結局骨架")
 		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"), "發瘋 BE 觸發後地點面板必須收起")
 		assert_true(_visible_ids(tree, "location::").is_empty(), "發瘋 BE 觸發後地圖必須收起 (be_map_hidden, K-70)")
@@ -984,7 +1031,14 @@ class UiCase extends CaseBaseClass:
 		await _click(tree, "slot::d3_pm_sanquan::show_version")
 		assert_eq(JSON.stringify(before), JSON.stringify(_state(tree)), "鎖定槽真實左鍵輸入不得改變狀態")
 		await _click(tree, "preview::d3_pm_sanquan::show_version")
-		assert_true(_has_text(tree.get_root(), "不知道他們兩個私下說了什麼") or _has_text(tree.get_root(), "目前沒有可放的卡"), "鎖定理由")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_show_reason := ""
+		for s in (loader.beats_by_id.get("d3_pm_sanquan", {}) as Dictionary).get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "show_version":
+				exp_show_reason = str((s as Dictionary).get("reject_reason", "")).replace("（", "").replace("）", "").strip_edges()
+				break
+		assert_true(not exp_show_reason.is_empty(), "fixture 前提：show_version 有 reject_reason")
+		assert_true(_has_text(tree.get_root(), exp_show_reason) or _has_text(tree.get_root(), "目前沒有可放的卡"), "鎖定理由")
 		await _click(tree, "dialog_confirm::preview")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["locked_visual", "locked_click_blocked", "locked_reason"] } }
 
@@ -1002,21 +1056,32 @@ class UiCase extends CaseBaseClass:
 		await _enter(tree, "temple")
 		var panel_nodes := QAStepClass.find_controls_by_name(tree.get_root(), "LocationPanel")
 		var panel: Node = panel_nodes[0] if not panel_nodes.is_empty() else tree.get_root()
-		assert_true(not _has_text(panel, "看夜市那邊的燈"), "無邀請分支不顯示阿婕內容")
-		assert_true(not _has_text(panel, "金伯的尾音還沒收"), "無邀請分支不顯示阿薇內容")
-		assert_true(_has_text(panel, "兩段都沒有") or _has_text(panel, "一個人走"), "條件成立的 D32 分支")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_ajie_sub := str((loader.beats_by_id.get("d32_festival_ajie", {}) as Dictionary).get("text", "")).substr(0, 6)
+		var exp_awei_sub := str((loader.beats_by_id.get("d32_festival_awei", {}) as Dictionary).get("text", "")).substr(0, 6)
+		var exp_d32_sub := str((loader.beats_by_id.get("d32_festival", {}) as Dictionary).get("text", "")).substr(0, 5)
+		assert_true(not exp_ajie_sub.is_empty() and not exp_awei_sub.is_empty() and not exp_d32_sub.is_empty(), "fixture 前提：D32 各分支有 text")
+		assert_true(not _has_text(panel, exp_ajie_sub), "無邀請分支不顯示阿婕內容")
+		assert_true(not _has_text(panel, exp_awei_sub), "無邀請分支不顯示阿薇內容")
+		assert_true(_has_text(panel, exp_d32_sub) or _has_text(panel, "一個人走"), "條件成立的 D32 分支")
 		return { "ok": errors.is_empty(), "errors": errors }
 
 	func _competing_beats(tree: SceneTree) -> Dictionary:
 		var evidence: Array[String] = []
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var text_sanquan := str((loader.beats_by_id.get("d3_pm_sanquan", {}) as Dictionary).get("text", "")).substr(0, 8)
+		var text_oldstreet := str((loader.beats_by_id.get("d3_pm_oldstreet", {}) as Dictionary).get("text", "")).substr(0, 6)
+		var text_temple := str((loader.beats_by_id.get("d3_pm_temple", {}) as Dictionary).get("text", "")).substr(0, 8)
+		assert_true(not text_sanquan.is_empty() and not text_oldstreet.is_empty() and not text_temple.is_empty(), "fixture 前提：D3 各地點 beat 有 text")
+		var expected_map := {
+			"sanquan": text_sanquan,
+			"oldstreet": text_oldstreet,
+			"temple": text_temple,
+		}
 		for loc_id in ["sanquan", "oldstreet", "temple"]:
 			await _enter(tree, loc_id)
 			assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "panel_back"), "D3 %s 面板" % loc_id)
-			var expected_text: String = str({
-				"sanquan": "阿宏還在後面搬貨",
-				"oldstreet": "麵攤在收桌子",
-				"temple": "金伯在整理慶典用具",
-			}.get(loc_id, ""))
+			var expected_text: String = str(expected_map.get(loc_id, ""))
 			assert_true(_has_text(tree.get_root(), expected_text), "D3 %s 競爭 beat 內容" % loc_id)
 			evidence.append(loc_id + "_beat")
 			await _close(tree)
@@ -1031,7 +1096,14 @@ class UiCase extends CaseBaseClass:
 		assert_true((after.get("flags", {}) as Dictionary).get("ahong_last_normal_contact", false), "on_place 旗標")
 		var after_state := _state(tree)
 		assert_true((after_state.get("meta", {}) as Dictionary).get("knowledge", {}).has("info_ahong_private") or (after.get("hand", []) as Array).has("info_ahong_private"), "on_place 知識效果")
-		assert_true(_has_text(tree.get_root(), "搬到一半他講了一件小事"), "on_place 效果文字必須在 UI 顯示")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_help_text := ""
+		for s in (loader.beats_by_id.get("d3_pm_sanquan", {}) as Dictionary).get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "help_ahong":
+				exp_help_text = str((s as Dictionary).get("on_place", {}).get("text", "")).substr(0, 10)
+				break
+		assert_true(not exp_help_text.is_empty(), "fixture 前提：help_ahong 有 on_place.text")
+		assert_true(_has_text(tree.get_root(), exp_help_text), "on_place 效果文字必須在 UI 顯示")
 		assert_false(bool(before.get("action_spent", false)), "放置前 action 未用")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["effect_text_visible", "effect_state"] } }
 
@@ -1150,18 +1222,23 @@ class UiCase extends CaseBaseClass:
 
 	func _echo(tree: SceneTree) -> Dictionary:
 		var text_ok := false
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var echo_d5_sub := str((loader.beats_by_id.get("d3_pm_sanquan", {}).get("echo", {}) as Dictionary).get("text", "")).substr(0, 6)
+		var echo_d8_sub := str((loader.beats_by_id.get("d8_echo_bathhouse", {}) as Dictionary).get("text", "")).substr(0, 6)
+		var echo_d13_sub := str((loader.beats_by_id.get("d12_pm_awei", {}).get("echo", {}) as Dictionary).get("text", "")).substr(0, 6)
+		assert_true(not echo_d5_sub.is_empty() and not echo_d8_sub.is_empty() and not echo_d13_sub.is_empty(), "fixture 前提：殘響文字非空")
 		match mode:
 			"echo_d5_attended":
-				assert_false(_has_text(tree.get_root(), "旁邊有人提起"), "到場不播 D5 殘響")
+				assert_false(_has_text(tree.get_root(), echo_d5_sub), "到場不播 D5 殘響")
 				text_ok = true
 			"echo_d5_missed", "echo_d5_repeat":
-				assert_true(_has_text(tree.get_root(), "旁邊有人提起"), "錯過時播 D5 殘響")
+				assert_true(_has_text(tree.get_root(), echo_d5_sub), "錯過時播 D5 殘響")
 				text_ok = true
 			"echo_d8":
-				assert_true(_has_text(tree.get_root(), "不管你今天去哪"), "D8 殘響文字")
+				assert_true(_has_text(tree.get_root(), echo_d8_sub), "D8 殘響文字")
 				text_ok = true
 			"echo_d13":
-				assert_true(_has_text(tree.get_root(), "有人說阿薇那天"), "D13 殘響文字")
+				assert_true(_has_text(tree.get_root(), echo_d13_sub), "D13 殘響文字")
 				text_ok = true
 		assert_true(text_ok, "殘響案例已執行")
 		return { "ok": errors.is_empty(), "errors": errors }
@@ -1170,9 +1247,13 @@ class UiCase extends CaseBaseClass:
 		var run := _run(tree)
 		var flags := run.get("flags", {}) as Dictionary
 		var knowledge := (_state(tree).get("meta", {}) as Dictionary).get("knowledge", {}) as Dictionary
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var d27_1_text := str((loader.beats_by_id.get("d27_evening_awei_confirm", {}) as Dictionary).get("text", ""))
+		var d27_2_text := str((loader.beats_by_id.get("d27_evening_cover_knowledge", {}) as Dictionary).get("text", ""))
+		assert_true(not d27_1_text.is_empty() and not d27_2_text.is_empty(), "fixture 前提：d27 fixed beats 有 text")
 		var texts := _texts(tree.get_root())
-		var first_text_index := texts.find("這是你唯一能親眼確認的人。")
-		var second_text_index := texts.find("有幾個人在閃躲，而你說不上來為什麼。")
+		var first_text_index := texts.find(d27_1_text)
+		var second_text_index := texts.find(d27_2_text)
 		if mode == "d27_both":
 			assert_true(first_text_index >= 0 and second_text_index > first_text_index, "D27 evening UI fixed beat 順序")
 		else:
@@ -1195,13 +1276,17 @@ class UiCase extends CaseBaseClass:
 
 		var count_before := (_run(tree).get("hand", []) as Array).size()
 		await _enter(tree, "n_landmark")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_base_sub := str((loader.beats_by_id.get("n_landmark_ch1", {}) as Dictionary).get("text", "")).substr(0, 10)
+		var exp_add_sub := str((loader.beats_by_id.get("n_take_something", {}) as Dictionary).get("text", "")).substr(0, 10)
+		assert_true(not exp_base_sub.is_empty() and not exp_add_sub.is_empty(), "fixture 前提：landmark beats 有 text")
 		var texts := _texts(tree.get_root())
 		var base_idx := -1
 		var add_idx := -1
 		for idx in range(texts.size()):
-			if texts[idx].contains("夜鎮裡有一個特殊的東西"):
+			if texts[idx].contains(exp_base_sub):
 				base_idx = idx
-			if texts[idx].contains("某個地方擺著一個小玩具"):
+			if texts[idx].contains(exp_add_sub):
 				add_idx = idx
 		assert_true(base_idx >= 0, "D10 免費地點主內容/章節變體演出")
 		assert_true(add_idx >= 0, "D10 附加 beat 並列演出")
@@ -1252,7 +1337,10 @@ class UiCase extends CaseBaseClass:
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "location::n_landmark"), "D10 免費標記可見")
 		var mcards_before: int = (_run(tree).get("hand", []) as Array).filter(func(c: Variant) -> bool: return str(c).begins_with("madness")).size()
 		await _enter(tree, "n_ahong_1")
-		assert_true(_has_text(tree.get_root(), "腳印是工作鞋的") or _has_text(tree.get_root(), "有人走過"), "付費夜間標記顯示真實 beat 內容")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_ahong1_sub := str((loader.beats_by_id.get("n_ahong_1_ch1", {}) as Dictionary).get("text", "")).substr(0, 7)
+		assert_true(not exp_ahong1_sub.is_empty(), "fixture 前提：n_ahong_1_ch1 有 text")
+		assert_true(_has_text(tree.get_root(), exp_ahong1_sub) or _has_text(tree.get_root(), "有人走過"), "付費夜間標記顯示真實 beat 內容")
 		assert_true(_has_text(tree.get_root(), "獲得 1 張發狂卡"), "進入收費標記顯示發卡提示")
 		await _close(tree)
 
@@ -1300,7 +1388,10 @@ class UiCase extends CaseBaseClass:
 		await _advance(tree)
 		await _advance(tree)
 		assert_eq(str(_run(tree).get("phase", "")), "night", "D1 夜間起點")
-		assert_true(_has_text(tree.get_root(), "一條走廊，兩側都是門"), "D1 fixed night beat 優先演出")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_d1_fixed_sub := str((loader.beats_by_id.get("n_corridor_ch1", {}) as Dictionary).get("text", "")).substr(0, 10)
+		assert_true(not exp_d1_fixed_sub.is_empty(), "fixture 前提：n_corridor_ch1 有 text")
+		assert_true(_has_text(tree.get_root(), exp_d1_fixed_sub), "D1 fixed night beat 優先演出")
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["night_fixed_priority"] } }
 
 	func _sleep_d24(tree: SceneTree, main_node: Control) -> Dictionary:
@@ -1363,7 +1454,14 @@ class UiCase extends CaseBaseClass:
 		assert_true(QAStepClass.has_visible_qa_id(tree.get_root(), "slot::d8_morning_jinghe::go_with_ajie"), "第 8 天旗標控制槽存在")
 		assert_false(QAStepClass.has_visible_qa_id(tree.get_root(), "place::d8_morning_jinghe::go_with_ajie::protagonist"), "重置後未持有旗標不可放卡")
 		var go_label := QAStepClass.find_controls_by_qa_id(tree.get_root(), "slot::d8_morning_jinghe::go_with_ajie")[0] as Label
-		assert_true(go_label.text.contains("未解鎖") or go_label.text.contains("你昨天沒有答應她"), "旗標控制槽回到未解鎖狀態")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_go_reason := ""
+		for s in (loader.beats_by_id.get("d8_morning_jinghe", {}) as Dictionary).get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "go_with_ajie":
+				exp_go_reason = str((s as Dictionary).get("reject_reason", "")).replace("（", "").replace("）", "").strip_edges()
+				break
+		assert_true(not exp_go_reason.is_empty(), "fixture 前提：go_with_ajie 有 reject_reason")
+		assert_true(go_label.text.contains("未解鎖") or go_label.text.contains(exp_go_reason), "旗標控制槽回到未解鎖狀態")
 		var before_click := _state(tree)
 		await _click(tree, "slot::d8_morning_jinghe::go_with_ajie")
 		assert_eq(JSON.stringify(before_click), JSON.stringify(_state(tree)), "點擊未解鎖旗標槽不得改變狀態")
@@ -1602,7 +1700,10 @@ class UiCase extends CaseBaseClass:
 		assert_eq(reason_nodes.size(), 1, "詳情面板中找到 night_reason::n_ahong_2 節點")
 		if not reason_nodes.is_empty():
 			assert_true(reason_nodes[0].is_visible_in_tree(), "理由節點可見")
-			assert_eq((reason_nodes[0] as Label).text, "你還沒跟完上一段痕跡。", "門檻理由為『你還沒跟完上一段痕跡。』")
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_n_ahong2_reason := str((loader.locations.get("n_ahong_2", {}) as Dictionary).get("reject_reason", ""))
+			assert_true(not exp_n_ahong2_reason.is_empty(), "fixture 前提：n_ahong_2 有 reject_reason")
+			assert_eq((reason_nodes[0] as Label).text, exp_n_ahong2_reason, "門檻理由等於資料定義")
 		var enter_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_ahong_2")
 		assert_eq(enter_nodes.size(), 1, "詳情面板中找到 night_enter::n_ahong_2 節點")
 		if not enter_nodes.is_empty():
@@ -1621,7 +1722,10 @@ class UiCase extends CaseBaseClass:
 		assert_eq(reason_nodes.size(), 1, "詳情面板中找到 night_reason::n_corridor_end 節點")
 		if not reason_nodes.is_empty():
 			assert_true(reason_nodes[0].is_visible_in_tree(), "teaser 理由節點可見")
-			assert_eq((reason_nodes[0] as Label).text, "還沒有走到那裡。", "teaser 理由為『還沒有走到那裡。』")
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_n_end_reason := str((loader.locations.get("n_corridor_end", {}) as Dictionary).get("reject_reason", ""))
+			assert_true(not exp_n_end_reason.is_empty(), "fixture 前提：n_corridor_end 有 reject_reason")
+			assert_eq((reason_nodes[0] as Label).text, exp_n_end_reason, "teaser 理由等於資料定義")
 		var enter_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_enter::n_corridor_end")
 		assert_eq(enter_nodes.size(), 1, "詳情面板中找到 night_enter::n_corridor_end 節點")
 		if not enter_nodes.is_empty():
@@ -1794,7 +1898,10 @@ class UiCase extends CaseBaseClass:
 		var btns_music := QAStepClass.find_controls_by_qa_id(tree.get_root(), "location::n_music")
 		if not btns_music.is_empty():
 			assert_true((btns_music[0] as Button).text.contains("[尚未到訪]"), "第二個 row n_music 仍為 [尚未到訪]")
-			assert_false((btns_music[0] as Button).text.contains("廟＋廟埕"), "第二個 row 未劇透白天地點名")
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_temple_name := str((loader.locations.get("temple", {}) as Dictionary).get("name", ""))
+			assert_true(not exp_temple_name.is_empty(), "fixture 前提：temple 有 name")
+			assert_false((btns_music[0] as Button).text.contains(exp_temple_name), "第二個 row 未劇透白天地點名")
 
 		# 5. 首次進入第二個 row n_music
 		await _enter(tree, "n_music")
@@ -1826,7 +1933,14 @@ class UiCase extends CaseBaseClass:
 		assert_true(_has_text(tree.get_root(), "回報"), "確認畫面顯示回報時機")
 		assert_true(_has_text(tree.get_root(), "傾向"), "確認畫面顯示傾向")
 		assert_false(_has_text(tree.get_root(), "doc_prescription"), "確認畫面不洩漏卡片 id")
-		assert_false(_has_text(tree.get_root(), "藥袋放到櫃檯"), "確認畫面不洩漏 on_place 效果正文")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_ajie_onplace := ""
+		for s in (loader.beats_by_id.get("d17_19_prescription", {}) as Dictionary).get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "ask_ajie":
+				exp_ajie_onplace = str((s as Dictionary).get("on_place", {}).get("text", "")).substr(0, 6)
+				break
+		assert_true(not exp_ajie_onplace.is_empty(), "fixture 前提：ask_ajie 有 on_place.text")
+		assert_false(_has_text(tree.get_root(), exp_ajie_onplace), "確認畫面不洩漏 on_place 效果正文")
 		await _click(tree, "dialog_cancel::delegation")
 		var snap_after := JSON.stringify(_state(tree))
 		assert_eq(snap_after, snap_before, "取消委託後完整 serialize 狀態逐字不變")
@@ -1842,7 +1956,14 @@ class UiCase extends CaseBaseClass:
 		var flow_nodes := QAStepClass.find_controls_by_name(tree.get_root(), "FlowText")
 		assert_eq(flow_nodes.size(), 1, "FlowText 節點存在")
 		if not flow_nodes.is_empty():
-			assert_true(_has_text(flow_nodes[0], "你爸媽的東西"), "即時委託回報文字出現在 FlowText")
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_ajie_report := ""
+			for s in (loader.beats_by_id.get("d17_19_prescription", {}) as Dictionary).get("slots", []):
+				if str((s as Dictionary).get("id", "")) == "ask_ajie":
+					exp_ajie_report = str((s as Dictionary).get("on_place", {}).get("text", ""))
+					break
+			assert_true(not exp_ajie_report.is_empty(), "fixture 前提：ask_ajie 有 on_place.text")
+			assert_true(_has_text(flow_nodes[0], exp_ajie_report.substr(0, 10)), "即時委託回報文字出現在 FlowText")
 		var hand: Array = _run(tree).get("hand", []) as Array
 		assert_true(hand.has("doc_prescription"), "確認委託阿婕後取得 doc_prescription")
 		assert_true(hand.has("npc_ajie"), "委託後人物卡仍在手牌")
@@ -1926,8 +2047,20 @@ class UiCase extends CaseBaseClass:
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["indulge_breaks_delegation_eligibility", "candidate_hidden_after_card_lost"] } }
 
 	func _p4e_01(tree: SceneTree) -> Dictionary:
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_d8_intro_sub := str((loader.beats_by_id.get("n_manydoors_ch1", {}) as Dictionary).get("text", "")).substr(0, 5)
+		var d8_enc := (loader.beats_by_id.get("n_manydoors_ch1", {}).get("encounter", {}) as Dictionary)
+		var exp_r1_demand := ""
+		for r_entry in d8_enc.get("rounds", []):
+			var r_dict := r_entry as Dictionary
+			if str(r_dict.get("id", "")) == "name_since_when":
+				exp_r1_demand = str(r_dict.get("demand", "")).replace("「", "").replace("」", "").strip_edges()
+				break
+		assert_true(not exp_d8_intro_sub.is_empty(), "fixture 前提：n_manydoors_ch1 有 text")
+		assert_true(not exp_r1_demand.is_empty(), "fixture 前提：name_since_when 有 demand")
+
 		# D8 遭遇：開場 FlowText 有文字，推進按鈕被禁用
-		assert_true(_has_text(tree.get_root(), "兩側全是門") or _has_text(tree.get_root(), "名字"), "FlowText 顯示開場文字")
+		assert_true(_has_text(tree.get_root(), exp_d8_intro_sub) or _has_text(tree.get_root(), "名字"), "FlowText 顯示開場文字")
 		assert_has_qa_id(tree, "encounter_intro_ack", "確認開場按鈕在場")
 		
 		# 斷言 1：遭遇 intro 階段推進按鈕禁用守衛
@@ -1940,7 +2073,7 @@ class UiCase extends CaseBaseClass:
 
 		# 斷言 2：進入 round 階段顯示 demand
 		assert_has_qa_id(tree, "encounter_demand", "進入 round 階段顯示 demand")
-		assert_true(_has_text(tree.get_root(), "那個名字什麼時候開始是你的"), "Demand 文字可見")
+		assert_true(_has_text(tree.get_root(), exp_r1_demand), "Demand 文字可見")
 
 		# 斷言 3：遭遇 round 階段推進按鈕仍然禁用
 		if not adv_btns.is_empty():
@@ -2025,7 +2158,16 @@ class UiCase extends CaseBaseClass:
 		# 6. 提交 info_husband_version 進入 Round 2
 		await _click(tree, "encounter_candidate::info_husband_version")
 		await _click(tree, "dialog_confirm::encounter_respond")
-		assert_true(_has_text(tree.get_root(), "誰記得你"), "進入 R2 demand")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var d8_enc := (loader.beats_by_id.get("n_manydoors_ch1", {}).get("encounter", {}) as Dictionary)
+		var exp_r2_demand := ""
+		for r_entry in d8_enc.get("rounds", []):
+			var r_dict := r_entry as Dictionary
+			if str(r_dict.get("id", "")) == "who_remembers":
+				exp_r2_demand = str(r_dict.get("demand", "")).replace("「", "").replace("」", "").strip_edges()
+				break
+		assert_true(not exp_r2_demand.is_empty(), "fixture 前提：who_remembers 有 demand")
+		assert_true(_has_text(tree.get_root(), exp_r2_demand), "進入 R2 demand")
 
 		# R2 候選清單更新且不可提交卡呈現 disabled 與理由
 		var r2_pro_cands := QAStepClass.find_controls_by_qa_id(tree.get_root(), "encounter_candidate::protagonist")
@@ -2093,7 +2235,17 @@ class UiCase extends CaseBaseClass:
 			assert_true(ft.is_visible_in_tree(), "FlowText 呈現遭遇出口文字且可見")
 			var ft_lines: PackedStringArray = ft.call("get_lines")
 			var all_lines_text := "".join(ft_lines)
-			assert_true(all_lines_text.contains("你拿出了你自己") or all_lines_text.contains("這個名字已經登記"), "FlowText 包含主角卡回應出口文字")
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var d45_enc := (loader.beats_by_id.get("d45_encounter", {}).get("encounter", {}) as Dictionary)
+			var exp_protag_text := ""
+			for r_entry in d45_enc.get("rounds", []):
+				for resp_entry in (r_entry as Dictionary).get("responses", []):
+					var resp_dict := resp_entry as Dictionary
+					if "protagonist" in (resp_dict.get("accepts", []) as Array):
+						exp_protag_text = str((resp_dict.get("on_resolve", {}) as Dictionary).get("text", "")).replace("「", "").replace("」", "").strip_edges()
+						break
+			assert_true(not exp_protag_text.is_empty(), "fixture 前提：d45 protagonist 有 on_resolve.text")
+			assert_true(all_lines_text.contains("你拿出了你自己") or all_lines_text.contains(exp_protag_text), "FlowText 包含主角卡回應出口文字")
 
 		# coda 地點面板同時開啟
 		assert_true(_has_text(tree.get_root(), "靜和園") or _has_text(tree.get_root(), "後棟"), "Coda 地點面板開啟")
@@ -2110,11 +2262,19 @@ class UiCase extends CaseBaseClass:
 		var open_panel: Node = tree.get_root().find_child("OpeningPanel", true, false)
 		assert_true(open_panel != null and open_panel.is_visible_in_tree(), "OpeningPanel 必須在啟動時可見")
 
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var exp_opening_title := "出門前的十分鐘"
+		for oc in loader.opening_choices:
+			if (oc as Dictionary).has("opening_phase_title"):
+				exp_opening_title = str((oc as Dictionary).get("opening_phase_title", ""))
+				break
+		assert_true(not exp_opening_title.is_empty(), "fixture 前提：opening title 非空")
+
 		var status_label: Label = tree.get_root().find_child("StatusLabel", true, false) as Label
-		assert_true(status_label != null and status_label.text.contains("出門前的十分鐘"), "StatusLabel 顯示出門前的十分鐘")
+		assert_true(status_label != null and status_label.text.contains(exp_opening_title), "StatusLabel 顯示開局標題")
 
 		var title_label: Label = open_panel.find_child("TitleLabel", true, false) as Label
-		assert_true(title_label != null and title_label.text == "出門前的十分鐘", "OpeningPanel 標題為出門前的十分鐘")
+		assert_true(title_label != null and title_label.text == exp_opening_title, "OpeningPanel 標題為開局標題")
 
 		var choices_container: Node = open_panel.find_child("ChoicesContainer", true, false)
 		assert_true(choices_container != null, "ChoicesContainer 存在")
@@ -2480,7 +2640,15 @@ class UiCase extends CaseBaseClass:
 		assert_eq(str((_state(tree).get("flow", {}) as Dictionary).get("mode", "")), "ending", "不上車開局直接進入 ending")
 		var view_refuse: Dictionary = gs.call("ending_view")
 		var p_text: String = str(view_refuse.get("page_text", ""))
-		assert_true(p_text.contains("外面的城市") or p_text.contains("退掉了車票") or p_text.contains("放下了行李"), "不上車結局文字符合預期")
+		var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+		var refuse_ending: Dictionary = loader.endings_by_id.get("ending_refuse_boarding", {}) as Dictionary
+		var exp_refuse_sub := ""
+		for p in (refuse_ending.get("first_seen", {}) as Dictionary).get("pages", []):
+			exp_refuse_sub = str((p as Dictionary).get("text", "")).substr(0, 5)
+			if not exp_refuse_sub.is_empty():
+				break
+		assert_true(not exp_refuse_sub.is_empty(), "fixture 前提：refuse_boarding 有 page text")
+		assert_true(p_text.contains(exp_refuse_sub) or p_text.contains("退掉了車票") or p_text.contains("放下了行李"), "不上車結局文字符合預期")
 
 		# 播完不上車結局並結算
 		guard = 50

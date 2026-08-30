@@ -157,11 +157,13 @@ func _test_rejection_matrix(gs: Node, _data_node: Node) -> int:
 	_reset_gs(gs)
 	gs.set("day", 11)
 	gs.set("phase", "night")
+	var exp_n_ahong_2_reason := str((_data_node.get("loader").locations.get("n_ahong_2", {}) as Dictionary).get("reject_reason", ""))
+	assert(not exp_n_ahong_2_reason.is_empty(), "fixture 前提：n_ahong_2 有 reject_reason")
 	# 未見過 n_ahong_1
 	snap_before = (gs.call("serialize") as Dictionary).duplicate(true)
 	var res6: Dictionary = gs.call("enter_night_location", "n_ahong_2")
 	snap_after = (gs.call("serialize") as Dictionary).duplicate(true)
-	if not bool(res6.get("ok", true)) and str(res6.get("reason_code", "")) == "locked" and str(res6.get("reason_text", "")) == "你還沒跟完上一段痕跡。":
+	if not bool(res6.get("ok", true)) and str(res6.get("reason_code", "")) == "locked" and str(res6.get("reason_text", "")) == exp_n_ahong_2_reason:
 		failed += _ok("6. locked: 門檻未達成拒絕成功並附 reject_reason")
 	else:
 		failed += _fail("6. locked 失敗: %s" % str(res6))

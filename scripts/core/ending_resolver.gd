@@ -285,6 +285,11 @@ static func _find_page(pages_raw: Variant, page_id: String) -> Dictionary:
 			continue
 		var text := str(page.get("text", ""))
 		if text.strip_edges().is_empty():
-			return { "ok": false, "text": "", "page_id": "" }
-		return { "ok": true, "text": text, "page_id": page_id }
-	return { "ok": false, "text": "", "page_id": "" }
+			return { "ok": false, "text": "", "page_id": "", "narrative_beats": [] }
+		return {
+			"ok": true,
+			"text": text,
+			"page_id": page_id,
+			"narrative_beats": (page.get("narrative_beats", []) as Array).duplicate()
+		}
+	return { "ok": false, "text": "", "page_id": "", "narrative_beats": [] }

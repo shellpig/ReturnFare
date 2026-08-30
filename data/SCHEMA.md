@@ -241,11 +241,12 @@ UI 是蘇丹式的——**最底下一排是你的手牌，上方是地圖，點
 ### 共用 page
 
 ```json
-{ "id": "outside_years", "text": "……" }
+{ "id": "outside_years", "text": "……", "narrative_beats": ["outside_ordinary_life"] }
 ```
 
 - 同一 ending 內所有巢狀 page id 全域唯一；不能因 first／repeat 分支不同就重複。
 - `text` 必填且非空，是可翻譯欄位。顯示順序只由所在陣列決定。
+- `narrative_beats` 選填 Array[String]；非翻譯欄位，供測試與敘事契約檢驗語意節點（例如 `spouse_dies_first`, `became_innkeeper`），與文案字面解耦。封閉語彙由 `DataLoader.LEGAL_NARRATIVE_BEAT_TAGS` 嚴格約束（Lint 21）。
 - runtime page ref 由 ending id、容器路徑與 page id 組成；存檔存 ref，不存中文全文。
 
 ### `kind: "linear"`

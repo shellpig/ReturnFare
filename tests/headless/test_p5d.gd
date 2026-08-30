@@ -153,11 +153,19 @@ func _test_1_opening_view_and_lock(gs: Node) -> void:
 	_check(ids == OPENING_ORDER,
 		"opening view 永遠按相簿、電話、不上的資料順序（實際：%s）" % str(ids))
 
+	var loader: DataLoader = gs.call("loader") as DataLoader
+	var exp_refuse_reason := ""
+	for oc in loader.opening_choices:
+		if str((oc as Dictionary).get("id", "")) == "refuse_boarding":
+			exp_refuse_reason = str((oc as Dictionary).get("reject_reason", ""))
+			break
+	assert(not exp_refuse_reason.is_empty(), "fixture 前提：refuse_boarding 有 reject_reason")
+
 	_check(bool((view[0] as Dictionary).get("available", false)) and bool((view[1] as Dictionary).get("available", false)),
 		"首輪相簿與電話皆可選")
 	var refuse: Dictionary = view[2] as Dictionary
 	_check(not bool(refuse.get("available", true)), "首輪不上車 available:false")
-	_check(str(refuse.get("reason_text", "")) == "你還沒有理由放棄這趟路。", "鎖定理由取自資料且不劇透")
+	_check(str(refuse.get("reason_text", "")) == exp_refuse_reason, "鎖定理由取自資料且不劇透")
 
 	for row: Dictionary in view:
 		for leaked: String in ["requires", "on_select", "ending", "condition"]:
@@ -1110,8 +1118,19 @@ func _test_20_settlement_lines_reach_screen(gs: Node) -> void:
 	main.call("_on_advance_pressed")
 	await process_frame
 	_check(str(gs.get("phase")) == "evening", "按推進後離開 D29 afternoon")
+	var data_node: Node = get_root().get_node("Data")
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var d29_beat := loader.beats_by_id.get("d29_pm_invitation", {}) as Dictionary
+	var exp_invite_none_text := ""
+	for s_entry in d29_beat.get("slots", []):
+		var s_dict := s_entry as Dictionary
+		if str(s_dict.get("id", "")) == "invite_none":
+			exp_invite_none_text = str((s_dict.get("on_place", {}) as Dictionary).get("text", ""))
+			break
+	assert(not exp_invite_none_text.is_empty(), "fixture 前提：invite_none 有 on_place.text")
+
 	var evening_text := str(flow.call("get_text"))
-	_check(evening_text.contains("你想了一下，決定誰都不找。"),
+	_check(evening_text.contains(exp_invite_none_text),
 		"D29 逾期「不邀」的文字出現在畫面上（實際：%s）" % evening_text.substr(0, 60))
 
 	# (c) 自動進場 beat 的文字同樣不能只留在 transient 裡。
@@ -1134,7 +1153,6 @@ func _test_20_settlement_lines_reach_screen(gs: Node) -> void:
 	#     afternoon 有逾期預設，落點是 evening，因此這一條用合成 beat 補上。
 	var synth_id := "p5d_default_lines_probe"
 	var probe_text := "（測試用：逾期預設的演出文字）"
-	var loader: DataLoader = gs.call("loader")
 	var synth_beat := {
 		"id": synth_id,
 		"location": "sanquan",

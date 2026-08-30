@@ -115,9 +115,12 @@ func _test_status_text_and_display_name_rules(gs: Node, data_node: Node) -> int:
 	gs.set("day", 14)
 	gs.set("phase", "night")
 
+	var exp_n_exit_name := str((data_node.loader.locations.get("n_exit", {}) as Dictionary).get("name", ""))
+	assert(not exp_n_exit_name.is_empty(), "fixture 前提：n_exit 有 name")
+
 	# 1. 未到訪可對位 row (n_exit -> day_counterpart: sanquan, 引子名: 石階外的鎮)
 	var s_unseen_cp := PanelBuilder.location_summary("n_exit", gs, data_node)
-	if str(s_unseen_cp.get("status_text")) == "[尚未到訪]" and str(s_unseen_cp.get("display_name")) == "石階外的鎮":
+	if str(s_unseen_cp.get("status_text")) == "[尚未到訪]" and str(s_unseen_cp.get("display_name")) == exp_n_exit_name:
 		failed += _ok("未到訪可對位 row 顯示引子名與 [尚未到訪]")
 	else:
 		failed += _fail("未到訪可對位 row 狀態文字異常: %s" % str(s_unseen_cp))
@@ -132,7 +135,7 @@ func _test_status_text_and_display_name_rules(gs: Node, data_node: Node) -> int:
 	# 3. 已到訪、未對位 (n_exit seen, knowledge 缺 k_night_sanquan)
 	(gs.get("night_locations_seen") as Dictionary)["n_exit"] = true
 	var s_seen_unaligned := PanelBuilder.location_summary("n_exit", gs, data_node)
-	if str(s_seen_unaligned.get("status_text")) == "[已到訪，尚未對位]" and str(s_seen_unaligned.get("display_name")) == "石階外的鎮":
+	if str(s_seen_unaligned.get("status_text")) == "[已到訪，尚未對位]" and str(s_seen_unaligned.get("display_name")) == exp_n_exit_name:
 		failed += _ok("已到訪未對位 row 顯示 [已到訪，尚未對位] 且維持引子名")
 	else:
 		failed += _fail("已到訪未對位 row 狀態文字異常: %s" % str(s_seen_unaligned))
@@ -198,9 +201,12 @@ func _test_teaser_only_chapter_gating_and_reason(gs: Node, data_node: Node) -> i
 	else:
 		failed += _fail("第 3 章 n_corridor_end 未出現在 available_locations")
 
+	var exp_n_corridor_end_reason := str((data_node.loader.locations.get("n_corridor_end", {}) as Dictionary).get("reject_reason", ""))
+	assert(not exp_n_corridor_end_reason.is_empty(), "fixture 前提：n_corridor_end 有 reject_reason")
+
 	var summary: Dictionary = PanelBuilder.location_summary("n_corridor_end", gs, data_node)
-	if bool(summary.get("teaser_only", false)) and not bool(summary.get("can_enter", true)) and str(summary.get("reason_code", "")) == "teaser" and str(summary.get("reason_text", "")) == "還沒有走到那裡。" and str(summary.get("status_text", "")) == "[尚未到訪]":
-		failed += _ok("teaser-only 詳情顯示 [尚未到訪]、can_enter=false、reason_code=teaser、reason_text='還沒有走到那裡。'")
+	if bool(summary.get("teaser_only", false)) and not bool(summary.get("can_enter", true)) and str(summary.get("reason_code", "")) == "teaser" and str(summary.get("reason_text", "")) == exp_n_corridor_end_reason and str(summary.get("status_text", "")) == "[尚未到訪]":
+		failed += _ok("teaser-only 詳情顯示 [尚未到訪]、can_enter=false、reason_code=teaser、reason_text 等於資料定義")
 	else:
 		failed += _fail("teaser-only summary 內容異常: %s" % str(summary))
 
@@ -217,10 +223,13 @@ func _test_gating_and_closed_reject_matrix(gs: Node, data_node: Node) -> int:
 	gs.set("day", 14)
 	gs.set("phase", "night")
 
+	var exp_n_ahong_2_reason := str((data_node.loader.locations.get("n_ahong_2", {}) as Dictionary).get("reject_reason", ""))
+	assert(not exp_n_ahong_2_reason.is_empty(), "fixture 前提：n_ahong_2 有 reject_reason")
+
 	# 1. locked: n_ahong_2 缺少 info_ahong_traces
 	var s_locked := PanelBuilder.location_summary("n_ahong_2", gs, data_node)
-	if not bool(s_locked.get("can_enter", true)) and str(s_locked.get("reason_code", "")) == "locked" and str(s_locked.get("reason_text", "")) == "你還沒跟完上一段痕跡。":
-		failed += _ok("requires 不成立的地點 (n_ahong_2) can_enter=false、reason_code=locked、帶具體理由 '你還沒跟完上一段痕跡。'")
+	if not bool(s_locked.get("can_enter", true)) and str(s_locked.get("reason_code", "")) == "locked" and str(s_locked.get("reason_text", "")) == exp_n_ahong_2_reason:
+		failed += _ok("requires 不成立的地點 (n_ahong_2) can_enter=false、reason_code=locked、帶具體理由")
 	else:
 		failed += _fail("locked 地點 summary 異常: %s" % str(s_locked))
 

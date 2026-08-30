@@ -102,6 +102,11 @@ func _test_view_model_fields(gs: Node, data_node: Node) -> int:
 	var hand: Array = gs.get("hand") as Array
 	hand.append("npc_ajie")
 
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var d17_beat := loader.beats_by_id.get("d17_19_prescription", {}) as Dictionary
+	var exp_task_title := str(d17_beat.get("title", ""))
+	assert(not exp_task_title.is_empty(), "fixture 前提：d17_19_prescription 有 title")
+
 	var panel: Dictionary = gs.call("build_panel", "sanquan")
 	var ajie_view := _find_slot_view(panel, "d17_19_prescription", "ask_ajie")
 	if ajie_view.is_empty():
@@ -111,7 +116,7 @@ func _test_view_model_fields(gs: Node, data_node: Node) -> int:
 		if str(deleg.get("result_timing", "")) == "immediate" \
 			and not str(deleg.get("preview", "")).is_empty() \
 			and not str(deleg.get("tendency", "")).is_empty() \
-			and str(deleg.get("task_title", "")) == "叔叔的舊藥單" \
+			and str(deleg.get("task_title", "")) == exp_task_title \
 			and str(deleg.get("delegation_state", "")) == "available":
 			_ok("ask_ajie view model 含 result_timing/preview/tendency/task_title，delegation_state=available")
 		else:

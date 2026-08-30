@@ -371,6 +371,13 @@ func _test_empty_result_and_no_fake_beats(gs: Node, data_node: Node) -> int:
 func _test_dual_run_d1_d2_d15(gs: Node, _data_node: Node) -> int:
 	print("--- 6. D1, D2, D15 meta-once dual run & D14 prior active visit ---")
 	var failed := 0
+	var loader: DataLoader = _data_node.get("loader") as DataLoader
+	var exp_n_corridor_ch1 := str(loader.beats_by_id.get("n_corridor_ch1", {}).get("text", ""))
+	var exp_n_exit_ch1 := str(loader.beats_by_id.get("n_exit_ch1", {}).get("text", ""))
+	var exp_n15_everyone := str(loader.beats_by_id.get("n15_everyone", {}).get("text", ""))
+	assert(not exp_n_corridor_ch1.is_empty(), "fixture 前提：n_corridor_ch1 有 text")
+	assert(not exp_n_exit_ch1.is_empty(), "fixture 前提：n_exit_ch1 有 text")
+	assert(not exp_n15_everyone.is_empty(), "fixture 前提：n15_everyone 有 text")
 
 	_reset_gs(gs)
 
@@ -379,7 +386,7 @@ func _test_dual_run_d1_d2_d15(gs: Node, _data_node: Node) -> int:
 	gs.set("phase", "night")
 	gs.set("night_location_chosen", "")
 	var d1_lines: PackedStringArray = gs.call("play_night_fixed")
-	if d1_lines.size() > 0 and d1_lines[0].contains("一條走廊"):
+	if d1_lines.size() > 0 and d1_lines[0].contains(exp_n_corridor_ch1):
 		failed += _ok("第一輪 D1 night play_night_fixed 播放 n_corridor_ch1")
 	else:
 		failed += _fail("第一輪 D1 night 播放失敗: %s" % str(d1_lines))
@@ -404,7 +411,7 @@ func _test_dual_run_d1_d2_d15(gs: Node, _data_node: Node) -> int:
 	gs.set("phase", "night")
 	gs.set("night_location_chosen", "")
 	var d2_lines: PackedStringArray = gs.call("play_night_fixed")
-	if d2_lines.size() > 0 and d2_lines[0].contains("同一條走廊"):
+	if d2_lines.size() > 0 and d2_lines[0].contains(exp_n_exit_ch1):
 		failed += _ok("第一輪 D2 night play_night_fixed 播放 n_exit_ch1")
 	else:
 		failed += _fail("第一輪 D2 night 播放失敗: %s" % str(d2_lines))
@@ -428,7 +435,7 @@ func _test_dual_run_d1_d2_d15(gs: Node, _data_node: Node) -> int:
 	gs.set("phase", "night")
 	gs.set("night_location_chosen", "")
 	var d15_lines: PackedStringArray = gs.call("play_night_fixed")
-	if d15_lines.size() > 0 and d15_lines[0].contains("人群裡有一個背影"):
+	if d15_lines.size() > 0 and d15_lines[0].contains(exp_n15_everyone):
 		failed += _ok("第一輪 D15 fixed 在已主動到訪後仍播一次 n15_everyone")
 	else:
 		failed += _fail("第一輪 D15 播放失敗: %s" % str(d15_lines))
@@ -476,6 +483,9 @@ func _test_dual_run_d1_d2_d15(gs: Node, _data_node: Node) -> int:
 func _test_dual_run_d24_laozeng(gs: Node, _data_node: Node) -> int:
 	print("--- 7. D24 d24_night_laozeng repeat per run and no same-night duplicate ---")
 	var failed := 0
+	var loader: DataLoader = _data_node.get("loader") as DataLoader
+	var exp_d24_laozeng := str(loader.beats_by_id.get("d24_night_laozeng", {}).get("text", ""))
+	assert(not exp_d24_laozeng.is_empty(), "fixture 前提：d24_night_laozeng 有 text")
 
 	_reset_gs(gs)
 
@@ -483,7 +493,7 @@ func _test_dual_run_d24_laozeng(gs: Node, _data_node: Node) -> int:
 	gs.set("day", 24)
 	gs.set("phase", "night")
 	var d24_lines1: PackedStringArray = gs.call("play_night_fixed")
-	if d24_lines1.size() > 0 and d24_lines1[0].contains("巡查點名"):
+	if d24_lines1.size() > 0 and d24_lines1[0].contains(exp_d24_laozeng):
 		failed += _ok("第一輪 D24 night play_night_fixed 播放 d24_night_laozeng")
 	else:
 		failed += _fail("第一輪 D24 播放失敗: %s" % str(d24_lines1))
@@ -510,7 +520,7 @@ func _test_dual_run_d24_laozeng(gs: Node, _data_node: Node) -> int:
 	gs.set("day", 24)
 	gs.set("phase", "night")
 	var d24_lines2: PackedStringArray = gs.call("play_night_fixed")
-	if d24_lines2.size() > 0 and d24_lines2[0].contains("巡查點名"):
+	if d24_lines2.size() > 0 and d24_lines2[0].contains(exp_d24_laozeng):
 		failed += _ok("第二輪 D24 night 正確再次播放 d24_night_laozeng（每輪 fixed）")
 	else:
 		failed += _fail("第二輪 D24 未重播: %s" % str(d24_lines2))
@@ -523,6 +533,9 @@ func _test_dual_run_d24_laozeng(gs: Node, _data_node: Node) -> int:
 func _test_dual_run_d3_n3_map_opens(gs: Node, _data_node: Node) -> int:
 	print("--- 8. D3 n3_map_opens environmental guidance dual run ---")
 	var failed := 0
+	var loader: DataLoader = _data_node.get("loader") as DataLoader
+	var exp_n3_map_opens := str(loader.beats_by_id.get("n3_map_opens", {}).get("text", ""))
+	assert(not exp_n3_map_opens.is_empty(), "fixture 前提：n3_map_opens 有 text")
 
 	_reset_gs(gs)
 
@@ -530,7 +543,7 @@ func _test_dual_run_d3_n3_map_opens(gs: Node, _data_node: Node) -> int:
 	gs.set("day", 3)
 	gs.set("phase", "night")
 	var d3_lines1: PackedStringArray = gs.call("play_night_fixed")
-	if d3_lines1.size() > 0 and d3_lines1[0].contains("三個沒有名字的標記出現"):
+	if d3_lines1.size() > 0 and d3_lines1[0].contains(exp_n3_map_opens):
 		failed += _ok("第一輪 D3 night play_night_fixed 播放 n3_map_opens 環境引導")
 	else:
 		failed += _fail("第一輪 D3 播放失敗: %s" % str(d3_lines1))

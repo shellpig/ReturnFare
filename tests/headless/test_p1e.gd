@@ -352,14 +352,24 @@ func _test_choice_locked_slot(gs: Node, _data_node: Node) -> int:
 	gs.set("day", 29)
 	gs.set("phase", "afternoon")
 
+	var data_node: Node = get_root().get_node("Data")
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var d29_beat := loader.beats_by_id.get("d29_pm_invitation", {}) as Dictionary
+	var exp_invite_awei_reason := ""
+	for s_entry in d29_beat.get("slots", []):
+		if str((s_entry as Dictionary).get("id", "")) == "invite_awei":
+			exp_invite_awei_reason = str((s_entry as Dictionary).get("reject_reason", ""))
+			break
+	assert(not exp_invite_awei_reason.is_empty(), "fixture 前提：invite_awei 有 reject_reason")
+
 	# 未達關係時直接選 invite_awei
 	var res: Dictionary = gs.call("choose", "d29_pm_invitation", "invitation", "invite_awei", "")
 	if res.get("ok", false):
 		return _fail("choose on locked slot should fail")
 	if str(res.get("reason_code", "")) != "locked":
 		return _fail("expected reason_code 'locked', got '%s'" % str(res.get("reason_code", "")))
-	if str(res.get("reason_text", "")) != "（你想不出用什麼身分開這個口。）":
-		return _fail("reason_text mismatch: %s" % str(res.get("reason_text", "")))
+	if str(res.get("reason_text", "")) != exp_invite_awei_reason:
+		return _fail("reason_text mismatch: %s (expected: %s)" % [str(res.get("reason_text", "")), exp_invite_awei_reason])
 
 	# 驗證 choices 未寫入
 	var choices: Dictionary = gs.get("choices") as Dictionary
@@ -406,6 +416,15 @@ func _test_choice_real_data_d22_sandbags(gs: Node, data_node: Node) -> int:
 	var found_talk := false
 	var found_dismiss := false
 
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var d22_beat := loader.beats_by_id.get("d22_pm_sandbags", {}) as Dictionary
+	var exp_obs_hands_reason := ""
+	for s_entry in d22_beat.get("slots", []):
+		if str((s_entry as Dictionary).get("id", "")) == "obs_hands":
+			exp_obs_hands_reason = str((s_entry as Dictionary).get("reject_reason", ""))
+			break
+	assert(not exp_obs_hands_reason.is_empty(), "fixture 前提：obs_hands 有 reject_reason")
+
 	for sv in slots:
 		var sid: String = str(sv["slot"].get("id", ""))
 		match sid:
@@ -421,8 +440,8 @@ func _test_choice_real_data_d22_sandbags(gs: Node, data_node: Node) -> int:
 				found_hands = true
 				if int(sv["tri"]) != PanelBuilder.TriState.LOCKED:
 					return _fail("obs_hands slot tri is not LOCKED (missing requires)")
-				if str(sv["reason"]) != "（你沒有真的跟他遞過幾次東西。）":
-					return _fail("obs_hands reason mismatch: %s" % str(sv["reason"]))
+				if str(sv["reason"]) != exp_obs_hands_reason:
+					return _fail("obs_hands reason mismatch: %s (expected: %s)" % [str(sv["reason"]), exp_obs_hands_reason])
 			"obs_talk":
 				found_talk = true
 				if int(sv["tri"]) != PanelBuilder.TriState.OPEN:
@@ -553,11 +572,20 @@ func _test_choice_ui_buttons(gs: Node, _data_node: Node) -> int:
 		panel_b.call("_on_advance_beat_pressed")
 		await process_frame
 
+	var exp_obs_walk_label := ""
+	var data_node: Node = get_root().get_node("Data")
+	var d22_beat_b := (data_node.get("loader") as DataLoader).beats_by_id.get("d22_pm_sandbags", {}) as Dictionary
+	for s_entry in d22_beat_b.get("slots", []):
+		if str((s_entry as Dictionary).get("id", "")) == "obs_walk":
+			exp_obs_walk_label = str((s_entry as Dictionary).get("label", ""))
+			break
+	assert(not exp_obs_walk_label.is_empty(), "fixture 前提：obs_walk 有 label")
+
 	var beat_container_b: Node = panel_b.find_child("BeatContainer", true, false)
 	var found_obs_walk_label := false
 	var card_btn: Button = null
 	for child in beat_container_b.get_children():
-		if child is Label and (child as Label).text.contains("① 他走路的方式"):
+		if child is Label and (child as Label).text.contains(exp_obs_walk_label):
 			found_obs_walk_label = true
 			continue
 		if found_obs_walk_label and child is Button and (child as Button).text.contains("拍立得"):

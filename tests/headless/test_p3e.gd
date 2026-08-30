@@ -165,8 +165,11 @@ func _test_multi_row_partial_seen_and_subsequent_visit(gs: Node, data_node: Node
 	else:
 		failed += _fail("n_woodtags summary 異常: %s" % str(sum_woodtags))
 
-	if str(sum_music.get("status_text", "")) == "[尚未到訪]" and str(sum_music.get("display_name", "")) == "有音樂的地方":
-		failed += _ok("未到訪 row (n_music) 維持 [尚未到訪] 且維持原夜間名『有音樂的地方』（不劇透）")
+	var exp_n_music_name := str((data_node.loader.locations.get("n_music", {}) as Dictionary).get("name", ""))
+	assert(not exp_n_music_name.is_empty(), "fixture 前提：n_music 有 name")
+
+	if str(sum_music.get("status_text", "")) == "[尚未到訪]" and str(sum_music.get("display_name", "")) == exp_n_music_name:
+		failed += _ok("未到訪 row (n_music) 維持 [尚未到訪] 且維持原夜間名（不劇透）")
 	else:
 		failed += _fail("未到訪 row n_music 提前洩漏對位狀態或名稱: %s" % str(sum_music))
 
@@ -179,7 +182,7 @@ func _test_multi_row_partial_seen_and_subsequent_visit(gs: Node, data_node: Node
 
 	# 驗證離開後查看 summary：n_music 自動顯示 [已對位] 與『廟＋廟埕・有音樂的地方』，無須第二次白天確認
 	var sum_music_after: Dictionary = PanelBuilder.location_summary("n_music", gs, data_node)
-	if str(sum_music_after.get("status_text", "")) == "[已對位]" and str(sum_music_after.get("display_name", "")) == "廟＋廟埕・有音樂的地方":
+	if str(sum_music_after.get("status_text", "")) == "[已對位]" and str(sum_music_after.get("display_name", "")) == ("廟＋廟埕・%s" % exp_n_music_name):
 		failed += _ok("首次到訪第二個 row 後，自動衍生 [已對位] 與白天名・夜間名，無須第二次確認")
 	else:
 		failed += _fail("第二個 row 到訪後未能自動衍生對位: %s" % str(sum_music_after))
@@ -202,10 +205,13 @@ func _test_state_purity_no_third_state(gs: Node, data_node: Node) -> int:
 	var failed := 0
 	_reset_gs(gs)
 
+	var exp_n_exit_name := str((data_node.loader.locations.get("n_exit", {}) as Dictionary).get("name", ""))
+	assert(not exp_n_exit_name.is_empty(), "fixture 前提：n_exit 有 name")
+
 	# 3.1 僅注入 knowledge 但無 seen
 	gs.call("gain_card", "k_night_sanquan")
 	var sum_unseen: Dictionary = PanelBuilder.location_summary("n_exit", gs, data_node)
-	if str(sum_unseen.get("status_text", "")) == "[尚未到訪]" and str(sum_unseen.get("display_name", "")) == "石階外的鎮":
+	if str(sum_unseen.get("status_text", "")) == "[尚未到訪]" and str(sum_unseen.get("display_name", "")) == exp_n_exit_name:
 		failed += _ok("手上有 knowledge 但無 seen 時，地點維持 [尚未到訪] 與引子名")
 	else:
 		failed += _fail("無 seen 卻因 knowledge 誤顯示對位: %s" % str(sum_unseen))
@@ -215,7 +221,7 @@ func _test_state_purity_no_third_state(gs: Node, data_node: Node) -> int:
 	var seen_dict: Dictionary = gs.get("night_locations_seen") as Dictionary
 	seen_dict["n_exit"] = true
 	var sum_unaligned: Dictionary = PanelBuilder.location_summary("n_exit", gs, data_node)
-	if str(sum_unaligned.get("status_text", "")) == "[已到訪，尚未對位]" and str(sum_unaligned.get("display_name", "")) == "石階外的鎮":
+	if str(sum_unaligned.get("status_text", "")) == "[已到訪，尚未對位]" and str(sum_unaligned.get("display_name", "")) == exp_n_exit_name:
 		failed += _ok("有 seen 但無 knowledge 時，地點顯示 [已到訪，尚未對位] 與引子名")
 	else:
 		failed += _fail("無 knowledge 卻誤顯示已對位: %s" % str(sum_unaligned))
@@ -232,7 +238,7 @@ func _test_state_purity_no_third_state(gs: Node, data_node: Node) -> int:
 	# 3.4 拿掉 knowledge 即刻失效
 	(gs.get("knowledge") as Dictionary).erase("k_night_sanquan")
 	var sum_revert: Dictionary = PanelBuilder.location_summary("n_exit", gs, data_node)
-	if str(sum_revert.get("status_text", "")) == "[已到訪，尚未對位]" and str(sum_revert.get("display_name", "")) == "石階外的鎮":
+	if str(sum_revert.get("status_text", "")) == "[已到訪，尚未對位]" and str(sum_revert.get("display_name", "")) == exp_n_exit_name:
 		failed += _ok("刪除 knowledge 後，衍生的已對位狀態立即退回 [已到訪，尚未對位]，無狀態殘留")
 	else:
 		failed += _fail("刪除 knowledge 後未能立即退回未對位: %s" % str(sum_revert))

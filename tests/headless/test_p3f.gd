@@ -600,8 +600,11 @@ func _test_second_round_replay_and_five_paths(gs: Node, data_node: Node) -> int:
 
 	var loader: DataLoader = data_node.get("loader") as DataLoader
 	var temple_day_name := str((loader.locations.get("temple", {}) as Dictionary).get("name", "temple"))
-	var exp_woodtags_name := "%s・數木牌的屋子" % temple_day_name
-	var exp_music_name := "%s・有音樂的地方" % temple_day_name
+	var n_woodtags_night_name := str((loader.locations.get("n_woodtags", {}) as Dictionary).get("name", "n_woodtags"))
+	var n_music_night_name := str((loader.locations.get("n_music", {}) as Dictionary).get("name", "n_music"))
+	assert(not temple_day_name.is_empty() and not n_music_night_name.is_empty(), "fixture 前提：地點名稱非空")
+	var exp_woodtags_name := "%s・%s" % [temple_day_name, n_woodtags_night_name]
+	var exp_music_name := "%s・%s" % [temple_day_name, n_music_night_name]
 
 	var summary_woodtags: Dictionary = PanelBuilder.location_summary("n_woodtags", gs, data_node)
 	var summary_music_before: Dictionary = PanelBuilder.location_summary("n_music", gs, data_node)
@@ -611,8 +614,8 @@ func _test_second_round_replay_and_five_paths(gs: Node, data_node: Node) -> int:
 	else:
 		failed += _fail("Path 5a summary 異常: %s" % str(summary_woodtags))
 
-	if str(summary_music_before.get("status_text", "")) == "[尚未到訪]" and str(summary_music_before.get("display_name", "")) == "有音樂的地方":
-		failed += _ok("Path 5b (Unseen Counterpart): 第 2 輪未見之 n_music 仍為 [尚未到訪] 與『有音樂的地方』")
+	if str(summary_music_before.get("status_text", "")) == "[尚未到訪]" and str(summary_music_before.get("display_name", "")) == n_music_night_name:
+		failed += _ok("Path 5b (Unseen Counterpart): 第 2 輪未見之 n_music 仍為 [尚未到訪] 與夜間引子名")
 	else:
 		failed += _fail("Path 5b summary_before 異常: %s" % str(summary_music_before))
 

@@ -4,11 +4,9 @@
 
 ## 目前狀態
 
-**P5-F 機器層已由 verifier 關門（2026-08-30），`PROJECT_BRIEF.md` 轉 🟦。三輪 review 的 B1／B2、N1～N9、R1～R3 共十七條全數處理，已落檔為 K-223～K-236。P5-F 是 P5 的最後一個子階段，沒有 P5-G。**
+**T-01 文案解耦已全數完成（2026-08-30）。全套 33 套 Headless 測試（含 `test_p5c` 敘事標籤化斷言、各 headless 解耦）與 UI Simulation（117 variants / 94 catalog contracts / 94 executed / 94 completed / 0 failed checks）全數綠燈通過。步驟 6 文案改寫實驗（5 處跨檔案台詞改寫保持全綠、Category B 敘事標籤移除精確轉紅）已驗證解耦完全有效。**
 
 **唯一未完成的是 `測試指南.md > P5-F` 最後一條 👤 人工驗收**——首輪三種 ending、正常長／短版、不上車 locked／unlocked／重見摘要、相簿／電話開局、逐字補完與翻頁、至少一次完整跨輪回場，每項附當下輪數與路徑。與 P3-F／P4-F 同狀態，只有真人玩過才能落檔。人工那條過了之後 P5 整段轉 ✅，接 i18n 管線與 P6 存檔 UI。
-
-**下一個 implementer 任務不是 P5-F，是本檔下一節的「T-01 文案解耦」**（使用者 2026-08-30 指派，為之後大改文案鋪路）。P5-F 的人工驗收由使用者自己跑，不擋 T-01。
 
 ---
 
@@ -143,6 +141,53 @@ _check(page_beats.has("spouse_first_death") and page_beats.has("same_illness"),
 - 全套 headless ＋ UI sim 的 run id
 - 步驟 6 的文案改寫實驗：改了哪五句、A 類全綠的證據、B 類正反兩向各自的結果
 - 更新本檔（只增不刪 verifier 區塊，見 K-236）
+
+## T-01 執行成果與解耦證據（2026-08-30 完成）
+
+### 1. 斷言盤點與分類統計（共 126 處）
+
+依「字面改寫後是否應維持綠燈」嚴格劃分：
+
+- **Category A（呈現契約，動態讀取資料）**：共 59 處
+  - 涵蓋：`test_boot` (1), `test_p1c_bugfix` (3), `test_p1e` (3), `test_p1f` (6), `test_p1g` (1), `test_p2b` (1), `test_p2c` (1), `test_p3a` (3), `test_p3b` (1), `test_p3c` (6), `test_p3d` (3), `test_p3e` (4), `test_p3f` (1), `test_p4c` (1), `test_p4e` (5), `test_p5d` (2), `p1g_cases` (3), `p1af_cases` (27)
+  - 解耦策略：透過 `CaseBaseClass.get_data(tree).get("loader")` 或 `GameState.loader` 動態取得對應 beat/slot/card/location 定義之文字，並一律加上 `assert_true(not expected.is_empty(), "fixture 前提：...")` 嚴密防空跑。
+- **Category B（敘事契約，語意標籤化）**：共 30 處（全數集中於 `tests/headless/test_p5c.gd`）
+  - 解耦策略：在 `data/endings.json` 頂層 17 個結局 page 結構引入 `narrative_beats: Array[String]` 語意標籤。
+  - 在 `scripts/data_loader.gd` 建立 `LEGAL_NARRATIVE_BEAT_TAGS`（19 個封閉語彙），並擴充 Lint 21 嚴格防錯。
+  - `EndingResolver._find_page()` 擴充回傳 `narrative_beats`。
+  - `data/SCHEMA.md` 正式登記 `narrative_beats` 為非翻譯設計契約 metadata。
+  - `test_p5c.gd` 全面轉為 `page_beats.has("...")` 與順序比對。
+- **False Positives（偽陽性，斷言訊息／日誌／測試固定夾具）**：共 37 處
+  - 涵蓋：斷言描述訊息（`assert_true(..., "第 1 天...")`）、測試內部自建之合成 dummy fixture、日誌格式化字串等，原樣保留。
+
+### 2. 測試執行結果
+
+- **全套 Headless 測試（33 套）**：
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run_all_headless.ps1`
+  - 結果：**ALL 33 HEADLESS SUITES PASSED (Exit Code: 0)**
+- **UI Simulation 測試**：
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\ui_sim\run_ui_sim.ps1 -Background`
+  - Run ID: `20260830-140847-134-p21764-ee087a88`
+  - 規模與結果：**117 variants / 94 catalog contracts / 94 executed / 94 completed / 0 failed checks (Exit Code: 0)**
+  - 負向測試：全部 11 條負向反證皆以預期原因被拒絕。
+
+### 3. 步驟 6 文案改寫實驗（驗收核心證明）
+
+為證明解耦完全有效，執行了跨檔案文案改寫實驗：
+
+1. **跨 5 處資料台詞改寫實驗（正向驗證）**：
+   - `data/beats/ch1_d01_d03.json` 中的 `d1_arrival.text`（改寫為全新字串）
+   - `data/beats/ch1_d01_d03.json` 中的 `d3_pm_sanquan > help_ahong.on_place.text`（改寫為全新字串）
+   - `data/endings.json` 中的 `ending_refuse_boarding > first_seen.pages[0].text`（改寫為全新字串）
+   - `data/cards.json` 中的 `k_ahong_point_1.name`（改寫為全新字串）
+   - `data/locations.json` 中的 `sanquan.desc`（改寫為全新字串）
+   - **驗證結果**：全套 33 套 Headless 測試 **全數維持綠燈通過（Exit Code: 0）**。
+2. **Category B 敘事標籤移除實驗（反向驗證）**：
+   - 暫時從 `data/endings.json` 的 `partner_ajie_long` 移除 `"spouse_dies_first"` 標籤。
+   - **驗證結果**：`test_p5c.gd` 立即精確轉紅（`ERROR: FAIL 伴侶頁包含「她先」與癌症 (K-203)`，Exit Code: 1）。
+3. 實驗完成後以 `git checkout data/` 乾淨還原，所有測試再次全數通過。
+
+---
 
 ### verifier 關門證據（`69158c5`）
 

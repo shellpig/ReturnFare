@@ -430,11 +430,11 @@ func _test_5_uninvited_proxy_lookup(gs: Node, data_node: Node) -> void:
 	]:
 		var long_ref := str((long_case["refs"] as Array)[4])
 		var long_page := EndingResolver.resolve_ref(long_ref, loader)
-		var long_text := str(long_page.get("text", ""))
-		_check(str(long_case["npc"]) in long_text and "至於那個走出山泉閣的人" in long_text,
-			"%s 首見 proxy 頁明確切回後日談主體" % str(long_case["npc"]))
-		_check("四十出頭" in long_text and "癌症" in long_text and "走得很快" in long_text,
-			"%s 首見 proxy 頁由走出山泉閣的人病逝" % str(long_case["npc"]))
+		var long_beats: Array = long_page.get("narrative_beats", []) as Array
+		_check(long_beats.has("switch_subject_to_protagonist"),
+			"%s 首見 proxy 頁明確切回後日談主體 (K-208)" % str(long_case["npc"]))
+		_check(long_beats.has("died_early_forties") and long_beats.has("died_of_cancer") and long_beats.has("died_rapidly"),
+			"%s 首見 proxy 頁由走出山泉閣的人病逝 (K-208)" % str(long_case["npc"]))
 
 	# 重見短版同樣逐一守住主詞，避免把「四十出頭病逝」接到 proxy NPC。
 	for repeat_case in [
@@ -449,9 +449,9 @@ func _test_5_uninvited_proxy_lookup(gs: Node, data_node: Node) -> void:
 		var repeat_refs: Array = repeat_res.get("page_refs", []) as Array
 		var repeat_ref := str(repeat_refs[4])
 		var repeat_page := EndingResolver.resolve_ref(repeat_ref, loader)
-		var repeat_text := str(repeat_page.get("text", ""))
-		_check(str(repeat_case["npc"]) in repeat_text and "那個走出山泉閣的人在四十出頭病逝" in repeat_text,
-			"%s 重見 proxy 頁明確由走出山泉閣的人病逝" % str(repeat_case["npc"]))
+		var repeat_beats: Array = repeat_page.get("narrative_beats", []) as Array
+		_check(repeat_beats.has("protagonist_dies_early_forties"),
+			"%s 重見 proxy 頁明確由走出山泉閣的人病逝 (K-208)" % str(repeat_case["npc"]))
 
 	# (d) D29 凍結後改動 npc_action_counts：結局 festival_proxy_npc 仍為凍結 id
 	_fresh_run(gs)
@@ -496,9 +496,9 @@ func _test_6_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 
 	# 第 1 頁：prefix 可觀察畫面
 	var p0 := EndingResolver.resolve_ref(str(refs_ajie[0]), loader)
-	var t0 := str(p0.get("text", ""))
-	_check("穿上外套" in t0 and "走出了山泉閣" in t0, "首見 prefix 呈現可觀察畫面")
-	_check(not ("另一個你" in t0) and not ("替換" in t0), "首見 prefix 不過早揭露替換真相")
+	var beats0: Array = p0.get("narrative_beats", []) as Array
+	_check(beats0.has("observable_exit_sanquan"), "首見 prefix 呈現可觀察畫面")
+	_check(not beats0.has("reveals_replacement_truth"), "首見 prefix 不過早揭露替換真相 (K-200)")
 
 	# 第 2 頁：生計
 	_check("livelihood" in str(refs_ajie[1]), "第 2 頁為生計落地")
@@ -509,17 +509,17 @@ func _test_6_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 	# 第 4 頁：伴侶（婚姻 → 二十年 → 她先癌逝 → 主角同病死亡）
 	_check("partner" in str(refs_ajie[3]), "第 4 頁為伴侶婚姻與死亡順序")
 	var p3_ajie := EndingResolver.resolve_ref(str(refs_ajie[3]), loader)
-	var t3_ajie := str(p3_ajie.get("text", ""))
-	_check("結婚" in t3_ajie and "沒有小孩" in t3_ajie, "伴侶頁包含婚姻與無小孩")
-	_check("二十年過去" in t3_ajie and "四十出頭" in t3_ajie, "伴侶頁包含二十年與四十出頭時間軸")
-	_check("她先" in t3_ajie and "癌症" in t3_ajie and "走得很快" in t3_ajie, "伴侶頁包含「她先」與癌症")
-	_check("然後是他" in t3_ajie and "同一個病" in t3_ajie and "一樣快" in t3_ajie, "伴侶頁包含主角同病死亡（承重線索）")
+	var beats3_ajie: Array = p3_ajie.get("narrative_beats", []) as Array
+	_check(beats3_ajie.has("marriage") and beats3_ajie.has("no_children"), "伴侶頁包含婚姻與無小孩")
+	_check(beats3_ajie.has("twenty_years") and beats3_ajie.has("died_early_forties"), "伴侶頁包含二十年與四十出頭時間軸")
+	_check(beats3_ajie.has("spouse_dies_first") and beats3_ajie.has("died_of_cancer") and beats3_ajie.has("died_rapidly"), "伴侶頁包含「她先」與癌症 (K-203)")
+	_check(beats3_ajie.has("protagonist_same_illness") and beats3_ajie.has("died_rapidly"), "伴侶頁包含主角同病死亡（承重線索 K-203）")
 
 	# 第 5 頁：suffix 黑畫面與庇佑發動
 	_check("long_return" in str(refs_ajie[4]), "第 5 頁為庇佑回歸")
 	var p4 := EndingResolver.resolve_ref(str(refs_ajie[4]), loader)
-	var t4 := str(p4.get("text", ""))
-	_check("然後是黑" in t4 and "庇佑再次發動" in t4, "suffix 呈現黑畫面與庇佑回歸")
+	var beats4: Array = p4.get("narrative_beats", []) as Array
+	_check(beats4.has("black_screen") and beats4.has("blessing_reactivated"), "suffix 呈現黑畫面與庇佑回歸")
 
 	# (b) 邀阿薇首見長版：同樣包含「她先」與同病死亡
 	_fresh_run(gs)
@@ -532,9 +532,9 @@ func _test_6_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 	var res_awei := EndingResolver.resolve("ending_replaced", gs, loader)
 	var refs_awei: Array = res_awei.get("page_refs", []) as Array
 	var p3_awei := EndingResolver.resolve_ref(str(refs_awei[3]), loader)
-	var t3_awei := str(p3_awei.get("text", ""))
-	_check("阿薇" in t3_awei and "她先" in t3_awei and "然後是他" in t3_awei and "同一個病" in t3_awei,
-		"阿薇長版包含婚姻、她先走與主角同病死亡")
+	var beats3_awei: Array = p3_awei.get("narrative_beats", []) as Array
+	_check(beats3_awei.has("spouse_dies_first") and beats3_awei.has("protagonist_same_illness"),
+		"阿薇長版包含婚姻、她先走與主角同病死亡 (K-203)")
 
 	# (c) 不邀首見長版：先獨身二十年，再播 proxy 回顧與四十出頭癌逝，最後庇佑回歸（不誤播「她先」）
 	_fresh_run(gs)
@@ -550,23 +550,23 @@ func _test_6_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 	
 	# 第 4 頁：伴侶頁只有獨身二十年，不提前播死亡
 	var p3_none := EndingResolver.resolve_ref(str(refs_none[3]), loader)
-	var t3_none := str(p3_none.get("text", ""))
-	_check("沒有結婚" in t3_none and "一個人過完二十年" in t3_none, "無伴侶長版伴侶頁包含獨身二十年")
-	_check(not ("癌症" in t3_none) and not ("四十出頭" in t3_none), "無伴侶伴侶頁不提前播癌症早死（留待 proxy 回顧之後）")
-	_check(not ("她先" in t3_none) and not ("然後是他" in t3_none), "無伴侶伴侶頁不得誤播「她先」或「然後是他」")
+	var beats3_none: Array = p3_none.get("narrative_beats", []) as Array
+	_check(beats3_none.has("no_marriage") and beats3_none.has("single_twenty_years"), "無伴侶長版伴侶頁包含獨身二十年")
+	_check(not beats3_none.has("died_of_cancer") and not beats3_none.has("died_early_forties"), "無伴侶伴侶頁不提前播癌症早死（留待 proxy 回顧之後 K-206）")
+	_check(not beats3_none.has("spouse_dies_first") and not beats3_none.has("protagonist_same_illness"), "無伴侶伴侶頁不得誤播「她先」或「然後是他」")
 	
 	# 第 5 頁：proxy 回顧＋四十出頭癌症早死（時間軸：照片回顧 → 癌症早死）
 	_check("proxy_acai_long" in str(refs_none[4]), "第 5 頁為代付者阿財照片")
 	var p4_none := EndingResolver.resolve_ref(str(refs_none[4]), loader)
-	var t4_none := str(p4_none.get("text", ""))
-	_check("阿財" in t4_none and "四十出頭" in t4_none and "癌症" in t4_none and "走得很快" in t4_none,
-		"proxy 頁面呈現多年後回顧與四十出頭癌症早死")
+	var beats4_none: Array = p4_none.get("narrative_beats", []) as Array
+	_check(beats4_none.has("proxy_reminisce") and beats4_none.has("died_early_forties") and beats4_none.has("died_of_cancer") and beats4_none.has("died_rapidly"),
+		"proxy 頁面呈現多年後回顧與四十出頭癌症早死 (K-206)")
 	
 	# 第 6 頁：黑畫面與庇佑回歸
 	_check("long_return" in str(refs_none[5]), "第 6 頁為庇佑回歸")
 	var p5_none := EndingResolver.resolve_ref(str(refs_none[5]), loader)
-	var t5_none := str(p5_none.get("text", ""))
-	_check("然後是黑" in t5_none and "庇佑再次發動" in t5_none, "第 6 頁呈現黑畫面與庇佑回歸")
+	var beats5_none: Array = p5_none.get("narrative_beats", []) as Array
+	_check(beats5_none.has("black_screen") and beats5_none.has("blessing_reactivated"), "第 6 頁呈現黑畫面與庇佑回歸")
 
 	# (d) history 只有 BE 結局 -> 正常結局仍為 first_seen
 	_fresh_run(gs)
@@ -592,8 +592,8 @@ func _test_6_first_seen_vs_repeat_and_chronology(gs: Node, data_node: Node) -> v
 	_check(_refs_contain(refs_rep, "livelihood_uncle_high_short"), "重見包含 livelihood_uncle_high_short")
 	_check(_refs_contain(refs_rep, "inn_sign_short"), "重見包含 inn_sign_short")
 	var p_rep_ajie := EndingResolver.resolve_ref(str(refs_rep[3]), loader)
-	var t_rep_ajie := str(p_rep_ajie.get("text", ""))
-	_check("她先離世" in t_rep_ajie and "同病而終" in t_rep_ajie, "重見短版亦保留她先離世與同病線索")
+	var beats_rep_ajie: Array = p_rep_ajie.get("narrative_beats", []) as Array
+	_check(beats_rep_ajie.has("spouse_dies_first") and beats_rep_ajie.has("protagonist_same_illness"), "重見短版亦保留她先離世與同病線索 (K-203)")
 	_check(EndingResolver.skip_target("ending_replaced", loader) == "short_return", "正常結局 skip_to 指向 short_return")
 
 
@@ -664,8 +664,10 @@ func _test_8_refuse_boarding_ending(gs: Node, data_node: Node) -> void:
 	_check(refs.size() == 2, "不上車首見恰 2 頁 (page_count=%d)" % refs.size())
 	var page0 := EndingResolver.resolve_ref(str(refs[0]), loader)
 	var page1 := EndingResolver.resolve_ref(str(refs[1]), loader)
-	_check(bool(page0.get("ok", false)) and ("外面的城市" in str(page0.get("text", ""))), "第 1 頁描述外地普通生活")
-	_check(bool(page1.get("ok", false)) and ("四十出頭" in str(page1.get("text", ""))) and ("庇佑再次發動" in str(page1.get("text", ""))), "第 2 頁描述四十出頭癌症早死與庇佑回歸")
+	var beats_page0: Array = page0.get("narrative_beats", []) as Array
+	var beats_page1: Array = page1.get("narrative_beats", []) as Array
+	_check(bool(page0.get("ok", false)) and beats_page0.has("outside_ordinary_life"), "第 1 頁描述外地普通生活")
+	_check(bool(page1.get("ok", false)) and beats_page1.has("died_early_forties") and beats_page1.has("died_of_cancer") and beats_page1.has("blessing_reactivated"), "第 2 頁描述四十出頭癌症早死與庇佑回歸")
 
 	# (c) 重見不上車為摘要短篇
 	_fresh_run(gs)
@@ -677,7 +679,8 @@ func _test_8_refuse_boarding_ending(gs: Node, data_node: Node) -> void:
 	var rep_refs: Array = rep_snap.get("page_refs", []) as Array
 	_check(rep_refs.size() == 1, "重見不上車恰 1 頁")
 	var rep_p0 := EndingResolver.resolve_ref(str(rep_refs[0]), loader)
-	_check(bool(rep_p0.get("ok", false)) and ("不上車" in str(rep_p0.get("text", ""))), "重見不上車播摘要文字")
+	var beats_rep_p0: Array = rep_p0.get("narrative_beats", []) as Array
+	_check(bool(rep_p0.get("ok", false)) and beats_rep_p0.has("refuse_boarding_summary"), "重見不上車播摘要文字")
 	_check(EndingResolver.skip_target("ending_refuse_boarding", loader) == "complete", "不上車 skip_to 指向 complete")
 
 

@@ -364,18 +364,26 @@ func _test_a7_on_enter_text_rendered_in_panel() -> int:
 	gs.set("day", 15)
 	gs.set("phase", "afternoon")
 
+	var data_node: Node = get_root().get_node("Data")
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var clinic_beat := loader.beats_by_id.get("d15_pm_clinic", {}) as Dictionary
+	var exp_main := str(clinic_beat.get("text", ""))
+	var exp_on_enter := str((clinic_beat.get("on_enter", {}) as Dictionary).get("text", ""))
+	assert(not exp_main.is_empty(), "fixture 前提：d15_pm_clinic 有主文")
+	assert(not exp_on_enter.is_empty(), "fixture 前提：d15_pm_clinic 有 on_enter.text")
+
 	# ① 驗證 GameState.play_beat() 回傳 beat 主文與 on_enter.text
 	var lines: PackedStringArray = gs.call("play_beat", "d15_pm_clinic")
 	if lines.size() < 2:
 		failed += _fail("play_beat(clinic): expected at least 2 lines (beat text + on_enter text), got %d: %s" % [lines.size(), str(lines)])
 	else:
-		if lines[0] != "陳醫師溫和地解釋，說是老毛病，要多休息。":
-			failed += _fail("play_beat(clinic): line[0] wrong: %s" % lines[0])
+		if lines[0] != exp_main:
+			failed += _fail("play_beat(clinic): line[0] wrong: %s (expected: %s)" % [lines[0], exp_main])
 		else:
 			failed += _ok("play_beat(clinic): line[0] is beat main text")
 
-		if lines[1] != "走出來的時候阿薇站在外面。「我媽以前也是這樣。」":
-			failed += _fail("play_beat(clinic): line[1] wrong: %s" % lines[1])
+		if lines[1] != exp_on_enter:
+			failed += _fail("play_beat(clinic): line[1] wrong: %s (expected: %s)" % [lines[1], exp_on_enter])
 		else:
 			failed += _ok("play_beat(clinic): line[1] is on_enter.text")
 
@@ -401,9 +409,9 @@ func _test_a7_on_enter_text_rendered_in_panel() -> int:
 	var found_main := false
 	var found_on_enter := false
 	for txt in all_labels_text:
-		if txt.contains("陳醫師溫和地解釋"):
+		if txt.contains(exp_main):
 			found_main = true
-		if txt.contains("我媽以前也是這樣"):
+		if txt.contains(exp_on_enter):
 			found_on_enter = true
 
 	if not found_main:

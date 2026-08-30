@@ -12,6 +12,28 @@ const CARD_TYPES := [
 	"inference", "document", "knowledge", "mood", "madness", "routine",
 ]
 
+const LEGAL_NARRATIVE_BEAT_TAGS: Array[String] = [
+	"observable_exit_sanquan",
+	"reveals_replacement_truth",
+	"marriage",
+	"no_marriage",
+	"no_children",
+	"twenty_years",
+	"single_twenty_years",
+	"spouse_dies_first",
+	"protagonist_same_illness",
+	"protagonist_dies_early_forties",
+	"switch_subject_to_protagonist",
+	"proxy_reminisce",
+	"died_early_forties",
+	"died_of_cancer",
+	"died_rapidly",
+	"black_screen",
+	"blessing_reactivated",
+	"outside_ordinary_life",
+	"refuse_boarding_summary",
+]
+
 var DATA_DIR: String
 var BEATS_DIR: String
 
@@ -1754,6 +1776,23 @@ static func _lint_page_list(pages: Array, eid: String, where: String, page_ids: 
 		for forbidden in ["ending_replaced", "ending_madness_be", "ending_inventory_be", "ending_refuse_boarding"]:
 			if forbidden in text:
 				problems.append("%s [%s.%s]：玩家文字直接包含內部 ending id → %s" % [eid, where, pid, forbidden])
+
+		if pd.has("narrative_beats"):
+			var nb: Variant = pd.get("narrative_beats")
+			if not (nb is Array):
+				problems.append("%s [%s.%s]：narrative_beats 必須為 Array" % [eid, where, pid])
+			else:
+				var seen_tags := {}
+				for tag_v in nb as Array:
+					if not (tag_v is String):
+						problems.append("%s [%s.%s]：narrative_beats 元素必須為 String" % [eid, where, pid])
+						continue
+					var tag := str(tag_v)
+					if not LEGAL_NARRATIVE_BEAT_TAGS.has(tag):
+						problems.append("%s [%s.%s]：未知 narrative_beat tag → %s" % [eid, where, pid, tag])
+					if seen_tags.has(tag):
+						problems.append("%s [%s.%s]：重複的 narrative_beat tag → %s" % [eid, where, pid, tag])
+					seen_tags[tag] = true
 
 
 ## `ending` 效果可以寫在 beat 的任何巢狀效果位置：on_enter、on_place、on_place_by_level，

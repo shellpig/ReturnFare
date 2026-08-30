@@ -153,15 +153,27 @@ func _test_first_time_is_light_with_warning_text(gs: Node, data: Node) -> int:
 
 	gs.call("advance_phase") # -> D2 morning
 
+	var exit_beat := (data.get("loader") as DataLoader).beats_by_id.get("exit_sanquan", {}) as Dictionary
+	var possible_light_texts: Array[String] = []
+	for s_entry in exit_beat.get("slots", []):
+		var s_dict := s_entry as Dictionary
+		var light_t := str(((s_dict.get("on_place_by_level", {}) as Dictionary).get("light", {}) as Dictionary).get("text", ""))
+		if not light_t.is_empty():
+			possible_light_texts.append(light_t)
+	assert(not possible_light_texts.is_empty(), "fixture 前提：exit_sanquan 有 light text")
+
 	var lines: PackedStringArray = gs.get("last_forced_lines")
 	var has_light_warning := false
 	for l in lines:
-		if l.contains("開始") or l.contains("沒這麼容易") or l.contains("輕微"):
-			has_light_warning = true
+		for exp_t in possible_light_texts:
+			if l.contains(exp_t):
+				has_light_warning = true
+				break
+		if has_light_warning:
 			break
 
 	if has_light_warning:
-		failed += _ok("第 1 次強制縱慾播出輕度預告文字 (例如「只是開始」/「沒這麼容易」)")
+		failed += _ok("第 1 次強制縱慾播出輕度預告文字 (via on_place_by_level.light.text)")
 	else:
 		failed += _fail("第 1 次強制縱慾未包含預期之輕度預告文字 (輸出: %s)" % str(lines))
 

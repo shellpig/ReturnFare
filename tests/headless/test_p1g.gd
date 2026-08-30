@@ -108,10 +108,13 @@ func _test_two_stage_location_panel(gs: Node) -> int:
 		failed += _ok("normal stage reached only after all beats演出")
 
 	var title: Label = panel.get_node("LocationTitle")
-	if title.text == "廟＋廟埕":
+	var data_node: Node = get_root().get_node("Data")
+	var exp_temple_name := str((data_node.get("loader").locations.get("temple", {}) as Dictionary).get("name", ""))
+	assert(not exp_temple_name.is_empty(), "fixture 前提：temple 有 name")
+	if title.text == exp_temple_name:
 		failed += _ok("missing desc fallback still displays location name")
 	else:
-		failed += _fail("location name fallback mismatch: %s" % title.text)
+		failed += _fail("location name fallback mismatch: %s (expected: %s)" % [title.text, exp_temple_name])
 	panel.queue_free()
 	return failed
 

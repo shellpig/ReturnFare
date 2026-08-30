@@ -98,6 +98,11 @@ func _test_evening_echo_missed_vs_attended(gs: Node, _data_node: Node) -> int:
 	print("--- 1. evening echo missed vs attended (d3_pm_sanquan -> d5 evening) ---")
 	var failed := 0
 
+	var data_node: Node = get_root().get_node("Data")
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var exp_d3_echo := str((loader.beats_by_id.get("d3_pm_sanquan", {}).get("echo", {}) as Dictionary).get("text", ""))
+	assert(not exp_d3_echo.is_empty(), "fixture 前提：d3_pm_sanquan 有 echo.text")
+
 	# 狀況 A：錯過第 3 天下午阿宏（沒放 help_ahong 槽）
 	_reset_gs(gs)
 	gs.set("day", 3)
@@ -108,7 +113,7 @@ func _test_evening_echo_missed_vs_attended(gs: Node, _data_node: Node) -> int:
 	var echoes_missed: PackedStringArray = gs.play_evening()
 	var found_missed := false
 	for l in echoes_missed:
-		if l.contains("旁邊有人提起第 3 天下午發生過的一件小事"):
+		if l.contains(exp_d3_echo):
 			found_missed = true
 			break
 	if found_missed:
@@ -128,7 +133,7 @@ func _test_evening_echo_missed_vs_attended(gs: Node, _data_node: Node) -> int:
 	var echoes_attended: PackedStringArray = gs.play_evening()
 	var found_attended := false
 	for l in echoes_attended:
-		if l.contains("旁邊有人提起第 3 天下午發生過的一件小事"):
+		if l.contains(exp_d3_echo):
 			found_attended = true
 			break
 	if not found_attended:
@@ -144,6 +149,14 @@ func _test_evening_echo_missed_vs_attended(gs: Node, _data_node: Node) -> int:
 func _test_chapter1_three_echoes(gs: Node, _data_node: Node) -> int:
 	print("--- 2. chapter 1 three echoes (d5, d8, d13) ---")
 	var failed := 0
+	var data_node: Node = get_root().get_node("Data")
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var exp_d3_echo := str((loader.beats_by_id.get("d3_pm_sanquan", {}).get("echo", {}) as Dictionary).get("text", ""))
+	var exp_d8_echo := str(loader.beats_by_id.get("d8_echo_bathhouse", {}).get("text", ""))
+	var exp_d12_echo := str((loader.beats_by_id.get("d12_pm_awei", {}).get("echo", {}) as Dictionary).get("text", ""))
+	assert(not exp_d3_echo.is_empty(), "fixture 前提：d3_pm_sanquan 有 echo.text")
+	assert(not exp_d8_echo.is_empty(), "fixture 前提：d8_echo_bathhouse 有 text")
+	assert(not exp_d12_echo.is_empty(), "fixture 前提：d12_pm_awei 有 echo.text")
 
 	# 1. 第 5 天殘響 (d3_pm_sanquan.echo)
 	_reset_gs(gs)
@@ -152,7 +165,7 @@ func _test_chapter1_three_echoes(gs: Node, _data_node: Node) -> int:
 	var d5_lines: PackedStringArray = gs.play_evening()
 	var d5_found := false
 	for l in d5_lines:
-		if l.contains("第 3 天下午"):
+		if l.contains(exp_d3_echo):
 			d5_found = true
 			break
 	if d5_found:
@@ -167,7 +180,7 @@ func _test_chapter1_three_echoes(gs: Node, _data_node: Node) -> int:
 	var d8_lines: PackedStringArray = gs.play_evening()
 	var d8_found := false
 	for l in d8_lines:
-		if l.contains("浴場"):
+		if l.contains(exp_d8_echo):
 			d8_found = true
 			break
 	if d8_found:
@@ -182,7 +195,7 @@ func _test_chapter1_three_echoes(gs: Node, _data_node: Node) -> int:
 	var d13_lines: PackedStringArray = gs.play_evening()
 	var d13_found := false
 	for l in d13_lines:
-		if l.contains("阿薇那天一個人搬到天黑"):
+		if l.contains(exp_d12_echo):
 			d13_found = true
 			break
 	if d13_found:
@@ -320,8 +333,11 @@ func _test_night_sleep_resolution(gs: Node, data_node: Node) -> int:
 	gs.set_flag("boundary_bleeding", true)
 	gs.set_flag("hold_d24am", true)
 
+	var exp_d24_bleed := str(loader.beats_by_id.get("d24_night_bleed", {}).get("text", ""))
+	assert(not exp_d24_bleed.is_empty(), "fixture 前提：d24_night_bleed 有 text")
+
 	var sleep_lines: PackedStringArray = gs.sleep_night()
-	if sleep_lines.size() > 0 and sleep_lines[0].contains("二樓有人在走"):
+	if sleep_lines.size() > 0 and sleep_lines[0].contains(exp_d24_bleed):
 		failed += _ok("直接睡：成功解析旅館當夜定日 beat (d24_night_bleed)")
 	else:
 		failed += _fail("直接睡：未能解析出 d24_night_bleed (輸出: %s)" % str(sleep_lines))
@@ -367,9 +383,13 @@ func _test_day45_ending_coda_and_loop_reset(gs: Node, data_node: Node) -> int:
 	gs.set("phase", "evening")
 	gs.set_flag("final_day", true)
 
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var exp_d45_then := str(loader.beats_by_id.get("d45_then", {}).get("text", ""))
+	assert(not exp_d45_then.is_empty(), "fixture 前提：d45_then 有 text")
+
 	# 1. d45_then 播出
 	var lines: PackedStringArray = gs.play_beat("d45_then")
-	if lines.size() > 0 and lines[0].contains("是他自己"):
+	if lines.size() > 0 and lines[0].contains(exp_d45_then):
 		failed += _ok("第 45 天 evening d45_then 成功播出")
 	else:
 		failed += _fail("第 45 天 evening d45_then 播出失敗 (輸出: %s)" % str(lines))

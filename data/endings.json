@@ -6,13 +6,20 @@
       "prefix_pages": [
         {
           "id": "replacement",
-          "text": "蒸氣散去。你穿上外套，走出了山泉閣。"
+          "text": "蒸氣散去。你穿上外套，走出了山泉閣。",
+          "narrative_beats": [
+            "observable_exit_sanquan"
+          ]
         }
       ],
       "suffix_pages": [
         {
           "id": "long_return",
-          "text": "然後是黑。\n庇佑再次發動。你猛然睜開眼睛——"
+          "text": "然後是黑。\n庇佑再次發動。你猛然睜開眼睛——",
+          "narrative_beats": [
+            "black_screen",
+            "blessing_reactivated"
+          ]
         }
       ]
     },
@@ -582,13 +589,28 @@
             "first_seen_pages": [
               {
                 "id": "partner_ajie_long",
-                "text": "他跟阿婕結婚了。他們沒有小孩。\n二十年過去。四十出頭，她先。癌症，走得很快。\n然後是他。同一個病，一樣快。"
+                "text": "他跟阿婕結婚了。他們沒有小孩。\n二十年過去。四十出頭，她先。癌症，走得很快。\n然後是他。同一個病，一樣快。",
+                "narrative_beats": [
+                  "marriage",
+                  "no_children",
+                  "twenty_years",
+                  "died_early_forties",
+                  "spouse_dies_first",
+                  "died_of_cancer",
+                  "died_rapidly",
+                  "protagonist_same_illness"
+                ]
               }
             ],
             "repeat_pages": [
               {
                 "id": "partner_ajie_short",
-                "text": "他與阿婕成婚，膝下無子。二十年後她先離世，隨後他也因同病而終。"
+                "text": "他與阿婕成婚，膝下無子。二十年後她先離世，隨後他也因同病而終。",
+                "narrative_beats": [
+                  "marriage",
+                  "spouse_dies_first",
+                  "protagonist_same_illness"
+                ]
               }
             ]
           },
@@ -600,13 +622,28 @@
             "first_seen_pages": [
               {
                 "id": "partner_awei_long",
-                "text": "他跟阿薇結婚了。他們沒有小孩。\n二十年過去。四十出頭，她先。癌症，走得很快。\n然後是他。同一個病，一樣快。"
+                "text": "他跟阿薇結婚了。他們沒有小孩。\n二十年過去。四十出頭，她先。癌症，走得很快。\n然後是他。同一個病，一樣快。",
+                "narrative_beats": [
+                  "marriage",
+                  "no_children",
+                  "twenty_years",
+                  "died_early_forties",
+                  "spouse_dies_first",
+                  "died_of_cancer",
+                  "died_rapidly",
+                  "protagonist_same_illness"
+                ]
               }
             ],
             "repeat_pages": [
               {
                 "id": "partner_awei_short",
-                "text": "他與阿薇成婚，膝下無子。二十年後她先離世，隨後他也因同病而終。"
+                "text": "他與阿薇成婚，膝下無子。二十年後她先離世，隨後他也因同病而終。",
+                "narrative_beats": [
+                  "marriage",
+                  "spouse_dies_first",
+                  "protagonist_same_illness"
+                ]
               }
             ]
           },
@@ -616,13 +653,21 @@
             "first_seen_pages": [
               {
                 "id": "partner_none_long",
-                "text": "他沒有結婚，一個人過完二十年。"
+                "text": "他沒有結婚，一個人過完二十年。",
+                "narrative_beats": [
+                  "no_marriage",
+                  "single_twenty_years"
+                ]
               }
             ],
             "repeat_pages": [
               {
                 "id": "partner_none_short",
-                "text": "他獨身一人過完二十年。"
+                "text": "他獨身一人過完二十年。",
+                "narrative_beats": [
+                  "no_marriage",
+                  "single_twenty_years"
+                ]
               }
             ]
           }
@@ -643,13 +688,24 @@
             "first_seen_pages": [
               {
                 "id": "proxy_ajie_long",
-                "text": "很多年後的一張照片裡，阿婕也在鎮上。只是那時她也早就不咬指甲了。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。"
+                "text": "很多年後的一張照片裡，阿婕也在鎮上。只是那時她也早就不咬指甲了。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。",
+                "narrative_beats": [
+                  "proxy_reminisce",
+                  "switch_subject_to_protagonist",
+                  "died_early_forties",
+                  "died_of_cancer",
+                  "died_rapidly"
+                ]
               }
             ],
             "repeat_pages": [
               {
                 "id": "proxy_ajie_short",
-                "text": "多年後的照片中，阿婕亦在鎮上留有身影。那個走出山泉閣的人在四十出頭病逝。"
+                "text": "多年後的照片中，阿婕亦在鎮上留有身影。那個走出山泉閣的人在四十出頭病逝。",
+                "narrative_beats": [
+                  "proxy_reminisce",
+                  "protagonist_dies_early_forties"
+                ]
               }
             ]
           },
@@ -658,13 +714,24 @@
             "first_seen_pages": [
               {
                 "id": "proxy_awei_long",
-                "text": "很多年後的一張照片裡，阿薇也在靜和園。只是笑起來時不再用手遮嘴。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。"
+                "text": "很多年後的一張照片裡，阿薇也在靜和園。只是笑起來時不再用手遮嘴。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。",
+                "narrative_beats": [
+                  "proxy_reminisce",
+                  "switch_subject_to_protagonist",
+                  "died_early_forties",
+                  "died_of_cancer",
+                  "died_rapidly"
+                ]
               }
             ],
             "repeat_pages": [
               {
                 "id": "proxy_awei_short",
-                "text": "多年後的照片中，阿薇亦在靜和園如常生活。那個走出山泉閣的人在四十出頭病逝。"
+                "text": "多年後的照片中，阿薇亦在靜和園如常生活。那個走出山泉閣的人在四十出頭病逝。",
+                "narrative_beats": [
+                  "proxy_reminisce",
+                  "protagonist_dies_early_forties"
+                ]
               }
             ]
           },
@@ -673,13 +740,24 @@
             "first_seen_pages": [
               {
                 "id": "proxy_acai_long",
-                "text": "很多年後在街角遇見阿財，他走路已經完全不跛了，笑著向你打招呼。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。"
+                "text": "很多年後在街角遇見阿財，他走路已經完全不跛了，笑著向你打招呼。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。",
+                "narrative_beats": [
+                  "proxy_reminisce",
+                  "switch_subject_to_protagonist",
+                  "died_early_forties",
+                  "died_of_cancer",
+                  "died_rapidly"
+                ]
               }
             ],
             "repeat_pages": [
               {
                 "id": "proxy_acai_short",
-                "text": "多年後的街頭，阿財步履健全地打著招呼。那個走出山泉閣的人在四十出頭病逝。"
+                "text": "多年後的街頭，阿財步履健全地打著招呼。那個走出山泉閣的人在四十出頭病逝。",
+                "narrative_beats": [
+                  "proxy_reminisce",
+                  "protagonist_dies_early_forties"
+                ]
               }
             ]
           }
@@ -742,11 +820,19 @@
       "pages": [
         {
           "id": "refuse_outside_life",
-          "text": "你放下了行李，退掉了車票。\n你留在了外面的城市，找了一份平凡的工作，過著再普通不過的生活。"
+          "text": "你放下了行李，退掉了車票。\n你留在了外面的城市，找了一份平凡的工作，過著再普通不過的生活。",
+          "narrative_beats": [
+            "outside_ordinary_life"
+          ]
         },
         {
           "id": "refuse_early_death",
-          "text": "四十出頭。同一個病，癌症來得很急。\n躺在病床上閉上眼睛的那一刻，庇佑再次發動。"
+          "text": "四十出頭。同一個病，癌症來得很急。\n躺在病床上閉上眼睛的那一刻，庇佑再次發動。",
+          "narrative_beats": [
+            "died_early_forties",
+            "died_of_cancer",
+            "blessing_reactivated"
+          ]
         }
       ]
     },
@@ -754,7 +840,10 @@
       "pages": [
         {
           "id": "refuse_summary",
-          "text": "你選擇不上車，在外地度過平凡的一生，直至四十出頭再次回到起點。"
+          "text": "你選擇不上車，在外地度過平凡的一生，直至四十出頭再次回到起點。",
+          "narrative_beats": [
+            "refuse_boarding_summary"
+          ]
         }
       ],
       "skip_to": "complete"

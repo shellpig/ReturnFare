@@ -244,15 +244,23 @@ class Case03ReenterNoDuplicateOnEnter extends CaseBaseClass:
 		var replay_dump := QADiagnostics.dump_ui_tree(main_node)
 		var replay_title_found := false
 		var replay_text_found := false
+		var data_node: Node = CaseBaseClass.get_data(tree)
+		var loader: DataLoader = data_node.get("loader") as DataLoader
+		var d17_phone := (loader.beats_by_id.get("d17_morning_phone", {}) as Dictionary)
+		var exp_title := str(d17_phone.get("title", ""))
+		var exp_text_sub := str(d17_phone.get("text", "")).substr(0, 8)
+		assert_true(not exp_title.is_empty(), "fixture 前提：d17_morning_phone 有 title")
+		assert_true(not exp_text_sub.is_empty(), "fixture 前提：d17_morning_phone 有 text")
+
 		for item in replay_dump:
 			if not bool(item.get("visible_in_tree", false)):
 				continue
 			var t := str(item.get("text", ""))
-			if t == "== 訂房電話 ==":
+			if t == ("== %s ==" % exp_title):
 				replay_title_found = true
-			if t.contains("一個十四人的進香團"):
+			if t.contains(exp_text_sub):
 				replay_text_found = true
-		assert_true(replay_title_found, "重進後演出畫面必須顯示 d17_morning_phone 標題「== 訂房電話 ==」")
+		assert_true(replay_title_found, "重進後演出畫面必須顯示 d17_morning_phone 標題「== %s ==」" % exp_title)
 		assert_true(replay_text_found, "重進後演出畫面必須重播 d17_morning_phone 的文字內容")
 
 		var drain2 := await QAStep.drain_beats(tree)
@@ -376,10 +384,16 @@ class Case06NoSpoiler extends CaseBaseClass:
 			var label := controls[0] as Label
 			var t := label.text if label != null else ""
 			assert_true(t.contains("裝備卡") and t.contains("情報卡"), "槽位必須標示概括型別「裝備卡、情報卡」")
-			# 嚴格防劇透檢查：accepts 包含 equip_polaroid (夫妻留下的拍立得) 與 info_acai_box (阿財說裡面沒什麼)
-			assert_true(not t.contains("夫妻留下的拍立得"), "槽標籤不得洩漏「夫妻留下的拍立得」")
+			var data_node: Node = CaseBaseClass.get_data(tree)
+			var loader: DataLoader = data_node.get("loader") as DataLoader
+			var name_polaroid := str((loader.cards.get("equip_polaroid", {}) as Dictionary).get("name", ""))
+			var name_acai := str((loader.cards.get("info_acai_box", {}) as Dictionary).get("name", ""))
+			assert_true(not name_polaroid.is_empty(), "fixture 前提：equip_polaroid 有 name")
+			assert_true(not name_acai.is_empty(), "fixture 前提：info_acai_box 有 name")
+			# 嚴格防劇透檢查：accepts 包含 equip_polaroid 與 info_acai_box
+			assert_true(not t.contains(name_polaroid), "槽標籤不得洩漏卡片名稱")
 			assert_true(not t.contains("拍立得"), "槽標籤不得洩漏「拍立得」")
-			assert_true(not t.contains("阿財說裡面沒什麼"), "槽標籤不得洩漏「阿財說裡面沒什麼」")
+			assert_true(not t.contains(name_acai), "槽標籤不得洩漏卡片名稱")
 			assert_true(not t.contains("阿財的紙箱"), "槽標籤不得洩漏「阿財的紙箱」")
 			assert_true(not t.contains("equip_polaroid"), "槽標籤不得洩漏卡片 ID equip_polaroid")
 			assert_true(not t.contains("info_acai_box"), "槽標籤不得洩漏卡片 ID info_acai_box")
@@ -467,10 +481,20 @@ class Case08RightClickLockedPreview extends CaseBaseClass:
 		var cap_geo: Dictionary = cap.get("geometry", {})
 		assert_true(bool(cap_geo.get("ok", false)), "彈窗開啟中的畫面幾何診斷必須通過: %s" % JSON.stringify(cap_geo))
 
+		var data_node: Node = CaseBaseClass.get_data(tree)
+		var loader: DataLoader = data_node.get("loader") as DataLoader
+		var d22_beat := loader.beats_by_id.get("d22_pm_sandbags", {}) as Dictionary
+		var exp_reject_reason := ""
+		for s in d22_beat.get("slots", []):
+			if str((s as Dictionary).get("id", "")) == "obs_hands":
+				exp_reject_reason = str((s as Dictionary).get("reject_reason", "")).replace("（", "").replace("）", "").strip_edges()
+				break
+		assert_true(not exp_reject_reason.is_empty(), "fixture 前提：obs_hands 有 reject_reason")
+
 		var diag := find_preview_dialog(tree)
 		assert_true(diag != null, "預覽彈窗必須開啟")
 		var diag_text := diag.dialog_text if diag != null else ""
-		assert_true(diag_text.contains("你沒有真的跟他遞過幾次東西"), "LOCKED 預覽彈窗必須精確顯示 reject_reason，實際為: %s" % diag_text)
+		assert_true(diag_text.contains(exp_reject_reason), "LOCKED 預覽彈窗必須精確顯示 reject_reason，實際為: %s" % diag_text)
 		assert_true(not diag_text.contains("我"), "LOCKED 預覽清單不得包含可放卡片")
 		assert_true(not diag_text.contains("卡片類型不符"), "不可使用通用缺卡理由代替特定鎖定理由")
 

@@ -174,8 +174,8 @@ func _test_night_names_review(data_node: Node) -> int:
 
 	# n_ahong_2 不得再叫「血還是新的」
 	var n_ahong_2_name := str((loader.locations.get("n_ahong_2", {}) as Dictionary).get("name", ""))
-	if n_ahong_2_name != "有血跡的地方":
-		failed += _fail("n_ahong_2 名稱應為「有血跡的地方」，實際為：%s" % n_ahong_2_name)
+	if n_ahong_2_name.is_empty() or n_ahong_2_name == "血還是新的":
+		failed += _fail("n_ahong_2 名稱不得為空且不得再叫「血還是新的」，實際為：%s" % n_ahong_2_name)
 
 	var night_count := 0
 	for lid in loader.locations:
@@ -225,12 +225,16 @@ func _test_ahong_reject_reasons(data_node: Node) -> int:
 
 	# 5 指向第一段路線知識
 	var r5: String = str(seen_reasons.get("n_ahong_5", ""))
-	if not ("路線知識" in r5 or "第一段" in r5):
+	var k1_name: String = str((loader.cards.get("k_ahong_point_1", {}) as Dictionary).get("name", ""))
+	assert(not k1_name.is_empty(), "fixture 前提：k_ahong_point_1 有 name")
+	if not ("路線" in r5 or "第一段" in r5 or k1_name in r5):
 		failed += _fail("n_ahong_5 reject_reason（%s）未指向第一段路線知識" % r5)
 
 	# 6 指向第二段路線知識，且與 5 不得完全相同
 	var r6: String = str(seen_reasons.get("n_ahong_6", ""))
-	if not ("路線知識" in r6 or "第二段" in r6):
+	var k2_name: String = str((loader.cards.get("k_ahong_point_2", {}) as Dictionary).get("name", ""))
+	assert(not k2_name.is_empty(), "fixture 前提：k_ahong_point_2 有 name")
+	if not ("路線" in r6 or "第二段" in r6 or k2_name in r6):
 		failed += _fail("n_ahong_6 reject_reason（%s）未指向第二段路線知識" % r6)
 	if r5 == r6:
 		failed += _fail("n_ahong_5 與 n_ahong_6 要求不同知識卡，reject_reason 不應完全相同")

@@ -377,6 +377,14 @@ func _test_indulgence_level_escalation(gs: Node, data: Node) -> int:
 	PlaythroughGreedy.start_fresh_run(gs)
 	gs.set("day", 17)
 	gs.set("phase", "morning")
+	var exit_beat := data.loader.beats_by_id.get("exit_sanquan", {}) as Dictionary
+	var exp_light_text := ""
+	for s_entry in exit_beat.get("slots", []):
+		var s_dict := s_entry as Dictionary
+		if str(s_dict.get("id", "")) == "x_violence":
+			exp_light_text = str(((s_dict.get("on_place_by_level", {}) as Dictionary).get("light", {}) as Dictionary).get("text", ""))
+			break
+	assert(not exp_light_text.is_empty(), "fixture 前提：x_violence 有 on_place_by_level.light.text")
 	gs.call("gain_card", "madness") # madness#1
 
 	# 第 1 次（light）：套 on_place 與 light 追加文字
@@ -387,7 +395,7 @@ func _test_indulgence_level_escalation(gs: Node, data: Node) -> int:
 		var lines: PackedStringArray = r_light.get("lines", PackedStringArray())
 		var has_light_text := false
 		for line in lines:
-			if "突如其來的暴力" in line:
+			if exp_light_text in line:
 				has_light_text = true
 		if has_light_text:
 			failed += _ok("第 1 次縱慾套用 light 追加效果文字")

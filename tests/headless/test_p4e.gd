@@ -124,7 +124,17 @@ func _test_2_d8_lifecycle(gs: Node, _data_node: Node) -> int:
 	if str(view2.get("stage", "")) != "round":
 		failed += _err("D8 encounter should transition to 'round' stage")
 	
-	if not "那個名字什麼時候開始是你的？" in str(view2.get("demand", "")):
+	var loader: DataLoader = _data_node.get("loader") as DataLoader
+	var d8_enc := (loader.beats_by_id.get("n_manydoors_ch1", {}).get("encounter", {}) as Dictionary)
+	var exp_r1_demand := ""
+	for r_entry in d8_enc.get("rounds", []):
+		var r_dict := r_entry as Dictionary
+		if str(r_dict.get("id", "")) == "name_since_when":
+			exp_r1_demand = str(r_dict.get("demand", ""))
+			break
+	assert(not exp_r1_demand.is_empty(), "fixture 前提：name_since_when 有 demand")
+
+	if not exp_r1_demand in str(view2.get("demand", "")):
 		failed += _err("Demand does not match first round of D8 encounter")
 		
 	if failed == 0:
@@ -226,6 +236,19 @@ func _test_4_charge_first_visit_real_run_reset(gs: Node, _data_node: Node) -> in
 
 func _test_5_three_round_paths(gs: Node, data_node: Node) -> int:
 	var failed: int = 0
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var d8_enc := (loader.beats_by_id.get("n_manydoors_ch1", {}).get("encounter", {}) as Dictionary)
+	var exp_r2_demand := ""
+	var exp_r3_demand := ""
+	for r_entry in d8_enc.get("rounds", []):
+		var r_dict := r_entry as Dictionary
+		if str(r_dict.get("id", "")) == "who_remembers":
+			exp_r2_demand = str(r_dict.get("demand", ""))
+		elif str(r_dict.get("id", "")) == "what_remains":
+			exp_r3_demand = str(r_dict.get("demand", ""))
+	assert(not exp_r2_demand.is_empty(), "fixture 前提：who_remembers 有 demand")
+	assert(not exp_r3_demand.is_empty(), "fixture 前提：what_remains 有 demand")
+
 	# Victory Path
 	_setup_gs_for_d8(gs, true)
 	gs.acknowledge_encounter_intro()
@@ -234,14 +257,14 @@ func _test_5_three_round_paths(gs: Node, data_node: Node) -> int:
 	gs.respond_to_encounter("equip_polaroid")
 	
 	var r2_view = gs.encounter_view()
-	if not "誰記得你" in str(r2_view.get("demand", "")):
+	if not exp_r2_demand in str(r2_view.get("demand", "")):
 		failed += _err("Did not reach R2 'who_remembers'")
 		
 	# R2: info_chunama_pause (accepts, next_round: what_remains)
 	gs.respond_to_encounter("info_chunama_pause")
 	
 	var r3_view = gs.encounter_view()
-	if not "那你留下什麼" in str(r3_view.get("demand", "")):
+	if not exp_r3_demand in str(r3_view.get("demand", "")):
 		failed += _err("Did not reach R3 'what_remains'")
 		
 	# R3: routine_debt (accepts, next_round: null -> victory)
@@ -358,10 +381,22 @@ func _test_9_d45_response_paths_and_cards_retained(gs: Node, _data_node: Node) -
 	# Path 1: Submit protagonist (protagonist must be retained in hand and not consumed)
 	_setup_gs_for_d45(gs)
 	gs.acknowledge_encounter_intro()
+
+	var loader: DataLoader = _data_node.get("loader") as DataLoader
+	var d45_enc := (loader.beats_by_id.get("d45_encounter", {}).get("encounter", {}) as Dictionary)
+	var exp_protag_text := ""
+	for r_entry in d45_enc.get("rounds", []):
+		for resp_entry in (r_entry as Dictionary).get("responses", []):
+			var resp_dict := resp_entry as Dictionary
+			if "protagonist" in (resp_dict.get("accepts", []) as Array):
+				exp_protag_text = str((resp_dict.get("on_resolve", {}) as Dictionary).get("text", ""))
+				break
+	assert(not exp_protag_text.is_empty(), "fixture 前提：d45 protagonist 有 on_resolve.text")
+
 	var req1 = gs.respond_to_encounter("protagonist")
 	if not bool(req1.get("ok", false)):
 		failed += _err("Submitting protagonist should succeed")
-	if not "這個名字已經登記" in "".join(req1.get("lines", [])):
+	if not exp_protag_text in "".join(req1.get("lines", [])):
 		failed += _err("Did not get correct resolution text for protagonist")
 	if not gs.has_card("protagonist") or not gs.hand.has("protagonist"):
 		failed += _err("Protagonist card should be retained in hand after D45 encounter")
@@ -566,8 +601,18 @@ func _test_14_d8_knowledge_overwrites_round_1(gs: Node, _data_node: Node) -> int
 	if not bool(res.get("ok", false)):
 		failed += _err("Submitting k_not_today in R1 should succeed")
 		
+	var loader: DataLoader = _data_node.get("loader") as DataLoader
+	var d8_enc := (loader.beats_by_id.get("n_manydoors_ch1", {}).get("encounter", {}) as Dictionary)
+	var exp_r2_demand := ""
+	for r_entry in d8_enc.get("rounds", []):
+		var r_dict := r_entry as Dictionary
+		if str(r_dict.get("id", "")) == "who_remembers":
+			exp_r2_demand = str(r_dict.get("demand", ""))
+			break
+	assert(not exp_r2_demand.is_empty(), "fixture 前提：who_remembers 有 demand")
+
 	var r2_view = gs.encounter_view()
-	if not "誰記得你" in str(r2_view.get("demand", "")):
+	if not exp_r2_demand in str(r2_view.get("demand", "")):
 		failed += _err("Submitting k_not_today should advance directly to R2 'who_remembers'")
 		
 	# equip_polaroid should NOT have been consumed (knowledge answer preserved discardable hand card)
