@@ -8,6 +8,142 @@
 
 **唯一未完成的是 `測試指南.md > P5-F` 最後一條 👤 人工驗收**——首輪三種 ending、正常長／短版、不上車 locked／unlocked／重見摘要、相簿／電話開局、逐字補完與翻頁、至少一次完整跨輪回場，每項附當下輪數與路徑。與 P3-F／P4-F 同狀態，只有真人玩過才能落檔。人工那條過了之後 P5 整段轉 ✅，接 i18n 管線與 P6 存檔 UI。
 
+**下一個 implementer 任務不是 P5-F，是本檔下一節的「T-01 文案解耦」**（使用者 2026-08-30 指派，為之後大改文案鋪路）。P5-F 的人工驗收由使用者自己跑，不擋 T-01。
+
+---
+
+# T-01 文案解耦（implementer 待辦）
+
+## 為什麼要做
+
+使用者接下來要把全作文案改得更故事性。盤點結果：文案本身**沒有散落**——`data/SCHEMA.md > 可翻譯欄位清單` 已是單一權威清單，玩家可見字串集中在 `data/beats/*.json`（525 條 `text`／約 13,900 字）、`endings.json`、`cards.json`、`locations.json`、`npcs.json`、`opening_choices.json`。`subdocs/故事線/` 是設計層不是第二份台詞（實測只有 12% 的 beat 台詞首句能在故事線裡找到）。
+
+真正的阻礙是**測試直接把台詞當字面斷言**：自動掃描找到 126 處，改一句台詞就會弄紅一批跟該改動無關的測試。K-222 只講了開局標題那三處，這是同一個病的全貌。
+
+**介面用語（`scenes/*.gd` 約 115 條硬寫中文）本次不動**——使用者明示不改，那批留給 i18n 管線（K-221 同族）。
+
+## 起始清單怎麼來的（可重現）
+
+用一支一次性腳本掃出來的，不進版控：對 `tests/**/*.gd` 抽出所有長度 ≥4 且含中日韓字、不含 `%` 的字串字面，逐一檢查是否原文出現在任何 `data/**/*.json` 裡。
+
+| 測試檔 | 命中數 |
+|---|---|
+| `tests/ui_sim/cases/p1af_cases.gd` | 46 |
+| `tests/headless/test_p5c.gd` | 30 |
+| `tests/headless/test_p1f.gd` | 6 |
+| `tests/headless/test_p3c.gd` | 6 |
+| `tests/headless/test_p4e.gd` | 5 |
+| `test_p1c_bugfix` / `test_p3d` / `test_p3e` / `p1g_cases` | 各 4 |
+| `test_p1e` / `test_p3a` | 各 3 |
+| `test_boot` / `test_p1g` / `test_p5d` | 各 2 |
+| `test_p2b` / `test_p2c` / `test_p3b` / `test_p3f` / `test_p4c` | 各 1 |
+
+> ⚠️ **126 是起始清單，不是工單。** 掃描有偽陽性：`assert_eq(int(run.get("day",0)), 1, "第 1 天")` 的 `"第 1 天"` 只是斷言訊息，剛好也出現在資料裡；`p1af_cases.gd:1016-1018` 是 case 自己的預期值對照表。**第一步是逐條分類，不是逐條改。**
+
+## 核心：兩類斷言，做法完全相反
+
+**這一節是本任務最重要的部分。搞混會把真實契約改成恆真式，正是 P5-F 三輪 review 一路在殺的那個病（K-225／K-226／K-227／K-230／K-231／K-234／K-235）。**
+
+### A 類｜呈現契約：「UI 有沒有把資料裡那一句播出來」
+
+長相：
+
+```gdscript
+assert_true(_has_text(tree.get_root(), "碎片散了一地"), "on_place 效果文字必須在 UI 顯示")
+if lines[0] != "陳醫師溫和地解釋，說是老毛病，要多休息。":
+assert_false(_has_text(tree.get_root(), "壓抑不住的衝動"), "出口 beat 的文字也不得播出")
+```
+
+驗的是「資料 → UI」這條線通不通，句子本身是什麼不重要。
+
+**做法**：從 `Data.loader` 取出那個 beat／slot／page 的字串，再拿它去比對 UI。K-222 建議的修法就是這一招。
+
+```gdscript
+# 之前
+assert_true(_has_text(root, "碎片散了一地"), "on_place 效果文字必須在 UI 顯示")
+# 之後
+var expected := str((slot.get("on_place", {}) as Dictionary).get("text", ""))
+assert_true(not expected.is_empty(), "fixture 前提：該槽有 on_place 文字")   # 防空跑
+assert_true(_has_text(root, expected), "on_place 效果文字必須在 UI 顯示")
+```
+
+**每一條都必須配一句「取出來的字串非空」的防空跑斷言。** 沒有這句的話，資料欄位改名或路徑寫錯時 `expected` 會變空字串，`_has_text(root, "")` 恆真——又生一條假綠。
+
+否定斷言（`assert_false` / `not ... in ...`）同樣照做：取出「不該出現的那個 beat」的字串再斷言看不到，不要留字面。
+
+### B 類｜敘事契約：「這段文案必須／不得包含某個敘事要素」
+
+長相（`test_p5c` 那 30 條幾乎全是）：
+
+```gdscript
+_check("四十出頭" in long_text and "癌症" in long_text and "走得很快" in long_text, ...)
+_check(not ("另一個你" in t0) and not ("替換" in t0), "首見 prefix 不過早揭露替換真相")
+_check("她先" in t3_ajie and "癌症" in t3_ajie, "伴侶頁包含「她先」與癌症")
+_check("然後是他" in t3_ajie and "同一個病" in t3_ajie, "伴侶頁包含主角同病死亡（承重線索）")
+```
+
+這些**不是**在驗呈現，是在守 K-200／K-203／K-206／K-208 拍板的敘事規則：首見不得提前揭露替換、伴侶先死、主角同病同速、proxy 回顧要排在死亡之前。
+
+**❌ 絕對不可以改成從 `endings.json` 讀同一段文字再比對。** 那就變成拿資料驗資料的恆真式，契約等於沒了。
+
+**✅ 做法：把敘事要素從測試搬進資料，變成可查詢的語意標籤。**
+
+在 `endings.json` 的 page 物件上新增一個選填欄位（欄名自訂，建議 `beats`，與「劇情節拍」同義；**定案前先跟 verifier 確認欄名不與既有 `beats/*.json` 概念混淆**），值是封閉字彙的字串陣列：
+
+```json
+{
+  "id": "replaced_partner_ajie_long",
+  "text": "……",
+  "beats": ["spouse_first_death", "same_illness", "died_early_forties"]
+}
+```
+
+測試改成斷言標籤：
+
+```gdscript
+_check(page_beats.has("spouse_first_death") and page_beats.has("same_illness"),
+    "伴侶頁包含「她先離世」與主角同病（K-203 承重線索）")
+```
+
+配套三件，缺一不可：
+
+1. **封閉字彙 ＋ lint**：`data_loader.gd` 新增一條 lint，`beats[]` 的值必須來自一份寫死的合法標籤清單（放 `data_loader.gd` 常數或 `card_types.json` 同級的小檔），拼錯即 `verify_data` 轉紅。**沒有 lint 的話標籤打錯字測試會靜靜變綠。**
+2. **`data/SCHEMA.md` 登記**：在 `endings.json` 小節說明這個欄位、封閉字彙、以及「它是設計契約不是文案，改文案時要維持，改敘事順序才動它」。**明確寫進「不翻譯、不抽取」那一類**（與 `note` 同級），免得 i18n 管線把它當文案抽走。
+3. **順序類契約仍用索引**：K-206 那種「proxy 回顧必須排在死亡之前」是頁面**順序**，不是單頁內容。用兩個標籤在 `pages[]` 裡的索引比大小來斷言，不要塞回字面。
+
+### 分類判準（拿不準時用這句）
+
+> **把資料裡那句話整段換成另一句意思相同但用字全不同的文案，這條斷言應不應該還是綠的？**
+>
+> - 應該還綠 → A 類（驗的是通路）
+> - 應該轉紅 → B 類（驗的是敘事要素），走標籤
+
+## 執行步驟
+
+1. **分類**：重跑掃描產生清單，逐條標 A／B／偽陽性。**分類表交給 verifier 過目再動手**——這是本任務唯一需要事前確認的關卡，改錯方向比不改更糟。
+2. **A 類**：改讀資料，每條配防空跑斷言。
+3. **B 類**：先跟 verifier 敲定欄名與封閉字彙，再改 `endings.json` ＋ lint ＋ `SCHEMA.md` ＋ 測試。
+4. **偽陽性**：不動。在分類表註明理由即可。
+5. **驗證**：全套 headless ＋ UI sim 全綠。
+6. **真正的收尾證明（本任務的驗收核心）**：挑 **5 句以上**跨不同檔的台詞（至少涵蓋 `beats/`、`endings.json`、`cards.json` 或 `locations.json`），**把文字整句改寫成意思相同、用字全不同的版本**，再跑一次全套。
+   - **A 類覆蓋處必須全綠**——這證明解耦真的成功。
+   - **B 類契約必須仍然守住**（改寫時刻意維持敘事要素 → 綠；刻意拿掉一個要素 → 該條轉紅）。
+   - 兩邊都做完再 `git checkout` 還原文案，附上改了哪五句與兩次結果。
+
+## 不要做的事
+
+- **不要動 `scenes/*.gd` 的介面用語**（使用者明示不改，留給 i18n）。
+- **不要為了讓測試變綠而刪掉斷言。** 分不出 A／B 的條目留著並在分類表標「待確認」，交回 verifier，不要自行猜。
+- **不要動 `note` 與 `_comment`**，那是開發者註解。
+- **不要順手改文案。** 本任務只解耦，改文案是使用者之後的事；步驟 6 的改寫是驗證用，做完要還原。
+
+## 交回時要附
+
+- 分類表（126 條逐條標 A／B／偽陽性，含判準理由）
+- 全套 headless ＋ UI sim 的 run id
+- 步驟 6 的文案改寫實驗：改了哪五句、A 類全綠的證據、B 類正反兩向各自的結果
+- 更新本檔（只增不刪 verifier 區塊，見 K-236）
+
 ### verifier 關門證據（`69158c5`）
 
 - Headless：**33 套 exit 0**，`ALL HEADLESS TESTS PASSED!`（`test_p5f` 9 組全通過；`verify_data` Lint 1～20 全 0、45 天貪心走查通過）
