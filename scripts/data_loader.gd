@@ -34,6 +34,13 @@ const LEGAL_NARRATIVE_BEAT_TAGS: Array[String] = [
 	"refuse_boarding_summary",
 ]
 
+const LEGAL_REJECT_REASON_TAGS: Array[String] = [
+	"prev_trail",
+	"route_knowledge_1",
+	"route_knowledge_2",
+	"three_points",
+]
+
 var DATA_DIR: String
 var BEATS_DIR: String
 
@@ -827,6 +834,19 @@ static func lint_night_locations(loader: DataLoader) -> PackedStringArray:
 				var cost_val: Variant = loc.get("madness_cost")
 				if cost_val == null or not (cost_val is int or cost_val is float) or float(int(cost_val)) != float(cost_val) or int(cost_val) < 0:
 					errs.append("%s：madness_cost 必須為 >= 0 之整數（實際為 %s）" % [lid, str(cost_val)])
+
+		# 3. 帶 requires 的夜間地點必須有有效的 reject_reason 與合法的 reject_reason_tag
+		if loc.has("requires") and loc.get("requires") != null:
+			var req_reason_val: Variant = loc.get("reject_reason")
+			if req_reason_val == null or not (req_reason_val is String) or str(req_reason_val).strip_edges().is_empty():
+				errs.append("%s：帶 requires 的夜間地點缺少有效的 reject_reason" % lid)
+			var tag_val: Variant = loc.get("reject_reason_tag")
+			if tag_val == null or not (tag_val is String) or str(tag_val).strip_edges().is_empty():
+				errs.append("%s：帶 requires 的夜間地點缺少有效的 reject_reason_tag" % lid)
+			elif not LEGAL_REJECT_REASON_TAGS.has(str(tag_val).strip_edges()):
+				errs.append("%s：reject_reason_tag「%s」不在封閉字彙（%s）內" % [
+					lid, str(tag_val), ", ".join(LEGAL_REJECT_REASON_TAGS)
+				])
 
 	return errs
 

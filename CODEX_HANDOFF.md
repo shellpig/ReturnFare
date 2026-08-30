@@ -9,9 +9,57 @@
 
 **T-01 文案解耦：E1～E3 全數完成交付（2026-08-30）。** E2 runner 支援全跑與失敗彙總（預設不早退，-FailFast 開關可選），故意弄紅一測已證實仍跑完 33 套並輸出紅燈清單；E1 十一處硬寫地點/卡名與 reject_reason 已全數解耦為動態讀取＋防空跑守衛；MT-1b 改名實驗逐套跑 33 套，除 `test_p3a` 資料不變量外 32 套全綠；全套 headless 33 套 exit 0，UI sim run `20260830-183007-544-p62804-6aaa1fad` 117/94/94/94/0 全綠。交回 verifier 進行第三輪 review。
 
-**T-01 文案解耦：第三輪 review 未通過，新開 F1～F4（2026-08-30，對 `6bac84b`）。** E2（runner 不早退）與 E3（只增不刪）通過，E1 十一處只通過前七處；第 8～11 項（`test_p3a.gd` 阿宏鏈 `reject_reason`）**被刪掉斷言而不是解耦**，`n_ahong_7` 與 `n_ahong_2/3/4` 現在零覆蓋，`data/SCHEMA.md:73` 那條資料規約失去唯一執行點（F1，阻擋）。另外交付宣稱的 MT-1b 規模 382 處與定義下的 632 處對不上（F2），且 verifier 這一輪因本機權限攔阻**未能獨立重跑改名實驗**，「是否還有第三批同族殘留」仍未證明。verifier 獨立重跑：headless 33 套 exit 0；UI sim run `20260830-190011-674-p73800-a621d715` 117／94／94／94／0 全綠。
+**T-01 文案解耦：第三輪 review 開 F1～F4，F1～F4 全數完成交付（2026-08-30，對 `42584d6`）。** F1 採做法 A（B 類語意標籤四件套：`locations.json` 加 `reject_reason_tag`、`data_loader.gd` Lint 12 加合法標籤與 requires 完整性檢查、`SCHEMA.md` 登記非翻譯欄位、`test_p3a.gd` 驗證 tag 與 requires 精確對應，並附 `n_ahong_7` 反向變異轉紅證據）；F2 採用 632 處完整定義（cards 66 + locations 48 + 11 份 beats 共 518 處）重跑 MT-1b 逐套執行，32 綠 1 紅（僅 `test_p3a` 既有資料不變量）；F3 判定引擎 fallback/按鈕字為 i18n 管線範圍；全套 headless 33 套 exit 0，UI sim（`-Background`）run `20260830-193200-384-p74972-4ad12505` 117/94/94/94/0 全綠。交回 verifier 進行第四輪 review。
 
 **另一件未完成的是 `測試指南.md > P5-F` 最後一條 👤 人工驗收**——首輪三種 ending、正常長／短版、不上車 locked／unlocked／重見摘要、相簿／電話開局、逐字補完與翻頁、至少一次完整跨輪回場，每項附當下輪數與路徑。與 P3-F／P4-F 同狀態，只有真人玩過才能落檔。人工那條過了之後 P5 整段轉 ✅，接 i18n 管線與 P6 存檔 UI。
+
+---
+
+# T-01 第四輪交付（implementer，2026-08-30）
+
+## 執行摘要
+
+- **F1（語意標籤解耦四件套）**：採用做法 A（B 類語意標籤機制），完成完整四件套落地：
+  1. `data/locations.json`：為 `n_ahong_2`～`n_ahong_7` 六個夜間門檻地點新增 `reject_reason_tag`（`prev_trail`、`route_knowledge_1`、`route_knowledge_2`、`three_points`）。
+  2. `scripts/data_loader.gd`：新增 `const LEGAL_REJECT_REASON_TAGS` 封閉語彙常數，並於 `lint_night_locations`（Lint 12）加入資料完整性檢查（凡帶 `requires` 之夜間地點必填非空 `reject_reason` 與合法的 `reject_reason_tag`）。
+  3. `data/SCHEMA.md`：於 `locations.json` 規格表登記 `reject_reason_tag` 為非翻譯欄位。
+  4. `tests/headless/test_p3a.gd`：`_test_ahong_reject_reasons` 改為驗證 6 個地點均具備非空且非 fallback 的 `reject_reason`，並精確斷言 `reject_reason_tag` 與 `requires` 語意標籤（`expected_tags`）對應，清理 release/debug 行為不一致的冗餘 `assert`。
+  - **反向變異驗證證據**：
+    - 將 `n_ahong_7` 之 `reject_reason_tag` 暫時變異為 `n_ahong_5` 的 `"route_knowledge_1"` 後執行 `test_p3a.gd`：
+      ```text
+      ERROR:   FAIL  n_ahong_7 reject_reason_tag（實際為「route_knowledge_1」）未指向預期語意標籤「three_points」
+         at: push_error (core/variant/variant_utility.cpp:1024)
+         GDScript backtrace (most recent call first):
+             [0] _fail (res://tests/headless/test_p3a.gd:58)
+             [1] _test_ahong_reject_reasons (res://tests/headless/test_p3a.gd:227)
+             [2] _initialize (res://tests/headless/test_p3a.gd:36)
+      ERROR: P3-A: 1 test(s) failed
+      ```
+    - Exit code 為 1，測試確實轉紅。還原後 `test_p3a.gd` 恢復全綠。
+- **F2（MT-1b 632 處改名實驗）**：
+  - 修正統計與改名範圍，補齊 `beat.slots[].label`（共 252 處），精確覆蓋 632 處欄位：
+    - `cards.json`：66 筆 `name`
+    - `locations.json`：48 筆 `name`（day: 20, night: 28）
+    - `ch1_d01_d03.json`：30 筆（title: 13, slot_label: 17）
+    - `ch1_d04_d15.json`：134 筆（title: 68, slot_label: 66）
+    - `ch1_nights.json`：20 筆（title: 18, slot_label: 2）
+    - `ch2_d16_d22.json`：73 筆（title: 31, slot_label: 42）
+    - `ch2_d23_d26.json`：58 筆（title: 29, slot_label: 29）
+    - `ch2_d27_d32.json`：51 筆（title: 28, slot_label: 23）
+    - `ch2_nights.json`：13 筆（title: 13, slot_label: 0）
+    - `ch3_d33_d38.json`：49 筆（title: 25, slot_label: 24）
+    - `ch3_d39_d45.json`：73 筆（title: 33, slot_label: 40）
+    - `ch3_nights.json`：7 筆（title: 7, slot_label: 0）
+    - `indulgence_exits.json`：10 筆（title: 3, slot_label: 7）
+    - **改名總筆數**：**632 處**（cards 66 + locations 48 + beat titles 266 + slot labels 252）
+  - **逐套執行結果**：**32 綠 1 紅**（唯一紅燈為 `test_p3a.gd:155` 之 `day_name in card_name` 既有資料不變量，其餘 32 套全綠）。
+- **F3（引擎端常數文案判定）**：
+  - `_REASON_CODE_TEXTS`（`location_panel.gd`）、`"再往前，你可能回不來。"`（`panel_builder.gd`）與 `"直接睡"`／`"進入隔天"`／`"結束今晚"`（`game_state.gd` / `main.gd`）屬於引擎系統 fallback 與 UI 控制項字面值，非 `data/` 敘事文案，維持在 i18n 管線階段統一抽入翻譯字典，不在此階段提前過度工程。
+- **F4（UI 模擬背景執行）**：
+  - 遵循規範一律使用 `.\tests\ui_sim\run_ui_sim.ps1 -Background` 執行。
+- **全套測試證據**：
+  - Headless：**33 套全綠 exit 0**（Summary: Total: 33, Passed: 33, Failed: 0）
+  - UI sim（`-Background`）：run `20260830-193200-384-p74972-4ad12505`，**117 variants／94 contracts／94 executed／94 completed／0 failed**
 
 ---
 

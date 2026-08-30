@@ -407,6 +407,7 @@ resolver 輸出的 `page_refs` 是有序 `Array[String]`。每一筆都用穩定
 | `earliest_night` | 夜間地點最早可開的夜。**是下限不是期限**——開過與否跨夜持續 |
 | `requires` | 夜間地點級門檻；不成立時 row 仍顯示，詳情的「進入」灰掉。走過前一夜間地點用 `night_seen`，不用 `opened_n_*` flag |
 | `reject_reason` | 夜間地點灰掉時那一行字（選填；未填時引擎用通用文案） |
+| `reject_reason_tag` | 選填 string。夜間地點門檻理由之語意標籤（非翻譯欄位，封閉字彙：`prev_trail`／`route_knowledge_1`／`route_knowledge_2`／`three_points`）。有 `requires` 的夜間地點必填 |
 | `night_reveal` | 對位後取得的 knowledge 卡 id；有 `day_counterpart` 的 row 必填，夜間限定 row 必須為 null。同一 `day_counterpart` 的 row 必須共用 id |
 | `day_counterpart` | **夜間地點專用**：白天去同一個位置是哪個地點；`null` ＝ 白天那裡什麼都沒有。見下 |
 | `madness_cost` | 夜間 row 的終身首次主動到訪會產生幾張發狂卡；0 ＝不產生。玩家到訪前不看見數字，UI 不顯示「免費」 |

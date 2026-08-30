@@ -202,28 +202,39 @@ func _test_ahong_reject_reasons(data_node: Node) -> int:
 	var failed := 0
 	var loader: DataLoader = data_node.loader
 
-	# 驗證 6 個帶 location requires 的阿宏 row 均有非空、非通用且 5 與 6 互異之 reject_reason（K-109 / A 類解耦）
-	var ahong_ids := ["n_ahong_2", "n_ahong_3", "n_ahong_4", "n_ahong_5", "n_ahong_6", "n_ahong_7"]
-	var seen_reasons: Dictionary = {}
+	# 驗證 6 個帶 location requires 的阿宏 row 均有非空、非通用、且 tag 與 requires 精確對應（K-109 / F1 語意標籤解耦）
+	var expected_tags := {
+		"n_ahong_2": "prev_trail",
+		"n_ahong_3": "prev_trail",
+		"n_ahong_4": "prev_trail",
+		"n_ahong_5": "route_knowledge_1",
+		"n_ahong_6": "route_knowledge_2",
+		"n_ahong_7": "three_points",
+	}
 
-	for lid in ahong_ids:
+	for lid in expected_tags:
 		var loc: Dictionary = loader.locations.get(lid, {}) as Dictionary
 		var reason := str(loc.get("reject_reason", "")).strip_edges()
-		assert(not reason.is_empty(), "fixture 前提：%s 有 reject_reason" % lid)
 		if reason.is_empty():
 			failed += _fail("%s 缺少 reject_reason" % lid)
 			continue
 		if reason == "無法進入" or reason == "條件未達成" or reason == "未解鎖":
 			failed += _fail("%s reject_reason 不得使用通用 fallback（實際為「%s」）" % [lid, reason])
-		seen_reasons[lid] = reason
 
-	var r5: String = str(seen_reasons.get("n_ahong_5", ""))
-	var r6: String = str(seen_reasons.get("n_ahong_6", ""))
-	if r5 == r6:
+		var tag := str(loc.get("reject_reason_tag", "")).strip_edges()
+		var exp_tag: String = expected_tags[lid]
+		if tag != exp_tag:
+			failed += _fail("%s reject_reason_tag（實際為「%s」）未指向預期語意標籤「%s」" % [lid, tag, exp_tag])
+
+	var loc5: Dictionary = loader.locations.get("n_ahong_5", {}) as Dictionary
+	var loc6: Dictionary = loader.locations.get("n_ahong_6", {}) as Dictionary
+	var r5 := str(loc5.get("reject_reason", "")).strip_edges()
+	var r6 := str(loc6.get("reject_reason", "")).strip_edges()
+	if not r5.is_empty() and r5 == r6:
 		failed += _fail("n_ahong_5 與 n_ahong_6 要求不同知識卡，reject_reason 不應完全相同")
 
 	if failed == 0:
-		failed += _ok("阿宏鏈 6 個門檻地點均有非空、非通用且 5 與 6 互異之 reject_reason")
+		failed += _ok("阿宏鏈 6 個門檻地點均有非空、非通用且與 requires 語意精確對應之 reject_reason_tag")
 
 	return failed
 

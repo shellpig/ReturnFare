@@ -470,6 +470,7 @@
         "night_seen": "n_ahong_1"
       },
       "reject_reason": "你還沒跟完上一段痕跡。",
+      "reject_reason_tag": "prev_trail",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -534,6 +535,7 @@
         "night_seen": "n_ahong_2"
       },
       "reject_reason": "你還沒跟完上一段痕跡。",
+      "reject_reason_tag": "prev_trail",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -581,6 +583,7 @@
       "madness_cost": 1,
       "requires": { "night_seen": "n_ahong_3" },
       "reject_reason": "你還沒跟完上一段痕跡。",
+      "reject_reason_tag": "prev_trail",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -628,6 +631,7 @@
       "madness_cost": 1,
       "requires": { "has_knowledge": "k_ahong_point_1" },
       "reject_reason": "你手上的路線知識還少了第一段。",
+      "reject_reason_tag": "route_knowledge_1",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -660,6 +664,7 @@
       "madness_cost": 1,
       "requires": { "has_knowledge": "k_ahong_point_2" },
       "reject_reason": "你手上的路線知識還少了第二段。",
+      "reject_reason_tag": "route_knowledge_2",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
@@ -713,6 +718,7 @@
         ] }
       },
       "reject_reason": "三個對位點尚未連齊。",
+      "reject_reason_tag": "three_points",
       "day_counterpart": null,
       "night_reveal": null,
       "map": {
