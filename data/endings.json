@@ -6,7 +6,7 @@
       "prefix_pages": [
         {
           "id": "replacement",
-          "text": "蒸氣散去。你穿上外套，走出了山泉閣。",
+          "text": "滾燙的硫磺蒸氣悄然散盡。穿著整潔外套的『你』平靜地推開木門，邁著沉穩而陌生的步伐，走出了山泉閣的大廳。",
           "narrative_beats": [
             "observable_exit_sanquan"
           ]
@@ -15,7 +15,7 @@
       "suffix_pages": [
         {
           "id": "long_return",
-          "text": "然後是黑。\n庇佑再次發動。你猛然睜開眼睛——",
+          "text": "視線陷入了無邊無際的深黑。\n深埋在靈魂深處的古老庇佑在死寂中轟然再度發動。在劇烈的震顫與心悸中，你猛然睜開了眼睛——",
           "narrative_beats": [
             "black_screen",
             "blessing_reactivated"
@@ -27,13 +27,13 @@
       "prefix_pages": [
         {
           "id": "again_replaced",
-          "text": "替換再次發生。另一個你走出了山泉閣，過完了那段被安排好的人生。"
+          "text": "替換的儀軌再次無聲降臨。另一個完美無瑕的『你』推門走出了山泉閣，在小鎮溫柔的謊言中，替你過完了那段被命運精密安排好的一生。"
         }
       ],
       "suffix_pages": [
         {
           "id": "short_return",
-          "text": "生命走到終點。庇佑將你再次送回起點。"
+          "text": "四十餘載的浮生如白駒過隙走到終點。沈默的古老庇佑，將你的意識再次無情地拽回了最初的起點。"
         }
       ],
       "skip_to": "short_return"
@@ -83,13 +83,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_uncle_high_long",
-                "text": "他接下了山泉閣。旅館做起來了。他慢慢變成了叔叔當年的樣子。"
+                "text": "他毅然接下了山泉閣的重擔。在他的苦心經營下，老店的名聲漸漸響亮，溫泉生意蒸蒸日上。歲月在他臉上刻下了深深的溝壑，不知不覺間，他舉手投足的神態，已與當年的阿源叔分毫不差。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_uncle_high_short",
-                "text": "他接掌山泉閣並將旅館經營起來，成為下一任經營者。"
+                "text": "他繼承了山泉閣並將旅館經營得有聲有色，成為鎮上受人敬重的下一任當家。"
               }
             ]
           },
@@ -133,13 +133,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_uncle_mid_long",
-                "text": "他接下了山泉閣。做得普通，但守住了老屋與溫泉。"
+                "text": "他接過了山泉閣的大門鑰匙。生意雖無大起大落，卻也平平穩穩地守住了這座百年老宅與世代相傳的溫泉。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_uncle_mid_short",
-                "text": "他接掌山泉閣，規模普通但守住經營。"
+                "text": "他接掌山泉閣，規模雖未擴張，卻也勉力守住了家族基業。"
               }
             ]
           },
@@ -151,13 +151,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_uncle_low_long",
-                "text": "他接下了山泉閣，撐了兩年後收掉。叔叔在他手上走了。"
+                "text": "他勉強接下了風雨飄搖的山泉閣，苦撐兩年後終究不敵債務而黯然歇業。不久後，阿源叔在診所的病榻上平靜地嚥下了最後一口氣。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_uncle_low_short",
-                "text": "他接下山泉閣但未能維持，兩年後歇業，叔叔離世。"
+                "text": "他未能守住山泉閣，兩年後旅館停業，阿源叔亦在診所病逝。"
               }
             ]
           },
@@ -201,13 +201,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_boss_high_long",
-                "text": "他回到熟悉的工作。旅館交給別人顧，但仍撐著。他下山了，但每年還是會回來一次。"
+                "text": "他收拾行囊重返外地熟悉的大都會職場。山泉閣委託給鎮上的親友代管，老店依舊屹立不倒。他雖遠走他鄉，但每逢深秋慶典，總會獨自搭車回小鎮住上幾天。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_boss_high_short",
-                "text": "他重回外地職務，旅館由他人代管維持，每年返鄉一次。"
+                "text": "他重返外地職場打拚，旅館委託他人妥善代管，每年秋季固定返鄉探望。"
               }
             ]
           },
@@ -251,13 +251,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_boss_mid_long",
-                "text": "他回去排班，日子普通；旅館後來縮小了。他下山了，但每年還是會回來一次。"
+                "text": "他回到了原先的公司按部就班地上班，生活平淡如水；老家的山泉閣因缺乏人手而逐漸縮小了經營規模。每年深秋，他依然會抽空回老街走走。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_boss_mid_short",
-                "text": "他回外地排班，旅館規模縮小，每年仍回鎮上一趟。"
+                "text": "他回外地過著普通生活，老宅規模縮減，每年定期返鄉一趟。"
               }
             ]
           },
@@ -269,13 +269,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_boss_low_long",
-                "text": "他回外地工作，旅館後來收掉了。叔叔在診所走了。他每年還是會回來一次。"
+                "text": "他回到外地職場生活，山泉閣不久後因無人照料而悄然歇業。阿源叔在診所的病房裡安詳離世。每年秋季，他依舊會回到這座空蕩的老鎮默默祭拜。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_boss_low_short",
-                "text": "他回外地工作，旅館歇業且叔叔於診所離世，每年定期返鄉。"
+                "text": "他回外地工作，旅館歇業且阿源叔在診所病逝，每年深秋定期返鄉。"
               }
             ]
           },
@@ -319,13 +319,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_zhou_high_long",
-                "text": "他去了周先生介紹的公司上班。旅館交給別人顧。他下山了，但每年還是會回來一次。"
+                "text": "他憑藉周先生的推薦，進入了外地的大企業任職，事業順遂。山泉閣委託給信得過的鄉親照看，每年他都會回到小鎮小住，在河畔的茶座靜坐良久。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_zhou_high_short",
-                "text": "他任職於周先生安排的職位，旅館交他人代管，每年定期返鄉。"
+                "text": "他在周先生安排的優渥職位上穩步發展，旅館由人代管，每年定期回鎮上小住。"
               }
             ]
           },
@@ -369,13 +369,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_zhou_mid_long",
-                "text": "他下山上班，只是旅館後來撐不了太久。他每年還是會回來一次。"
+                "text": "他隨周先生下山任職，然而山泉閣在他離去後未能支撐太久。他每年依舊會搭車回鄉，站在老街的石階上凝望山嵐。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_zhou_mid_short",
-                "text": "他下山任職，旅館經營未久，每年定期返鄉。"
+                "text": "他下山就職，老家旅館經營未久便歇業，每年秋天定期返鄉探看。"
               }
             ]
           },
@@ -387,13 +387,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_zhou_low_long",
-                "text": "他去周先生那裡上班，旅館後來收掉了。叔叔在診所走了。他每年還是會回來一次。"
+                "text": "他去了周先生介紹的公司上班，老家的山泉閣不久後關門大吉。阿源叔在診所撒手人寰。他每年依然會回來一次，在父母與叔叔的靈前長久佇立。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_zhou_low_short",
-                "text": "他下山就職，旅館歇業且叔叔於診所離世，每年定期返鄉。"
+                "text": "他下山任職，旅館歇業且阿源叔於診所離世，每年定期返鄉掃墓。"
               }
             ]
           },
@@ -430,13 +430,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_none_high_long",
-                "text": "沒說要接，也沒走。旅館一直是他在顧。"
+                "text": "他始終沒有給出明確的承諾，卻也從未真正離開。歲月流轉，整座山泉閣大大小小的事務，終究在他手中被照料得妥妥帖帖。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_none_high_short",
-                "text": "他未做承諾，留在鎮上持續照料旅館。"
+                "text": "他未作口頭承諾，卻長年留駐鎮上，默默承擔起照料旅館的責任。"
               }
             ]
           },
@@ -473,13 +473,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_none_mid_long",
-                "text": "沒說要接，也沒走。只是山泉閣規模一直沒起來。"
+                "text": "他沒有答應繼承，也沒有收拾行囊遠走。他就這樣留在小鎮守著老宅，山泉閣的生意雖未見起色，倒也維持著微弱的煙火氣。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_none_mid_short",
-                "text": "他留在鎮上守著老屋，規模未見擴展。"
+                "text": "他留在鎮上守著老屋度日，旅館規模平平，維持著基本的生計。"
               }
             ]
           },
@@ -489,13 +489,13 @@
             "first_seen_pages": [
               {
                 "id": "livelihood_none_low_long",
-                "text": "他哪裡都沒答應去，山泉閣關門了。叔叔在診所走了。"
+                "text": "他沒有給出任何方向，山泉閣最終隨風塵封鎖門。阿源叔在深秋的病榻上閉上了雙眼，老字號的招牌在荒藤中漸漸褪色。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "livelihood_none_low_short",
-                "text": "他未作承諾，旅館歇業，叔叔於診所離世。"
+                "text": "他未作任何抉擇，旅館最終關閉歇業，阿源叔於診所病逝。"
               }
             ]
           }
@@ -513,13 +513,13 @@
             "first_seen_pages": [
               {
                 "id": "inn_sign_long",
-                "text": "門口的招牌修得筆挺。湯屋只開一半，二樓的窗一直空著。"
+                "text": "大門上方的實木招牌修得筆挺端莊，遠遠便能看見老字號的風采；後棟的湯屋只開放了一半池子，二樓破損的木窗則始終空置著。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "inn_sign_short",
-                "text": "山泉閣招牌完好，湯屋與二樓維持舊貌。"
+                "text": "山泉閣大門招牌修葺一新，湯屋與二樓客房則維持舊有殘態。"
               }
             ]
           },
@@ -531,13 +531,13 @@
             "first_seen_pages": [
               {
                 "id": "inn_pipes_long",
-                "text": "湯屋的熱水蒸氣依舊充足。招牌一直歪著，二樓的窗空著。"
+                "text": "後棟湯屋的管線修復如初，滾燙的溫泉蒸氣常年在大池中翻湧；門口的老招牌依然在風中微微傾斜，二樓的客房始終未曾修繕。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "inn_pipes_short",
-                "text": "湯屋管線修復運作，其餘部分未加修繕。"
+                "text": "湯屋管線修復如常運作，大門招牌與二樓客房保留風災殘損。"
               }
             ]
           },
@@ -549,13 +549,13 @@
             "first_seen_pages": [
               {
                 "id": "inn_windows_long",
-                "text": "二樓的房間窗明几淨。招牌一直歪著，湯屋只開了一半。"
+                "text": "二樓所有的客房窗明几淨，在慶典旺季迎接了無數外地旅客；門口的老招牌依舊傾斜，後棟湯屋的供水能力亦只維持了一半。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "inn_windows_short",
-                "text": "二樓客房修復開放，招牌與湯屋保留殘損。"
+                "text": "二樓客房修復完好對外開放，招牌與湯屋則維持半損狀態。"
               }
             ]
           },
@@ -565,13 +565,13 @@
             "first_seen_pages": [
               {
                 "id": "inn_none_long",
-                "text": "旅館保留著當年的模樣，時間在上面留下了痕跡。"
+                "text": "老旅館始終維持著風災肆虐後的殘破模樣，風雨與歲月在斑駁的木石之上，刻滿了滄桑的痕跡。"
               }
             ],
             "repeat_pages": [
               {
                 "id": "inn_none_short",
-                "text": "旅館維持風災後的樣貌未變。"
+                "text": "老旅館維持風災後的受損狀態未作大型改動。"
               }
             ]
           }
@@ -589,7 +589,7 @@
             "first_seen_pages": [
               {
                 "id": "partner_ajie_long",
-                "text": "他跟阿婕結婚了。他們沒有小孩。\n二十年過去。四十出頭，她先。癌症，走得很快。\n然後是他。同一個病，一樣快。",
+                "text": "他最終與阿婕結為連理，在小鎮裡平淡相守，膝下始終未有子嗣。\n二十年光陰彈指而過。行至四十出頭的年歲，阿婕先一步病倒。是急性癌症，惡化得極快，短短數月便在病榻上悄然離世。\n不久之後是他。患上了同一個病症，走得同樣急促迅猛。",
                 "narrative_beats": [
                   "marriage",
                   "no_children",
@@ -605,7 +605,7 @@
             "repeat_pages": [
               {
                 "id": "partner_ajie_short",
-                "text": "他與阿婕成婚，膝下無子。二十年後她先離世，隨後他也因同病而終。",
+                "text": "他與阿婕成婚，膝下無子。二十年後阿婕先因病離世，隨後他也罹患同種重疾而終。",
                 "narrative_beats": [
                   "marriage",
                   "spouse_dies_first",
@@ -622,7 +622,7 @@
             "first_seen_pages": [
               {
                 "id": "partner_awei_long",
-                "text": "他跟阿薇結婚了。他們沒有小孩。\n二十年過去。四十出頭，她先。癌症，走得很快。\n然後是他。同一個病，一樣快。",
+                "text": "他最終與阿薇結為夫妻，在青山溫泉間長相廝守，一生沒有要孩子。\n二十年的歲月悄然而逝。剛過四十歲的門檻，阿薇便先一步倒下。癌症來勢洶洶，走得無比迅捷。\n隨後便是他自己。染上了同一種絕症，離開得同樣倉促。",
                 "narrative_beats": [
                   "marriage",
                   "no_children",
@@ -638,7 +638,7 @@
             "repeat_pages": [
               {
                 "id": "partner_awei_short",
-                "text": "他與阿薇成婚，膝下無子。二十年後她先離世，隨後他也因同病而終。",
+                "text": "他與阿薇結髮為伴，膝下無子。二十年後阿薇先因疾撒手人寰，隨後他亦染同病相隨而去。",
                 "narrative_beats": [
                   "marriage",
                   "spouse_dies_first",
@@ -653,7 +653,7 @@
             "first_seen_pages": [
               {
                 "id": "partner_none_long",
-                "text": "他沒有結婚，一個人過完二十年。",
+                "text": "他一生未曾娶妻成家，隻身一人孤獨而平靜地走過了二十年的光陰。",
                 "narrative_beats": [
                   "no_marriage",
                   "single_twenty_years"
@@ -663,7 +663,7 @@
             "repeat_pages": [
               {
                 "id": "partner_none_short",
-                "text": "他獨身一人過完二十年。",
+                "text": "他終生未娶，獨自一人在小鎮度過了二十個春秋。",
                 "narrative_beats": [
                   "no_marriage",
                   "single_twenty_years"
@@ -688,7 +688,7 @@
             "first_seen_pages": [
               {
                 "id": "proxy_ajie_long",
-                "text": "很多年後的一張照片裡，阿婕也在鎮上。只是那時她也早就不咬指甲了。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。",
+                "text": "很多年後的一張泛黃合照裡，阿婕依舊在鎮上安靜地生活著，只是那時的她，早已不再撕咬指甲。\n至於那個當年走出山泉閣的替身，活到四十出頭便罹患急性癌症，走得極為倉促。",
                 "narrative_beats": [
                   "proxy_reminisce",
                   "switch_subject_to_protagonist",
@@ -701,7 +701,7 @@
             "repeat_pages": [
               {
                 "id": "proxy_ajie_short",
-                "text": "多年後的照片中，阿婕亦在鎮上留有身影。那個走出山泉閣的人在四十出頭病逝。",
+                "text": "多年後的泛黃相片中，阿婕依舊在鎮上如常生活。而那個走出山泉閣的人，在四十出頭因病溘然長逝。",
                 "narrative_beats": [
                   "proxy_reminisce",
                   "protagonist_dies_early_forties"
@@ -714,7 +714,7 @@
             "first_seen_pages": [
               {
                 "id": "proxy_awei_long",
-                "text": "很多年後的一張照片裡，阿薇也在靜和園。只是笑起來時不再用手遮嘴。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。",
+                "text": "很多年後的一張老照片中，阿薇依然在靜和園前台端莊地照料客人，只是笑起來時不再用手掩嘴。\n至於那個當年走出山泉閣的替身，到了四十出頭的年歲，因急性癌症迅速衰竭離世。",
                 "narrative_beats": [
                   "proxy_reminisce",
                   "switch_subject_to_protagonist",
@@ -727,7 +727,7 @@
             "repeat_pages": [
               {
                 "id": "proxy_awei_short",
-                "text": "多年後的照片中，阿薇亦在靜和園如常生活。那個走出山泉閣的人在四十出頭病逝。",
+                "text": "多年後的照片裡，阿薇依然在靜和園平靜度日。那個走出山泉閣的人，在四十歲剛過之際因病早逝。",
                 "narrative_beats": [
                   "proxy_reminisce",
                   "protagonist_dies_early_forties"
@@ -740,7 +740,7 @@
             "first_seen_pages": [
               {
                 "id": "proxy_acai_long",
-                "text": "很多年後在街角遇見阿財，他走路已經完全不跛了，笑著向你打招呼。\n至於那個走出山泉閣的人，到了四十出頭，癌症，走得很快。",
+                "text": "很多年後在老街拐角偶遇阿財，他步履輕健、走路完全不再跛腳，熱情爽朗地向熟人打著招呼。\n至於那個當年走出山泉閣的替身，到了四十出頭，同樣因急性癌症急劇惡化而離世。",
                 "narrative_beats": [
                   "proxy_reminisce",
                   "switch_subject_to_protagonist",
@@ -753,7 +753,7 @@
             "repeat_pages": [
               {
                 "id": "proxy_acai_short",
-                "text": "多年後的街頭，阿財步履健全地打著招呼。那個走出山泉閣的人在四十出頭病逝。",
+                "text": "多年後的街頭，阿財雙腿健全、精神飽滿地打著招呼。而那個走出山泉閣的人，在四十出頭因病逝世。",
                 "narrative_beats": [
                   "proxy_reminisce",
                   "protagonist_dies_early_forties"
@@ -765,7 +765,7 @@
       }
     ],
     "draft": true,
-    "draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"
+    "draft_note": "已完成全量文學性重寫"
   },
   {
     "id": "ending_madness_be",
@@ -774,7 +774,7 @@
       "pages": [
         {
           "id": "madness_lost",
-          "text": "眼前的景象開始扭曲、重疊。你看到太多不該看見的東西——鎮子沉入水底，水底浮現城鎮。\n\n你已經無法再思考，也無法再維持自己的形狀。"
+          "text": "眼前的天地在劇烈的震顫中轟然顛倒扭曲。你看到了太多凡人神智無法承受的禁忌景象——整座古鎮沉入黑濁的淵藪，沸騰的水底浮現出數以萬計的無面之城。\n\n靈魂在不可名狀的瘋狂中徹底溶解碎裂，你再也無法維持思考，甚至無法維持身為人類的基本形態。"
         }
       ]
     },
@@ -782,13 +782,13 @@
       "pages": [
         {
           "id": "madness_summary",
-          "text": "發狂吞噬了神智。你在混沌之中倒下，等待下一次甦醒。"
+          "text": "無盡的狂亂徹底吞噬了最後的理智。你在混沌無光的深淵中轟然倒下，靜候著下一次輪迴的冰冷甦醒。"
         }
       ],
       "skip_to": "complete"
     },
     "draft": true,
-    "draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"
+    "draft_note": "已完成全量文學性重寫"
   },
   {
     "id": "ending_inventory_be",
@@ -797,7 +797,7 @@
       "pages": [
         {
           "id": "inventory_confined",
-          "text": "診所的門在身後關上。\n陳醫師微笑著說：「別擔心，只是常規療養。你很快就會好起來。」\n\n你看著窗外的鐵欄杆。你被送進了庫存，再也沒有出來。"
+          "text": "診所厚重的鐵門在身後沉重地反鎖上扣。\n陳醫師戴著無菌口罩，眼神冰冷而憐憫：「別害怕，這只是例行的深層療養……在這裡，你很快就會擺脫所有的痛苦。」\n\n你絕望地抓著窗欞上冰冷的鐵柵欄。你被作為備份的活體庫存封入暗室，自此再也未能踏出半步。"
         }
       ]
     },
@@ -805,13 +805,13 @@
       "pages": [
         {
           "id": "inventory_summary",
-          "text": "被送入診所療養。調查在此中斷，進入漫長的沉睡。"
+          "text": "被作為活體樣本押入診所深處實施永久療養。所有的調查在此戛然而止，意識陷入漫長死寂的沉睡。"
         }
       ],
       "skip_to": "complete"
     },
     "draft": true,
-    "draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"
+    "draft_note": "已完成全量文學性重寫"
   },
   {
     "id": "ending_refuse_boarding",
@@ -820,14 +820,14 @@
       "pages": [
         {
           "id": "refuse_outside_life",
-          "text": "你放下了行李，退掉了車票。\n你留在了外面的城市，找了一份平凡的工作，過著再普通不過的生活。",
+          "text": "在客運站的月台上，你鬆開了行李箱，退掉了那張前往溫泉小鎮的車票。\n你選擇留在了繁華而冷漠的外界大都會，找了一份朝九晚五的平凡工作，過著與世無爭、再普通不過的凡俗生活。",
           "narrative_beats": [
             "outside_ordinary_life"
           ]
         },
         {
           "id": "refuse_early_death",
-          "text": "四十出頭。同一個病，癌症來得很急。\n躺在病床上閉上眼睛的那一刻，庇佑再次發動。",
+          "text": "剛滿四十出頭的年紀。同一個躲不開的宿命絕症，急性癌症在數月之內吞噬了你的生機。\n在冰冷的加護病房裡閉上雙眼的剎那，靈魂深處沉睡的古老庇佑，無可抗拒地再度轟然發動。",
           "narrative_beats": [
             "died_early_forties",
             "died_of_cancer",
@@ -840,7 +840,7 @@
       "pages": [
         {
           "id": "refuse_summary",
-          "text": "你選擇不上車，在外地度過平凡的一生，直至四十出頭再次回到起點。",
+          "text": "你選擇在最初的一刻不上車，在外面的世界度過了平凡無奇的短暫半生，直至四十出頭因癌症再次被命運遣返回最初的起點。",
           "narrative_beats": [
             "refuse_boarding_summary"
           ]
@@ -849,6 +849,6 @@
       "skip_to": "complete"
     },
     "draft": true,
-    "draft_note": "P5-A 結構版氣氛草稿，待後續文案階段潤飾"
+    "draft_note": "已完成全量文學性重寫"
   }
 ]

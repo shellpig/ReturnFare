@@ -1,5 +1,5 @@
 {
-  "_comment": "六個縱慾出口與泡湯特例。欄位說明見 data/SCHEMA.md > 縱慾出口。文字為佔位。",
+  "_comment": "六個縱慾出口與泡湯特例。欄位說明見 data/SCHEMA.md > 縱慾出口。已進行全量文學性重寫。",
 
   "beats": [
     {
@@ -12,22 +12,22 @@
       },
       "condition": { "madness_at_least": 1 },
       "fixed": false,
-      "title": "山泉閣縱慾出口",
-      "text": "壓抑不住的衝動在體內翻湧。你可以選擇在此宣洩，或付出代價洗滌心智。",
+      "title": "山泉閣的躁動",
+      "text": "幽閉的山泉閣內，不可遏制的瘋狂與焦躁如野火般在體內肆虐燃燒。你可以在此肆意宣洩，或是付出沉重代價讓翻騰的理智重歸平靜。",
       "slots": [
         {
           "id": "x_smash",
-          "label": "砸東西",
+          "label": "砸碎器物",
           "accepts": ["madness"],
           "condition": { "madness_at_least": 1 },
           "indulgence": { "weight": 1 },
           "on_place": {
-            "text": "你把房間裡能摔的東西都摔了。碎片散了一地，胸口那股窒息感稍微退了一點。",
+            "text": "你狂暴地將客房內觸手可及的瓷器、茶几與鏡框狠狠摔在地上。碎裂聲響徹走廊，冰冷的碎片散落一地，胸口那股近乎窒息的灼燒感終於稍微退卻了一絲。",
             "flag": { "inn_damaged": true }
           },
           "on_place_by_level": {
             "light": {
-              "text": "第一次的失控還算輕微。但你知道這只是開始。"
+              "text": "最初的失控雖然短暫，但看著滿地的狼藉，你清楚這場心智的崩塌才剛剛拉開序幕。"
             },
             "normal": {
               "relation": { "npc": "uncle", "delta": -1 }
@@ -39,17 +39,17 @@
         },
         {
           "id": "x_binge",
-          "label": "暴食",
+          "label": "瘋狂暴食",
           "accepts": ["madness"],
           "condition": { "madness_at_least": 1 },
           "indulgence": { "weight": 2 },
           "on_place": {
-            "text": "你把廚房裡能找到的食物一股腦塞進胃裡。直到胃部隱隱作痛，腦中的雜音才安靜下來。",
+            "text": "你如飢似渴地衝進後廚，將冷飯、生肉與剩菜一股腦瘋狂塞入口中。直到胃部劇烈痙攣、幾乎要撕裂開來，腦海中那尖銳刺耳的幻聽才漸漸沉寂。",
             "flag": { "binge_eaten": true }
           },
           "on_place_by_level": {
             "light": {
-              "text": "胃裡的飽脹感暫時壓住了躁動。下一次恐怕沒這麼容易。"
+              "text": "胃部沉重的墜脹與絞痛，暫時壓制住了靈魂深處的躁狂，但下一次的飢渴只會來得更加猛烈。"
             },
             "normal": {
               "relation": { "npc": "uncle", "delta": -1 }
@@ -61,7 +61,7 @@
         },
         {
           "id": "x_violence",
-          "label": "暴力對人",
+          "label": "施加暴力",
           "accepts": ["madness"],
           "condition": {
             "all": [
@@ -71,12 +71,12 @@
           },
           "indulgence": { "weight": 4 },
           "on_place": {
-            "text": "你無法克制心中的暴虐，對身邊的人動了手。",
+            "text": "狂亂徹底吞噬了你的理性，你面目猙獰地將內心積壓的所有暴戾，毫無保留地宣洩在了至親之人的身上。",
             "relation": { "npc": "uncle", "delta": -2 }
           },
           "on_place_by_level": {
             "light": {
-              "text": "突如其來的暴力讓人震驚。"
+              "text": "突如其來的暴行令空氣驟然冰封，至親眼中難以置信的恐懼，比任何傷痛都更深刻地烙在心頭。"
             },
             "normal": {
               "relation": { "npc": "uncle", "delta": -1 }
@@ -88,7 +88,7 @@
         },
         {
           "id": "x_lust_ajie",
-          "label": "宣洩慾望（阿婕）",
+          "label": "情慾宣洩（阿婕）",
           "accepts": ["madness"],
           "condition": {
             "all": [
@@ -98,21 +98,21 @@
           },
           "indulgence": { "weight": 5 },
           "on_place": {
-            "text": "在混亂與衝動中，你將慾望宣洩在阿婕身上。",
+            "text": "在幽暗混亂的穿堂風中，理智的防線徹底崩塌，你緊緊抱住驚慌失措的阿婕，將所有壓抑的慾望與恐懼粗暴地宣洩在了她單薄的身軀上。",
             "relation": { "npc": "ajie", "delta": 1 },
             "flag": { "ajie_trust_broken": true },
             "lose": [{ "card": "npc_ajie", "if": { "has_card": "npc_ajie" } }]
           },
           "on_place_by_level": {
             "light": {
-              "text": "關係在失控中產生了微妙的變化。"
+              "text": "失控的激情過後，原本脆弱的信任在彼此無聲的淚水與窒息感中，悄然裂開了一道無法彌合的深痕。"
             }
           },
           "note": "P4-A：對阿婕使用縱慾卡破壞委託資格。設 ajie_trust_broken=true 為阿婕資格的唯一真值；若已持有人物卡則同時 lose。D16 d16_pm_sanquan::repair_ajie_trust 是明示修復接點"
         },
         {
           "id": "x_soak",
-          "label": "長時間泡湯",
+          "label": "極限浸泡",
           "accepts": ["madness"],
           "condition": { "madness_at_least": 1 },
           "indulgence": {
@@ -120,7 +120,7 @@
             "soak": true
           },
           "on_place": {
-            "text": "你在溫泉池裡浸泡了整整一天。熱氣蒸騰，思緒漸漸沉澱，發狂的念頭被洗去了一部分。"
+            "text": "你將自己整個人浸沒在滾燙灼熱的溫泉水底，任由黏稠的硫磺蒸氣滲入每一個毛孔。在近乎窒息的高溫中，神經漸漸麻木，瘋狂的囈語被洗去了一角。"
           }
         }
       ]
@@ -135,23 +135,23 @@
       },
       "condition": { "madness_at_least": 1 },
       "fixed": false,
-      "title": "老街縱慾出口",
-      "text": "老街熱鬧的市聲刺激著感官。",
+      "title": "老街的喧囂狂熱",
+      "text": "老街嘈雜的市井聲響與刺鼻的油煙氣息，瘋狂地刺激著你脆弱緊繃的神經。",
       "slots": [
         {
           "id": "x_splurge",
-          "label": "奢侈",
+          "label": "肆意揮霍",
           "accepts": ["madness"],
           "condition": { "madness_at_least": 1 },
           "requires": { "has_card": "card_money" },
           "reject_reason": "（身上沒有足夠的錢）",
           "indulgence": { "weight": 3 },
           "on_place": {
-            "text": "你走進老街最貴的店鋪，揮霍了一筆不該花的錢。"
+            "text": "你衝進老街最奢華的商鋪，將身上所有的鈔票肆無忌憚地揮灑在毫無用處的奢侈古董與陳年烈酒之上。"
           },
           "on_place_by_level": {
             "light": {
-              "text": "揮霍帶來了短暫的平靜。"
+              "text": "金錢流逝的虛妄快感，為你換來了極為短暫的心靈麻醉。"
             }
           }
         }
@@ -167,12 +167,12 @@
       },
       "condition": { "madness_at_least": 1 },
       "fixed": false,
-      "title": "靜和園縱慾出口",
-      "text": "靜和園幽靜的角落掩蓋著隱密的騷動。",
+      "title": "靜和園的幽邃暗角",
+      "text": "靜和園精緻典雅的庭院深處，微風吹動竹林，掩蓋著內心深處蠢蠢欲動的陰暗衝動。",
       "slots": [
         {
           "id": "x_lust_awei",
-          "label": "宣洩慾望（阿薇）",
+          "label": "情慾宣洩（阿薇）",
           "accepts": ["madness"],
           "condition": {
             "all": [
@@ -182,12 +182,12 @@
           },
           "indulgence": { "weight": 5 },
           "on_place": {
-            "text": "在混亂與衝動中，你將慾望宣洩在阿薇身上。",
+            "text": "在幽閉無人的長廊拐角，你死死按住阿薇顫抖的雙肩，在狂亂的衝動中索求著她溫熱的肌膚與氣息，試圖藉由肉體的糾纏驅散逼近的瘋狂。",
             "relation": { "npc": "awei", "delta": 1 }
           },
           "on_place_by_level": {
             "light": {
-              "text": "關係在失控中產生了微妙的變化。"
+              "text": "喘息漸平，她靠在冰冷的石牆上，眼神中交織著震驚、困惑與某種難以言說的悲憫。"
             }
           }
         }
