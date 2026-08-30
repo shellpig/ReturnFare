@@ -362,9 +362,16 @@ func _route_view(encounter_lines: PackedStringArray = PackedStringArray()) -> vo
 			if not GameState.active_encounter.is_empty():
 				_show_encounter()
 				return
-			_map_list.visible = true
-			_layout_with_flow(_map_list)
-			_map_list.call("refresh")
+			# 純演出時段（D1 上午／下午，主角還在路上）地圖清單為空：不留一個空框，
+			# 讓演出文字佔滿，畫面與晚間演出同形。
+			if PanelBuilder.available_locations(GameState, Data).is_empty():
+				_map_list.visible = false
+				_flow_text.visible = true
+				_layout_flow_full()
+			else:
+				_map_list.visible = true
+				_layout_with_flow(_map_list)
+				_map_list.call("refresh")
 			_advance_btn.visible = true
 		"evening":
 			_encounter_panel.visible = false

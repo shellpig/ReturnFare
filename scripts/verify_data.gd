@@ -105,7 +105,9 @@ func _initialize() -> void:
 			print("  " + e)
 		quit(1)
 		return
-	print("行動格供需 (Lint 5)　0 錯誤（第 1-45 天全滿，3 格刻意留空）")
+	print("行動格供需 (Lint 5)　0 錯誤（第 1-45 天全滿，%d 格刻意留空、%d 格純演出）" % [
+		DataFacts.BY_DESIGN_EMPTY_PHASES.size(), DataFacts.NARRATION_ONLY_PHASES.size()
+	])
 
 	# Lint 7: 夜間可達性
 	var night_errs := DataLoader.lint_night_reachability(loader)

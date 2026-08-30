@@ -5,9 +5,16 @@ extends RefCounted
 
 ## 刻意設計為完全無任何 beat 的行動時段名單（verify_data 與走查腳本共用，B-03）
 const BY_DESIGN_EMPTY_PHASES: Array[Dictionary] = [
+	{ "day": 32, "phase": "afternoon" },
+]
+
+## 純演出時段：有 fixed auto_enter beat、但玩家不選地點也不放卡的行動時段。
+## 第 1 天上午與下午主角還在路上，鎮上的地點一個都還沒抵達，因此地圖不出清單
+## （PanelBuilder.available_locations() 直接回空），lint 5 的地點時段支援檢查也跳過
+## ——這類 beat 的 location 只是歸屬標籤，玩家不從地圖進入。
+const NARRATION_ONLY_PHASES: Array[Dictionary] = [
 	{ "day": 1, "phase": "morning" },
 	{ "day": 1, "phase": "afternoon" },
-	{ "day": 32, "phase": "afternoon" },
 ]
 
 ## 有 beat 但僅有 choice 槽、無主角卡槽的行動時段（K-16，走查腳本豁免名單）
@@ -47,6 +54,14 @@ static func chapter_for_day(day: int) -> int:
 ## 檢查給定的 (day, phase) 是否為刻意留空的行動時段
 static func is_empty_phase_by_design(day: int, phase: String) -> bool:
 	for p in BY_DESIGN_EMPTY_PHASES:
+		if int(p.get("day", -1)) == day and str(p.get("phase", "")) == phase:
+			return true
+	return false
+
+
+## 檢查給定的 (day, phase) 是否為純演出時段（無地圖、無行動格）
+static func is_narration_only_phase(day: int, phase: String) -> bool:
+	for p in NARRATION_ONLY_PHASES:
 		if int(p.get("day", -1)) == day and str(p.get("phase", "")) == phase:
 			return true
 	return false

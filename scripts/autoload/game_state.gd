@@ -799,6 +799,10 @@ func _start_run_from_opening(choice_id: String, on_select: Dictionary) -> Dictio
 	opening_choice_id = choice_id
 	flow_mode = FLOW_RUN
 
+	# 開局落地的 D1 morning 沒有經過 _commit_phase_transition()，這裡補結算一次進場
+	# beat，否則第 1 天上午的演出永遠不會播。填在 emit 之前，UI 收到訊號時才讀得到。
+	last_auto_enter_lines = _settle_auto_enter_beats()
+
 	flow_mode_changed.emit(FLOW_RUN)
 	day_changed.emit(day)
 	phase_changed.emit(day, phase)

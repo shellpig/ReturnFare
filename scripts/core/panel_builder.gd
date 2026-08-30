@@ -60,6 +60,10 @@ static func available_locations(gs: Node, data: Node) -> Array[String]:
 			result.append(str(c["id"]))
 		return result
 
+	# 純演出時段（D1 上午／下午，主角還在路上）：鎮上一個地點都還沒抵達，不出清單。
+	if DataFacts.is_narration_only_phase(current_day, current_phase):
+		return result
+
 	for loc_id: String in loader.locations:
 		var loc: Dictionary = loader.locations[loc_id] as Dictionary
 		var layer: String = str(loc.get("layer", ""))

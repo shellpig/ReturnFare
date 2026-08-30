@@ -147,11 +147,34 @@ func _initialize() -> void:
 	var choices: Dictionary = gs.get("choices") as Dictionary
 	var beats_entered: Dictionary = gs.get("beats_entered") as Dictionary
 
-	if not flags.is_empty() or not switches.is_empty() or not relations.is_empty() or not slots_placed.is_empty() or not choices.is_empty() or not beats_entered.is_empty():
+	if not flags.is_empty() or not switches.is_empty() or not relations.is_empty() or not slots_placed.is_empty() or not choices.is_empty():
 		push_error("FAIL: 重置後 run 層狀態未清空")
 		failed += 1
 	else:
-		print("  ok  重置後 run 層狀態（flags, switches, relations, slots_placed, choices, beats_entered）全部清空")
+		print("  ok  重置後 run 層狀態（flags, switches, relations, slots_placed, choices）全部清空")
+
+	# `beats_entered` 不在上面那組：第 1 天上午是純演出時段，choose_opening() 落地時
+	# auto_enter 就已經結算過。所以這裡驗的不是「空」，是「恰好等於本輪 D1 morning
+	# 條件成立的那幾個 auto_enter beat」——多一個代表沒清乾淨，少一個代表開局沒播。
+	var expected_entered: Array[String] = []
+	for b in data_node.loader.beats_at(1, "morning"):
+		if not bool(b.get("fixed", false)) or not bool(b.get("auto_enter", false)):
+			continue
+		if not ConditionEval.eval(b.get("condition"), gs) or not ConditionEval.eval(b.get("requires"), gs):
+			continue
+		expected_entered.append(str(b.get("id", "")))
+	expected_entered.sort()
+	var actual_entered: Array[String] = []
+	for k: String in beats_entered.keys():
+		actual_entered.append(k)
+	actual_entered.sort()
+	if actual_entered != expected_entered:
+		push_error("FAIL: 重置後 beats_entered 應為 D1 morning 的自動進場 beat %s，實得 %s" % [
+			str(expected_entered), str(actual_entered)
+		])
+		failed += 1
+	else:
+		print("  ok  重置後 beats_entered 恰為 D1 morning 自動進場 beat %s" % str(expected_entered))
 
 	if failed > 0 or not bool(res.get("ok", false)):
 		push_error("playthrough_greedy: %d assertion(s) failed" % failed)
@@ -215,6 +238,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		"requires_locked": 0,
 		"slot_requires_locked": 0,
 		"empty_by_design": 0,
+		"narration_only": 0,
 		"choice_only_by_design": 0,
 		"compare_only": 0,
 		"illegal": 0,
@@ -335,6 +359,7 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 			stats["slot_requires_locked"]
 		])
 		print("  刻意留空時段 (名單內):     %2d 格" % stats["empty_by_design"])
+		print("  純演出時段 (名單內):       %2d 格" % stats["narration_only"])
 		print("  純選擇題時段 (豁免名單):   %2d 格" % stats["choice_only_by_design"])
 		print("  純比對槽時段:             %2d 格" % stats["compare_only"])
 		if stats["illegal"] > 0:
@@ -511,6 +536,12 @@ static func diagnose_unplaced_phase(data_node: Node, day: int, phase: String, gs
 	# 1. 刻意留空
 	if DataFacts.is_empty_phase_by_design(day, phase):
 		return { "ok": true, "category": "empty_by_design", "detail": "刻意留空時段" }
+
+	# 1.5 純演出時段：有 auto_enter 演出 beat、沒有地圖也沒有行動格。
+	#     要排在 all_fixed 之前——常駐的縱慾出口是 fixed:false，會讓 all_fixed 判成假，
+	#     那時這一格會被歸到後面某個分類，診斷訊息就不再說實話。
+	if DataFacts.is_narration_only_phase(day, phase):
+		return { "ok": true, "category": "narration_only", "detail": "純演出時段（無地圖、無行動格）" }
 
 	# 2. 刻意 choice-only
 	if DataFacts.is_choice_only_phase_by_design(day, phase):

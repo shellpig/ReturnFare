@@ -536,8 +536,13 @@ static func lint_action_phases(loader: DataLoader) -> PackedStringArray:
 		var loc_id: String = str(b.get("location", ""))
 		var loc: Dictionary = loader.locations.get(loc_id, {}) as Dictionary
 		var loc_phases: Array = loc.get("phases", []) as Array
+		var beat_day: int = int((w as Dictionary).get("day", -1))
 		for phase_str in phases_to_check:
 			if phase_str in ["morning", "afternoon"]:
+				# 純演出時段的 beat 只由 auto_enter 進場，location 是歸屬標籤而非入口，
+				# 因此不要求該地點的 phases 支援這個時段。
+				if DataFacts.is_narration_only_phase(beat_day, phase_str):
+					continue
 				if not loc_phases.has(phase_str):
 					errs.append("%s：beat 時段為 %s，但所屬地點 %s 的 phases 僅有 %s" % [
 						str(b.get("id", "")), phase_str, loc_id, str(loc_phases)
