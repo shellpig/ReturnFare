@@ -4,21 +4,72 @@
 
 ## 目前狀態
 
-**P5-F 第一輪 review 完成，未關門。機器層全綠，但 verifier 開出 2 個 blocker 與 9 條非阻擋；下一步是照本檔「P5-F review 待修清單」修完再交回複驗。**
+**P5-F 第二輪 review 完成，仍未關門。`36077fc` 把第一輪的 B1、B2、N1～N9 全數處理，verifier 複驗後確認十一條落地；但新開 R1～R3 三條，全部是同一個形狀——變數指派了卻從未被讀，測試綠而斷言不存在。下一步是照本檔「P5-F 第二輪 review 待修清單（R1～R3）」修完再交回複驗。**
 
-verifier 獨立重跑基準線（2026-08-30）：
+verifier 第二輪獨立重跑基準線（2026-08-30，`36077fc`）：
 
-- Headless：33 套 exit 0，`ALL HEADLESS TESTS PASSED!`（`verify_data` Lint 1～20 全 0、45 天貪心走查通過）
-- UI Sim：run `20260830-094050-084-p48616-61649527`，117 variants／94 catalog contracts／94 executed／94 completed／**0 failed checks**，8 條負向反證皆以預期原因失敗
-- 上述數字與 implementer 自跑一致；**綠燈本身沒問題，問題在綠燈證明的東西**
+- Headless：33 套 exit 0，`ALL HEADLESS TESTS PASSED!`（`test_p5f` 9 組全 ok；`verify_data` Lint 1～20 全 0、45 天貪心走查通過）
+- UI Sim：run `20260830-101817-705-p19044-2097d7c1`，117 variants／94 catalog contracts／94 executed／94 completed／**0 failed checks**，8 條負向反證皆以預期原因失敗
+- 變異驗證：**5 個注入點全部精確轉紅**，工作區還原後 `git status` 乾淨
 
-已由使用者拍板：庫存 BE 第一輪不可達屬**內容供給缺口**，不在 P5-F 補資料。`實作規格書.md > P5-F` 與 `測試指南.md > P5-F` 已同批改成「規則層可達即可」，並新增一條「斷言 `data/beats/` 目前沒有任何 beat 帶 `ending: ending_inventory_be`」的守衛，讓第一輪內容補上翻面寫法時這條會轉紅。
+| 變異 | 注入 | 結果 |
+|---|---|---|
+| M1（N8 lint） | `d45_then > empty_handed` 的 `condition` 改成也要求持 `info_registry`（整組無無條件槽且不互補） | `verify_data` exit 1，命中「無無條件槽且未具可驗證之互補條件保證」 |
+| M2（B1 守衛） | 給 `d37_clinic` 掛 `on_enter.ending = ending_inventory_be` | `test_p5f` exit 1，B1 catalog 斷言轉紅 |
+| M3（B2 否定斷言） | `d31_proxy_awei` 的 `festival_proxy_is` 改成 `ajie` | `test_p5f` exit 1，**3 條路徑**的「非目標 proxy beat 條件不成立」轉紅 |
+| M4（N5 集合覆蓋） | 從 `test_p5f` 的 `bands` 拿掉 mid 帶 | 轉紅並列出缺漏 `["uncle_mid","boss_mid","zhou_mid","none_mid"]` |
+| M5（N1 跨輪保留） | `game_state.gd` 的 `is_first_time` 硬寫 `true` | 第 2、3 輪「零扣費」轉紅 |
+
+**B1、B2、N1、N5、N8 五條由上表確認真的守住；N2、N3、N7、N9 由 diff 確認落地。N4 落地但斷言不完整，見 R2。N6 未落地，見 R1。**
+
+已由使用者拍板：庫存 BE 第一輪不可達屬**內容供給缺口**，不在 P5-F 補資料。`實作規格書.md > P5-F` 與 `測試指南.md > P5-F` 已同批改成「規則層可達即可」，並新增一條「斷言 `data/beats/` 目前沒有任何 beat 帶 `ending: ending_inventory_be`」的守衛，讓第一輪內容補上翻面寫法時這條會轉紅（M2 已證有牙齒）。
 
 ---
 
-## P5-F review 待修清單（implementer 待辦）
+## P5-F 第二輪 review 待修清單（R1～R3，implementer 待辦）
 
-修完全部後跑：全套 headless → UI sim → 逐條變異驗證（把修改整段拿掉，對應測試必須轉紅），再交回 verifier。
+三條全在 `tests/headless/test_p5f.gd`，可以一批修。修完只需重跑 `test_p5f`（不動資料與 UI，UI sim 與其他 32 套不受影響），再交回 verifier 做對應變異。
+
+### R1（阻擋）｜N6 沒做，`ready_checkpoint` 是死變數
+
+`tests/headless/test_p5f.gd:740` 指派了 `ready_checkpoint` 之後**從未被讀**。第 6 組實際測的是「`complete_ending()` 成功、回到 opening 之後再呼叫一次被拒（`not_ending`）」——這與第 2 組結尾已有的斷言是同一件事，不是新證據。
+
+`測試指南.md > P5-F` 要的是「**同一 ready checkpoint** 重複完成只有第一個成功」，目前零證據。
+
+**要做的**：在末頁 `can_complete == true` 時存下的那份 `ready_checkpoint`，於第一次 `complete_ending()` 成功後 `deserialize()` 回去，再完成一次，斷言：① 第二次被拒或不產生第二筆 history；② `ending_history` 筆數與第一次完成後相同；③ `run_number` 不再加。做法若與規則層現況衝突（例如重載 ready 快照在設計上就該可再完成一次），不要硬改測試遷就——把衝突寫進本檔，交由 verifier 與使用者決定契約該怎麼收。
+
+**變異驗證**：把 `complete_ending()` 的重複保護拿掉，本條必須轉紅。
+
+### R2（阻擋）｜第 9 組沒有任何狀態零變化斷言，`snap_before` 是死變數
+
+`tests/headless/test_p5f.gd:878` 指派了 `snap_before` 之後**從未被讀**。函式名寫「K-198 preflight null 防禦反例與狀態零變化斷言」，但七個拒絕點只驗了 `reason_code`，沒有任何前後狀態比對。
+
+這違反 `AGENTS.md > 實作守則 7`（「契約要求零副作用的拒絕操作，前後可序列化狀態必須逐字一致」），也沒做到第一輪交接檔 N4 明寫的「狀態逐字不變」。
+
+**要做的**：七個拒絕點（`choose_opening`、`_settle_effects`、`EffectApply.preflight`、`acknowledge_encounter_intro`、`respond_to_encounter`、`discard_in_encounter`、`resolve_unfinished_choice_groups`）**各自**在呼叫前後取 `JSON.stringify(gs.serialize())` 逐字比對。注意每個點之間測試自己會改狀態（設 `flow_mode`、發卡、塞 `active_encounter`），所以要每點各取一次 before，不能共用開頭那一份。
+
+**變異驗證**：讓其中一個拒絕點在回傳前先改一個欄位（例如 `run_number += 1`），本條必須轉紅。
+
+### R3（高，非阻擋）｜B2 的正向斷言是空的
+
+`play_beat()`（`scripts/autoload/game_state.gd:1697-1704`）只擋 unknown beat id 與非 run mode，**完全不檢查 `condition`**。所以第 4 組的「D31／D39 成功演出目標 proxy beat」不論凍結值是什麼都會過，證不到 proxy。
+
+契約目前是被那兩條「非目標 proxy beat 條件不成立」的否定斷言守住的（M3 已證），但有一個洞：若凍結值變成第四個 NPC，`d31_proxy_ajie`／`awei`／`acai` 三個 `festival_proxy_is` 全部 false，**正負斷言會一起假通過**。
+
+**要做的**：每條路徑補一句 `ConditionEval.eval(target_def.get("condition"), gs) == true`，把目標 beat 的條件也納入斷言。
+
+**變異驗證**：把凍結值改成一個不存在的 NPC id，本條必須轉紅。
+
+### 附帶兩條（不是缺陷，但要處理）
+
+1. **`CODEX_HANDOFF.md` 第一輪修完沒更新**。`36077fc` 動了程式、資料與測試，本檔卻停在第一輪的待修清單，與實際狀態不符。本次由 verifier 補上；之後每次交回複驗前 implementer 自己更新。
+2. **`test_p5f` 現在會吐 8 行 `ERROR: clone_for_preflight: deserialize 失敗 (invalid_save_shape)`**。這是 K-198 修法刻意的 `push_error`，屬預期輸出、不是回歸。P5-D 當初對 `test_p5d` 立的「stderr 全空」慣例對本檔不成立——修 R2 時順手在 `test_p5f.gd` 第 9 組的檔頭註解寫明，免得下一輪被當成新問題。
+
+---
+
+## P5-F 第一輪 review 待修清單（B1～N9，已全數處理於 `36077fc`）
+
+> 保留供對照。落地與否見上方「目前狀態」的變異表。修完全部後跑：全套 headless → UI sim → 逐條變異驗證（把修改整段拿掉，對應測試必須轉紅），再交回 verifier。
 
 ### B1（阻擋，規格已改，改為補守衛測試）
 
@@ -89,7 +140,10 @@ K-195 修法後 `d45_then` 的 `d45_coda` 整組沒有任何無條件槽（`comp
 
 ---
 
-## P5-F 實作與驗收完成項目
+## P5-F 第一輪實作項目（`2712849`，供對照）
+
+> ⚠️ 原標題為「實作與驗收完成項目」，但當時尚未經 verifier 複驗，兩輪 review 各開出 11 條與 3 條。標題已改為不宣稱驗收完成。
+
 
 1. **K-195 後半修復（`data/beats/ch3_d39_d45.json`）**
    - 在 `d45_then > empty_handed` slot 補上 `"condition": { "not": { "has_card": "info_registry" } }`，持名冊玩家不再看到「你手上什麼都沒有」。
