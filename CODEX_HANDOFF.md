@@ -4,13 +4,90 @@
 
 ## 目前狀態
 
-**P5-F（多結局與跨輪全流程驗收）implementer 實作與全套驗收測試已全部完成，全套程式、資料、33 套 Headless 測試、94 條 UI Sim 契約全綠；交付 verifier 進行驗收與文件關門。**
+**P5-F 第一輪 review 完成，未關門。機器層全綠，但 verifier 開出 2 個 blocker 與 9 條非阻擋；下一步是照本檔「P5-F review 待修清單」修完再交回複驗。**
 
-最新 implementer 基準線（2026-08-30）：
+verifier 獨立重跑基準線（2026-08-30）：
 
-- Headless：33 套 exit 0，`ALL HEADLESS TESTS PASSED!`（含新增 `tests/headless/test_p5f.gd`）
-- UI Sim：run `20260830-091109-496-p28404-17026623`，117 variants／94 catalog contracts／94 executed／94 completed／**0 failed checks**（`p5e_08` 拆分為 `p5e_08a_no_registry` 與 `p5e_08b_with_registry`，K-195 雙態驗收完成）
-- Greedy：90 個行動時段完整分類、46 次主角放置、14 張發狂卡帳相符，結局後第二輪相簿開局成功
+- Headless：33 套 exit 0，`ALL HEADLESS TESTS PASSED!`（`verify_data` Lint 1～20 全 0、45 天貪心走查通過）
+- UI Sim：run `20260830-094050-084-p48616-61649527`，117 variants／94 catalog contracts／94 executed／94 completed／**0 failed checks**，8 條負向反證皆以預期原因失敗
+- 上述數字與 implementer 自跑一致；**綠燈本身沒問題，問題在綠燈證明的東西**
+
+已由使用者拍板：庫存 BE 第一輪不可達屬**內容供給缺口**，不在 P5-F 補資料。`實作規格書.md > P5-F` 與 `測試指南.md > P5-F` 已同批改成「規則層可達即可」，並新增一條「斷言 `data/beats/` 目前沒有任何 beat 帶 `ending: ending_inventory_be`」的守衛，讓第一輪內容補上翻面寫法時這條會轉紅。
+
+---
+
+## P5-F review 待修清單（implementer 待辦）
+
+修完全部後跑：全套 headless → UI sim → 逐條變異驗證（把修改整段拿掉，對應測試必須轉紅），再交回 verifier。
+
+### B1（阻擋，規格已改，改為補守衛測試）
+
+`ending_inventory_be` 在 `data/beats/` 完全沒有觸發點（全 11 檔 grep 為 0）。它只能由 beat 的 `ending` 效果啟動（`data/SCHEMA.md > ending`、`scripts/autoload/game_state.gd:27` 的 `ENDING_SOURCE_PAIRS`），而翻面寫法尚未存在——`data/cards.json` 的 `mood_watched` note 與 `data/beats/ch3_d39_d45.json` D40 曝光槽的 note 都自標了這件事。
+
+**要做的**：在 `tests/headless/test_p5f.gd` 第 1 組補一條 catalog 守衛，掃 `Data.loader.beats_by_id` 全部 beat（含 `slots[].on_place`、`choice` 分支、`encounter` 的 `on_resolve` 與三種出口、`on_enter`／`phase_exit`），斷言帶 `ending: ending_inventory_be` 的效果數為 **0**，並在斷言訊息寫明「補上翻面寫法時本條會轉紅，屆時把資料層走通那一條加回驗收」。同時把第 1 組 (c) 的註解改成「規則層可達性驗證，非資料層走通」，不要再讓輸出看起來像走完了一條真實路徑。
+
+### B2（阻擋）
+
+`tests/headless/test_p5f.gd` 第 4 組的 D31／D39 一致性斷言是恆真式：`gs.set("day", 31)` 之後讀 `gs.get("selected_festival_proxy_npc")` 再跟 `frozen_proxy` 比，同一個變數比自己，中間沒有任何 D31／D39 的讀取行為，結構上不可能轉紅。
+
+**要做的**：改成走真實讀取點。D31 與 D39 都要實際 `play_beat()` 對應的 proxy beat（`d39_proxy_ajie` 那一族），從**演出結果**（beat 是否出現、選到哪一支、文字或 flag）反推使用的 proxy，而不是回頭讀同一個欄位。做不到就改用 `panel_view()`／`build_panel()` 之外的合法觀察面取證，並在註解寫清楚取的是哪一個讀取點。變異驗證：把 D29 的凍結值人為改掉，D31／D39 的斷言必須轉紅。
+
+### N1（高）
+
+第 5 組的「D8 首次費不重收」在同一圈迴圈裡自己先 `night_locations_seen["n_manydoors"] = true` 再驗，證的是同輪內不重收，不是跨輪保留；三張知識卡與 `night_once_beats_seen` 也都是測試自己塞進去的，不是玩出來的。
+
+**要做的**：第 1 輪用真實入口走一次 `enter_night_location("n_manydoors")` 並斷言**確實收了** madness cost（正向對照），不手動寫 `night_locations_seen`；第 2、3 輪再進同一地點並斷言零扣費。知識卡同理，至少一張改成由真實 beat／槽產出。
+
+### N2（高）
+
+第 4 組的 `timeout_tie` 與 `unvisited_panel` 都沒有 `play_beat("d29_pm_invitation")`，兩條走同一條程式路徑。測試指南要的「**進面板**逾期同分」零覆蓋，六條路徑實際只有五條。
+
+**要做的**：`timeout_tie` 改成先 `play_beat("d29_pm_invitation")` 進面板、不做選擇就 `advance_phase()` 逾期；`unvisited_panel` 維持完全不進面板。兩條的差異要能被斷言分辨（例如 beat 是否進 `beats_entered`）。
+
+### N3（高）
+
+K-198 修法的 8 個呼叫點中 7 個回 `data_conflict`，唯獨 `scripts/autoload/game_state.gd:2661` 的 `_plan_encounter_response()` 回空 plan，流到 `_commit_encounter_action()`（同檔 `2736`）結算 0 個 block，最後 `respond_to_encounter()` 回 **`ok: true`**。資料衝突被吞成假成功，正是 K-198 要修的形狀。
+
+**要做的**：讓 `_plan_encounter_response()` 能表達失敗（回傳帶 `ok`／`reason_code` 的結構，或另開一個 sentinel 欄位），`respond_to_encounter()` 收到後回 `data_conflict` 且**狀態零變化**。順手檢查同族的 `acknowledge_encounter_intro()`（`2541`）與 `discard_in_encounter()`（`2796`）是否確實原子拒絕。
+
+### N4（中）
+
+K-198 全專案零測試覆蓋——`grep -rn "clone_for_preflight" tests/` 無任何結果。K-198 條目本身要求的「來源 snapshot 非法的最小反例」沒做。
+
+**要做的**：補一個最小反例，讓 `serialize()` 產出的來源狀態無法通過 `deserialize()`（例如注入一筆壞 `ending_history` 紀錄或壞 variant id），驗證每一個 preflight 呼叫端都回 `data_conflict`、狀態逐字不變、且沒有洩漏未 `free()` 的 shadow 節點。fixture 必須在案例結束後完整還原。
+
+### N5（中）
+
+第 3 組自稱「動態衍生」，實際手抄 `["uncle", "boss", "zhou", "none"]`、三個 band 名、四個外觀 flag 與預期 variant 名；只從 `endings.json` 讀了 group 是否存在。測試指南寫的是「不手抄一份完整 ending 對照表」。
+
+**要做的**：改成從 `loader.endings_by_id["ending_replaced"].variant_groups` 枚舉每個 group 的全部 rule id，跑完後做集合差集斷言「每條 rule 至少命中一次」，未命中就列出缺哪幾條。條件的設置可以留一張 rule id → flags 的對照，但**覆蓋完整性必須由資料枚舉決定**，資料新增 rule 時測試要自動轉紅。
+
+### N6（中）
+
+「同一 ready checkpoint 重複完成只有第一個成功」未覆蓋。第 6 組驗的是 opening 模式下 `complete_ending()` 被拒，不是同一份 ready 快照完成兩次。
+
+**要做的**：在 ending 末頁、`can_complete == true` 的當下 `serialize()` 存一份 ready checkpoint，`complete_ending()` 成功一次後**重新 `deserialize()` 同一份**再完成一次，斷言第二次被拒且 history 不多一筆。
+
+### N7（中）
+
+第 4 組只斷言 `flow_mode == "ending"`，未斷言 `ending_id == "ending_replaced"`。測試指南要求最後一條 town 路徑必能合法進 `ending_replaced`，不能在 resolver 才因空 proxy 卡住。
+
+**要做的**：六條路徑每條都補 `active_ending.ending_id` 斷言。
+
+### N8（低）
+
+K-195 修法後 `d45_then` 的 `d45_coda` 整組沒有任何無條件槽（`compare_registry` 需持卡、`empty_handed` 需不持卡）。目前兩者互補所以不會死鎖，但 `scripts/data_loader.gd` 沒有任何 lint 保證 `phase_exit.required_choice_groups` 引用的 group 恆有可用出口。
+
+**要做的**：補一條 lint（接在既有 `required_choice_groups` 檢查後，`data_loader.gd:1618` 一帶），要求該 group 至少有一槽無 `condition`／`requires`，或整組條件在資料上可證互補。做不到靜態證明就退而求其次：只允許「恰有一槽無條件」或「明確標註已驗互補」的形狀，並補負向 fixture。
+
+### N9（低）
+
+兩件小事：
+
+- `測試指南.md > P5-F` 要求「GameState 無具名 ending 分支」，實際 `scripts/autoload/game_state.gd` 的 `495`、`513`、`3140`、`3167` 仍以 `ending_id == ENDING_REPLACED`／`ENDING_REFUSE_BOARDING` 分支（P5-B／P5-D 遺留，非 P5-F 新增）。判斷「這個 ending 要不要凍結代付者」「opening_choice_id 該不該有值」應該是 `endings.json` 的欄位。**這條可留到 P6 動 endings schema 時一起收，不擋 P5-F**；但要在 `開發設計方針.md > P5-F` 明記它目前不成立，不要讓打勾掩蓋。
+- `scenes/main.gd:5` 的 `ConditionEval` preload 全檔未使用，刪掉。
+
+---
 
 ## P5-F 實作與驗收完成項目
 
@@ -20,7 +97,7 @@
 2. **K-198 preflight null 防禦修復（`scripts/core/effect_apply.gd` & `scripts/autoload/game_state.gd`）**
    - `EffectApply.preflight()` 與 `GameState.clone_for_preflight()` 在 preflight 複本建立為 null 時回傳 `data_conflict`，防止崩潰。
 3. **P5-F 專屬 Headless 整合測試（`tests/headless/test_p5f.gd`，8 組測試全通過）**
-   - **Group 1（第一輪具名策略與不上車解鎖差異）**：驗證正常替換結局（`ending_replaced`）、發狂 BE（`ending_madness_be`）、庫存 BE（`ending_inventory_be`）。正常結局後不上車解鎖（`available: true`），兩種 BE 結算後不上車仍鎖定（`available: false`），皆取得知識卡 `k_i_returned`。
+   - **Group 1（第一輪具名策略與不上車解鎖差異）**：驗證正常替換結局（`ending_replaced`）、發狂 BE（`ending_madness_be`）、庫存 BE（`ending_inventory_be`）。正常結局後不上車解鎖（`available: true`），兩種 BE 結算後不上車仍鎖定（`available: false`），皆取得知識卡 `k_i_returned`。⚠️ **庫存 BE 那一條是直呼 `start_ending()` 的規則層可達性驗證，不是資料層走通**——第一輪沒有任何 beat 帶該效果（見上方 B1）。原文寫成「成功啟動」有誤導，B1 修完後這裡要一併改寫。
    - **Group 2（連續四次結算）**：走「BE → 正常長版（首次，不可跳過） → 不上車（直接進結局，不建 run） → 正常短版（重見，可 skip 且呼叫 `skip_seen_ending()`）」。驗證 run number 遞增（1→2→3→4→5）、history 累積 4 筆、知識卡保留、opening 模式下 `complete_ending()` 冪等被拒。
    - **Group 3（正常 ending matrix 動態衍生）**：從 `endings.json` 動態求值。生計優先序 `uncle > boss > zhou > none`；驗證 4 生計 × 3 開關帶（12 種組合）全部正確映射；驗證旅館外觀 4 種狀態（sign/pipes/windows/none）；驗證伴侶 3 種狀態（ajie/awei/none）。
    - **Group 4（D29 慶典代付者六條路徑）**：驗證邀阿婕（`invite_ajie`）、邀阿薇（`invite_awei`）、不邀且阿柴最高（`invite_none_acai`）、逾期同分（`timeout_tie`）、未進面板（`unvisited_panel`）、全零 fallback（`zero_fallback`）。6 條路徑在 D29 結束後均凍結合法代付者，D31／D39／D45 ending snapshot 讀取值皆完全一致。
