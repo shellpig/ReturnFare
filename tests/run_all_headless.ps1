@@ -1,3 +1,7 @@
+param(
+    [switch]$FailFast = $false
+)
+
 $tests = @(
     "scripts/verify_data.gd",
     "tests/headless/test_boot.gd",
@@ -37,6 +41,9 @@ $tests = @(
 $godot = "C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe"
 $project = Split-Path -Parent $PSScriptRoot
 
+$failedTests = @()
+$passCount = 0
+
 foreach ($t in $tests) {
     Write-Host "=== Running $t ===" -ForegroundColor Cyan
     $outFile = [System.IO.Path]::GetTempFileName()
@@ -55,22 +62,47 @@ foreach ($t in $tests) {
     if ($outText) { Write-Host $outText -NoNewline }
     if ($errText) { Write-Host $errText -NoNewline }
 
+    $isFailed = $false
+    $failReason = ""
+
     if ($exitCode -ne 0) {
-        Write-Host "`nFAILED: $t (ExitCode: $exitCode)" -ForegroundColor Red
-        exit 1
+        $isFailed = $true
+        $failReason = "ExitCode: $exitCode"
+    } else {
+        # K-144 Step 4 / K-149 / K-152: Gatekeep engine-level errors and test-level failures in stderr
+        $hasEngineErr = ($errText.IndexOf("SCRIPT ERROR: Assertion failed") -ge 0) -or `
+                        ($errText.IndexOf("Invalid access") -ge 0) -or `
+                        ($errText.IndexOf("Invalid index") -ge 0) -or `
+                        ($errText.IndexOf("Invalid call") -ge 0) -or `
+                        ($errText -match "ERROR:\s+FAIL")
+
+        if ($hasEngineErr) {
+            $isFailed = $true
+            $failReason = "detected engine or test failure in stderr despite exit 0"
+        }
     }
 
-    # K-144 Step 4 / K-149 / K-152: Gatekeep engine-level errors and test-level failures in stderr
-    $hasEngineErr = ($errText.IndexOf("SCRIPT ERROR: Assertion failed") -ge 0) -or `
-                    ($errText.IndexOf("Invalid access") -ge 0) -or `
-                    ($errText.IndexOf("Invalid index") -ge 0) -or `
-                    ($errText.IndexOf("Invalid call") -ge 0) -or `
-                    ($errText -match "ERROR:\s+FAIL")
-
-    if ($hasEngineErr) {
-        Write-Host "`nFAILED: $t detected engine or test failure in stderr despite exit 0" -ForegroundColor Red
-        exit 1
+    if ($isFailed) {
+        Write-Host "`nFAILED: $t ($failReason)" -ForegroundColor Red
+        $failedTests += "$t ($failReason)"
+        if ($FailFast) {
+            Write-Host "`n-FailFast specified, terminating early." -ForegroundColor Red
+            exit 1
+        }
+    } else {
+        $passCount++
     }
+}
+
+Write-Host "`n=== HEADLESS SUMMARY ===" -ForegroundColor Cyan
+Write-Host "Total: $($tests.Count), Passed: $passCount, Failed: $($failedTests.Count)"
+
+if ($failedTests.Count -gt 0) {
+    Write-Host "`nFailed tests:" -ForegroundColor Red
+    foreach ($f in $failedTests) {
+        Write-Host " - $f" -ForegroundColor Red
+    }
+    exit 1
 }
 
 Write-Host "`nALL HEADLESS TESTS PASSED!" -ForegroundColor Green

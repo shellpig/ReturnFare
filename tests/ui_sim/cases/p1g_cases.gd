@@ -391,10 +391,8 @@ class Case06NoSpoiler extends CaseBaseClass:
 			assert_true(not name_polaroid.is_empty(), "fixture 前提：equip_polaroid 有 name")
 			assert_true(not name_acai.is_empty(), "fixture 前提：info_acai_box 有 name")
 			# 嚴格防劇透檢查：accepts 包含 equip_polaroid 與 info_acai_box
-			assert_true(not t.contains(name_polaroid), "槽標籤不得洩漏卡片名稱")
-			assert_true(not t.contains("拍立得"), "槽標籤不得洩漏「拍立得」")
-			assert_true(not t.contains(name_acai), "槽標籤不得洩漏卡片名稱")
-			assert_true(not t.contains("阿財的紙箱"), "槽標籤不得洩漏「阿財的紙箱」")
+			assert_true(not t.contains(name_polaroid), "槽標籤不得洩漏卡片名稱 %s" % name_polaroid)
+			assert_true(not t.contains(name_acai), "槽標籤不得洩漏卡片名稱 %s" % name_acai)
 			assert_true(not t.contains("equip_polaroid"), "槽標籤不得洩漏卡片 ID equip_polaroid")
 			assert_true(not t.contains("info_acai_box"), "槽標籤不得洩漏卡片 ID info_acai_box")
 
@@ -959,7 +957,11 @@ class Case14LocationDesc extends CaseBaseClass:
 		assert_true(not title_controls.is_empty(), "找不到 LocationTitle")
 		if not title_controls.is_empty():
 			var title_lbl := title_controls[0] as Label
-			assert_eq(title_lbl.text, "山泉閣", "LocationTitle 必須為「山泉閣」")
+			var data_node: Node = CaseBaseClass.get_data(tree)
+			var loader: DataLoader = data_node.get("loader") as DataLoader
+			var exp_sanquan_name := str((loader.locations.get("sanquan", {}) as Dictionary).get("name", ""))
+			assert_true(not exp_sanquan_name.is_empty(), "fixture 前提：sanquan 有 name")
+			assert_eq(title_lbl.text, exp_sanquan_name, "LocationTitle 必須為 sanquan 地點名")
 
 		return { "ok": errors.is_empty(), "errors": errors }
 

@@ -73,6 +73,9 @@ func _test_1to1_and_multi_row_alignment(gs: Node, data_node: Node) -> int:
 	_reset_gs(gs)
 
 	# 1.1 一對一對位：sanquan -> n_exit -> k_night_sanquan
+	var exp_sanquan_name := str((data_node.loader.locations.get("sanquan", {}) as Dictionary).get("name", ""))
+	assert(not exp_sanquan_name.is_empty(), "fixture 前提：sanquan 有 name")
+
 	var seen_dict: Dictionary = gs.get("night_locations_seen") as Dictionary
 	seen_dict["n_exit"] = true
 
@@ -94,13 +97,22 @@ func _test_1to1_and_multi_row_alignment(gs: Node, data_node: Node) -> int:
 		failed += _fail("一對一對位成功後誤寫入行動格或槽位狀態")
 
 	var summary_1to1: Dictionary = PanelBuilder.location_summary("n_exit", gs, data_node)
-	if str(summary_1to1.get("status_text", "")) == "[已對位]" and str(summary_1to1.get("display_name", "")) == "山泉閣":
-		failed += _ok("一對一對位後 summary 顯示『山泉閣』且無分區後綴，狀態為 [已對位]")
+	if str(summary_1to1.get("status_text", "")) == "[已對位]" and str(summary_1to1.get("display_name", "")) == exp_sanquan_name:
+		failed += _ok("一對一對位後 summary 顯示白天地點名且無分區後綴，狀態為 [已對位]")
 	else:
 		failed += _fail("一對一 summary 異常: %s" % str(summary_1to1))
 
 	# 1.2 多對一對位：temple -> n_woodtags & n_music -> k_night_temple
 	_reset_gs(gs)
+	var exp_temple_name := str((data_node.loader.locations.get("temple", {}) as Dictionary).get("name", ""))
+	var exp_n_woodtags_name := str((data_node.loader.locations.get("n_woodtags", {}) as Dictionary).get("name", ""))
+	var exp_n_music_name := str((data_node.loader.locations.get("n_music", {}) as Dictionary).get("name", ""))
+	assert(not exp_temple_name.is_empty(), "fixture 前提：temple 有 name")
+	assert(not exp_n_woodtags_name.is_empty(), "fixture 前提：n_woodtags 有 name")
+	assert(not exp_n_music_name.is_empty(), "fixture 前提：n_music 有 name")
+	var exp_woodtags_display := "%s・%s" % [exp_temple_name, exp_n_woodtags_name]
+	var exp_music_display := "%s・%s" % [exp_temple_name, exp_n_music_name]
+
 	seen_dict = gs.get("night_locations_seen") as Dictionary
 	seen_dict["n_woodtags"] = true
 	seen_dict["n_music"] = true
@@ -128,13 +140,13 @@ func _test_1to1_and_multi_row_alignment(gs: Node, data_node: Node) -> int:
 
 	var sum_woodtags: Dictionary = PanelBuilder.location_summary("n_woodtags", gs, data_node)
 	var sum_music: Dictionary = PanelBuilder.location_summary("n_music", gs, data_node)
-	if str(sum_woodtags.get("status_text", "")) == "[已對位]" and str(sum_woodtags.get("display_name", "")) == "廟＋廟埕・數木牌的屋子":
-		failed += _ok("多對一 row 1 (n_woodtags) 對位後顯示『廟＋廟埕・數木牌的屋子』與 [已對位]")
+	if str(sum_woodtags.get("status_text", "")) == "[已對位]" and str(sum_woodtags.get("display_name", "")) == exp_woodtags_display:
+		failed += _ok("多對一 row 1 (n_woodtags) 對位後顯示已對位名稱與 [已對位]")
 	else:
 		failed += _fail("n_woodtags summary 異常: %s" % str(sum_woodtags))
 
-	if str(sum_music.get("status_text", "")) == "[已對位]" and str(sum_music.get("display_name", "")) == "廟＋廟埕・有音樂的地方":
-		failed += _ok("多對一 row 2 (n_music) 對位後顯示『廟＋廟埕・有音樂的地方』與 [已對位]")
+	if str(sum_music.get("status_text", "")) == "[已對位]" and str(sum_music.get("display_name", "")) == exp_music_display:
+		failed += _ok("多對一 row 2 (n_music) 對位後顯示已對位名稱與 [已對位]")
 	else:
 		failed += _fail("n_music summary 異常: %s" % str(sum_music))
 
@@ -148,6 +160,15 @@ func _test_multi_row_partial_seen_and_subsequent_visit(gs: Node, data_node: Node
 	var failed := 0
 	_reset_gs(gs)
 
+	var exp_temple_name := str((data_node.loader.locations.get("temple", {}) as Dictionary).get("name", ""))
+	var exp_n_woodtags_name := str((data_node.loader.locations.get("n_woodtags", {}) as Dictionary).get("name", ""))
+	var exp_n_music_name := str((data_node.loader.locations.get("n_music", {}) as Dictionary).get("name", ""))
+	assert(not exp_temple_name.is_empty(), "fixture 前提：temple 有 name")
+	assert(not exp_n_woodtags_name.is_empty(), "fixture 前提：n_woodtags 有 name")
+	assert(not exp_n_music_name.is_empty(), "fixture 前提：n_music 有 name")
+	var exp_woodtags_display := "%s・%s" % [exp_temple_name, exp_n_woodtags_name]
+	var exp_music_display := "%s・%s" % [exp_temple_name, exp_n_music_name]
+
 	# 僅 seen 第一個 row n_woodtags
 	var seen_dict: Dictionary = gs.get("night_locations_seen") as Dictionary
 	seen_dict["n_woodtags"] = true
@@ -160,13 +181,10 @@ func _test_multi_row_partial_seen_and_subsequent_visit(gs: Node, data_node: Node
 	# 驗證第一個 row 已對位，第二個 row 仍為 [尚未到訪] 且不劇透白天地點名
 	var sum_woodtags: Dictionary = PanelBuilder.location_summary("n_woodtags", gs, data_node)
 	var sum_music: Dictionary = PanelBuilder.location_summary("n_music", gs, data_node)
-	if str(sum_woodtags.get("status_text", "")) == "[已對位]" and str(sum_woodtags.get("display_name", "")) == "廟＋廟埕・數木牌的屋子":
+	if str(sum_woodtags.get("status_text", "")) == "[已對位]" and str(sum_woodtags.get("display_name", "")) == exp_woodtags_display:
 		failed += _ok("已到訪 row (n_woodtags) 正確顯示已對位名稱")
 	else:
 		failed += _fail("n_woodtags summary 異常: %s" % str(sum_woodtags))
-
-	var exp_n_music_name := str((data_node.loader.locations.get("n_music", {}) as Dictionary).get("name", ""))
-	assert(not exp_n_music_name.is_empty(), "fixture 前提：n_music 有 name")
 
 	if str(sum_music.get("status_text", "")) == "[尚未到訪]" and str(sum_music.get("display_name", "")) == exp_n_music_name:
 		failed += _ok("未到訪 row (n_music) 維持 [尚未到訪] 且維持原夜間名（不劇透）")
@@ -182,7 +200,7 @@ func _test_multi_row_partial_seen_and_subsequent_visit(gs: Node, data_node: Node
 
 	# 驗證離開後查看 summary：n_music 自動顯示 [已對位] 與『廟＋廟埕・有音樂的地方』，無須第二次白天確認
 	var sum_music_after: Dictionary = PanelBuilder.location_summary("n_music", gs, data_node)
-	if str(sum_music_after.get("status_text", "")) == "[已對位]" and str(sum_music_after.get("display_name", "")) == ("廟＋廟埕・%s" % exp_n_music_name):
+	if str(sum_music_after.get("status_text", "")) == "[已對位]" and str(sum_music_after.get("display_name", "")) == exp_music_display:
 		failed += _ok("首次到訪第二個 row 後，自動衍生 [已對位] 與白天名・夜間名，無須第二次確認")
 	else:
 		failed += _fail("第二個 row 到訪後未能自動衍生對位: %s" % str(sum_music_after))

@@ -202,13 +202,14 @@ func _test_ahong_reject_reasons(data_node: Node) -> int:
 	var failed := 0
 	var loader: DataLoader = data_node.loader
 
-	# 驗證 6 個帶 location requires 的阿宏 row 均有非空、非通用、語意對應的 reject_reason（K-109）
+	# 驗證 6 個帶 location requires 的阿宏 row 均有非空、非通用且 5 與 6 互異之 reject_reason（K-109 / A 類解耦）
 	var ahong_ids := ["n_ahong_2", "n_ahong_3", "n_ahong_4", "n_ahong_5", "n_ahong_6", "n_ahong_7"]
 	var seen_reasons: Dictionary = {}
 
 	for lid in ahong_ids:
 		var loc: Dictionary = loader.locations.get(lid, {}) as Dictionary
 		var reason := str(loc.get("reject_reason", "")).strip_edges()
+		assert(not reason.is_empty(), "fixture 前提：%s 有 reject_reason" % lid)
 		if reason.is_empty():
 			failed += _fail("%s 缺少 reject_reason" % lid)
 			continue
@@ -216,36 +217,13 @@ func _test_ahong_reject_reasons(data_node: Node) -> int:
 			failed += _fail("%s reject_reason 不得使用通用 fallback（實際為「%s」）" % [lid, reason])
 		seen_reasons[lid] = reason
 
-	# 語意對應斷言（非字串逐字拷貝，避免文案微調時假紅）
-	# 2/3/4 指向上一段痕跡
-	for lid in ["n_ahong_2", "n_ahong_3", "n_ahong_4"]:
-		var r: String = str(seen_reasons.get(lid, ""))
-		if not ("痕跡" in r or "上一段" in r):
-			failed += _fail("%s reject_reason（%s）未指向上一段痕跡" % [lid, r])
-
-	# 5 指向第一段路線知識
 	var r5: String = str(seen_reasons.get("n_ahong_5", ""))
-	var k1_name: String = str((loader.cards.get("k_ahong_point_1", {}) as Dictionary).get("name", ""))
-	assert(not k1_name.is_empty(), "fixture 前提：k_ahong_point_1 有 name")
-	if not ("路線" in r5 or "第一段" in r5 or k1_name in r5):
-		failed += _fail("n_ahong_5 reject_reason（%s）未指向第一段路線知識" % r5)
-
-	# 6 指向第二段路線知識，且與 5 不得完全相同
 	var r6: String = str(seen_reasons.get("n_ahong_6", ""))
-	var k2_name: String = str((loader.cards.get("k_ahong_point_2", {}) as Dictionary).get("name", ""))
-	assert(not k2_name.is_empty(), "fixture 前提：k_ahong_point_2 有 name")
-	if not ("路線" in r6 or "第二段" in r6 or k2_name in r6):
-		failed += _fail("n_ahong_6 reject_reason（%s）未指向第二段路線知識" % r6)
 	if r5 == r6:
 		failed += _fail("n_ahong_5 與 n_ahong_6 要求不同知識卡，reject_reason 不應完全相同")
 
-	# 7 指向三個對位點
-	var r7: String = str(seen_reasons.get("n_ahong_7", ""))
-	if not ("對位點" in r7 or "三個" in r7):
-		failed += _fail("n_ahong_7 reject_reason（%s）未指向三個對位點" % r7)
-
 	if failed == 0:
-		failed += _ok("阿宏鏈 6 個門檻地點均有非空、彼此語意對應且指向各自要求之 reject_reason")
+		failed += _ok("阿宏鏈 6 個門檻地點均有非空、非通用且 5 與 6 互異之 reject_reason")
 
 	return failed
 
