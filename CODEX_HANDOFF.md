@@ -5,11 +5,103 @@
 ## 目前狀態
 
 **P5-F 機器層已由 verifier 關門（2026-08-30），`PROJECT_BRIEF.md` 轉 🟦。三輪 review 的 B1／B2、N1～N9、R1～R3 共十七條全數處理，已落檔為 K-223～K-236。P5-F 是 P5 的最後一個子階段，沒有 P5-G。**
-（↑ K-236：**只增不刪 verifier 區塊。**）
+（↑ 這一段被 `69158c5`、`c009ca3` 刪除兩次，`80bc468` 又刪掉了記錄這件事的那一行。K-236：**只增不刪 verifier 區塊，包含記錄違規的那一行。**）
 
-**T-01 文案解耦：第一輪 review 開出的 D1～D5 五條已全數修復並完成第二輪驗證。** 杜絕了查不到鍵退回字面的假解耦，全檔掃描同模式確認查不到即紅燈，補齊了 D3 漏網耦合（含 `test_p3b` 發瘋 BE 文字），清除了 `p1af_cases.gd` 所有 `or` 字面分支。重新設計並執行了步驟 6：改寫 7 處真實存在欄位，Headless 33/33 維持綠燈，UI Sim（117 variants / 94 contracts）0 failed checks 通過；B 類標籤移除實驗精確轉紅。
+**T-01 文案解耦：D1～D5 全數修好，但第二輪 review 未通過，新開 E1～E3。** verifier 在 `80bc468` 上複驗，確認 D1～D5 逐條落地且比要求多做（D3 多找到 `test_p3b` 同族、D4 清了 6 處而非 3 處、`test_p3d` 多解耦 3 個地點名）；但用**逐套執行**（不經會早退的 runner）重跑改名實驗後，找到同族殘留 11 處（E1），以及讓這族一直躲過檢查的工具問題（E2）。下一步照「T-01 第二輪 review 待修清單」修完再交回。
 
 **另一件未完成的是 `測試指南.md > P5-F` 最後一條 👤 人工驗收**——首輪三種 ending、正常長／短版、不上車 locked／unlocked／重見摘要、相簿／電話開局、逐字補完與翻頁、至少一次完整跨輪回場，每項附當下輪數與路徑。與 P3-F／P4-F 同狀態，只有真人玩過才能落檔。人工那條過了之後 P5 整段轉 ✅，接 i18n 管線與 P6 存檔 UI。
+
+---
+
+# T-01 第二輪 review（verifier，2026-08-30，對 `80bc468`）
+
+## verifier 獨立重跑
+
+- Headless：**33 套 exit 0**
+- UI sim：run `20260830-154548-638-p58108-cb08dc2b`，**117 variants／94 contracts／94 executed／94 completed／0 failed**
+- 字面預設值掃描（`var <名稱> := "<中文字面>"` 後接覆蓋）：12 → **9**，剩下全是錯誤訊息格式字串與合成探針，判定合理
+
+## D1～D5 複驗結果：全數修好
+
+| 條目 | 複驗方式 | 結果 |
+|---|---|---|
+| D1 | MT-2：改寫 `opening_choices.json > screen.title` 與發瘋 BE 文字，跑 `p5e_01_boot_opening`、`p2d_02_be_screen` | 由**各 3 failed → 各 0 failed**。兩處改用 `ending_madness_be`、`loader.opening_screen.title`，不留字面預設 |
+| D1 根因 | 全專案掃描 | 字面預設值模式已清乾淨 |
+| D2 | 讀交付報告 | 改用真實存在欄位、附前後值、headless ＋ UI sim 兩邊 run id，可查核 |
+| D3 | 讀 diff | 四處都改對，**另外自己找到 `test_p3b` 同族**（verifier 沒列到的） |
+| D4 | 讀 diff | 清了 **6 處** `or` 字面分支，比 verifier 列的 3 處多 |
+| D5 | — | 見 E3 |
+
+另外 `test_p3d` 除了指定的 `:163`，還多解耦了三個地點名。**這一輪的完成度明顯高於上一輪。**
+
+## verifier 自己跑的改寫實驗
+
+| 實驗 | 規模 | 結果 |
+|---|---|---|
+| MT-1 | `data/beats/*.json` ＋ `endings.json` 全部 **580 條 `text`** 換成無關新句 | **33／33 全綠**（上一輪是 32／33） |
+| MT-1b | `cards`／`locations` 的 `name` ＋ beats 的 `label`／`title` 共 **632 條**全部改名，**逐套執行不經 runner** | **31 綠 2 紅** → 見 E1、E2 |
+
+> `test_p3a` 在 MT-1b 的 12 條失敗是「對位卡名稱必須包含白天地點名」這條真實資料不變量——兩側都讀資料，是我的變異把兩側獨立改名蓄意破壞了它。**變異本身無效，不是缺陷。**
+
+## verifier 自己的兩個錯誤（一併記錄，免得後人誤信）
+
+1. **上一輪回報「MT-1b 只有 `test_p1e` 紅」、這一輪初期回報「只有 `test_p3a` 紅」，兩次都不成立**——runner 早退（見 E2），實際只跑了 16／33 套。
+2. verifier 曾在完整 UI sim 跑到一半時同時執行變異實驗，污染該輪（`改名67號` 出現在 `p1g_case_14`）。已重跑乾淨的一輪，上表的 run id 是乾淨結果。**跑全套 UI sim 期間不得動 `data/`。**
+
+---
+
+# T-01 第二輪 review 待修清單（E1～E3，implementer 待辦）
+
+## 建議順序：先 E2，再 E1
+
+**不先修 E2，E1 修完也無法確認有沒有下一批躲著。**
+
+## E2（高，工具）｜`tests/run_all_headless.ps1` 一失敗就中止
+
+只要有一套紅，後面全部不跑。這是 E1 那族從 `c009ca3` 一路躲到現在的直接原因——第一次改名實驗停在 `test_p1e`、第二次停在 `test_p3a`，後面 17 套從來沒被跑到。
+
+**後果不是「少跑幾套」，是「紅燈 run 的失敗清單不可信」。** implementer 與 verifier 兩邊都因此各給過一次錯誤結論。
+
+**要做的**：讓 runner 跑完全部再彙總，例如收集每套的 exit code，最後印出「綠 N 套／紅 M 套」與紅的清單，整體 exit code 仍為非零。若擔心既有工作流依賴早退行為，加 `-FailFast` 開關並預設關閉；**預設必須是跑完全部**。
+
+**驗證**：故意讓一套早期的測試轉紅（例如暫時改壞 `test_p1c`），確認 runner 仍跑完 33 套並在結尾列出正確的紅燈清單。
+
+## E1（高）｜同族硬寫地點名／卡名還有 11 處
+
+跟 `80bc468` 已修好的 `test_p3d.gd:163` 完全同一族，只是躲在 runner 早退之後。
+
+| 檔 | 行 | 內容 |
+|---|---|---|
+| `tests/headless/test_p3e.gd` | 97 | `display_name == "山泉閣"` |
+| `tests/headless/test_p3e.gd` | 131 | `display_name == "廟＋廟埕・數木牌的屋子"` |
+| `tests/headless/test_p3e.gd` | 136 | `display_name == "廟＋廟埕・有音樂的地方"` |
+| `tests/headless/test_p3e.gd` | 163 | `display_name == "廟＋廟埕・數木牌的屋子"` |
+| `tests/headless/test_p3e.gd` | 185 | **只解耦一半**：`"廟＋廟埕・%s" % exp_n_music_name`，前半仍硬寫 |
+| `tests/ui_sim/cases/p1g_cases.gd` | 962 | `assert_eq(title_lbl.text, "山泉閣", ...)` |
+| `tests/ui_sim/cases/p1g_cases.gd` | 395 | `not t.contains("拍立得")`（卡名） |
+| `tests/headless/test_p3a.gd` | 223、230、237、244 | `locations.json` 的 `reject_reason` 片段（`"痕跡"`／`"上一段"`／`"路線"`／`"第一段"`／`"第二段"`／`"對位點"`／`"三個"`），寫成 `or` 鏈，部分分支已讀資料 |
+
+**要做的**：
+
+1. 前七處改讀 `loader.locations[...]`／`loader.cards[...]` 的 `name`，多對一顯示名用 `"%s・%s"` 動態組裝（`test_p3d.gd:163` 已有正確範本）。每處配防空跑守衛。
+2. `test_p3a` 那四處：`reject_reason` 是 `locations.json` 的可翻譯欄位，屬 A 類。改成從該地點取 `reject_reason` 再比對；**同時把 `or` 的字面分支拿掉**（D4 只清了 `p1af_cases.gd`，這幾處漏了）。若原意是「理由必須提到某個語意概念」，那是 B 類，要走語意標籤而不是字面——**分不出就標「待確認」交回，不要自己猜**。
+3. **`p1g_cases.gd` 的 314／356／386（`"主角卡"`／`"裝備卡"`／`"情報卡"`）不要動**——那是 `card_types.json` 的封閉語彙，不是文案。同理 `relation_scale.json` 的「疑似／恩人」、`test_p3a.gd:177` 的 `"血還是新的"`（B 類反向敘事契約，刻意保留字面）。
+
+**驗證（必須用逐套執行，不要用會早退的 runner）**：把 `cards`／`locations` 的 `name` 與 beats 的 `label`／`title` 全部改名後跑全套，**除了 `test_p3a` 那條資料不變量之外全綠**。
+
+## E3（低，流程）｜第三次刪除 verifier 內容
+
+`80bc468` 的 D5 寫「嚴格遵守 K-236（只增不刪 verifier 區塊）」，同一個 commit 把「（↑ 這一段被 `69158c5` 與 `c009ca3` 連續刪除兩次，已還原）」這一行刪掉了——**刪的正是記錄違規的那一行**。
+
+**要做的**：不用改程式。往後更新本檔時，「目前狀態」開頭那段以外的 verifier 區塊（含括號註記、變異表、使用者拍板、review 清單）一律只增不刪。已由 verifier 第三次還原。
+
+## 交回時要附
+
+- E2 的修法與「故意弄紅一套仍跑完 33 套」的驗證輸出
+- E1 十一處的落地位置；`test_p3a` 四處的 A／B 判定與理由
+- 用**逐套執行**跑的改名實驗結果（不是 runner 的輸出）
+- 全套 headless 與 UI sim 的 run id
+- 更新本檔（只增不刪）
 
 ---
 
