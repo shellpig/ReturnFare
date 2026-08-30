@@ -2,7 +2,6 @@ extends Control
 
 ## 主場景。P1-F：白天/夜間地圖、晚間演出、夜間解析、P5-E 開局與結局 UI、遭遇與委託。
 
-const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 const QAValidationClass := preload("res://tests/ui_sim/qa_validation.gd")
 
 const _MSG_DATA_ERROR := "資料載入失敗，詳情見 Output。"

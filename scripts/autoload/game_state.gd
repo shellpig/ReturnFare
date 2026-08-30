@@ -2650,16 +2650,18 @@ func respond_to_encounter(card_id: String) -> Dictionary:
 
 	# 通過所有檢查 → 先在複本上把整回合推演到出口，回應與出口效果合併成同一個動作。
 	var plan := _plan_encounter_response(card_id, base_id, enc, round_data, is_discardable)
+	if plan.has("ok") and not bool(plan.get("ok", false)):
+		return plan
 	return _commit_encounter_action(plan)
 
 
 ## 在複本上推演一次回應：扣卡、佔格、換回合、容量與死局判定全部先在複本跑完，
 ## 回傳單一 action plan。真狀態在這裡完全不動。
-## 回傳：{ blocks, pre, advance_after }
+## 回傳：{ blocks, pre, advance_after } 或失敗 { ok: false, reason_code: "data_conflict", ... }
 func _plan_encounter_response(card_id: String, base_id: String, enc: Dictionary, round_data: Dictionary, is_discardable: bool) -> Dictionary:
 	var sh: Node = clone_for_preflight()
 	if sh == null:
-		return { "blocks": [], "pre": {}, "advance_after": false }
+		return { "ok": false, "reason_code": "data_conflict", "reason_text": "preflight 複本建立失敗", "lines": PackedStringArray() }
 	var sh_enc: Dictionary = sh.get("active_encounter") as Dictionary
 	var lose_cards: Array[String] = []
 	var blocks: Array = []

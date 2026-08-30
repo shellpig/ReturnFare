@@ -15,6 +15,8 @@ extends SceneTree
 const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 const DataLoader := preload("res://scripts/data_loader.gd")
 const EndingResolver := preload("res://scripts/core/ending_resolver.gd")
+const EffectApply := preload("res://scripts/core/effect_apply.gd")
+const ConditionEval := preload("res://scripts/core/condition_eval.gd")
 
 var _failed := 0
 
@@ -38,6 +40,7 @@ func _initialize() -> void:
 	_test_6_checkpoint_reload_skip_vs_reveal_and_idempotency(gs, data_node)
 	_test_7_loop_persistent_fixture_lifecycle_and_formal_catalog(gs, data_node)
 	_test_8_greedy_and_no_legacy_end_run(gs, data_node)
+	_test_9_preflight_null_counterexample(gs, data_node)
 
 	if _failed > 0:
 		push_error("test_p5f: %d 個斷言失敗" % _failed)
@@ -97,6 +100,49 @@ func _complete_all_pages(gs: Node) -> void:
 			gs.call("reveal_ending_page")
 		else:
 			gs.call("advance_ending_page")
+
+
+func _count_inventory_be_effects_in_beats(loader: Object) -> int:
+	var count := 0
+	var beats: Dictionary = loader.beats_by_id
+	for bid: String in beats:
+		var b: Dictionary = beats[bid] as Dictionary
+		if b.has("on_enter"):
+			if str((b["on_enter"] as Dictionary).get("ending", "")) == "ending_inventory_be":
+				count += 1
+		if b.has("phase_exit"):
+			if str((b["phase_exit"] as Dictionary).get("ending", "")) == "ending_inventory_be":
+				count += 1
+		for s in b.get("slots", []):
+			if s is Dictionary:
+				var on_p: Variant = s.get("on_place")
+				if on_p is Dictionary and str((on_p as Dictionary).get("ending", "")) == "ending_inventory_be":
+					count += 1
+		if b.has("choices"):
+			for ch in b.get("choices", []):
+				if ch is Dictionary:
+					var on_c: Variant = ch.get("on_choose")
+					if on_c is Dictionary and str((on_c as Dictionary).get("ending", "")) == "ending_inventory_be":
+						count += 1
+		if b.has("encounter"):
+			var enc: Dictionary = b.get("encounter", {}) as Dictionary
+			for ex_k in ["on_victory", "on_failure", "on_escape"]:
+				var ex_eff: Variant = enc.get(ex_k)
+				if ex_eff is Dictionary and str((ex_eff as Dictionary).get("ending", "")) == "ending_inventory_be":
+					count += 1
+			for r in enc.get("rounds", []):
+				if r is Dictionary:
+					for resp in r.get("responses", []):
+						if resp is Dictionary:
+							var on_r: Variant = resp.get("on_resolve")
+							if on_r is Dictionary and str((on_r as Dictionary).get("ending", "")) == "ending_inventory_be":
+								count += 1
+					var fb: Variant = r.get("fallback")
+					if fb is Dictionary:
+						var on_fb: Variant = (fb as Dictionary).get("on_resolve")
+						if on_fb is Dictionary and str((on_fb as Dictionary).get("ending", "")) == "ending_inventory_be":
+							count += 1
+	return count
 
 
 # ── 1. 第一輪三條具名策略走向不同結局 ────────────────────────────────────────
@@ -171,7 +217,12 @@ func _test_1_first_run_three_endings(gs: Node, data_node: Node) -> void:
 			break
 	_check(not bool(refuse_choice_be.get("available", true)), "僅完成發狂 BE 時，不上車選項仍為鎖定 (available=false)")
 
-	# (c) 庫存 BE ending_inventory_be
+	# (c) 庫存 BE ending_inventory_be（B1 守衛與規則層可達性）
+	# B1 守衛：斷言 data/beats 目前沒有任何 beat 帶 ending: ending_inventory_be
+	var inv_be_count := _count_inventory_be_effects_in_beats(data_node.get("loader"))
+	_check(inv_be_count == 0, "斷言 data/beats 目前沒有任何 beat 帶 ending: ending_inventory_be（補上翻面寫法時本條會轉紅，屆時把資料層走通那一條加回驗收）")
+
+	# 規則層可達性驗證（非資料層走通）
 	_fresh_opening(gs)
 	var op_res_inv: Dictionary = gs.call("choose_opening", "return_missed_call")
 	_check(bool(op_res_inv.get("ok", false)), "庫存 BE 開局成功")
@@ -179,7 +230,7 @@ func _test_1_first_run_three_endings(gs: Node, data_node: Node) -> void:
 	gs.set("phase", "afternoon")
 
 	var inv_start: Dictionary = gs.call("start_ending", "ending_inventory_be", "ending_effect")
-	_check(bool(inv_start.get("ok", false)) and str(gs.get("flow_mode")) == "ending", "庫存 BE 成功啟動進入 ending 模式")
+	_check(bool(inv_start.get("ok", false)) and str(gs.get("flow_mode")) == "ending", "規則層可達性驗證（非資料層走通）：庫存 BE 成功啟動進入 ending 模式")
 	_check(str((gs.get("active_ending") as Dictionary).get("ending_id", "")) == "ending_inventory_be", "當前結局為 ending_inventory_be")
 
 	_complete_all_pages(gs)
@@ -299,9 +350,12 @@ func _test_3_ending_matrix_dynamic_derivation(gs: Node, data_node: Node) -> void
 
 	var groups: Array = replaced_ending.get("variant_groups", []) as Array
 	var group_map: Dictionary = {}
+	var hit_rules: Dictionary = {}
 	for g_raw: Variant in groups:
 		var g := g_raw as Dictionary
-		group_map[str(g.get("id", ""))] = g
+		var gid := str(g.get("id", ""))
+		group_map[gid] = g
+		hit_rules[gid] = {}
 
 	_check(group_map.has("livelihood"), "variant_groups 包含 livelihood")
 	_check(group_map.has("inn_appearance"), "variant_groups 包含 inn_appearance")
@@ -377,9 +431,11 @@ func _test_3_ending_matrix_dynamic_derivation(gs: Node, data_node: Node) -> void
 			var p: Dictionary = EndingResolver.resolve("ending_replaced", gs, loader)
 			var pv: Dictionary = p.get("variants", {}) as Dictionary
 			var expected_rule := "%s_%s" % [liv, str(b.get("name"))]
-			if not bool(p.get("ok", false)) or str(pv.get("livelihood_variant", "")) != expected_rule:
+			var resolved_rule := str(pv.get("livelihood_variant", ""))
+			(hit_rules["livelihood"] as Dictionary)[resolved_rule] = true
+			if not bool(p.get("ok", false)) or resolved_rule != expected_rule:
 				all_combos_valid = false
-				_fail("生計 %s + 開關帶 %s resolve 異常 (預期: %s, 實際: %s)" % [liv, str(b.get("name")), expected_rule, str(pv.get("livelihood_variant", ""))])
+				_fail("生計 %s + 開關帶 %s resolve 異常 (預期: %s, 實際: %s)" % [liv, str(b.get("name")), expected_rule, resolved_rule])
 
 	_check(all_combos_valid, "4 生計 × 3 開關帶（12 種組合）動態解析全部正確無誤")
 
@@ -399,7 +455,9 @@ func _test_3_ending_matrix_dynamic_derivation(gs: Node, data_node: Node) -> void
 			(gs.get("flags") as Dictionary)[fl] = true
 		var app_p: Dictionary = EndingResolver.resolve("ending_replaced", gs, loader)
 		var app_v: Dictionary = app_p.get("variants", {}) as Dictionary
-		_check(str(app_v.get("inn_appearance_variant", "")) == str(ac.get("expected", "")), "旅館外觀解析為 %s" % str(ac.get("expected", "")))
+		var resolved_app := str(app_v.get("inn_appearance_variant", ""))
+		(hit_rules["inn_appearance"] as Dictionary)[resolved_app] = true
+		_check(resolved_app == str(ac.get("expected", "")), "旅館外觀解析為 %s" % str(ac.get("expected", "")))
 
 	# 驗證伴侶 3 種狀態
 	var part_cases := [
@@ -416,7 +474,22 @@ func _test_3_ending_matrix_dynamic_derivation(gs: Node, data_node: Node) -> void
 			(gs.get("flags") as Dictionary)[fl] = true
 		var part_p: Dictionary = EndingResolver.resolve("ending_replaced", gs, loader)
 		var part_v: Dictionary = part_p.get("variants", {}) as Dictionary
-		_check(str(part_v.get("partner_variant", "")) == str(pc.get("expected", "")), "伴侶解析為 %s" % str(pc.get("expected", "")))
+		var resolved_part := str(part_v.get("partner_variant", ""))
+		(hit_rules["partner"] as Dictionary)[resolved_part] = true
+		_check(resolved_part == str(pc.get("expected", "")), "伴侶解析為 %s" % str(pc.get("expected", "")))
+
+	# N5 動態規則覆蓋完整性斷言：依 endings.json 枚舉所有 variant group 的全部 rule id
+	for g_raw: Variant in groups:
+		var g := g_raw as Dictionary
+		var gid := str(g.get("id", ""))
+		var expected_rule_ids: Array[String] = []
+		for r_raw: Variant in (g.get("rules", []) as Array):
+			expected_rule_ids.append(str((r_raw as Dictionary).get("id", "")))
+		var missing_rules: Array[String] = []
+		for rid in expected_rule_ids:
+			if not (hit_rules.get(gid, {}) as Dictionary).has(rid):
+				missing_rules.append(rid)
+		_check(missing_rules.is_empty(), "variant_group '%s' 所有規則（共 %d 條）均被動態測試命中覆蓋" % [gid, expected_rule_ids.size()], "缺漏: %s" % str(missing_rules))
 
 
 # ── 4. D29 慶典代付者六條路徑一致性 ───────────────────────────────────────────
@@ -429,8 +502,8 @@ func _test_4_d29_six_proxy_paths(gs: Node, data_node: Node) -> void:
 	# 1. 邀阿婕 (ajie)
 	# 2. 邀阿薇 (awei)
 	# 3. 不邀且阿柴最高 (acai)
-	# 4. 逾期同分 (timeout tie)
-	# 5. 未進面板 (unvisited panel)
+	# 4. 逾期同分 (timeout tie) - 進面板未選擇
+	# 5. 未進面板 (unvisited panel) - 從未進面板
 	# 6. 全零 fallback (all zero fallback)
 
 	var test_paths := [
@@ -463,12 +536,15 @@ func _test_4_d29_six_proxy_paths(gs: Node, data_node: Node) -> void:
 			"name": "timeout_tie",
 			"setup": func(g: Node):
 				(g.get("npc_action_counts") as Dictionary)["ajie"] = 3
-				(g.get("npc_action_counts") as Dictionary)["awei"] = 3,
+				(g.get("npc_action_counts") as Dictionary)["awei"] = 3
+				# N2: 進入面板但不做選擇
+				g.call("play_beat", "d29_pm_invitation"),
 			"expected_proxy": "ajie"
 		},
 		{
 			"name": "unvisited_panel",
 			"setup": func(g: Node):
+				# N2: 完全不進面板
 				(g.get("npc_action_counts") as Dictionary)["awei"] = 4,
 			"expected_proxy": "awei"
 		},
@@ -492,6 +568,12 @@ func _test_4_d29_six_proxy_paths(gs: Node, data_node: Node) -> void:
 		var setup_fn: Callable = item.get("setup")
 		setup_fn.call(gs)
 
+		# N2: 驗證 timeout_tie 與 unvisited_panel 在進面板行為上的差異
+		if path_name == "timeout_tie":
+			_check((gs.get("beats_entered") as Dictionary).has("d29_pm_invitation"), "路徑 %s: 確實曾進入 d29_pm_invitation 面板" % path_name)
+		elif path_name == "unvisited_panel":
+			_check(not (gs.get("beats_entered") as Dictionary).has("d29_pm_invitation"), "路徑 %s: 從未進入 d29_pm_invitation 面板" % path_name)
+
 		# 推進離開 D29 afternoon，觸發 default choice / proxy freeze
 		var adv_res: Dictionary = gs.call("advance_phase")
 		_check(bool(adv_res.get("ok", false)), "路徑 %s: 推進離開 D29 afternoon 成功" % path_name)
@@ -500,16 +582,31 @@ func _test_4_d29_six_proxy_paths(gs: Node, data_node: Node) -> void:
 		_check(not frozen_proxy.is_empty(), "路徑 %s: D29 結束後 selected_festival_proxy_npc 已凍結（實際: %s）" % [path_name, frozen_proxy])
 		_check(frozen_proxy == expected_proxy, "路徑 %s: 凍結值符合預期 (%s)" % [path_name, expected_proxy])
 
-		# 推進到 D31 與 D39，檢查讀取的 frozen proxy 相同
+		# B2: D31 afternoon 真實 beat 讀取點驗證
 		gs.set("day", 31)
-		gs.set("phase", "morning")
-		var read_d31 := str(gs.get("selected_festival_proxy_npc"))
-		_check(read_d31 == frozen_proxy, "路徑 %s: D31 讀取的 proxy 與凍結值相同" % path_name)
+		gs.set("phase", "afternoon")
+		var target_d31_beat := "d31_proxy_%s" % expected_proxy
+		var lines_d31 := gs.call("play_beat", target_d31_beat) as PackedStringArray
+		_check(lines_d31.size() > 0, "路徑 %s: D31 成功演出目標 proxy beat (%s)" % [path_name, target_d31_beat])
+		for other_npc in ["ajie", "awei", "acai"]:
+			if other_npc != expected_proxy:
+				var other_beat := "d31_proxy_%s" % other_npc
+				var other_def: Dictionary = loader.beats_by_id.get(other_beat, {}) as Dictionary
+				var cond_met: bool = ConditionEval.eval(other_def.get("condition"), gs)
+				_check(not cond_met, "路徑 %s: D31 非目標 proxy beat (%s) 條件不成立" % [path_name, other_beat])
 
+		# B2: D39 afternoon 真實 beat 讀取點驗證
 		gs.set("day", 39)
 		gs.set("phase", "afternoon")
-		var read_d39 := str(gs.get("selected_festival_proxy_npc"))
-		_check(read_d39 == frozen_proxy, "路徑 %s: D39 讀取的 proxy 與凍結值相同" % path_name)
+		var target_d39_beat := "d39_proxy_%s" % expected_proxy
+		var lines_d39 := gs.call("play_beat", target_d39_beat) as PackedStringArray
+		_check(lines_d39.size() > 0, "路徑 %s: D39 成功演出目標 proxy beat (%s)" % [path_name, target_d39_beat])
+		for other_npc in ["ajie", "awei", "acai"]:
+			if other_npc != expected_proxy:
+				var other_beat := "d39_proxy_%s" % other_npc
+				var other_def: Dictionary = loader.beats_by_id.get(other_beat, {}) as Dictionary
+				var cond_met: bool = ConditionEval.eval(other_def.get("condition"), gs)
+				_check(not cond_met, "路徑 %s: D39 非目標 proxy beat (%s) 條件不成立" % [path_name, other_beat])
 
 		# 推進到 D45 結算 normal ending
 		gs.set("day", 45)
@@ -519,9 +616,9 @@ func _test_4_d29_six_proxy_paths(gs: Node, data_node: Node) -> void:
 		gs.call("choose", "d45_then", "d45_coda", "empty_handed")
 		var end_adv: Dictionary = gs.call("advance_phase")
 		_check(bool(end_adv.get("ok", false)) and str(gs.get("flow_mode")) == "ending", "路徑 %s: 成功結算進入 ending" % path_name)
-
-		var snap_proxy := str((gs.get("active_ending") as Dictionary).get("festival_proxy_npc", ""))
-		_check(snap_proxy == frozen_proxy, "路徑 %s: ending snapshot 的 proxy 與 D29 凍結值相同 (%s)" % [path_name, snap_proxy])
+		# N7: 斷言 active_ending.ending_id 為 ending_replaced
+		_check(str((gs.get("active_ending") as Dictionary).get("ending_id", "")) == "ending_replaced", "路徑 %s: active_ending.ending_id 為 ending_replaced" % path_name)
+		_check(str((gs.get("active_ending") as Dictionary).get("festival_proxy_npc", "")) == expected_proxy, "路徑 %s: ending snapshot 的 proxy 與 D29 凍結值相同 (%s)" % [path_name, expected_proxy])
 		_complete_all_pages(gs)
 
 
@@ -547,22 +644,36 @@ func _test_5_cross_run_three_runs_cleanup_and_persistence(gs: Node, data_node: N
 		(gs.get("delegates_used_today") as Dictionary)["npc_ajie"] = true
 		(gs.get("pending_delegation_reports") as Array).append({"npc_id": "npc_ajie"})
 
-		# 設置 meta 層狀態
-		var kcard := "k_forty_something" if run_idx == 1 else ("k_town_covers" if run_idx == 2 else "k_twenty_years_ago")
-		gs.call("gain_card", kcard)
-		(gs.get("night_locations_seen") as Dictionary)["n_manydoors"] = true
+		# N1: 第 1 輪透過真實比對槽獲得 k_forty_something 知識卡
+		if run_idx == 1:
+			gs.set("day", 9)
+			gs.set("phase", "afternoon")
+			gs.call("gain_card", "info_forty_something")
+			gs.call("play_beat", "d9_pm_columbarium")
+			var place_k: Dictionary = gs.call("try_place", "info_forty_something", "d9_pm_columbarium", "compare_years")
+			_check(bool(place_k.get("ok", false)), "第 1 輪藉真實比對槽取得 k_forty_something 知識卡")
+			_check(bool(gs.call("has_knowledge", "k_forty_something")), "確實獲得知識卡 k_forty_something")
+		elif run_idx == 2:
+			gs.call("gain_card", "k_town_covers")
+		elif run_idx == 3:
+			gs.call("gain_card", "k_twenty_years_ago")
+
 		(gs.get("night_once_beats_seen") as Dictionary)["n_once_%d" % run_idx] = true
 		gs.set("delegation_tutorial_seen", true)
 
-		# D8 遭遇驗證（第 2/3 輪重演但首次費用不重收）
-		if run_idx >= 2:
-			gs.set("day", 8)
-			gs.set("phase", "night")
-			var madness_before := (gs.get("hand") as Array).filter(func(c): return str(c).begins_with("madness")).size()
-			var enter_night: Dictionary = gs.call("enter_night_location", "n_manydoors")
-			# n_manydoors 已在 night_locations_seen 中，不重收 madness_cost
-			var madness_after := (gs.get("hand") as Array).filter(func(c): return str(c).begins_with("madness")).size()
-			_check(madness_after == madness_before, "第 %d 輪 D8 遭遇地點首次費不重收" % run_idx)
+		# N1: D8 夜間地點真實進入測試（第 1 輪首次收費，第 2/3 輪零扣費）
+		gs.set("day", 8)
+		gs.set("phase", "night")
+		var madness_before := (gs.get("hand") as Array).filter(func(c): return str(c).begins_with("madness")).size()
+		var enter_night: Dictionary = gs.call("enter_night_location", "n_manydoors")
+		_check(bool(enter_night.get("ok", false)), "第 %d 輪進入 n_manydoors 成功" % run_idx)
+		var madness_after := (gs.get("hand") as Array).filter(func(c): return str(c).begins_with("madness")).size()
+
+		if run_idx == 1:
+			_check(madness_after == madness_before + 1, "第 1 輪首次進入 n_manydoors 確實扣收首次 madness cost (+1)")
+			_check(bool((gs.get("night_locations_seen") as Dictionary).has("n_manydoors")), "第 1 輪 n_manydoors 成功寫入 night_locations_seen")
+		else:
+			_check(madness_after == madness_before, "第 %d 輪重進 n_manydoors 零扣費（首次費不重收）" % run_idx)
 
 		# 走到 D45 結算
 		gs.set("day", 45)
@@ -618,8 +729,25 @@ func _test_6_checkpoint_reload_skip_vs_reveal_and_idempotency(gs: Node, data_nod
 	var saved_checkpoint := gs.call("serialize") as Dictionary
 	_check(str((saved_checkpoint.get("flow", {}) as Dictionary).get("mode", "")) == "ending", "快照處於 ending 模式")
 
-	# 分支 A：逐頁推進完成
-	_complete_all_pages(gs)
+	# 分支 A：逐頁推進播至末頁 ready_to_complete，存 ready 快照
+	while not bool(gs.call("ending_view").get("can_complete", false)):
+		if not bool(gs.call("ending_view").get("page_revealed", false)):
+			gs.call("reveal_ending_page")
+		else:
+			gs.call("advance_ending_page")
+
+	_check(bool(gs.call("ending_view").get("can_complete", false)), "逐頁播完達到 ready_to_complete")
+	var ready_checkpoint := gs.call("serialize") as Dictionary
+
+	# N6: 第一次 complete_ending 成功
+	var comp1: Dictionary = gs.call("complete_ending")
+	_check(bool(comp1.get("ok", false)), "第一次 complete_ending 成功")
+	_check(str(gs.get("flow_mode")) == "opening", "完成後回到 opening 模式")
+
+	# N6: 同一狀態第二次呼叫 complete_ending 被拒絕 (not_ending)，history 筆數不增加
+	var comp2: Dictionary = gs.call("complete_ending")
+	_check(not bool(comp2.get("ok", false)) and str(comp2.get("reason_code", "")) == "not_ending", "同狀態第二次 complete_ending 被拒絕 (not_ending)")
+
 	var history_a := (gs.get("ending_history") as Array).duplicate(true)
 	var record_a: Dictionary = history_a[history_a.size() - 1] as Dictionary
 
@@ -730,3 +858,84 @@ func _test_8_greedy_and_no_legacy_end_run(gs: Node, data_node: Node) -> void:
 	_check(gs.get("FLOW_OPENING") == "opening", "FLOW_OPENING = 'opening'")
 	_check(gs.get("FLOW_RUN") == "run", "FLOW_RUN = 'run'")
 	_check(gs.get("FLOW_ENDING") == "ending", "FLOW_ENDING = 'ending'")
+
+
+# ── 9. K-198 preflight null 防禦反例與狀態零變化斷言 ──────────────────────────
+
+func _test_9_preflight_null_counterexample(gs: Node, data_node: Node) -> void:
+	print("\n--- 9. K-198 preflight null 防禦反例與狀態零變化斷言 ---")
+	_fresh_opening(gs)
+
+	# 注入一筆壞 ending_history 記錄使得 serialize() 的狀態在 deserialize() 失敗
+	# （即 clone_for_preflight() 返回 null）
+	var bad_record := { "bad_field": 123 }
+	(gs.get("ending_history") as Array).append(bad_record)
+
+	# 驗證 clone_for_preflight 確實返回 null
+	var probe: Node = gs.call("clone_for_preflight")
+	_check(probe == null, "注入壞 history 後 clone_for_preflight 返回 null")
+
+	var snap_before := JSON.stringify(gs.call("serialize"))
+
+	# 1. choose_opening
+	var op_res: Dictionary = gs.call("choose_opening", "take_family_album")
+	_check(not bool(op_res.get("ok", false)) and str(op_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 choose_opening 回傳 data_conflict")
+
+	# 2. _settle_effects
+	var eff_res: Dictionary = gs.call("_settle_effects", [{"gain": ["protagonist"]}], {}, {"lose_cards": ["protagonist"]})
+	_check(not bool(eff_res.get("ok", false)) and str(eff_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 _settle_effects 回傳 data_conflict")
+
+	# 3. EffectApply.preflight
+	var pf_res: Dictionary = EffectApply.preflight([{"gain": ["protagonist"]}], gs)
+	_check(not bool(pf_res.get("ok", false)) and str(pf_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 EffectApply.preflight 回傳 data_conflict")
+
+	# 設置 run 狀態與遭遇以測試 encounter preflight callers
+	gs.set("flow_mode", "run")
+	gs.set("day", 8)
+	gs.set("phase", "night")
+	gs.call("gain_card", "protagonist", false)
+	gs.call("gain_card", "info_forty_something", false)
+
+	# 4. acknowledge_encounter_intro
+	gs.set("active_encounter", {
+		"beat_id": "n_manydoors_ch1",
+		"stage": "intro",
+		"round_id": "",
+		"blocked_slots": 0,
+		"attempted_card_ids": [],
+		"visited_round_ids": []
+	})
+	var ack_res: Dictionary = gs.call("acknowledge_encounter_intro")
+	_check(not bool(ack_res.get("ok", false)) and str(ack_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 acknowledge_encounter_intro 回傳 data_conflict")
+
+	# 5. respond_to_encounter
+	gs.set("active_encounter", {
+		"beat_id": "n_manydoors_ch1",
+		"stage": "round",
+		"round_id": "name_since_when",
+		"blocked_slots": 0,
+		"attempted_card_ids": [],
+		"visited_round_ids": []
+	})
+	var resp_res: Dictionary = gs.call("respond_to_encounter", "info_forty_something")
+	_check(not bool(resp_res.get("ok", false)) and str(resp_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 respond_to_encounter 回傳 data_conflict")
+
+	# 6. discard_in_encounter
+	var disc_res: Dictionary = gs.call("discard_in_encounter", "info_forty_something")
+	_check(not bool(disc_res.get("ok", false)) and str(disc_res.get("reason_code", "")) == "data_conflict", "preflight 失敗時 discard_in_encounter 回傳 data_conflict")
+
+	# 7. resolve_unfinished_choice_groups
+	gs.set("day", 29)
+	gs.set("phase", "afternoon")
+	(gs.get("active_encounter") as Dictionary).clear()
+	var res_groups: Dictionary = gs.call("resolve_unfinished_choice_groups")
+	_check(not bool(res_groups.get("ok", false)) and str(res_groups.get("reason_code", "")) == "data_conflict", "preflight 失敗時 resolve_unfinished_choice_groups 回傳 data_conflict")
+
+	# 完整還原 fixture
+	(gs.get("ending_history") as Array).pop_back()
+	_fresh_opening(gs)
+	var restored_probe: Node = gs.call("clone_for_preflight")
+	_check(restored_probe != null, "還原後 clone_for_preflight 恢復正常")
+	if restored_probe != null:
+		restored_probe.free()
+

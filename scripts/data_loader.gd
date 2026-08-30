@@ -1645,6 +1645,33 @@ static func lint_endings(loader: DataLoader) -> PackedStringArray:
 						seen_rg[rg_str] = true
 						if not b_group_ids.has(rg_str):
 							problems.append("%s [phase_exit]：required_choice_groups 引用父 beat 不存在的 choice group → %s" % [bid, rg_str])
+						else:
+							var group_slots: Array = []
+							for s in b.get("slots", []):
+								if str(s.get("choice_group", "")) == rg_str:
+									group_slots.append(s)
+							var has_unconditional := false
+							var req_card_id := ""
+							var not_card_id := ""
+							for s in group_slots:
+								var s_cond: Variant = s.get("condition")
+								var s_req: Variant = s.get("requires")
+								var s_crc: bool = bool(s.get("choice_requires_card", false))
+								if s_cond == null and s_req == null and not s_crc:
+									has_unconditional = true
+								if s_crc:
+									var acc: Array = s.get("accepts", []) as Array
+									if not acc.is_empty():
+										req_card_id = str(acc[0])
+								if s_cond is Dictionary and (s_cond as Dictionary).has("has_card"):
+									req_card_id = str((s_cond as Dictionary)["has_card"])
+								if s_cond is Dictionary and (s_cond as Dictionary).has("not"):
+									var not_block: Variant = (s_cond as Dictionary)["not"]
+									if not_block is Dictionary and (not_block as Dictionary).has("has_card"):
+										not_card_id = str((not_block as Dictionary)["has_card"])
+							var is_complementary := not req_card_id.is_empty() and req_card_id == not_card_id
+							if not has_unconditional and not is_complementary:
+								problems.append("%s [phase_exit]：required_choice_groups 引用之 group '%s' 無無條件槽且未具可驗證之互補條件保證" % [bid, rg_str])
 
 				var has_ending: bool = ped.has("ending")
 				var has_source: bool = ped.has("source")
