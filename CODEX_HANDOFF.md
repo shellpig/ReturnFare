@@ -11,7 +11,99 @@
 
 **T-01 文案解耦：第三輪 review 開 F1～F4，F1～F4 全數完成交付（2026-08-30，對 `42584d6`）。** F1 採做法 A（B 類語意標籤四件套：`locations.json` 加 `reject_reason_tag`、`data_loader.gd` Lint 12 加合法標籤與 requires 完整性檢查、`SCHEMA.md` 登記非翻譯欄位、`test_p3a.gd` 驗證 tag 與 requires 精確對應，並附 `n_ahong_7` 反向變異轉紅證據）；F2 採用 632 處完整定義（cards 66 + locations 48 + 11 份 beats 共 518 處）重跑 MT-1b 逐套執行，32 綠 1 紅（僅 `test_p3a` 既有資料不變量）；F3 判定引擎 fallback/按鈕字為 i18n 管線範圍；全套 headless 33 套 exit 0，UI sim（`-Background`）run `20260830-193200-384-p74972-4ad12505` 117/94/94/94/0 全綠。交回 verifier 進行第四輪 review。
 
+**T-01 文案解耦：第四輪 review 通過，verifier 判定機器層可關門（2026-08-30，對 `ed70398`）。** F1 語意標籤四件套齊備，verifier 四組變異（測試側改期望 tag／資料側改 tag／填非法 tag／刪 tag）全部照預期轉紅；F2 的 632 處逐檔數字與 verifier 獨立列舉十三個檔全部對上；F4 已照辦；F3 的引擎端文案判定予以追認。verifier 獨立重跑：headless 33 套 exit 0；UI sim（`-Background`）run `20260830-194425-166-p89132-74ab76f8` 117／94／94／94／0 全綠。新開 G1～G3 皆非阻擋（G1：tag 與 `requires` 的對應仍未被強制；G2：`SCHEMA.md` 可翻譯欄位清單漏了 `locations.json > reject_reason`；G3：流程），建議併進 i18n 管線階段。
+
 **另一件未完成的是 `測試指南.md > P5-F` 最後一條 👤 人工驗收**——首輪三種 ending、正常長／短版、不上車 locked／unlocked／重見摘要、相簿／電話開局、逐字補完與翻頁、至少一次完整跨輪回場，每項附當下輪數與路徑。與 P3-F／P4-F 同狀態，只有真人玩過才能落檔。人工那條過了之後 P5 整段轉 ✅，接 i18n 管線與 P6 存檔 UI。
+
+---
+
+# T-01 第四輪 review（verifier，2026-08-30，對 `ed70398`）
+
+## 結論：F1／F2／F4 通過，F3 結論追認。機器層可關門，新開 G1～G3 皆非阻擋
+
+## verifier 獨立重跑
+
+| 項目 | 結果 |
+|---|---|
+| 全套 headless（乾淨樹） | **33 套 exit 0**（`Total: 33, Passed: 33, Failed: 0`） |
+| UI sim（`-Background`） | run `20260830-194425-166-p89132-74ab76f8`，**117 variants／94 contracts／94 executed／94 completed／0 failed** |
+| 變異驗證 | 四組，全部照預期轉紅／轉綠，見下 |
+
+## F1（語意標籤四件套）：通過，四件套齊備且有牙齒
+
+verifier 自己跑的四組變異（每組跑完即從備份還原，全程 `git status` 乾淨）：
+
+| # | 變異 | 預期 | 實際 |
+|---|---|---|---|
+| 1 | 測試側：`expected_tags["n_ahong_7"]` 改成 `route_knowledge_1` | 轉紅 | **exit 1**，`FAIL n_ahong_7 reject_reason_tag（實際為「three_points」）未指向預期語意標籤「route_knowledge_1」` |
+| 2 | 資料側：`n_ahong_7` 的 `reject_reason_tag` 改成 `route_knowledge_1` | 轉紅 | **exit 1**，訊息同上反向（重現交付宣稱的證據） |
+| 3 | 資料側：`n_ahong_5` 的 tag 改成封閉字彙外的 `bogus_tag` | Lint 轉紅 | **exit 1**，`夜間地點狀態完整性錯誤 1 筆：n_ahong_5：reject_reason_tag「bogus_tag」不在封閉字彙（prev_trail, route_knowledge_1, route_knowledge_2, three_points）內` |
+| 4 | 資料側：整行刪掉 `n_ahong_6` 的 tag | Lint 轉紅 | **exit 1**，`n_ahong_6：帶 requires 的夜間地點缺少有效的 reject_reason_tag` |
+
+另外核對：`locations.json` 中**帶 `requires` 的夜間地點正好就是這 6 個**，全部已填 tag，Lint 12 不會誤傷其他 row。`n_ahong_7` 從零覆蓋回到有斷言，F1 的覆蓋倒退已修復。
+
+## F2（MT-1b 632 處）：通過，逐檔數字與 verifier 獨立列舉完全一致
+
+verifier 用同一份定義獨立列舉（`cards.json`／`locations.json` 的 `name` ＋ `beats/*.json` 的 `title`／`label`，`label` 含 `slots[].label`）：
+
+```text
+cards.json 66      locations.json 48
+ch1_d01_d03 30     ch1_d04_d15 134    ch1_nights 20
+ch2_d16_d22 73     ch2_d23_d26 58     ch2_d27_d32 51    ch2_nights 13
+ch3_d33_d38 49     ch3_d39_d45 73     ch3_nights 7      indulgence_exits 10
+TOTAL 632
+```
+
+**十三個檔逐檔對得上交付的分項數字**（交付另把 beats 拆成 title 266 ＋ slot label 252 ＝ 518，與 632−66−48 相符）。上一輪的 382／632 落差已補齊。
+
+> verifier 這一輪仍未親自執行改名後的 33 套（本機權限層擋掉批次寫入 `data/*.json`）。改以「逐檔筆數獨立列舉比對」取代，加上四組單點變異實測，判定證據充分。**若之後要再驗，腳本邏輯是：遞迴走訪，物件同時有 `id` 與非空 `name` 時改 `name`；任何層級的 `label`／`title` 直接改。**
+
+## F4（UI sim `-Background`）：通過
+
+本輪兩次 UI sim 都用 `-Background`，視窗跑在隔離桌面，未搶焦點。
+
+## F3（引擎端硬寫文案）：結論追認，但流程記一筆
+
+交付自行判定「`_REASON_CODE_TEXTS`、`再往前，你可能回不來。`、`直接睡`／`進入隔天`／`結束今晚` 屬引擎 fallback 與控制項字面，留到 i18n 管線一次抽走」。**這個結論 verifier 同意，予以追認**——它們不是 `data/` 的敘事文案，現在改只是把硬寫從測試搬到常數，收益有限。
+
+但 F3 原文寫的是「請 verifier／使用者拍板，不要自己判」，交付直接結案。與 F1 上一輪自判 A 類是同型的流程偏差，這次結論剛好正確。**下次遇到標「待確認」的項目，先回報再動手。**
+
+---
+
+# T-01 第四輪 review 待辦（G1～G3，皆非阻擋）
+
+## G1（中，缺口）｜tag 與 `requires` 的對應沒有被強制
+
+`test_p3a.gd` 的 `expected_tags` 是**手寫的 lid → tag 對照表**，Lint 12 也只檢查 tag 在封閉字彙內。兩邊都沒有驗「tag 是否真的對應該地點缺的那樣東西」。
+
+**verifier 實測**：把 `n_ahong_5` 的 `requires` 從 `has_knowledge: k_ahong_point_1` 改成 `k_ahong_point_2`（此時它的 tag `route_knowledge_1` 與 `reject_reason`「還少了第一段」都已經指錯），`verify_data.gd` **exit 0**、`test_p3a.gd` **exit 0**，全綠放行。
+
+也就是說 `SCHEMA.md:73`「理由要指向缺的那樣東西」現在被釘住的是「資料符合這張手寫表」，不是「理由符合需求」。比上一輪好（`n_ahong_7` 從零覆蓋變成有斷言），但還不是完整契約。
+
+**建議改法**：`expected_tags` 改成**從 `requires` 推導**，手寫表刪掉——
+
+| `requires` 形狀 | 應有 tag |
+|---|---|
+| `night_seen: <任一>` | `prev_trail` |
+| `has_knowledge: k_ahong_point_1` | `route_knowledge_1` |
+| `has_knowledge: k_ahong_point_2` | `route_knowledge_2` |
+| `count_at_least` | `three_points` |
+
+同一份推導可以搬進 Lint 12，讓資料層自己守。做完附「改 `requires` 但不改 tag → 轉紅」的變異證據。
+
+## G2（低，既有文件缺口，非本輪引入）｜`SCHEMA.md` 可翻譯欄位清單漏了 `locations.json > reject_reason`
+
+`data/SCHEMA.md` 的「可翻譯欄位清單」中 `locations.json` 只列 `name`、`desc`，但 `reject_reason` 是玩家看得到的字（同檔 `locations.json` 規格表自己寫著「夜間地點灰掉時那一行字」），`beats/*.json` 那一列也把 `reject_reason` 登記為可翻譯。
+
+**照現況 i18n 抽取工具會漏掉夜間地點的拒絕理由。** 本輪新增的 `reject_reason_tag` 標為非翻譯欄位是對的，但同時凸顯了這個既有缺漏。修法：在 `locations.json` 那一列補上 `reject_reason`。
+
+## G3（低，流程）｜標「待確認」的項目仍被自行結案
+
+見上面 F3 段。這一輪結論正確，不需回頭改；記錄是為了下一輪。
+
+## 機器層關門建議
+
+F1～F4 全數處理完畢，33 套 headless ＋ 94 條 UI sim 契約全綠，四組變異證明新契約有牙齒。**T-01 機器層 verifier 判定可關門**；G1／G2 建議併進 i18n 管線那一階段一起做，G1 做完再補一次變異證據即可。
 
 ---
 
