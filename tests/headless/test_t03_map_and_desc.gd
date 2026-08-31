@@ -7,8 +7,22 @@ const PlaythroughGreedy := preload("res://tests/headless/playthrough_greedy.gd")
 const PanelBuilder := preload("res://scripts/core/panel_builder.gd")
 
 const STOCK_PHRASES: Array[String] = [
-	"彷彿", "赫然", "悄然", "緩緩", "猛然", "驟然", "難以言喻",
-	"靜靜地", "宛如", "深深", "意識到", "莫名"
+	# 膨脹形容詞 (20)
+	"細膩", "精緻", "深刻", "雋永", "震撼", "極致", "絕美", "唯美", "璀璨", "耀眼",
+	"動人", "驚豔", "扣人心弦", "刻骨銘心", "淋漓盡致", "恰到好處", "無可取代", "分毫不差", "無邊無際", "無聲無息",
+	# 小說套語 (17)
+	"空氣彷彿凝結", "時間彷彿靜止", "心頭一緊", "喉頭一哽", "鼻頭一酸", "眼眶泛紅", "嘴角勾起", "幾不可聞",
+	"緩緩開口", "輕聲說道", "深吸一口氣", "瞳孔微縮", "指尖顫抖", "目光交會", "意味深長", "若有似無", "不易察覺",
+	# 標誌性副詞與片語 (18)
+	"說不出的", "道不盡的", "難以言喻", "莫名的", "空氣中瀰漫", "內心深處", "宛如", "彷彿",
+	"猛然", "悄然", "驟然", "轟然", "溘然", "黯然", "毅然", "決然", "赫然", "儼然",
+	# 宏大名詞 (13)
+	"浩瀚", "瑰寶", "殿堂", "盛宴", "樂章", "史詩", "篇章", "里程碑", "縮影", "光輝", "靈魂深處", "印記",
+	# 濾鏡詞 (4)
+	"感覺到", "意識到", "注意到", "不禁",
+	# 四字成語堆疊 (16)
+	"白駒過隙", "蒸蒸日上", "有聲有色", "風雨飄搖", "撒手人寰", "長相廝守", "結為連理", "結髮為伴",
+	"平淡相守", "苦心經營", "舉手投足", "溘然長逝", "急劇惡化", "來勢洶洶", "彈指而過", "悄然而逝"
 ]
 
 const DAY_LOCATIONS_20: Array[String] = [
@@ -133,7 +147,7 @@ func _test_group1_unseen_content_and_advance_hints(gs: Node, _data_node: Node) -
 
 
 # ── Group 2: show_location() 進門立刻呈現第一段 ──────────────────────────────
-func _test_group2_show_location_immediate_playback(gs: Node, _data_node: Node) -> int:
+func _test_group2_show_location_immediate_playback(gs: Node, data_node: Node) -> int:
 	print("--- Group 2: show_location() immediate playback ---")
 	var failed := 0
 	_reset_gs(gs)
@@ -155,12 +169,17 @@ func _test_group2_show_location_immediate_playback(gs: Node, _data_node: Node) -
 	else:
 		failed += _fail("show_location('sanquan') 未立即結算 d2_morning_intro")
 
+	var loader: DataLoader = data_node.get("loader") as DataLoader
+	var intro_beat: Dictionary = loader.beats_by_id.get("d2_morning_intro", {}) as Dictionary
+	var intro_title: String = str(intro_beat.get("title", ""))
 	var beat_container: Node = panel.find_child("BeatContainer", true, false)
 	var title_found := false
 	for child in beat_container.get_children():
-		if child is Label and (child as Label).text.contains("清晨分工"):
-			title_found = true
-			break
+		if child is Label:
+			var txt: String = (child as Label).text
+			if (not intro_title.is_empty() and txt.contains(intro_title)) or (intro_title.is_empty() and not txt.is_empty()):
+				title_found = true
+				break
 	if title_found:
 		failed += _ok("show_location('sanquan') 立即渲染了第一段 beat 標題/內容")
 	else:
@@ -249,6 +268,39 @@ func _test_group3_daytime_button_enablement_matrix(gs: Node, _data_node: Node) -
 	else:
 		failed += _fail("Case 2: 含有 LOCKED beat 的地點應為 enabled")
 
+	# Case 2 -> Case 3 體感延續（B4）：點進只有 LOCKED beat 的地點後，記錄已到訪，後續無 beat 時段維持 enabled
+	var loc_scene: PackedScene = load("res://scenes/ui/location_panel.tscn")
+	var panel: Node = loc_scene.instantiate()
+	get_root().add_child(panel)
+	await process_frame
+
+	panel.call("show_location", "upstream")
+	await process_frame
+
+	var visited_after_upstream: Dictionary = gs.get("day_locations_visited") as Dictionary
+	if visited_after_upstream.has("upstream") and visited_after_upstream["upstream"] == true:
+		failed += _ok("B4: 進入只有 LOCKED beat 的地點（upstream）後，成功記錄到訪")
+	else:
+		failed += _fail("B4: 進入只有 LOCKED beat 的地點未記錄到訪")
+
+	panel.queue_free()
+	await process_frame
+
+	# 驗證後續空時段（例如 D20 afternoon，upstream 無 beat）依然為 enabled
+	gs.set("day", 20)
+	gs.set("phase", "afternoon")
+	map_inst.call("refresh")
+	container = map_inst.get_node("LocationsContainer")
+	var d20_upstream_btn: Button = null
+	for b: Button in container.get_children():
+		if str(b.get_meta("qa_id", "")) == "location::upstream":
+			d20_upstream_btn = b
+			break
+	if d20_upstream_btn != null and not d20_upstream_btn.disabled:
+		failed += _ok("B4: 曾進入過 LOCKED 地點後，後續空時段維持 enabled（不會再度變灰）")
+	else:
+		failed += _fail("B4: 曾進入過 LOCKED 地點後，後續空時段未維持 enabled")
+
 	map_inst.queue_free()
 	await process_frame
 	return failed
@@ -318,6 +370,23 @@ func _test_group4_day_locations_visited_meta_and_save_validation(gs: Node, _data
 	else:
 		failed += _fail("未知 location id 未被拒絕: %s" % str(res3))
 
+	# 7. 壞形狀拒絕：非白天地點（夜間地點 id）（B1）
+	var bad_saved4: Dictionary = saved.duplicate(true)
+	bad_saved4["meta"]["day_locations_visited"] = { "n_corridor": true }
+	var res4: Dictionary = gs.deserialize(bad_saved4)
+	if not bool(res4.get("ok", false)) and str(res4.get("reason_code", "")) == "invalid_save_shape":
+		failed += _ok("B1: 包含夜間地點 id 的 day_locations_visited 被 invalid_save_shape 拒絕")
+	else:
+		failed += _fail("B1: 包含夜間地點 id 未被拒絕: %s" % str(res4))
+
+	# 8. 驗證 play_beat 播放夜間 beat 不會將夜間地點寫入 day_locations_visited（B1）
+	gs.play_beat("n_corridor_ch1")
+	var visited_after_night: Dictionary = gs.get("day_locations_visited") as Dictionary
+	if not visited_after_night.has("n_corridor"):
+		failed += _ok("B1: play_beat('n_corridor_ch1') 不會將夜間地點寫入 day_locations_visited")
+	else:
+		failed += _fail("B1: play_beat 誤將夜間地點寫入 day_locations_visited: %s" % str(visited_after_night))
+
 	return failed
 
 
@@ -369,25 +438,47 @@ func _test_group6_day_locations_desc_and_fallback(gs: Node, data_node: Node) -> 
 	else:
 		failed += _fail("build_panel 回傳的 desc 為空")
 
-	# 缺欄位退路測試（模擬某個地點無 desc 時退回只顯示 name 不崩）
 	var loc_scene: PackedScene = load("res://scenes/ui/location_panel.tscn")
 	var panel: Node = loc_scene.instantiate()
 	get_root().add_child(panel)
 	await process_frame
 
-	# 進入一個沒有事件的常態狀態 (D2 morning 的 oldschool)
+	# 1. 正常常態地點（有 desc，動態比對名稱與描述，不硬寫字面，解決 B5）
 	gs.set("day", 2)
 	gs.set("phase", "morning")
+	var oldschool_loc: Dictionary = loader.locations.get("oldschool", {}) as Dictionary
+	var expected_name: String = str(oldschool_loc.get("name", "oldschool"))
+	var expected_desc: String = str(oldschool_loc.get("desc", ""))
 	panel.call("show_location", "oldschool")
 	await process_frame
 
 	var title_lbl: Label = panel.get_node("LocationTitle")
 	var desc_lbl: Label = panel.get_node("DescriptionLabel")
-	if title_lbl.text == "舊國小" and desc_lbl.visible and not desc_lbl.text.is_empty():
-		failed += _ok("無事件地點正確顯示標題與 desc 常駐簡介")
+	if title_lbl.text == expected_name and desc_lbl.visible and desc_lbl.text == expected_desc:
+		failed += _ok("無事件地點正確顯示動態標題與 desc 常駐簡介")
 	else:
 		failed += _fail("無事件地點渲染不符: title='%s', desc_visible=%s" % [title_lbl.text, desc_lbl.visible])
 
+	# 2. 缺欄位退路測試（B2：模擬某個地點無 desc 或 desc 為空時，退回只顯示 name，DescriptionLabel 隱藏且不崩潰）
+	var mock_loc_id := "mock_no_desc_location"
+	loader.locations[mock_loc_id] = {
+		"id": mock_loc_id,
+		"name": "無簡介測試地點",
+		"layer": "day",
+		"phases": ["morning", "afternoon"],
+		"chapter": 1
+	}
+	panel.call("show_location", mock_loc_id)
+	await process_frame
+
+	var mock_title_lbl: Label = panel.get_node("LocationTitle")
+	var mock_desc_lbl: Label = panel.get_node("DescriptionLabel")
+	if mock_title_lbl.text == "無簡介測試地點" and not mock_desc_lbl.visible and mock_desc_lbl.text.is_empty():
+		failed += _ok("B2: 地點缺少 desc 欄位時，退回只顯示標題且 DescriptionLabel 隱藏不崩潰")
+	else:
+		failed += _fail("B2: 缺少 desc 地點渲染不符: title='%s', desc_visible=%s, desc_text='%s'" % [mock_title_lbl.text, mock_desc_lbl.visible, mock_desc_lbl.text])
+
+	loader.locations.erase(mock_loc_id)
 	panel.queue_free()
 	await process_frame
 	return failed

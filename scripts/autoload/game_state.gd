@@ -1727,9 +1727,21 @@ func play_beat(beat_id: String) -> PackedStringArray:
 
 	var loc_id := str(beat.get("location", ""))
 	if not loc_id.is_empty():
-		day_locations_visited[loc_id] = true
+		mark_day_location_visited(loc_id)
 
 	return lines
+
+
+## 記錄白天地點已到訪（meta 層，不隨輪重置）。只記錄 layer 為 "day" 的白天地點。
+func mark_day_location_visited(location_id: String) -> void:
+	if location_id.is_empty():
+		return
+	if Data != null and Data.loader != null:
+		var loc: Dictionary = Data.loader.locations.get(location_id, {}) as Dictionary
+		if str(loc.get("layer", "")) == "day":
+			day_locations_visited[location_id] = true
+	else:
+		day_locations_visited[location_id] = true
 
 
 ## 面板求值的規則層入口（P1-G）。純計算，不結算 on_enter、不改 GameState。
@@ -3089,7 +3101,7 @@ func deserialize(d: Dictionary) -> Dictionary:
 	return { "ok": true, "reason_code": "" }
 
 
-## meta day locations visited set 的原子驗證。引用不存在的地點或值非 true，
+## meta day locations visited set 的原子驗證。引用不存在的地點、非白天地點或值非 true，
 ## 一律視為資料錯誤。回傳 { ok, visited }。
 func _parse_day_locations_visited(d: Dictionary) -> Dictionary:
 	var meta_raw: Variant = d.get("meta", {})
@@ -3106,7 +3118,10 @@ func _parse_day_locations_visited(d: Dictionary) -> Dictionary:
 		var flag: Variant = (raw as Dictionary)[loc_id]
 		if typeof(flag) != TYPE_BOOL or not bool(flag):
 			return { "ok": false, "visited": {} }
-		if Data == null or Data.loader == null or not Data.loader.locations.has(lid):
+		if Data == null or Data.loader == null:
+			return { "ok": false, "visited": {} }
+		var loc: Dictionary = Data.loader.locations.get(lid, {}) as Dictionary
+		if loc.is_empty() or str(loc.get("layer", "")) != "day":
 			return { "ok": false, "visited": {} }
 		visited[lid] = true
 	return { "ok": true, "visited": visited }

@@ -110,6 +110,8 @@ func _ready() -> void:
 
 func show_location(location_id: String, extra_lines: PackedStringArray = PackedStringArray()) -> void:
 	_current_location = location_id
+	if GameState != null and GameState.has_method("mark_day_location_visited"):
+		GameState.mark_day_location_visited(location_id)
 	_night_enter_btn.visible = false
 	_night_align_btn.visible = false
 	_status_label.text = "\n".join(extra_lines) if not extra_lines.is_empty() else ""
