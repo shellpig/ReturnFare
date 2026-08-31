@@ -2233,3 +2233,39 @@ static func _cond_matches_proxy_is(cond: Variant, npc_id: String) -> bool:
 			if _cond_matches_proxy_is(sub, npc_id):
 				return true
 	return false
+
+
+## lint 22：夜間地點簡介完整性（T-04 工單）。
+## 1. 28 個 night layer 地點的 desc 均為非空字串。
+## 2. 12 個有 day_counterpart 的夜間地點，其 desc 不得包含對位白天地點名稱（或拆解名稱），避免提前劇透。
+static func lint_night_location_descs(loader: DataLoader) -> PackedStringArray:
+	var errs: PackedStringArray = []
+	for lid in loader.locations:
+		var loc: Dictionary = loader.locations[lid] as Dictionary
+		if str(loc.get("layer", "")) != "night":
+			continue
+
+		var desc := str(loc.get("desc", "")).strip_edges()
+		if desc.is_empty():
+			errs.append("%s：night desc 為空" % lid)
+			continue
+
+		var cp_val: Variant = loc.get("day_counterpart")
+		if cp_val != null and not str(cp_val).is_empty():
+			var cp_id := str(cp_val)
+			var cp_loc: Dictionary = loader.locations.get(cp_id, {}) as Dictionary
+			var cp_name := str(cp_loc.get("name", "")).strip_edges()
+			if not cp_name.is_empty():
+				var candidate_names: Array[String] = [cp_name]
+				for delimiter in ["／", "＋", "/"]:
+					if cp_name.contains(delimiter):
+						for part in cp_name.split(delimiter):
+							var p := part.strip_edges()
+							if p.length() >= 2 and not candidate_names.has(p):
+								candidate_names.append(p)
+				for check_name in candidate_names:
+					if desc.contains(check_name):
+						errs.append("%s：night desc 包含 day_counterpart 名稱「%s」" % [lid, check_name])
+						break
+	return errs
+

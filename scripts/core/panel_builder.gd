@@ -187,6 +187,7 @@ static func location_summary(location_id: String, gs: Node, data: Node) -> Dicti
 	return {
 		"display_name": display_name,
 		"status_text": status_text,
+		"desc": str(loc.get("desc", "")).strip_edges(),
 		"can_enter": can_enter,
 		"reason_code": reason_code,
 		"reason_text": reason_text,

@@ -157,6 +157,14 @@ func show_night_details(location_id: String) -> void:
 		status_lbl.set_meta("qa_id", "night_status::" + location_id)
 		_beat_container.add_child(status_lbl)
 
+	var desc := str(summary.get("desc", "")).strip_edges()
+	if not desc.is_empty():
+		var desc_lbl := Label.new()
+		desc_lbl.text = desc
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_lbl.set_meta("qa_id", "night_desc::" + location_id)
+		_beat_container.add_child(desc_lbl)
+
 	var can_enter := bool(summary.get("can_enter", false))
 	if not can_enter:
 		var reason_text := str(summary.get("reason_text", "")).strip_edges()

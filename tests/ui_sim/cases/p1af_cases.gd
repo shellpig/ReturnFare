@@ -1619,6 +1619,12 @@ class UiCase extends CaseBaseClass:
 		assert_eq(status_nodes.size(), 1, "詳情面板中找到 night_status::n_exit 節點")
 		if not status_nodes.is_empty():
 			assert_eq((status_nodes[0] as Label).text, "[已到訪，尚未對位]", "詳情狀態文字為 [已到訪，尚未對位]")
+		var desc_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_desc::n_exit")
+		assert_eq(desc_nodes.size(), 1, "詳情面板中找到 night_desc::n_exit 節點")
+		if not desc_nodes.is_empty():
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_desc := str((loader.locations.get("n_exit", {}) as Dictionary).get("desc", ""))
+			assert_eq((desc_nodes[0] as Label).text, exp_desc, "未對位地點詳情正確顯示 desc 引子擴寫")
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["status_seen_unaligned"] } }
 
@@ -1633,6 +1639,12 @@ class UiCase extends CaseBaseClass:
 		assert_eq(status_nodes.size(), 1, "詳情面板中找到 night_status::n_landmark 節點")
 		if not status_nodes.is_empty():
 			assert_eq((status_nodes[0] as Label).text, "[已到訪]", "詳情狀態文字為 [已到訪]")
+		var desc_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_desc::n_landmark")
+		assert_eq(desc_nodes.size(), 1, "詳情面板中找到 night_desc::n_landmark 節點")
+		if not desc_nodes.is_empty():
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_desc := str((loader.locations.get("n_landmark", {}) as Dictionary).get("desc", ""))
+			assert_eq((desc_nodes[0] as Label).text, exp_desc, "夜間限定地點詳情正確顯示 desc 引子擴寫")
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["status_seen_nightonly"] } }
 
@@ -1656,12 +1668,22 @@ class UiCase extends CaseBaseClass:
 		if not status_paid.is_empty():
 			assert_eq((status_paid[0] as Label).text, "[尚未到訪]", "收費地點詳情狀態文字為 [尚未到訪]")
 			assert_false(_has_digits((status_paid[0] as Label).text), "收費地點詳情狀態文字不含數字")
+		var desc_paid := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_desc::n_ahong_1")
+		if not desc_paid.is_empty():
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_desc := str((loader.locations.get("n_ahong_1", {}) as Dictionary).get("desc", ""))
+			assert_eq((desc_paid[0] as Label).text, exp_desc, "未到訪收費地點詳情正確顯示 desc")
 		await _close(tree)
 		await _click(tree, "location::n_woodtags")
 		var status_free := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_woodtags")
 		if not status_free.is_empty():
 			assert_eq((status_free[0] as Label).text, "[尚未到訪]", "免費地點詳情狀態文字為 [尚未到訪]")
 			assert_false(_has_digits((status_free[0] as Label).text), "免費地點詳情狀態文字不含數字")
+		var desc_free := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_desc::n_woodtags")
+		if not desc_free.is_empty():
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_desc := str((loader.locations.get("n_woodtags", {}) as Dictionary).get("desc", ""))
+			assert_eq((desc_free[0] as Label).text, exp_desc, "未到訪免費地點詳情正確顯示 desc")
 		await _close(tree)
 		return { "ok": errors.is_empty(), "errors": errors, "observations": { "evidence": ["status_no_number"] } }
 
@@ -1677,6 +1699,12 @@ class UiCase extends CaseBaseClass:
 		var status_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_exit")
 		if not status_nodes.is_empty():
 			assert_eq((status_nodes[0] as Label).text, "[已對位]", "一對一詳情狀態為 [已對位]")
+		var desc_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_desc::n_exit")
+		assert_eq(desc_nodes.size(), 1, "一對一對位詳情中找到 night_desc::n_exit 節點")
+		if not desc_nodes.is_empty():
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_desc := str((loader.locations.get("n_exit", {}) as Dictionary).get("desc", ""))
+			assert_eq((desc_nodes[0] as Label).text, exp_desc, "一對一對位後詳情顯示同一段 desc（不隨對位改變）")
 		var title_node := tree.get_root().find_child("LocationTitle", true, false) as Label
 		if title_node != null:
 			assert_true(title_node.text.contains("山泉閣"), "一對一詳情標題包含白天地點名『山泉閣』")
@@ -1694,6 +1722,12 @@ class UiCase extends CaseBaseClass:
 		var status_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_status::n_corridor")
 		if not status_nodes.is_empty():
 			assert_eq((status_nodes[0] as Label).text, "[已對位]", "多對一詳情狀態為 [已對位]")
+		var desc_nodes := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_desc::n_corridor")
+		assert_eq(desc_nodes.size(), 1, "多對一對位詳情中找到 night_desc::n_corridor 節點")
+		if not desc_nodes.is_empty():
+			var loader: DataLoader = CaseBaseClass.get_data(tree).get("loader") as DataLoader
+			var exp_desc := str((loader.locations.get("n_corridor", {}) as Dictionary).get("desc", ""))
+			assert_eq((desc_nodes[0] as Label).text, exp_desc, "多對一對位後詳情顯示同一段 desc（不隨對位改變）")
 		var title_node := tree.get_root().find_child("LocationTitle", true, false) as Label
 		if title_node != null:
 			assert_true(title_node.text.contains("靜和園後棟・很長的走廊"), "多對一詳情標題包含『靜和園後棟・很長的走廊』")
