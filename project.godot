@@ -1,9 +1,10 @@
 ; Engine configuration file.
-; ReturnFare（溫泉小鎮）
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
 ;
-; 專案根目錄與文件庫共用同一個資料夾，這是刻意的：data/ 是本作的核心資產，
-; 它現在的位置正好就是 res://data/。分成兩份會馬上製造「資料有兩份」的風險。
-; 場景放 scenes/，腳本放 scripts/，資料留在 data/。
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 

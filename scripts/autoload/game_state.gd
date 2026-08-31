@@ -55,6 +55,7 @@ var hand: Array[String] = []          # 佔格卡 id，有序；主角卡恆在 
 var knowledge: Dictionary = {}        # id -> true（Set；slotless 卡；meta 層，不隨輪重置）
 var night_locations_seen: Dictionary = {} # location_id -> true（meta 層，不隨輪重置）
 var night_once_beats_seen: Dictionary = {} # beat_id -> true（meta 層，不隨輪重置）
+var day_locations_visited: Dictionary = {} # location_id -> true（meta 層，不隨輪重置）
 var delegation_tutorial_seen: bool = false # 委託教學是否已由 UI 顯示並關閉／略過（meta 層，不隨輪重置，P4-C）
 var madness_clock: Dictionary = {}    # 實例 id -> 剩餘天數（P1 只建結構，P2 才走錶；run 層）
 var _madness_counter: int = 0         # 實例編號計數器（run 層）
@@ -1724,6 +1725,10 @@ func play_beat(beat_id: String) -> PackedStringArray:
 		return lines
 	lines.append_array(settle.get("lines", PackedStringArray()))
 
+	var loc_id := str(beat.get("location", ""))
+	if not loc_id.is_empty():
+		day_locations_visited[loc_id] = true
+
 	return lines
 
 
@@ -1940,6 +1945,22 @@ func has_any_legal_action() -> bool:
 				var slot_id := str((slot_view["slot"] as Dictionary).get("id", ""))
 				if not placeable_cards(beat_id, slot_id).is_empty():
 					return true
+	return false
+
+
+## 當前時段是否仍有尚未進入過的 OPEN beat（UI 專用查詢，決定推進按鈕文案）。
+func has_unseen_content() -> bool:
+	var locations := PanelBuilder.available_locations(self, Data)
+	for location_id: String in locations:
+		var view := build_panel(location_id)
+		for beat_view: Dictionary in view.get("beats", []) as Array:
+			if int(beat_view.get("tri", -1)) != PanelBuilder.TriState.OPEN:
+				continue
+			var beat_id := str((beat_view["beat"] as Dictionary).get("id", ""))
+			if beat_id.is_empty():
+				continue
+			if not (beats_entered is Dictionary and beats_entered.has(beat_id)):
+				return true
 	return false
 
 
@@ -2940,6 +2961,7 @@ func serialize() -> Dictionary:
 			"knowledge": knowledge.duplicate(),
 			"night_locations_seen": night_locations_seen.duplicate(),
 			"night_once_beats_seen": night_once_beats_seen.duplicate(),
+			"day_locations_visited": day_locations_visited.duplicate(),
 			"delegation_tutorial_seen": delegation_tutorial_seen,
 			"run_number": run_number,
 			"ending_history": history_copy,
@@ -2965,6 +2987,10 @@ func deserialize(d: Dictionary) -> Dictionary:
 
 	var history_parsed := _parse_history_records(d)
 	if not bool(history_parsed.get("ok", false)):
+		return { "ok": false, "reason_code": "invalid_save_shape" }
+
+	var visited_parsed := _parse_day_locations_visited(d)
+	if not bool(visited_parsed.get("ok", false)):
 		return { "ok": false, "reason_code": "invalid_save_shape" }
 
 	var run: Dictionary = d.get("run", {})
@@ -3033,6 +3059,7 @@ func deserialize(d: Dictionary) -> Dictionary:
 	knowledge = meta.get("knowledge", {}).duplicate()
 	night_locations_seen = meta.get("night_locations_seen", {}).duplicate()
 	night_once_beats_seen = meta.get("night_once_beats_seen", {}).duplicate()
+	day_locations_visited = visited_parsed.get("visited", {}).duplicate()
 	delegation_tutorial_seen = bool(meta.get("delegation_tutorial_seen", false))
 
 	# ── P5 欄位（缺欄的舊 checkpoint 以規格初值補齊，這條相容路徑在 P5-D 後仍保留）──
@@ -3060,6 +3087,30 @@ func deserialize(d: Dictionary) -> Dictionary:
 	active_ending = flow_parsed.get("active_ending", {}) as Dictionary
 
 	return { "ok": true, "reason_code": "" }
+
+
+## meta day locations visited set 的原子驗證。引用不存在的地點或值非 true，
+## 一律視為資料錯誤。回傳 { ok, visited }。
+func _parse_day_locations_visited(d: Dictionary) -> Dictionary:
+	var meta_raw: Variant = d.get("meta", {})
+	if not meta_raw is Dictionary:
+		return { "ok": true, "visited": {} }
+	if not (meta_raw as Dictionary).has("day_locations_visited"):
+		return { "ok": true, "visited": {} }
+	var raw: Variant = (meta_raw as Dictionary).get("day_locations_visited", {})
+	if not raw is Dictionary:
+		return { "ok": false, "visited": {} }
+	var visited: Dictionary = {}
+	for loc_id: Variant in (raw as Dictionary).keys():
+		var lid := str(loc_id)
+		var flag: Variant = (raw as Dictionary)[loc_id]
+		if typeof(flag) != TYPE_BOOL or not bool(flag):
+			return { "ok": false, "visited": {} }
+		if Data == null or Data.loader == null or not Data.loader.locations.has(lid):
+			return { "ok": false, "visited": {} }
+		visited[lid] = true
+	return { "ok": true, "visited": visited }
+
 
 
 ## meta persistent set 的原子驗證。引用不存在或非 `loop_persistent:true` 的卡，

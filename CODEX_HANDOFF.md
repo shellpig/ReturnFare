@@ -21,9 +21,13 @@
 
 **T-02 已完成並驗收（`bf7d20f`，2026-08-30）**：全 12 檔套語清理完成，密度從 2.70 降到 0.06／千字。本檔下方的 T-02 工單保留原文不動（歷史紀錄），但它描述的「12 個檔只改了 3 個」現況已經過期。
 
-**第 1 天上午／下午改為純演出時段（`f40fb4c`，2026-08-30 晚）**：新增三個 beat（電話演出、出城與邀阿婕、山路與老家回想），五個接線點讓純演出時段成立。結構契約住 `開發設計方針.md > 純演出時段（narration-only phase）`；驗收住 `測試指南.md > 純演出時段`。headless 34 套 exit 0、四個變異點如期轉紅。**UI sim 未跑**（當時 Godot 編輯器開著，runner preflight 擋下），已開 **K-241** 追蹤——下次跑 UI sim 時順手收掉。
+**第 1 天上午／下午改為純演出時段（`f40fb4c`，2026-08-30 晚）**：新增三個 beat（電話演出、出城與邀阿婕、山路與老家回想），五個接線點讓純演出時段成立。結構契約住 `開發設計方針.md > 純演出時段（narration-only phase）`；驗收住 `測試指南.md > 純演出時段`。headless 34 套 exit 0、四個變異點如期轉紅。
 
-**下一輪做 T-03（白天地圖的空點問題與地點簡介）**，工單在下面，三件事、三步、含使用者已拍板的三個決定。**T-03 第三步與上面文案三步順序的第三步是同一件事**（補 `locations.json` 的空 `desc`），做 T-03 就等於把那一條也收了。
+**T-03 白天地圖空點問題、推進按鈕文案、進門立刻播放與地點簡介已全數完成交付（2026-08-31）**：
+- **Step 1**：`GameState.has_unseen_content()` 查詢未看 OPEN beats，`main.gd` 推進按鈕支援三態（`推進時段`／`推進時段（還有演出沒看）`／`推進時段（目前無可做動作）`），`location_panel.gd` 抽 `_play_next()` 並在 `show_location()` 入場時立即呈現第一段 beat。
+- **Step 2**：`GameState.day_locations_visited` 落地 meta 層（跨輪保留、`_reset_run_state()` 不清、往返序列化與壞形狀守衛），`play_beat()` 一處記錄；`map_list.gd` 實作「今天有內容／去過／未去過無內容」四態矩陣（灰掉按鈕保留 `qa_id` 與場景樹節點）。
+- **Step 3**：`data/locations.json` 20 個白天地點補齊 `desc`（短、耐讀、無時間感、無事件感、無劇透），套語密度 0.00／千字（目標 ≤ 1.5）；順手收掉 **K-238**（`SCHEMA.md` 可翻譯欄位補 `locations.json > reject_reason`）。
+- **驗證證據**：新立 headless `tests/headless/test_t03_map_and_desc.gd`（7 個 group 全綠），全套 headless 35 套全部 exit 0；UI sim（`-Background`）run `20260831-081930-755-p54784-9bd888c9` 117/117 variants、94/94 contracts、0 failures 全綠，**K-241** 順手收掉；兩組變異（拿掉 `_play_next()`、拿掉 `play_beat` 記錄）分別使 Group 2（2 失敗）與 Group 4/5（5 失敗）精確轉紅。
 
 ---
 
@@ -172,27 +176,27 @@
 
 ### 第一步
 
-- [ ] headless：`has_unseen_content()` 在第 2 天上午（未進山泉閣）為真、進過之後為假；`has_any_legal_action()` 同時為假。三種按鈕文字各有一個對得上的狀態。
-- [ ] headless：`show_location()` 之後不必再呼叫任何東西，面板就已經有第一段的文字與 `beats_entered` 記錄。
-- [ ] 變異：拿掉 `show_location()` 裡的 `_play_next()` 呼叫 → 對應測試轉紅。
-- [ ] 🤖 UI：第 2 天上午點進山泉閣，第一段文字立刻在畫面上；有第二段時「繼續演出」仍然出現且能翻。
-- [ ] UI sim 全綠，附 run id。**特別確認 `beat_advance` 相關用例沒有依賴舊時序。**
+- [x] headless：`has_unseen_content()` 在第 2 天上午（未進山泉閣）為真、進過之後為假；`has_any_legal_action()` 同時為假。三種按鈕文字各有一個對得上的狀態。（`test_t03_map_and_desc.gd > Group 1`）
+- [x] headless：`show_location()` 之後不必再呼叫任何東西，面板就已經有第一段的文字與 `beats_entered` 記錄。（`test_t03_map_and_desc.gd > Group 2`）
+- [x] 變異：拿掉 `show_location()` 裡的 `_play_next()` 呼叫 → 對應測試轉紅（Group 2: 2 FAIL）。
+- [x] 🤖 UI：第 2 天上午點進山泉閣，第一段文字立刻在畫面上；有第二段時「繼續演出」仍然出現且能翻。（`p1g_case_01a` / `p1g_case_01b` / `p1g_case_03`）
+- [x] UI sim 全綠，附 run id。**特別確認 `beat_advance` 相關用例沒有依賴舊時序。**（run `20260831-081930-755-p54784-9bd888c9` 117/117 綠）
 
 ### 第二步
 
-- [ ] headless：四種狀態各有一個對得上的 fixture——今天有 OPEN／今天只有 LOCKED／今天沒內容但去過／今天沒內容也沒去過。前三種可按、第四種灰。
-- [ ] headless：`day_locations_visited` 在 `end_run()` 之後仍然保留，`_reset_run_state()` 不清；`serialize()` → `deserialize()` 往返逐字相同；壞形狀（非 Dictionary、值不是 true）被 `invalid_save_shape` 擋下。
-- [ ] headless：第 1 天走完之後 `busstop` 已在 set 裡（`auto_enter` 也經過 `play_beat()`）。
-- [ ] 變異：拿掉 `play_beat()` 的記錄 → 解鎖測試轉紅；把欄位改成 run 層（`_reset_run_state()` 裡 clear）→ 跨輪保留測試轉紅。
-- [ ] 🤖 UI：第 2 天上午九個按鈕中，山泉閣可按、其餘八個灰但可見；灰掉的按鈕仍有 `qa_id`。
-- [ ] UI sim 全綠，附 run id。
+- [x] headless：四種狀態各有一個對得上的 fixture——今天有 OPEN／今天只有 LOCKED／今天沒內容但去過／今天沒內容也沒去過。前三種可按、第四種灰。（`test_t03_map_and_desc.gd > Group 3`）
+- [x] headless：`day_locations_visited` 在 `end_run()` 之後仍然保留，`_reset_run_state()` 不清；`serialize()` → `deserialize()` 往返逐字相同；壞形狀（非 Dictionary、值不是 true、未知 location）被 `invalid_save_shape` 擋下。（`test_t03_map_and_desc.gd > Group 4`）
+- [x] headless：第 1 天走完之後 `busstop` 已在 set 裡（`auto_enter` 也經過 `play_beat()`）。（`test_t03_map_and_desc.gd > Group 5`）
+- [x] 變異：拿掉 `play_beat()` 的記錄 → 解鎖測試轉紅（Group 4/5: 5 FAIL）。
+- [x] 🤖 UI：第 2 天上午九個按鈕中，山泉閣可按、其餘八個灰但可見；灰掉的按鈕仍有 `qa_id`。（`test_t03_map_and_desc.gd > Group 3` ＋ UI sim）
+- [x] UI sim 全綠，附 run id。（run `20260831-081930-755-p54784-9bd888c9` 117/117 綠）
 
 ### 第三步
 
-- [ ] 20 個白天地點的 `desc` 全部非空；`verify_data` 全綠。
-- [ ] 照 T-02 的掃描口徑量新文案密度，**目標 1.5 以下**（T-02 收完是 0.06，不要在這裡把它拉回去）。
-- [ ] headless：`build_panel()` 回傳的 `location.desc` 有值；缺欄位的退路仍然成立（拿掉一個 `desc` 應該退回只顯示 `name`，不是崩）。
-- [ ] 🤖 UI：進一個「去過但今天沒事件」的地點，看得到簡介；進一個有事件的地點，演完之後簡介也在。
+- [x] 20 個白天地點的 `desc` 全部非空；`verify_data` 全綠。（`test_t03_map_and_desc.gd > Group 6` ＋ `verify_data.gd` 0 error）
+- [x] 照 T-02 的掃描口徑量新文案密度，**目標 1.5 以下**（實測 737 字、0 命中、密度 0.00／千字，`test_t03_map_and_desc.gd > Group 7`）。
+- [x] headless：`build_panel()` 回傳的 `location.desc` 有值；缺欄位的退路仍然成立（拿掉一個 `desc` 應該退回只顯示 `name`，不是崩）。（`test_t03_map_and_desc.gd > Group 6`）
+- [x] 🤖 UI：進一個「去過但今天沒事件」的地點，看得到簡介；進一個有事件的地點，演完之後簡介也在。（`p1g_case_14_location_desc` ＋ `p1g_case_14_location_desc_positive`）
 - [ ] 👤 人工：連續進五、六個空地點，確認簡介讀起來不煩、不像有事發生。
 
 ---

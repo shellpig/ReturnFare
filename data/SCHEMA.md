@@ -24,7 +24,7 @@
 | 檔 | 可翻譯欄位 |
 |---|---|
 | `cards.json` | `name`、`text` |
-| `locations.json` | `name`、`desc` |
+| `locations.json` | `name`、`desc`、`reject_reason` |
 | `npcs.json` | `name`、`locked_name` |
 | `card_types.json` | `name` |
 | `beats/*.json` | `title`、`text`、`slots[].label`、`slots[].reject_reason`、`reject_reason`、`echo.text`、`on_enter.text`、`on_place.text`、`slots[].delegation.preview`、`slots[].delegation.tendency`、`slots[].delegation.report.text`、`encounter.rounds[].demand`、`encounter.rounds[].responses[].on_resolve.text`、`encounter.rounds[].fallback.on_resolve.text`、`encounter.on_victory.text`／`on_failure.text`／`on_escape.text` |
@@ -392,7 +392,7 @@ resolver 輸出的 `page_refs` 是有序 `Array[String]`。每一筆都用穩定
 
 ## `locations.json`
 
-> `desc` 是 P1-G 新增的欄位：**玩家進到這個地點看到的地方描述**，在 beat 依序演出結束後常駐顯示（規格書第四節）。與 `note` 分開——`note` 是給開發者的，不翻譯、不進畫面。48 個地點的 `desc` 文字尚未填，引擎缺欄位時退回只顯示 `name`。
+> `desc` 是 P1-G 新增、T-03 填補的欄位：**玩家進到這個地點看到的地方描述**，在 beat 依序演出結束後常駐顯示（規格書第四節）。與 `note` 分開——`note` 是給開發者的，不翻譯、不進畫面。20 個白天地點已填寫，夜間詳情面板目前不顯示 `desc`。引擎缺欄位時退回只顯示 `name`。
 
 | 欄位 | 說明 |
 |---|---|
@@ -401,6 +401,7 @@ resolver 輸出的 `page_refs` 是有序 `Array[String]`。每一筆都用穩定
 | 欄位 | 說明 |
 |---|---|
 | `id` / `name` | `name` 是地點外部可觀察的名稱。night row 在對位前把它當引子顯示，不可直接寫進場後才知道的結果 |
+| `desc` | 玩家進到這個地點看到的地方描述（可翻譯欄位），在 beat 依序演出結束後常駐顯示。白天地點填寫，夜間詳情目前不顯示 |
 | `phases` | 開放時段：`morning` / `afternoon`（白天地點用） |
 | `layer` | `day` / `night` / `both` |
 | `chapter` | 第幾章開放。night row（含 `teaser_only`）必須與 `earliest_night` 所屬章節一致；一般 row 仍以 `earliest_night` 控制出現，`teaser_only` 才以 `chapter` 控制可見起點。teaser 的 `earliest_night` 不參與解鎖，只作章節一致性守衛 |

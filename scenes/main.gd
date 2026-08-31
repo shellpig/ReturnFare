@@ -7,6 +7,7 @@ const QAValidationClass := preload("res://tests/ui_sim/qa_validation.gd")
 const _MSG_DATA_ERROR := "資料載入失敗，詳情見 Output。"
 const _MSG_ADVANCE := "推進時段"
 const _MSG_ADVANCE_HINT := "推進時段（目前無可做動作）"
+const _MSG_ADVANCE_UNSEEN := "推進時段（還有演出沒看）"
 const _MSG_ADVANCE_SLEEP := "直接睡"
 const _MSG_ADVANCE_NEXT_DAY := "進入隔天"
 const _MSG_ADVANCE_END_NIGHT := "結束今晚"
@@ -297,8 +298,16 @@ func _refresh_advance_hint() -> void:
 		return
 	if GameState.phase == "morning" or GameState.phase == "afternoon":
 		var has_action: bool = GameState.has_any_legal_action()
-		_advance_btn.text = _MSG_ADVANCE if has_action else _MSG_ADVANCE_HINT
-		_advance_btn.modulate = Color.WHITE if has_action else Color(1.0, 0.82, 0.4)
+		var has_unseen: bool = GameState.has_unseen_content()
+		if has_action:
+			_advance_btn.text = _MSG_ADVANCE
+			_advance_btn.modulate = Color.WHITE
+		elif has_unseen:
+			_advance_btn.text = _MSG_ADVANCE_UNSEEN
+			_advance_btn.modulate = Color(1.0, 0.82, 0.4)
+		else:
+			_advance_btn.text = _MSG_ADVANCE_HINT
+			_advance_btn.modulate = Color(1.0, 0.82, 0.4)
 	elif GameState.phase == "night":
 		if GameState.night_sleep_pending:
 			_advance_btn.text = _MSG_ADVANCE_NEXT_DAY

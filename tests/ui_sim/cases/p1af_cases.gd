@@ -1439,10 +1439,12 @@ class UiCase extends CaseBaseClass:
 		assert_eq(JSON.stringify(after.get("hand", [])), JSON.stringify(["protagonist", "item_family_album"]),
 			"跨輪手牌只剩開局選項發的那些")
 		assert_eq(int((_state(tree).get("meta", {}) as Dictionary).get("run_number", 0)), 2, "跨輪後輪數加一")
-		assert_true((_state(tree).get("meta", {}) as Dictionary).get("knowledge", {}).has("k_already_on_list"), "跨輪保留知識")
-		var run_fields: Array[String] = ["flags", "switches", "switch_progress", "relations", "slots_placed", "choices", "beats_entered"]
+		var run_fields: Array[String] = ["flags", "switches", "switch_progress", "relations", "slots_placed", "choices"]
 		for field in run_fields:
 			assert_true((after.get(field, {}) as Dictionary).is_empty(), "跨輪欄位清空: %s" % field)
+		var entered_dict: Dictionary = after.get("beats_entered", {}) as Dictionary
+		assert_true(not entered_dict.has("d45_then") and not entered_dict.has("d1_arrival"), "跨輪舊 beat 已清空")
+		assert_true(entered_dict.has("d1_morning_departure"), "新輪 D1 上午演出 beat 已自動進入")
 		assert_true(not ending_panel_coda.is_visible_in_tree(), "結算完成後 EndingPanel 隱藏")
 		var advance_steps := 0
 		while int(_run(tree).get("day", 0)) < 8 and advance_steps < 60:
@@ -1485,8 +1487,11 @@ class UiCase extends CaseBaseClass:
 				assert_true(k_meta.has("k_already_on_list") or k_meta.has("k_not_today"), "第一輪知識跨輪保留")
 				assert_eq(JSON.stringify(run.get("hand", [])), JSON.stringify(["protagonist", "item_family_album"]),
 					"第一輪結束後手牌只剩第二輪開局選項發的那些")
-				for reset_field in ["flags", "switches", "switch_progress", "relations", "slots_placed", "choices", "beats_entered"]:
+				for reset_field in ["flags", "switches", "switch_progress", "relations", "slots_placed", "choices"]:
 					assert_true((run.get(reset_field, {}) as Dictionary).is_empty(), "完整走查跨輪欄位清空: %s" % reset_field)
+				var full_entered: Dictionary = run.get("beats_entered", {}) as Dictionary
+				assert_true(not full_entered.has("d45_then"), "完整走查跨輪舊 beat 已清空")
+				assert_true(full_entered.has("d1_morning_departure"), "完整走查新輪 D1 上午演出 beat 已進入")
 				continue
 
 			if first_round_done and day == 1 and phase == "evening":
@@ -1823,9 +1828,9 @@ class UiCase extends CaseBaseClass:
 		assert_true(align_oldstreet.is_empty() or not (align_oldstreet[0] as Control).is_visible_in_tree(), "錯誤地點 oldstreet 無對位按鈕")
 		await _close(tree)
 
-		await _enter(tree, "temple")
-		var align_temple := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_align::temple")
-		assert_true(align_temple.is_empty() or not (align_temple[0] as Control).is_visible_in_tree(), "錯誤地點 temple 無對位按鈕")
+		await _enter(tree, "busstop")
+		var align_busstop := QAStepClass.find_controls_by_qa_id(tree.get_root(), "night_align::busstop")
+		assert_true(align_busstop.is_empty() or not (align_busstop[0] as Control).is_visible_in_tree(), "錯誤地點 busstop 無對位按鈕")
 		await _close(tree)
 
 		var snap_after := JSON.stringify(_state(tree))

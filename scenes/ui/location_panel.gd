@@ -121,7 +121,10 @@ func show_location(location_id: String, extra_lines: PackedStringArray = PackedS
 	_current_played = false
 	_queue_open_beats()
 	_is_playing = not _pending_beat_ids.is_empty()
-	_rebuild()
+	if _is_playing:
+		_play_next()
+	else:
+		_rebuild()
 
 
 func show_night_details(location_id: String) -> void:
@@ -213,6 +216,10 @@ func _queue_open_beats() -> void:
 func _on_advance_beat_pressed() -> void:
 	if not _is_playing:
 		return
+	_play_next()
+
+
+func _play_next() -> void:
 	if not _pending_beat_ids.is_empty():
 		_current_beat_id = _pending_beat_ids.pop_front()
 		_visit_seen[_current_beat_id] = true

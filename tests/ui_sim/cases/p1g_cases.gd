@@ -64,34 +64,27 @@ class Case01aBeatsAjie extends CaseBaseClass:
 		if not click_res.get("ok", false):
 			return { "ok": false, "errors": ["點擊寺廟失敗: " + str(click_res.get("error"))] }
 
-		# 1. 進入寺廟時僅建立演出佇列，零狀態修改 (beats_entered 數量不變)
+		# 1. 進入寺廟時立即結算並呈現第 1 個 beat: d32_festival
 		var entered0: Dictionary = gs.call("serialize").get("run", {}).get("beats_entered", {})
-		assert_eq(entered0.size(), initial_count, "進入地點時不得直接結算 beat，beats_entered 數量必須不變")
+		assert_true(entered0.has("d32_festival"), "進入地點時必須立即呈現並結算第 1 個 beat: d32_festival")
+		assert_eq(entered0.size(), initial_count + 1, "進入地點時 beats_entered 數量必須恰 +1")
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"), "第 1 階段必須顯示繼續演出按鈕")
 
-		# 2. 第 1 次點擊推進按鈕 -> 結算第 1 個 beat: d32_festival
+		# 2. 第 1 次點擊推進按鈕 -> 結算第 2 個 beat: d32_festival_ajie
 		var adv1 := await QAStep.click(tree, "beat_advance")
 		assert_true(adv1.get("ok", false), "第 1 次點擊推進失敗: " + str(adv1.get("error")))
 
 		var entered1: Dictionary = gs.call("serialize").get("run", {}).get("beats_entered", {})
-		assert_true(entered1.has("d32_festival"), "第 1 次推進後必須進入 d32_festival")
-		assert_eq(entered1.size(), initial_count + 1, "第 1 次推進後 beats_entered 數量必須恰 +1")
+		assert_true(entered1.has("d32_festival_ajie"), "第 1 次推進後必須進入 d32_festival_ajie")
+		assert_eq(entered1.size(), initial_count + 2, "第 1 次推進後 beats_entered 數量必須恰 +2")
+		assert_true(not entered1.has("d32_festival_alone"), "不應觸發 d32_festival_alone")
+		assert_true(not entered1.has("d32_festival_awei"), "不應觸發 d32_festival_awei")
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"), "第 2 階段必須仍顯示繼續演出按鈕")
 
-		# 3. 第 2 次點擊推進按鈕 -> 結算第 2 個 beat: d32_festival_ajie
-		var adv2 := await QAStep.click(tree, "beat_advance")
-		assert_true(adv2.get("ok", false), "第 2 次點擊推進失敗: " + str(adv2.get("error")))
-
-		var entered2: Dictionary = gs.call("serialize").get("run", {}).get("beats_entered", {})
-		assert_true(entered2.has("d32_festival_ajie"), "第 2 次推進後必須進入 d32_festival_ajie")
-		assert_eq(entered2.size(), initial_count + 2, "第 2 次推進後 beats_entered 數量必須恰 +2")
-		assert_true(not entered2.has("d32_festival_alone"), "不應觸發 d32_festival_alone")
-		assert_true(not entered2.has("d32_festival_awei"), "不應觸發 d32_festival_awei")
-
-		# 4. 第 3 次點擊推進按鈕 -> 演畢進入常態畫面，推進按鈕隱藏
+		# 3. 第 2 次點擊推進按鈕 -> 演畢進入常態畫面，推進按鈕隱藏
 		if QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			var adv3 := await QAStep.click(tree, "beat_advance")
-			assert_true(adv3.get("ok", false), "第 3 次點擊推進失敗: " + str(adv3.get("error")))
+			var adv2 := await QAStep.click(tree, "beat_advance")
+			assert_true(adv2.get("ok", false), "第 2 次點擊推進失敗: " + str(adv2.get("error")))
 
 		assert_true(not QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"), "全部 beat 演完後 beat_advance 必須隱藏")
 
@@ -121,34 +114,27 @@ class Case01bBeatsAlone extends CaseBaseClass:
 		if not click_res.get("ok", false):
 			return { "ok": false, "errors": ["點擊寺廟失敗: " + str(click_res.get("error"))] }
 
-		# 1. 進入寺廟時僅建立演出佇列，零狀態修改 (beats_entered 數量不變)
+		# 1. 進入寺廟時立即結算並呈現第 1 個 beat: d32_festival
 		var entered0: Dictionary = gs.call("serialize").get("run", {}).get("beats_entered", {})
-		assert_eq(entered0.size(), initial_count, "進入地點時不得直接結算 beat，beats_entered 數量必須不變")
+		assert_true(entered0.has("d32_festival"), "進入地點時必須立即呈現並結算第 1 個 beat: d32_festival")
+		assert_eq(entered0.size(), initial_count + 1, "進入地點時 beats_entered 數量必須恰 +1")
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"), "第 1 階段必須顯示繼續演出按鈕")
 
-		# 2. 第 1 次點擊推進按鈕 -> 結算第 1 個 beat: d32_festival
+		# 2. 第 1 次點擊推進按鈕 -> 結算第 2 個 beat: d32_festival_alone
 		var adv1 := await QAStep.click(tree, "beat_advance")
 		assert_true(adv1.get("ok", false), "第 1 次點擊推進失敗: " + str(adv1.get("error")))
 
 		var entered1: Dictionary = gs.call("serialize").get("run", {}).get("beats_entered", {})
-		assert_true(entered1.has("d32_festival"), "第 1 次推進後必須進入 d32_festival")
-		assert_eq(entered1.size(), initial_count + 1, "第 1 次推進後 beats_entered 數量必須恰 +1")
+		assert_true(entered1.has("d32_festival_alone"), "第 1 次推進後必須進入 d32_festival_alone")
+		assert_eq(entered1.size(), initial_count + 2, "第 1 次推進後 beats_entered 數量必須恰 +2")
+		assert_true(not entered1.has("d32_festival_ajie"), "不應觸發 d32_festival_ajie")
+		assert_true(not entered1.has("d32_festival_awei"), "不應觸發 d32_festival_awei")
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"), "第 2 階段必須仍顯示繼續演出按鈕")
 
-		# 3. 第 2 次點擊推進按鈕 -> 結算第 2 個 beat: d32_festival_alone
-		var adv2 := await QAStep.click(tree, "beat_advance")
-		assert_true(adv2.get("ok", false), "第 2 次點擊推進失敗: " + str(adv2.get("error")))
-
-		var entered2: Dictionary = gs.call("serialize").get("run", {}).get("beats_entered", {})
-		assert_true(entered2.has("d32_festival_alone"), "第 2 次推進後必須進入 d32_festival_alone")
-		assert_eq(entered2.size(), initial_count + 2, "第 2 次推進後 beats_entered 數量必須恰 +2")
-		assert_true(not entered2.has("d32_festival_ajie"), "不應觸發 d32_festival_ajie")
-		assert_true(not entered2.has("d32_festival_awei"), "不應觸發 d32_festival_awei")
-
-		# 4. 第 3 次點擊推進按鈕 -> 演畢進入常態畫面，推進按鈕隱藏
+		# 3. 第 2 次點擊推進按鈕 -> 演畢進入常態畫面，推進按鈕隱藏
 		if QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"):
-			var adv3 := await QAStep.click(tree, "beat_advance")
-			assert_true(adv3.get("ok", false), "第 3 次點擊推進失敗: " + str(adv3.get("error")))
+			var adv2 := await QAStep.click(tree, "beat_advance")
+			assert_true(adv2.get("ok", false), "第 2 次點擊推進失敗: " + str(adv2.get("error")))
 
 		assert_true(not QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"), "全部 beat 演完後 beat_advance 必須隱藏")
 
@@ -239,8 +225,6 @@ class Case03ReenterNoDuplicateOnEnter extends CaseBaseClass:
 		assert_true(c2.get("ok", false), "第二次進山泉閣失敗: " + str(c2.get("error")))
 		assert_true(QAStep.has_visible_qa_id(tree.get_root(), "beat_advance"), "重進山泉閣必須再次顯示演出推進按鈕，證明重新排入演出佇列")
 
-		var adv_first := await QAStep.click(tree, "beat_advance")
-		assert_true(adv_first.get("ok", false), "重進後第一次點擊推進失敗: " + str(adv_first.get("error")))
 		var replay_dump := QADiagnostics.dump_ui_tree(main_node)
 		var replay_title_found := false
 		var replay_text_found := false

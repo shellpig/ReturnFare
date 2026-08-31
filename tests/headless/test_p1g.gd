@@ -79,23 +79,23 @@ func _test_two_stage_location_panel(gs: Node) -> int:
 	else:
 		failed += _ok("slots are absent during beat演出")
 
-	if not (gs.get("beats_entered") as Dictionary).is_empty():
-		failed += _fail("entering location should NOT play any beat immediately (side-effect free)")
+	if (gs.get("beats_entered") as Dictionary).size() != 1 or not (gs.get("beats_entered") as Dictionary).has("d32_festival"):
+		failed += _fail("entering location should play the first beat immediately")
 	else:
-		failed += _ok("entering location does not change state before player advances")
+		failed += _ok("entering location plays the first beat immediately and records beats_entered")
 
 	var advance_btn: Button = panel.get_node("AdvanceBeatButton")
 	if not advance_btn.visible:
-		failed += _fail("演出佇列 did not expose advance button")
+		failed += _fail("演出佇列 did not expose advance button for subsequent beats")
 	else:
-		failed += _ok("演出佇列 waits for player advance")
+		failed += _ok("演出佇列 exposes advance button for subsequent beats")
 
 	panel.call("_on_advance_beat_pressed")
 	await process_frame
-	if (gs.get("beats_entered") as Dictionary).size() != 1:
-		failed += _fail("first advance should play the first beat")
+	if (gs.get("beats_entered") as Dictionary).size() != 2:
+		failed += _fail("first advance button click should play the second beat")
 	else:
-		failed += _ok("first advance plays the first beat")
+		failed += _ok("first advance button click plays the second beat")
 
 	var guard := 0
 	while advance_btn.visible and guard < 12:
