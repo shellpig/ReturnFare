@@ -1,4 +1,5 @@
-import { copyFile, mkdir, readdir, rm } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { join, resolve, relative, sep, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -111,6 +112,21 @@ export async function syncData(sourceDir, targetDir) {
     await copyFile(srcAbs, targetFile);
     copied += 1;
   }
+
+  // 額外產生 data-manifest.json，置於產出資料目錄之外（public/data-manifest.json）。
+  // path 相對資料根、/ 分隔符、sha256 取來源檔案 bytes、依路徑排序。
+  const manifestFiles = [];
+  for (const [rel, srcAbs] of [...sourceJson.entries()].sort((a, b) =>
+    a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+  )) {
+    const bytes = await readFile(srcAbs);
+    manifestFiles.push({
+      path: rel,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+  }
+  const manifestFile = resolve(targetDir, '..', 'data-manifest.json');
+  await writeFile(manifestFile, JSON.stringify({ files: manifestFiles }, null, 2));
 
   return { source: sourceAbs, target: targetAbs, copied, removed };
 }
