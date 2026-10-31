@@ -60,7 +60,21 @@
 - 文楷 TC：官方 https://github.com/lxgw/LxgwWenKaiTC/releases/tag/v1.530 ，OFL 原文 https://raw.githubusercontent.com/lxgw/LxgwWenKaiTC/main/OFL.txt 。原始 TTF 15,341,148 bytes，SHA256 `6662480A3F95B4A90C80B189C679617A48ADCE3A505118A6AF63CE5A482B83FA`（worker 已對 release API）；成品 5,526,068 bytes，SHA256 `2360E22E3949FECEB5E82480FDD814D83678AA1E279091FCE2343FF5DDDC7D69`。
 - 台北黑體：官方 https://sites.google.com/view/jtfoundry/zh-tw/downloads ，官方 Drive 原檔 id `1eGAsTN1HBpJAkeVM57_C7ccp7hbgSz3_`；官方授權正文 https://openfontlicense.org/documents/OFL.txt ，原始 name table／來源另保留於 NOTICE。原始 TTF 20,659,344 bytes，SHA256 `8CC967E1E428C552701C461E8169E6AE76C7A23694EA1A6A786D6746ADEC53C4`；成品 7,215,276 bytes，SHA256 `B13DA4993C3715A8CE6299EA1C0A9CD71E4FA15EA72775E90D15B0AFFD4281F2`。
 
-## 未解與下一步
+## verifier 驗收、P3 修正與關門（2026-10-31）
 
-- 工程檢查通過，交 verifier 獨立驗收 W3-A；指揮者不自行勾驗收、不更新 PROJECT_BRIEF.md，W3 整體尚未關門。
-- 接續以本次提交為驗證對象，檢查正式 UI 與來源；完整玩法、地圖、卡片操作、存檔與多語系仍依後續 W 契約處理。
+- 驗證版本：乾淨的 `main@426574b`。`npm test` 8 files／55 tests、`npm run build`、`npm run test:ui` 連續兩次 3／3 皆 exit 0；`trace:web --output ../_qa/web/trace-web-W3A-verifier.json` 與 W3 scope 比對 exit 0，5 checkpoints／187 fields、equal=true。
+- 瀏覽器實走相簿路徑（Vite dev、內建瀏覽器）：鎖定選項顯示原鎖定理由；確認視窗開啟；D1 上午 1 段、下午 1 段、傍晚 3 段、第一夜長廊 1 段的順序與正式資料一致，抵達 D2 morning 後推進鈕停用，無地圖或卡槽。電話路徑、取消、載入失敗由 UI 測試涵蓋。兩套 woff2 皆 HTTP 200 並載入，1280 寬無水平溢出。
+- 變異：暫時移除 `GameShell` 的 `playNightFixed()` 呼叫，narration 測試轉紅；還原後 3／3。
+- 範圍：core、data、Godot、黃金基線零改動；`_qa/`、`.venv` 均受 gitignore。
+- 驗收時記下 4 項 P3，無 P0～P2：
+  1. `strings.ts` 只有一行概括來源；`資料載入中…` 非 Godot 原文；中文時段名、確認／取消在 Godot 無專案原文（Godot 狀態列直接顯示 phase id、確認框用引擎預設鈕）。
+  2. 開局確認框同時顯示 `preview` 與 `confirm_text`；Godot 只在 `confirm_text` 空白時以 `preview` 代替。
+  3. 讀完最後一段後正文消失，只剩推進鈕。
+  4. `error` 有值時推進鈕永久停用（W3 範圍內不可達）；UI 測試以 `[class*=map], [class*=slot]` 檢查無地圖／卡槽，恆為真。
+- P3 修正 `1400b39`：第 1 項逐條註明來源，載入文案改回 Godot 原文 `載入中...`，無原文者標明為 W3-A 新增；第 3 項保留最後一段正文；第 4 項推進鈕只依 `can_advance` 停用，測試改為斷言畫面只有一顆按鈕並檢查末段正文保留。第 2 項不改：SCHEMA 定義 `preview` 為確認前的故事預覽，契約亦要求「預覽→確認／取消」。
+- 修正後複驗：`npm test` 55 tests、build、`test:ui` 連續兩次 3／3 皆 exit 0。變異：末段改回只在閱讀中顯示，及多塞一顆按鈕，各使 narration 測試轉紅；還原後 3／3。
+- W3-A 驗收完成；W3 整體（B → A）關門。
+
+## 下一步
+
+- W4-A（完整條件求值器），接著 W4-B（白天地圖與面板），依 `docs/web/W4實作契約.md`。完整玩法、卡片操作、存檔與多語系仍依後續 W 契約。
