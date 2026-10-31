@@ -1,0 +1,22 @@
+@font-face { font-family: WenKai; src: url('/fonts/lxgw-wenkai-tc.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: TaipeiSans; src: url('/fonts/taipei-sans-tc.woff2') format('woff2'); font-display: swap; }
+:root { color: #382e27; background: #e9e3d7; font-family: TaipeiSans, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #e8e1d2, #cfc7b6); }
+.app-shell { width: min(100% - 2rem, 800px); margin: 6vh auto; padding: clamp(1.5rem, 4vw, 3.5rem); background: #f9f5eb; border: 1px solid #c5b99f; box-shadow: 0 12px 35px #554b3c25; }
+h1, h2 { font-weight: normal; color: #614b39; }
+h1 { font-size: 2rem; margin-top: 0; }
+h2 { font-size: 1.4rem; }
+.story { font-family: WenKai, serif; font-size: 1.15rem; line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.choices { display: grid; gap: 1rem; margin-top: 2rem; }
+button { font: inherit; color: #554435; background: #eee6d7; border: 1px solid #ac9b7e; padding: .8rem 1.2rem; cursor: pointer; }
+button:hover:not(:disabled) { background: #ded0b8; }
+button:focus-visible { outline: 3px solid #8a6746; outline-offset: 2px; }
+button:disabled { opacity: .55; cursor: default; }
+.choices button { width: 100%; text-align: left; }
+.reason { color: #775b49; font-size: .95rem; }
+dialog { width: min(90vw, 560px); border: 1px solid #ac9b7e; background: #f9f5eb; color: inherit; padding: 2rem; }
+dialog::backdrop { background: #251c16aa; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; }
+.narration header { color: #806e5a; border-bottom: 1px solid #d7cdbb; padding-bottom: 1rem; }
+.passage { min-height: 12rem; margin: 2rem 0; }
