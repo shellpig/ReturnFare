@@ -219,7 +219,7 @@ cmd /c "C:\Users\User\AppData\Local\agy\bin\agy.exe -p `"<任務>`" --model `"<�
 - `--add-dir <專案路徑>`：不加的話 agy 只在自己的 sandbox 暫存區活動，cwd 不算數——它會回報成功但專案裡什麼都沒發生。
 - `--dangerously-skip-permissions`：單次生效，不動持久設定。
 
-Model selection：`--model` 吃 `agy models` 列出的**完整顯示字串**（含括號內專注程度），例如 `"Gemini 3.5 Flash (High)"`。未指定時一律預設 `"Gemini 3.5 Flash (High)"`。
+Model selection：`--model` 吃 `agy models` 列出的**完整顯示字串**（含括號內專注程度），例如 `"Gemini 4 Argon (High)"`。未指定時一律預設 `"Gemini 4 Argon (High)"`。
 
 Default mode: read-only reviewer.
 - prompt 內明確要求：不建立 / 修改 / 刪除任何檔案、不跑會寫檔的命令、輸出純文字報告。

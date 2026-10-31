@@ -81,7 +81,7 @@ cmd /c "C:\Users\User\AppData\Local\agy\bin\agy.exe -p `\"<任務>`\" --model `\
 - **prompt 骨架**：`C:\_work\AI_Work\Tools\agy-runs\TEMPLATE.prompt.txt` 是 adventure-table 專案寫的，專案名、repo 路徑與 Phase 文件路徑都要換成本專案（見 [指揮者手冊 §2.2](conductor-handbook.md#22-prompt-骨架)）；第一行「YOU MUST DO THIS STEP YOURSELF」一律保留。
 - **拆步原則**：每個 agy 任務要在 15～20 分鐘內收斂到可驗證狀態；prompt 自足，只指向該步要讀的規格段落，明列交付物、focused test 指令與「不得 commit」。
 - 每步結束後 Claude 以 `git diff` 審改動、跑該步驗證，通過才 commit；失敗把錯誤餵回同一對話修。**審完若剩餘修改很小（幾行、單一檔案、不需重新理解脈絡），Claude 直接自己改完再 commit，不再開 agy 回合。**
-- Model：`--model` 用 `agy models` 列出的完整顯示字串，未指定時預設 `"Gemini 3.8 Flash (High)"`。
+- Model：`--model` 用 `agy models` 列出的完整顯示字串，未指定時預設 `"Gemini 4 Argon (High)"`。
 
 **Muse Spark 1.3 via OpenCode CLI**（worker）：用 OpenCode 桌面版內建的 CLI；不要再裝 npm 版 `opencode`（舊版資料庫與桌面版不相容，啟動即報 `Database is not empty and has no session table`）。流程、檢查節奏與權責見 [指揮者手冊 §4c](conductor-handbook.md#4c-muse-13-via-opencode-cli)。
 
