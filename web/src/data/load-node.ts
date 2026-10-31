@@ -23,12 +23,25 @@ const SCRIPT_DIR = resolve(SCRIPT_FILE, '..');
 const REPO_ROOT = resolve(SCRIPT_DIR, '..', '..', '..');
 const DATA_DIR = resolve(REPO_ROOT, 'data');
 
+export function getDefaultDataDir(): string {
+  const override = process.env.RETURNFARE_DATA_DIR;
+  return override && override.trim().length > 0 ? resolve(override) : DATA_DIR;
+}
+
+export function createNodeReadText(dataDir: string = getDefaultDataDir()): ReadText {
+  const baseDir = resolve(dataDir);
+  return async (relativeDataPath: string): Promise<string> => {
+    const abs = resolve(baseDir, relativeDataPath);
+    return readFile(abs, 'utf8');
+  };
+}
+
 export const readText: ReadText = async (relativeDataPath: string): Promise<string> => {
-  const abs = resolve(DATA_DIR, relativeDataPath);
-  return readFile(abs, 'utf8');
+  return createNodeReadText()(relativeDataPath);
 };
 
-export async function buildManifest(): Promise<DataFile[]> {
+export async function buildManifest(dataDir: string = getDefaultDataDir()): Promise<DataFile[]> {
+  const baseDir = resolve(dataDir);
   const files: DataFile[] = [];
 
   const collect = async (dir: string, prefix: string): Promise<void> => {
@@ -48,12 +61,13 @@ export async function buildManifest(): Promise<DataFile[]> {
     }
   };
 
-  await collect(DATA_DIR, '');
+  await collect(baseDir, '');
   files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return files;
 }
 
-export async function loadGameDataNode(): Promise<GameData> {
-  const manifest = await buildManifest();
-  return loadGameData(readText, manifest);
+export async function loadGameDataNode(dataDir: string = getDefaultDataDir()): Promise<GameData> {
+  const baseDir = resolve(dataDir);
+  const manifest = await buildManifest(baseDir);
+  return loadGameData(createNodeReadText(baseDir), manifest);
 }

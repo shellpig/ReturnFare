@@ -40,9 +40,83 @@ export const EFFECT_KEYS = [
 
 export const CARD_ENTRY_KEYS = ['card', 'if', 'permanent'] as const;
 
+export const CARD_TYPE_IDS = [
+  'protagonist',
+  'person',
+  'group',
+  'equipment',
+  'consumable',
+  'info',
+  'inference',
+  'document',
+  'knowledge',
+  'mood',
+  'madness',
+  'routine',
+] as const;
+
+export const LEGAL_NARRATIVE_BEAT_TAGS = [
+  'observable_exit_sanquan',
+  'reveals_replacement_truth',
+  'marriage',
+  'no_marriage',
+  'no_children',
+  'twenty_years',
+  'single_twenty_years',
+  'spouse_dies_first',
+  'protagonist_same_illness',
+  'protagonist_dies_early_forties',
+  'switch_subject_to_protagonist',
+  'proxy_reminisce',
+  'died_early_forties',
+  'died_of_cancer',
+  'died_rapidly',
+  'black_screen',
+  'blessing_reactivated',
+  'outside_ordinary_life',
+  'refuse_boarding_summary',
+] as const;
+
+export const LEGAL_REJECT_REASON_TAGS = [
+  'prev_trail',
+  'route_knowledge_1',
+  'route_knowledge_2',
+  'three_points',
+] as const;
+
+export const REQUIRED_TUNING_KEYS = [
+  'hand_size',
+  'phases_per_day',
+  'madness_cap',
+  'madness_countdown_days',
+  'madness_vision_threshold',
+  'indulgence.soak_phase_cost',
+  'indulgence.soak_cards_cleared',
+  'indulgence.forced_light_count',
+  'indulgence.forced_normal_until',
+] as const;
+
+export const INDULGENCE_LEVEL_KEYS = ['light', 'normal', 'heavy'] as const;
+
+export const EXPECTED_ENDING_IDS = [
+  'ending_replaced',
+  'ending_madness_be',
+  'ending_inventory_be',
+  'ending_refuse_boarding',
+] as const;
+
+export const EXPECTED_OPENING_CHOICE_IDS = [
+  'take_family_album',
+  'return_missed_call',
+  'refuse_boarding',
+] as const;
+
 export type ConditionOperator = typeof CONDITION_OPERATORS[number];
 export type EffectKey = typeof EFFECT_KEYS[number];
 export type CardEntryKey = typeof CARD_ENTRY_KEYS[number];
+export type NarrativeBeatTag = typeof LEGAL_NARRATIVE_BEAT_TAGS[number];
+export type RejectReasonTag = typeof LEGAL_REJECT_REASON_TAGS[number];
+export type RequiredTuningKey = typeof REQUIRED_TUNING_KEYS[number];
 
 export function isConditionOperator(key: string): key is ConditionOperator {
   return CONDITION_OPERATORS.includes(key as ConditionOperator);
@@ -55,3 +129,4 @@ export function isEffectKey(key: string): key is EffectKey {
 export function isCardEntryKey(key: string): key is CardEntryKey {
   return CARD_ENTRY_KEYS.includes(key as CardEntryKey);
 }
+
