@@ -48,6 +48,7 @@ Report to user: current progress, and any issues with their scope of impact.
 | 診斷 bug、分析錯誤、找根因、效能回歸 | `diagnose` |
 | 需求不清、規格討論、要問釐清問題 | `grill-me` |
 | 前端／本機 web app 驗證、UI 行為除錯、瀏覽器截圖或 console log | `webapp-testing` |
+| 指揮其他 agent（agy／ChatGPT／Muse 等）實作、派工、驗收 | `docs/others/conductor-handbook.md`（按該檔開頭的角色讀取指引只讀對應段落；外部 CLI 指令另見 `docs/others/local-tools.md`） |
 
 四個 skill 已用 junction 同時掛進 `~/.claude/skills/` 與 `~/.agents/skills/`。前者供 Claude 使用；後者供支援 Agent Skills 的其他 agent（包含 Codex）發現。**出現在 session 的技能清單時直接用 skill 名字叫**。原始檔仍在 `C:\_work\AI_Work\Skills\`（改那邊就等於改這邊）；環境沒掛 junction 時退回讀檔：
 
