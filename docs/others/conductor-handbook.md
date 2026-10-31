@@ -2,11 +2,13 @@
 
 適用對象：被指定為「指揮者」的 AI session（目前是 Claude Code）。指揮者不自己寫主要程式，而是把 Subphase 拆成小步驟交給外部 worker（Antigravity CLI `agy`、ChatGPT Web、Muse 網頁版、Muse 1.3 via OpenCode CLI）實作，再在本機驗證、審核、修小錯、commit、push、更新實作紀錄。
 
-本檔是流程與踩坑紀錄，不是 Phase 契約。Phase 要做什麼看 `docs/Px/` 三份文件；本檔只講「怎麼讓別人做、怎麼確認做對」。
+本檔是流程與踩坑紀錄，不是 Phase 契約。Phase 要做什麼看根目錄三份文件（`實作規格書.md`／`開發設計方針.md`／`測試指南.md`，按 AGENTS.md「按 Phase 查閱規則」只讀對應段）；網頁版 W 編號工單看 `docs/web/網頁版移植計畫.md`。本檔只講「怎麼讓別人做、怎麼確認做對」。
 
 按角色／工作讀取：指揮者讀 §1、§2、§5、§7，再讀所選 worker 的 §3、§4、§4b 或 §4c；選 worker 時才讀 §6。只建立實作紀錄時讀 §2.4。Windows 指令與外部 CLI 另見 [local-tools.md](local-tools.md) 對應段落，不必每次整份重讀。
 
 首次成型：2026-09-17，P4-E（E1～E9b 由 agy、E10a 起由 ChatGPT）。2026-09-27 起 P5 由 Muse 實作（§4b）。2026-10-04 起 M07-C 改由 OpenCode CLI 指揮 Muse 1.3（§4c）。
+
+> **來源**：本檔從 adventure-table 專案（Python 後端＋React 前端）移植。流程與規則已改成本專案（Godot 版＋`web/` 網頁版）；但 §3～§4c 的缺陷表、品質觀察與實例（P4-E、P5、M07-C、PostgreSQL、REST／MCP、route 等）是**該專案的踩坑紀錄**，保留作經驗參考，不是本專案的契約或編號。本專案的 P 編號與它無關。
 
 ---
 
@@ -15,7 +17,7 @@
 | 角色 | 做什麼 | 不做什麼 |
 |---|---|---|
 | 使用者 | 拍板 step 範圍、選 worker、決定何時停 | 不盯進度（指揮者負責） |
-| 指揮者（本 session） | 讀契約、拆 step、寫 prompt、送出、定時檢查、pull、跑測試、審 diff、修小錯、commit、push、更新 `<Subphase>實作紀錄.md` | 不重寫 worker 的大段程式（改動超過幾個檔案就退回 worker）；不改 Phase 三份文件（verifier 職權） |
+| 指揮者（本 session） | 讀契約、拆 step、寫 prompt、送出、定時檢查、pull、跑測試、審 diff、修小錯、commit、push、更新 `<Subphase>實作紀錄.md` | 不重寫 worker 的大段程式（改動超過幾個檔案就退回 worker）；不改 `實作規格書.md`、`測試指南.md`、`驗證後已知問題.md`、`PROJECT_BRIEF.md`（verifier 職權，見 AGENTS.md 實作守則第 4 條）；不替 worker 或自己打勾驗收 |
 | worker（agy / ChatGPT / Muse） | 讀指定文件與程式、寫程式與測試、回報 | agy：不得 git add / commit / push；ChatGPT／Muse：可 commit + push 到指定 branch，但不得開新 branch / 動 main / force push / rebase |
 
 **commit 權責**：agy 產出由指揮者 commit；ChatGPT 自己 commit（author 是 repo owner，沒有 Co-Authored-By）。指揮者自己的修正另開 commit，訊息寫清楚修了 worker 的什麼。
@@ -29,17 +31,17 @@
 - **使用者 2026-09-27 拍板：不要過度拆分。** Subphase 可視需要拆成少數大步（例：A1、A2、A3，每步約 2,000～3,000 行），但一步之內不再列 A～H 之類的子項，也不為子項建紀錄；指揮者以節省自身 token 為準。下面 15～20 分鐘的粒度只適用單回合有硬性時間上限的 worker（ChatGPT）。
 - **一個 step = 15～20 分鐘內能收斂到「測試綠、可 commit」的量**（ChatGPT）。 判準：一條 route + 對應 client、或一個元件 + 測試、或一個 domain 函式 + route + 測試。
 - 大 step 一定失敗：P4-E E10c 整包（rolls + reactions + grapple/shove + reach）連續兩回合 timeout；拆成 E10c-1 / E10c-2 後各一回合完成。
-- step 命名接在 Subphase 步驟板後面（E10a、E10b、E10c-1…），寫進 `docs/<Phase>/<Subphase>實作紀錄.md` 的「步驟進度」表，這張表是唯一的進度真相；`PROJECT_BRIEF.md` 不記 step。
+- step 命名接在 Subphase 編號後面（例：P5-A1、W3-B2、W3-B2-1…），寫進 `docs/records/<Subphase>實作紀錄.md` 的「步驟進度」表，這張表是唯一的進度真相；`PROJECT_BRIEF.md` 不記 step。
 
 ### 2.2 prompt 骨架
 
-從 `C:\_work\AI_Work\Tools\agy-runs\TEMPLATE.prompt.txt` 複製（本機路徑，見 [local-tools.md](local-tools.md)「外部 Reviewer / Worker CLI」），固定段落：
+從 `C:\_work\AI_Work\Tools\agy-runs\TEMPLATE.prompt.txt` 複製（本機路徑，見 [local-tools.md](local-tools.md)「外部 Worker CLI」）。**該範本是 adventure-table 寫的**：專案名改 ReturnFare、repo 改 `C:\_work\AI_Work\Projects\ReturnFare`、`docs/<PHASE-DIR>/` 改成根目錄三份文件（`實作規格.md` 改 `實作規格書.md`）、實作紀錄改 `docs/records/`。固定段落：
 
 1. **身分與狀態**：step 名、branch、HEAD hash、已完成的 step。
-2. **MANDATORY READING**：確認完整且最新的 `AGENTS.md`（已載入則不重讀）→ 精簡 `PROJECT_BRIEF.md` → 該 Subphase 接手摘要／步驟板與自己的 step 檔案 → 三份 Phase 文件對應段及必要共用前言 → **要動的每個程式檔與相關 API 定義（列檔名 + 用途 / 現在缺什麼）**。依賴其他 step 才額外列該步，不要求整份讀實作紀錄或 ROADMAP_HISTORY。server contract 把 route、input / view model 欄位與來源段落寫進 prompt；摘要不取代正式契約，修改前仍須讀該程式檔最新 HEAD。續做同一步時，不重讀已取得且未變更的背景文件。
-3. **SCOPE**：A/B/C… 條列，含測試案例清單，**必列「不該看到 / 不該操作」的 actor**（Player 看不到 DM 控制、非本場 participant 被拒且零副作用）。
-4. **Do not touch**：明列不可碰的檔案 / 區域。
-5. **CODE QUALITY**：一句「必須通過 `pytest tests/test_code_quality_gate.py`（cwd `apps/server`）與 `npm run build`」。`getattr` 帶 default／bare `Any` 註記／不 re-raise 的 broad except 由該測試擋，baseline 只能降不能升，不再逐條寫進 prompt。仍要人寫的：點名要共用的既有 helper；禁測試替身掩蓋 production gap、假資料補值／`"?"` 佔位、optional-everything props + 空值 guard、越界改既有契約；「貼超過 ~20 行就抽 helper」。
+2. **MANDATORY READING**：確認完整且最新的 `AGENTS.md`（已載入則不重讀）→ 精簡 `PROJECT_BRIEF.md` → 該 Subphase 接手摘要／步驟板與自己的 step 檔案 → 三份 Phase 文件對應段及必要共用前言 → **要動的每個程式檔與相關 API 定義（列檔名 + 用途 / 現在缺什麼）**。依賴其他 step 才額外列該步，不要求整份讀實作紀錄。要用到的 API（`GameState` / `PanelBuilder` 等的簽名）與 `data/SCHEMA.md` 欄位直接寫進 prompt；摘要不取代正式契約，修改前仍須讀該程式檔最新 HEAD。續做同一步時，不重讀已取得且未變更的背景文件。
+3. **SCOPE**：A/B/C… 條列，含測試案例清單，**必列拒絕路徑**（不合法的放卡被拒且序列化狀態前後逐字一致、未揭露資訊不出現在面板與地圖，見 AGENTS.md 實作守則第 7 條與 `實作規格書.md`「四、地點與面板」）。
+4. **Do not touch**：明列不可碰的檔案 / 區域。預設包含：verifier 文件、`_舊文件/`；網頁版步驟另含 `scripts/`、`scenes/`（Godot 版只讀）。
+5. **CODE QUALITY**：本專案**沒有自動 code quality gate**，要逐條寫進 prompt：遊戲文字一律從 `data/` 原樣取出、不得改寫或自編；可調數值只放 `data/`，不寫死；UI 不含規則判斷（規則只在規則層入口，見 `開發設計方針.md`「全域結構決策」）；網頁版 `web/src/core/` 不得 import React。另點名要共用的既有 helper；禁測試替身掩蓋正式接線缺口、假資料補值／`"?"` 佔位、全 optional 欄位＋空值 guard、越界改既有契約；「貼超過 ~20 行就抽 helper」。
 6. **VERIFICATION**：worker 跑不了或不可靠時，寫明指揮者會跑哪些指令。
 7. **HARD RULES / GIT**：agy 不得 git 操作；ChatGPT 的 commit message、禁 force push / 開新 branch / 動 main。**parent 一律寫「你動手前 fetch 到的 branch HEAD」，不要寫死 hash**——指揮者常在 worker 跑的期間推自己的修正或文件 commit，寫死的 hash 會過期（2026-09-17 E10d-2a 撞到，worker 正確地拒絕覆蓋並改用當前 HEAD）。
 8. **FINAL REPORT**：固定五項（commit / 檔案 / 新簽名 / 測試名 / 契約疑點）。
@@ -49,28 +51,28 @@ prompt 檔存 `C:\_work\AI_Work\Tools\agy-runs\<worker>-<phase>-<step>.prompt.tx
 ### 2.3 指揮者驗證 gate（每個 step）
 
 ```
-git pull --ff-only（ChatGPT）或 git diff（agy 直接改本機）
-→ focused pytest（cwd apps/server，..\..\.venv\Scripts\python.exe）
-→ 受影響 Phase 的 regression pytest（例：P4-B/C/D/E 全部 test_p4*）
-→ npm test -- --run、npm run build（cwd apps/web，只要動到 apps/web）
+git pull --ff-only（ChatGPT／Muse 網頁版）或 git diff（agy／OpenCode Muse 直接改本機）
+→ Godot 版：tests/run_all_headless.ps1 全套（escalated；搬過 .tscn/.gd 先 --import），見 local-tools.md
+→ 網頁版：npm test -- --run、npm run build（cwd web/，只要動到 web/）；有黃金軌跡（W1-C）後再跑軌跡比對
 → 讀 diff（見 §5 checklist）
+→ 關鍵規則／接線：暫時拔掉接線或反轉判斷，確認對應測試轉紅再還原（AGENTS.md 實作守則第 5 條）
 → 修小錯（幾行、單一目的）
 → 更新 <Subphase>實作紀錄.md 的接手摘要／步驟表 + 該 step 詳細紀錄（§2.4）
 → commit + push
 ```
 
-Subphase 關門與合併回 `main` 的 gate 照 `AGENTS.md`「工程實作守則」第 4 條，不在本檔重述。
+Subphase 關門（驗收打勾、落檔）由 verifier 做，不在本檔重述；指揮者只交證據（exit code、報告路徑、重數出來的實際數字），見 AGENTS.md 實作守則第 4 條。
 
 ### 2.4 實作紀錄格式
 
-本節是實作紀錄格式的唯一來源，**只適用之後新建的紀錄；P4-F 等既有紀錄不回溯拆分**。它是工作紀錄，不取代三份 Phase 契約。由指揮者／紀錄維護者更新，worker 的文件修改權仍依任務授權。
+本節是實作紀錄格式的唯一來源。本專案在採用本手冊之前沒有實作紀錄，`CODEX_HANDOFF.md` 等既有交接檔不回溯改格式。它是工作紀錄，不取代三份 Phase 契約。由指揮者／紀錄維護者更新，worker 的文件修改權仍依任務授權。
 
-`docs/<Phase>/<Subphase>實作紀錄.md` 只放：
+`docs/records/<Subphase>實作紀錄.md` 只放：
 
 - **接手摘要**（頂部，≤ **3,000 UTF-8 bytes**）：更新日期、目標與邊界、branch、最近已驗證 commit、下一步、阻礙／未審 worker commit、必要跨步依賴與正式契約入口。覆寫目前摘要，不追加日誌；HEAD 變更時核對 diff 與證據適用範圍，不直接宣稱新 commit 已驗證，也不重跑仍有效的檢查。
 - **步驟進度**：唯一 step 狀態來源。每步一列，只列 step id、短標題、狀態、依賴與詳細紀錄連結；長篇 scope、API 清單、測試數字不放表格。狀態須分清待做／進行中／待驗證／完成。
 
-每步另存 `docs/<Phase>/<Subphase>_steps/<step>.md`。派工前先寫該步 scope、對應契約標題、必要輸入／前置依賴與驗收方式；結束後補齊：起始（日期、worker、回合數與時長）、交付（函式／route／元件）、**指揮者審核修正**、測試（指令、結果、驗證 commit）、未解問題與下一步。詳細檔不另維護第二份 step 狀態；修正回合沿用同一步檔案，子步連結從步驟板可定位。
+每步另存 `docs/records/<Subphase>_steps/<step>.md`。派工前先寫該步 scope、對應契約標題、必要輸入／前置依賴與驗收方式；結束後補齊：起始（日期、worker、回合數與時長）、交付（函式／route／元件）、**指揮者審核修正**、測試（指令、結果、驗證 commit）、未解問題與下一步。詳細檔不另維護第二份 step 狀態；修正回合沿用同一步檔案，子步連結從步驟板可定位。
 
 Worker／新指揮者先讀接手摘要與步驟板，再讀自己的 step；只有依賴或待審項目才讀其他步。三份契約的相關段落、必要共用前言與最新程式碼仍須核對。接手舊格式時按標題讀步驟板及相關紀錄，不要求整份讀，也不為符合新格式回頭搬檔。
 
@@ -94,9 +96,9 @@ Worker／新指揮者先讀接手摘要與步驟板，再讀自己的 step；只
 啟動後立刻掛一個 `Monitor`（或等價的背景 loop），每 4～5 分鐘印一行：
 
 ```bash
-git status --short --untracked-files=all -- apps/server | wc -l   # 改動檔數
-git status --short --untracked-files=all -- apps/server | awk '{print $2}' | xargs -r ls -t | head -1   # 最新被改的檔
-tasklist | grep -ci python.exe                                     # 有沒有測試在跑
+git status --short --untracked-files=all -- scripts scenes tests data web | wc -l   # 改動檔數
+git status --short --untracked-files=all -- scripts scenes tests data web | awk '{print $2}' | xargs -r ls -t | head -1   # 最新被改的檔
+tasklist | grep -ciE "godot|node.exe"                                              # 有沒有測試在跑
 ```
 
 輸出檔（`<步驟>.json`）非空即結束，loop 退出。判斷規則：
@@ -106,12 +108,12 @@ tasklist | grep -ci python.exe                                     # 有沒有�
 | 檔數在增加、或最新檔在變 | 正常 | 不打擾 |
 | 前 5 分鐘 0 檔改動 | 正常（讀檔階段） | 不打擾 |
 | 連續 2 次（≈8～10 分鐘）檔數不變、最新檔 mtime 不變 | 卡住（多半在等自己丟到背景的測試） | 殺 agy 程序，讀輸出檔與已寫的檔，小則自己收尾、大則開新對話重送 |
-| python 程序常駐 + 檔案不變 | 同上 | 同上 |
+| Godot／node 程序常駐 + 檔案不變 | 同上 | 同上 |
 | 輸出檔開頭 `print timeout after ... with turn in progress` | 已死 | 同上 |
 
 重送時 prompt 加一句硬規則：「所有指令前景執行並等它回來；不得把測試丟到背景再等；先寫程式、最後只跑一次測試」。F7b 第二回合即以此重送。
 
-**agy 必須自己做，不得交給 subagent**（使用者 2026-09-28）：P5-G G2 第一回合 agy 把工作交給自己開的背景子任務，root agent 印「root agent idle; waiting ... for 1 background task(s)」後空等，10 分鐘零進度。`TEMPLATE.prompt.txt` 第一行已固定「YOU MUST DO THIS STEP YOURSELF…不得交給 subagent／background task／parallel worker」，每個 agy prompt 都要保留在最前面。注意同一句字樣也會在 agy 把長時間 shell 指令（例如 Docker E2E）放到背景時出現（G2d 實測：印出後 E2E server 仍持續收到請求、spec 持續修改）；單憑字樣不判死，仍依上表看檔案 mtime，跑 E2E 時另看 `docker logs --since 5m adventure-table-server-e2e-1` 是否仍有非 `/ready` 請求。
+**agy 必須自己做，不得交給 subagent**（使用者 2026-09-28）：P5-G G2 第一回合 agy 把工作交給自己開的背景子任務，root agent 印「root agent idle; waiting ... for 1 background task(s)」後空等，10 分鐘零進度。`TEMPLATE.prompt.txt` 第一行已固定「YOU MUST DO THIS STEP YOURSELF…不得交給 subagent／background task／parallel worker」，每個 agy prompt 都要保留在最前面。注意同一句字樣也會在 agy 把長時間 shell 指令（例如整套 headless 或 E2E）放到背景時出現（adventure-table G2d 實測：印出後測試仍在跑、檔案持續修改）；單憑字樣不判死，仍依上表看檔案 mtime 與程序。
 
 **agy 已知缺陷（P4-E E1～E9b 統計，每步都要在 prompt 裡點名禁止）**
 
@@ -134,8 +136,8 @@ tasklist | grep -ci python.exe                                     # 有沒有�
 
 - 對話必須由**有 GitHub connector 且對 repo 有寫入權的帳號**開；換帳號會看到「你沒有權限存取這段對話」。
 - 用 **Claude in Chrome**（使用者的真 Chrome，已登入）驅動，不是內建瀏覽器（隔離、未登入，且指揮者不得代替登入）。
-- ChatGPT 讀 / 寫 repo 走 GitHub connector：讀檔、建 blob / tree / commit、更新 branch ref。它**跑不了 pytest / vitest / build**，也不會自己看 diff。
-- 它可以叫 GitHub Actions 跑測試，但排隊 + checkout + npm ci 遠慢於本機（vitest 2 秒、focused pytest 1 分鐘內），所以驗證留在本機；只有它連續兩回合交同一個失敗、需要自己迭代時才值得讓它走 CI。
+- ChatGPT 讀 / 寫 repo 走 GitHub connector：讀檔、建 blob / tree / commit、更新 branch ref。它**跑不了 Godot headless / vitest / build**，也不會自己看 diff。
+- 本專案沒有 GitHub Actions；驗證一律留在本機。
 
 ### 4.2 送 prompt 的技術細節（全部踩過坑）
 
@@ -193,8 +195,8 @@ if (btn && !btn.disabled) btn.click();
 ### 4b.1 前置
 
 - Muse（muse.ai）thread 由使用者指定，**可能因 context 上限隨時重開**；當前 thread URL 只記在該 Subphase 實作紀錄的接手摘要，本檔不記。派新 step、送修正回合或新指揮者接手時，若使用者當下沒有提供 thread，**先問使用者**，不沿用紀錄裡的舊連結。新 thread 不帶前一 thread 的對話脈絡，prompt 必須自足（指向實作紀錄與 step 檔）；Linux 環境跨 thread 沿用。用 **Claude in Chrome**（使用者的真 Chrome，已登入）驅動。
-- Muse 有自己的 Linux 環境，跨回合保留：clone 在 `~/workspace/repos/adventure-table`、repo root `.venv`（`apps/server[dev,web]`，venv 內 pin SQLAlchemy 2.0.54，不進 repo）、PostgreSQL 17（`P4_POSTGRES_URL=postgresql+psycopg://advtest:advtest@localhost:5432/advtest`）、node 24。VM 重建後 PostgreSQL 需 `pg_ctlcluster 17 main start`。
-- **Muse 自己跑測試**：focused＋全套 backend pytest（含 PG）綠燈才 commit；指揮者仍在本機複驗（§2.3）。
+- Muse 有自己的 Linux 環境，跨回合保留。**本專案還沒在 Muse 環境建置過**：網頁版步驟需要 node；Godot 版步驟需要 Linux 版 Godot 4.6.3 headless。第一次派工前先讓它 clone 本 repo 並裝好對應工具，把實際路徑記進該 Subphase 實作紀錄的接手摘要。
+- **Muse 自己跑測試**：該步的測試綠燈才 commit；指揮者仍在本機複驗（§2.3）。
 - **`git push` 不通**（PAT 只經 egress proxy 以 Bearer 轉送，git 協定需 Basic）：Muse 在本機 commit 後用 Git Data API（blob→tree→commit→update ref）推同一 tree，推完 `git fetch` 核對 diff 為空。
 - **權限核可**：Muse 要連新網域時畫面會跳「允許Muse與…分享資訊？」並暫停；使用者授權指揮者一律按「這個網站一律允許」。
 
@@ -250,11 +252,11 @@ document.querySelector('button[aria-label="傳送"]').click();
 
 | | 網頁版 Muse（§4b） | OpenCode Muse 1.3（本節） |
 |---|---|---|
-| 執行環境 | muse.ai 的 Linux VM | 使用者本機 Windows 工作樹、本機 venv／npm／Docker |
+| 執行環境 | muse.ai 的 Linux VM | 使用者本機 Windows 工作樹、本機 Godot／npm |
 | 派工與讀回報 | Claude in Chrome 操作網頁 composer、讀 innerText | `opencode-cli.exe run` 背景執行，回報讀 log 尾段 |
 | commit | worker 自己用 Git Data API 推 | **指揮者 commit／push**；prompt 禁止所有 git 寫入 |
-| 環境差異 | 有（例：它那邊 0041 SQLite 測試失敗、本機通過） | 無，跑的就是本機那一套 |
-| E2E | 跑不了瀏覽器 | 可用 `npm run test:e2e:docker` 寫並實跑 spec |
+| 環境差異 | 有（adventure-table 實例：它那邊 SQLite 測試失敗、本機通過） | 無，跑的就是本機那一套 |
+| E2E | 跑不了瀏覽器 | 可寫並實跑 `web/` 的 Playwright spec（W1-A 建好之後） |
 
 ### 4c.2 送 prompt 與檢查節奏
 
@@ -264,9 +266,9 @@ document.querySelector('button[aria-label="傳送"]').click();
 
 ### 4c.3 prompt 必備
 
-- 第一段寫明：在本機工作樹直接改檔；**不得任何 git 寫入**（add／commit／push／checkout／stash／reset／rebase／branch）、不開 subagent 或背景任務、不刪除非本次新增的檔案、不碰 daily DB 與 daily `server`／`web`。需要 E2E 時，Docker 只准透過 `npm run test:e2e:docker` 使用（隔離的 `adventure_table_e2e`）。
+- 第一段寫明：在本機工作樹直接改檔；**不得任何 git 寫入**（add／commit／push／checkout／stash／reset／rebase／branch）、不開 subagent 或背景任務、不刪除非本次新增的檔案、不讀不碰 `_舊文件/`。
 - §4b.5 的 blocker 條款與可核對 FINAL REPORT 同樣適用；E2E 步驟另要求連跑兩次都通過、遇到產品 bug 停下回報，不得改產品程式碼或放寬斷言遷就。
-- 已知與本步無關的環境失敗（例：KI-ENV-002 worker crash）要在 prompt 註明不擋交付，避免它停在 gate 不回報。
+- 已知與本步無關的環境失敗（例：Godot headless 在 sandbox 內 signal 11、`驗證後已知問題.md` 裡已接受的項目）要在 prompt 註明不擋交付，避免它停在 gate 不回報。
 
 ### 4c.4 觀察到的品質（M07-C）
 
@@ -280,15 +282,15 @@ document.querySelector('button[aria-label="傳送"]').click();
 
 每個 step 至少看這些，看到就修或退回：
 
-1. **契約對照**：route 路徑 / method / input / view 欄位對 server model；enum 值對；optional 只在 server 允許 None 時。
-2. **REST ↔ MCP parity**：同一 view 在 Human route 與 MCP tool 的欄位語意一致（P4-E 教訓：`request_type`）。
-3. **秘密由 server 過濾**：Player 的 view / event 不含敵人精確 HP / AC / DC / dm_hints；UI 不顯示 `"?"` 佔位而是省略元素。
+1. **契約對照**：讀到的欄位對 `data/SCHEMA.md`；呼叫的 API 對最新簽名；enum／卡片類型值對；optional 只在 schema 允許缺省時。
+2. **Godot ↔ 網頁版一致**（網頁版步驟）：TS 規則層的行為對照 `scripts/core/` 與 `game_state.gd` 同名邏輯；有黃金軌跡後以軌跡比對為準。
+3. **反劇透**：面板與地圖不顯示尚未揭露的資訊（`實作規格書.md`「四、地點與面板」「九、夜間層」、「十七、資料完整性驗證」的 Lint）；UI 不顯示 `"?"` 佔位而是省略元素。
 4. **沒有越界**：`git show --stat` 的檔案清單對照 prompt 的 Do not touch；既有文案 / 契約沒被改寫。
 5. **重用而非複製**：新 helper 是否已有同義既有函式；貼超過 20 行的重複。
 6. **防禦式寫法**：§3 / §4 缺陷表。
-7. **測試真的在測**：fixture 有沒有被 test-only 子類換掉 production 行為；斷言有沒有對照既有測試；「不該看到」的 actor 有沒有測。
-8. **排版**：`awk 'length > 140' <file> | wc -l` 對照改動前；風格與周圍一致（2 空白、單引號、無分號、一 prop 一行）。
-9. **locale**：新 copy 兩個 locale 都有（parity test 會抓，但要確認語意不是機翻）。
+7. **測試真的在測**：fixture 有沒有被 test-only 替身換掉正式行為；斷言有沒有對照既有測試；拒絕路徑與「只套一次」有沒有測（AGENTS.md 實作守則第 5～7 條）；有沒有至少一條用正式資料、從最高層入口走完的驗收。
+8. **排版**：`awk 'length > 140' <file> | wc -l` 對照改動前；風格與周圍一致（GDScript 用 tab；TS 依 `web/` 既有設定）。
+9. **文字來源**：新出現的遊戲文字都能在 `data/` 找到原文，沒有自編或改寫；介面詞彙的歸屬依待決 W-02。
 10. **實作紀錄**：把上述發現寫進「指揮者審核修正」，下一個人才不會再踩。
 
 ---
@@ -297,13 +299,13 @@ document.querySelector('button[aria-label="傳送"]').click();
 
 | 情況 | 建議 |
 |---|---|
-| backend domain / persistence 小步驟，契約清楚 | agy（快、省 Claude 用量、審核量小） |
-| UI 元件、碰既有契約面、雙語 copy | agy 也可以（使用者 2026-09-20：自己下指令給 agy 做 UI 表現很強；P4-E 的高審核量偏向 prompt 問題——契約欄位、既有 helper、Do-not-touch 沒寫清楚），ChatGPT 或指揮者自己做為備選 |
-| 純 copy / guide 文案、closeout 文件、E2E 關門 | 指揮者自己（contract-bearing、需要跑 Docker E2E） |
+| 規則層（`scripts/core/`、`web/src/core/`）小步驟，契約清楚 | agy（快、省 Claude 用量、審核量小） |
+| UI 元件、碰既有契約面 | agy 也可以（使用者 2026-09-20：自己下指令給 agy 做 UI 表現很強；高審核量多半是 prompt 沒寫清契約欄位、既有 helper、Do-not-touch），ChatGPT 或指揮者自己做為備選 |
+| 牽涉劇情文字、資料 Lint、文件關門 | 指揮者自己（文字一字不能錯；關門屬 verifier） |
 | 使用者在意時間 | agy 為主；ChatGPT 每步預留兩回合 |
 | 使用者在意審核成本 | ChatGPT 為主 |
-| 大步 backend／整個 Subphase、希望 worker 自己跑測試（含真 PostgreSQL） | Muse（2026-09-27 起 P5 主力） |
-| 前端、E2E spec，或希望 worker 用本機環境驗證、省掉瀏覽器盯場 | Muse 1.3 via OpenCode CLI（§4c，2026-10-04 起） |
+| 大步驟／整個 Subphase、希望 worker 自己跑測試 | Muse（需先建好它的環境，見 §4b.1） |
+| 網頁版前端、E2E spec，或希望 worker 用本機環境驗證、省掉瀏覽器盯場 | Muse 1.3 via OpenCode CLI（§4c；本專案使用前先問使用者，見 local-tools.md） |
 
 指揮者自己做的判準：剩餘修改幾行、單一檔案、不需重新理解脈絡 → 直接改；否則退回 worker。
 
@@ -311,8 +313,8 @@ document.querySelector('button[aria-label="傳送"]').click();
 
 ## 7. 接手流程（新指揮者 session）
 
-1. 確認最新 `AGENTS.md`（已完整載入則不重讀）→ 精簡 `PROJECT_BRIEF.md` → 本檔共通段落與所選 worker 段落 → 當前 Subphase 接手摘要／步驟板 → 本步及必要前置／待審紀錄。舊格式按 §2.4 定位，不整份讀；ROADMAP_HISTORY 不列入固定必讀。
+1. 確認最新 `AGENTS.md`（已完整載入則不重讀）→ 精簡 `PROJECT_BRIEF.md` → 本檔共通段落與所選 worker 段落 → 當前 Subphase 接手摘要／步驟板 → 本步及必要前置／待審紀錄。舊格式按 §2.4 定位，不整份讀。
 2. `git fetch` + `git log origin/<branch> --oneline -5`，確認 remote 與本機一致；有未審的 worker commit 先走 §2.3 gate。
 3. 看 `C:\_work\AI_Work\Tools\agy-runs\` 最新的 prompt 檔，知道上一步送了什麼。
-4. ChatGPT 對話 URL 與帳號在指揮者 memory（`chatgpt-worker-workflow`）；Muse thread 依 §4b.1 先問使用者；agy conversation id 遺失不影響，開新對話讀實作紀錄即可。
+4. ChatGPT 對話 URL 與帳號：本專案 memory 沒有記錄，先問使用者；Muse thread 依 §4b.1 先問使用者；agy conversation id 遺失不影響，開新對話讀實作紀錄即可。
 5. 依所選 worker 的檢查節奏繼續（ChatGPT §4.3、Muse §4b.3）。
