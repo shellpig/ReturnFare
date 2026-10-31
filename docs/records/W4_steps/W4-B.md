@@ -35,6 +35,25 @@
 | 變異檢查（`panel.ts` beat `LOCKED` 下傳移除） | 暫時註解 `web/src/core/panel.ts` 的 `beatTri === TriState.LOCKED` 對 slot 的下傳邏輯，執行 `npx --prefix web vitest run tests/panel.test.ts` 立即轉紅（exit 1，`d19_pm_upstream.look` 斷言失敗）；還原後重跑 67 tests 全綠 |
 | 邊界檢查 | `git status` 確認 `data/`、Godot `scripts/`／`scenes/`、`web/public/art/`、`tools/trace/baselines/greedy-godot.json` 零改動 |
 
+## Verifier 獨立驗收與複驗（2026-10-31）
+
+- 結論：**W4-B 已完成並通過驗收，W4 整體關門**；原 P2 已修正，未發現其他阻擋或非阻擋問題。
+- 受驗版本：乾淨的 `main@548710c`；W4-B 程式與測試提交為 `a7c33f8`。`548710c` 為獨立夜間場景素材提交，不屬本次驗收範圍。
+- 首輪曾發現 P2：GameShell 無條件掛出全域測試橋接，並新增公開 loadTrustedSnapshot，導致正式 bundle 包含直接覆寫狀態的測試入口。修正後移除正式 API／橋接，高日數 UI 案例改由 Playwright route 攔截 state 模組，包裝原 createGame 並以既有 initialState 注入可信快照；測試繼續走 production Game 與實際點擊。
+- 複驗重新核對 W4-B 完整範圍：API／型別、map／panel 查詢純度、beat／slot 三態順序、choice／RESOLVED、泡湯行動格、正式文字與卡型展示、到訪雙入口與通知、逐段演出／重看、來源與檔案邊界、錯誤及測試注入隔離。
+
+| 獨立檢查 | 結果 |
+|---|---|
+| `npx vitest run tests/panel.test.ts` | exit 0；1 file／5 tests；取消變異後同範圍重跑仍為 5／5；未跑全套 npm test |
+| `npx playwright test tests/ui/map-panel.spec.ts tests/ui/narration.spec.ts --workers=1` | exit 0；3／3；專用 Headless Chromium。含正常 opening → D2 morning → 山泉閣立即演出／演完出槽／重開，以及 D19 LOCKED upstream 點擊到訪且 playBeat 0 次 → D20 空點仍可開。另驗受本步修改影響的 W3 演出接線；未跑 opening.spec.ts 或其他 UI 測試 |
+| `npm run build` | exit 0；19 份 JSON 同步、22 條 lint，0 errors／4 筆既有豁免 warnings，型別與 Vite 建置通過 |
+| 正式入口隔離 | 正式 Game 無 loadTrustedSnapshot；檢查實際 dist/assets JS，舊橋接、快照載入方法與新 Playwright 注入用的 6 個標記均不存在 |
+| W3 前綴軌跡 | 在記憶體中直接呼叫 production buildWebTrace／compareTraces，沿 tools/trace/scopes/W3.json 對正式 Godot 基線：exit 0，5 checkpoints／187 fields、0 diff；未新增 checkpoint、擴大 ignore 或重產基線 |
+| 最小變異保真 | 使用 Vite transform 與獨立快取目錄，在記憶體中停用 beat LOCKED 對 slot 的傳導，命中 1 次；panel.test.ts 的 d19_pm_upstream.look 斷言轉紅（exit 1，1 failed／4 passed）。取消變異後相關 5 tests 全綠，未修改原始碼 |
+| 邊界與清理 | git diff --check 通過；正式 data、Godot 與黃金基線未改；工作區乾淨，Playwright 測試服務已關閉（4178 無 listener） |
+
+- 驗收界線：只驗 W4-B 與必要 W3 回歸；不代表高日數已可從正常開局遊玩、不含 W5 放卡／選擇／預覽、未跑 Godot 或全套 Node／UI 測試。文件關門階段沿用上述複驗證據，未重跑測試。
+
 ## 下一步
 
-- 提交 verifier 進行 W4-B（及 W4 階段）驗收；通過後進入 W5（手牌、備用區、放卡／選邊交易與推進時段三態提示）。
+- 依 `docs/web/W5實作契約.md`「三、W5-A：卡片、手牌與知識」接續實作；沿用已驗收的 Game、map／panel VM 與逐段演出接線，不另建平行規則。
