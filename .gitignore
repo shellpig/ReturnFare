@@ -13,3 +13,8 @@ export_presets.cfg
 
 # 網頁版示意稿的產出 HTML（由同目錄 build 腳本從 data/ 產生）
 /web/prototype/*/returnfare-*.html
+
+# 網頁版 W1-A 產出與快取（由 web/package.json 腳本產生，不提交）
+/web/node_modules/
+/web/dist/
+/web/public/data/
