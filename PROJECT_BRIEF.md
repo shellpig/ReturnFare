@@ -158,4 +158,5 @@ $traceRevisionW1 = git rev-parse HEAD
   - 新增 `docs/web/`（[網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md)、[W1實作契約.md](docs/web/W1實作契約.md)～[W7實作契約.md](docs/web/W7實作契約.md)）及 `docs/others/` 指揮手冊，並完成兩輪契約漏洞與夜間／W6 守衛修正（至 `4ee0d79`）。
   - 建立 `web/public/art/`，放入小鎮地圖 `town.webp` 與 13 張白天地點場景圖（WebP），並於 `web/prototype/` 放入示意版原型與座標校準工具。
 - **2026-08-30 ～ 2026-08-31（Godot 基準封存前最後更新）**：完成 P5-F 機器層關門、T-01 測試文案解耦、T-02 全 12 檔套語清理、D1 上午／下午純演出時段、T-03 白天地圖空點解鎖與 20 個白天地點 `desc`（含 `c1acc73` B1–B5 修正）、T-04 夜間 28 個地點 `desc` 與防劇透 Lint 22（`49ab0c7`，Godot headless 共 36 套全綠）。
+- **後續方向**：W-01～W-06 已全數定案，見 `待決事項.md` 第六節；目前美術方向沿用，W7 先完成繁體中文版，再規劃多語系；不考慮 Steam 或 Godot 存檔相容，Godot 維持凍結。
 - **下一步**：依 [`docs/web/W2實作契約.md`](docs/web/W2實作契約.md) 實作 **W2-B（資料 lint 移進 build step）**；W1 與 W2-A 已完成驗收，不重做骨架、資料載入、比對器或重產基線。
