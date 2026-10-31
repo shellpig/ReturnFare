@@ -13,7 +13,7 @@
 
 import type { GameData } from '../data/types';
 import { cardBaseId } from './facts';
-import type { GameSnapshot, ReasonCode } from './state-types';
+import type { DeepReadonly, GameSnapshot, ReasonCode } from './state-types';
 
 export interface CardOpResult {
   readonly ok: boolean;
@@ -22,17 +22,25 @@ export interface CardOpResult {
 }
 
 /** 持有檢查：hand ∪ meta.knowledge。 */
-export function hasCard(state: Readonly<GameSnapshot>, cardId: string): boolean {
-  return state.run.hand.includes(cardId) || Boolean(state.meta.knowledge[cardId]);
+export function hasCard(
+  state: DeepReadonly<GameSnapshot>,
+  cardId: string,
+): boolean {
+  return (
+    state.run.hand.includes(cardId) || state.meta.knowledge[cardId] === true
+  );
 }
 
 /** 知識集合檢查：meta.knowledge。 */
-export function hasKnowledge(state: Readonly<GameSnapshot>, cardId: string): boolean {
-  return Boolean(state.meta.knowledge[cardId]);
+export function hasKnowledge(
+  state: DeepReadonly<GameSnapshot>,
+  cardId: string,
+): boolean {
+  return state.meta.knowledge[cardId] === true;
 }
 
 /** 手牌佔格數（hand 內每個元素佔一格；knowledge 不算）。 */
-export function handSlotsUsed(state: Readonly<GameSnapshot>): number {
+export function handSlotsUsed(state: DeepReadonly<GameSnapshot>): number {
   return state.run.hand.length;
 }
 

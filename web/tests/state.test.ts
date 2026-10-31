@@ -16,7 +16,6 @@ import {
 } from '../src/core/cards';
 import {
   ConditionError,
-  UnsupportedConditionError,
   evalCondition,
 } from '../src/core/condition';
 import { planEffects } from '../src/core/effect';
@@ -167,10 +166,19 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
       'data_conflict',
     );
 
-    // evalCondition: unimplemented operator throws UnsupportedConditionError, never defaults to true
+    // evalCondition: W4-A implements full operator vocabulary; unknown operator or empty object throws ConditionError, never defaults to true
+    expect(evalCondition({ flag: 'returned_opening_call' }, draft, data)).toBe(
+      false,
+    );
     expect(() =>
-      evalCondition({ flag: 'returned_opening_call' }, draft, data),
-    ).toThrow(UnsupportedConditionError);
+      evalCondition(
+        { unknown_op: 'whatever' } as unknown as Parameters<
+          typeof evalCondition
+        >[0],
+        draft,
+        data,
+      ),
+    ).toThrow(ConditionError);
     expect(() =>
       evalCondition(
         {} as unknown as Parameters<typeof evalCondition>[0],
