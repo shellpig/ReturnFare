@@ -192,6 +192,16 @@ export interface AdvanceResult extends MutationResult {
   readonly phase_advanced: boolean;
 }
 
+/** 卡片與知識唯讀投影（W5-A） */
+export interface CardView {
+  readonly instanceId: string;
+  readonly baseId: string;
+  readonly type: string;
+  readonly name: string;
+  readonly text: string;
+  readonly countdown?: number;
+}
+
 /** Game store 公開介面 */
 export interface Game {
   getSnapshot(): DeepReadonly<GameSnapshot>;
@@ -208,6 +218,13 @@ export interface Game {
   buildPanel(locationId: string): PanelView;
   remainingActionsToday(): number;
   markDayLocationVisited(locationId: string): void;
+  hasCard(cardId: string): boolean;
+  hasKnowledge(cardId: string): boolean;
+  handSlotsUsed(): number;
+  handCapacity(): number;
+  cardView(instanceId: string): CardView;
+  handView(): readonly CardView[];
+  knowledgeView(): readonly CardView[];
   chooseOpening(choiceId: string): MutationResult;
   playBeat(beatId: string): MutationResult;
   playEvening(): MutationResult;

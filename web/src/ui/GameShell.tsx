@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TriState } from '../core/panel';
 import type { Game } from '../core/state-types';
+import { HandPanel } from './HandPanel';
 import { LocationPanel } from './LocationPanel';
 import { MapPanel } from './MapPanel';
 import { NarrationPanel } from './NarrationPanel';
@@ -109,15 +110,18 @@ export function GameShell({ game }: { game: Game }) {
 
   if (view.narration_only || view.phase === 'night' || index < view.lines.length) {
     return (
-      <NarrationPanel
-        view={view}
-        index={index}
-        error={error}
-        onContinue={() =>
-          setIndex((current) => Math.min(current + 1, view.lines.length))
-        }
-        onAdvance={advance}
-      />
+      <section className="narration-shell">
+        <NarrationPanel
+          view={view}
+          index={index}
+          error={error}
+          onContinue={() =>
+            setIndex((current) => Math.min(current + 1, view.lines.length))
+          }
+          onAdvance={advance}
+        />
+        <HandPanel game={game} />
+      </section>
     );
   }
 
@@ -155,6 +159,7 @@ export function GameShell({ game }: { game: Game }) {
           {strings.advance}
         </button>
       </div>
+      <HandPanel game={game} />
     </section>
   );
 }

@@ -40,3 +40,15 @@ dialog::backdrop { background: #251c16aa; }
 .slot-accept-types { color: #806e5a; font-size: .92rem; }
 .slot-delegation-preview, .slot-delegation-tendency, .slot-reason { margin: .4rem 0 0; }
 .phase-actions { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d7cdbb; }
+.hand-panel { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d7cdbb; }
+.hand-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; font-size: .95rem; color: #614b39; }
+.hand-slots { font-weight: bold; }
+.knowledge-btn { padding: .4rem .8rem; font-size: .9rem; }
+.hand-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .5rem; }
+.card-btn { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: .6rem .8rem; font-size: .92rem; }
+.card-detail-dialog { max-height: 80vh; overflow-y: auto; }
+.card-detail-name, .knowledge-name { margin: 0 0 .5rem; font-size: 1.15rem; color: #614b39; }
+.card-detail-text, .knowledge-text { margin: 0 0 1rem; }
+.knowledge-item { border-bottom: 1px solid #d7cdbb; padding: .5rem 0; }
+.knowledge-item:last-child { border-bottom: none; }
+.empty-knowledge { color: #806e5a; }

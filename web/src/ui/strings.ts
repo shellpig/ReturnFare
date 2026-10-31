@@ -17,4 +17,11 @@ export const strings = {
   soakInsufficientActions: '（格數不足）', // scripts/core/panel_builder.gd:104；scripts/autoload/game_state.gd:1300
   slotTypesDelimiter: '、', // scenes/ui/slot_widget.gd:31
   slotTypes: (types: string) => `（收：${types}）`, // scenes/ui/slot_widget.gd:31
+  close: '關閉', // scenes/ui/card_detail.gd AcceptDialog 關閉
+  handSlots: (used: number, limit: number) => `手牌 ${used} / ${limit}`, // scenes/ui/hand_bar.gd:9 _FMT_SLOTS
+  knowledgeCount: (count: number) => `知識 (${count})`, // scenes/ui/hand_bar.gd:10 _FMT_KNOWLEDGE
+  cardCountdown: (name: string, days: number) => `${name} (${days}天)`, // scenes/ui/hand_bar.gd:63
+  cardDetailTitle: '卡片詳情', // scenes/ui/card_detail.gd:19
+  knowledgeListTitle: '知識清單', // scenes/ui/card_detail.gd:55
+  emptyKnowledge: '（目前無知識）', // scenes/ui/card_detail.gd:60
 } as const;

@@ -10,6 +10,14 @@
  */
 
 import type { Beat, Condition, GameData } from '../data/types';
+import {
+  cardView as calcCardView,
+  handSlotsUsed as calcHandSlotsUsed,
+  handView as calcHandView,
+  hasCard as checkHasCard,
+  hasKnowledge as checkHasKnowledge,
+  knowledgeView as calcKnowledgeView,
+} from './cards';
 import { ConditionError, UnsupportedConditionError, evalCondition } from './condition';
 import { planEffects } from './effect';
 import {
@@ -37,6 +45,7 @@ import {
 } from './run-initialization';
 import type {
   AdvanceResult,
+  CardView,
   DeepReadonly,
   Game,
   GameSnapshot,
@@ -855,6 +864,34 @@ export function createGame(
     notifyListeners();
   }
 
+  function hasCard(cardId: string): boolean {
+    return checkHasCard(state, cardId);
+  }
+
+  function hasKnowledge(cardId: string): boolean {
+    return checkHasKnowledge(state, cardId);
+  }
+
+  function handSlotsUsed(): number {
+    return calcHandSlotsUsed(state);
+  }
+
+  function handCapacity(): number {
+    return Number(data.tuning.hand_size);
+  }
+
+  function cardView(instanceId: string): CardView {
+    return calcCardView(state, instanceId, data);
+  }
+
+  function handView(): readonly CardView[] {
+    return calcHandView(state, data);
+  }
+
+  function knowledgeView(): readonly CardView[] {
+    return calcKnowledgeView(state, data);
+  }
+
   function chooseOpening(choiceId: string): MutationResult {
     // 1. mode opening
     if (state.flow.mode !== 'opening') {
@@ -1203,6 +1240,13 @@ export function createGame(
     buildPanel,
     remainingActionsToday,
     markDayLocationVisited,
+    hasCard,
+    hasKnowledge,
+    handSlotsUsed,
+    handCapacity,
+    cardView,
+    handView,
+    knowledgeView,
     chooseOpening,
     playBeat,
     playEvening,
