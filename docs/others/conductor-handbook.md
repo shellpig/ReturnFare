@@ -1,12 +1,12 @@
 # 指揮者手冊 — 讓 agy / ChatGPT / Muse 實作，指揮者驗證與收尾
 
-適用對象：被指定為「指揮者」的 AI session（目前是 Claude Code）。指揮者不自己寫主要程式，而是把 Subphase 拆成小步驟交給外部 worker（Antigravity CLI `agy`、ChatGPT Web、Muse 網頁版、Muse 1.3 via OpenCode CLI）實作，再在本機驗證、審核、修小錯、commit、push、更新實作紀錄。
+適用對象：被指定為「指揮者」的 AI session（目前是 Claude Code）。指揮者不自己寫主要程式，而是把 Subphase 拆成小步驟交給外部 worker（Antigravity CLI `agy`、ChatGPT Web、Muse 網頁版、OpenCode CLI）實作，再在本機驗證、審核、修小錯、commit、push、更新實作紀錄。
 
 本檔是流程與踩坑紀錄，不是 Phase 契約。Phase 要做什麼看根目錄三份文件（`實作規格書.md`／`開發設計方針.md`／`測試指南.md`，按 AGENTS.md「按 Phase 查閱規則」只讀對應段）；網頁版 W 編號工單看 `docs/web/網頁版移植計畫.md`。本檔只講「怎麼讓別人做、怎麼確認做對」。
 
 按角色／工作讀取：指揮者讀 §1、§2、§5、§7，再讀所選 worker 的 §3、§4、§4b 或 §4c；選 worker 時才讀 §6。只建立實作紀錄時讀 §2.4。Windows 指令與外部 CLI 另見 [local-tools.md](local-tools.md) 對應段落，不必每次整份重讀。
 
-首次成型：2026-09-17，P4-E（E1～E9b 由 agy、E10a 起由 ChatGPT）。2026-09-27 起 P5 由 Muse 實作（§4b）。2026-10-04 起 M07-C 改由 OpenCode CLI 指揮 Muse 1.3（§4c）。
+首次成型：2026-09-17，P4-E（E1～E9b 由 agy、E10a 起由 ChatGPT）。2026-09-27 起 P5 由 Muse 實作（§4b）。2026-10-04 起 M07-C 改由 OpenCode CLI 指揮 Muse 1.3（§4c）。2026-10-31 起 OpenCode 已不能用 Muse，改用 Nemotron 3.5 Super VL（§4c）。
 
 > **來源**：本檔從 adventure-table 專案（Python 後端＋React 前端）移植。流程與規則已改成本專案（Godot 版＋`web/` 網頁版）；但 §3～§4c 的缺陷表、品質觀察與實例（P4-E、P5、M07-C、PostgreSQL、REST／MCP、route 等）是**該專案的踩坑紀錄**，保留作經驗參考，不是本專案的契約或編號。本專案的 P 編號與它無關。
 
@@ -236,21 +236,23 @@ document.querySelector('button[aria-label="傳送"]').click();
 | 假測試：測試自己呼叫 mock 再斷言、`renderToStaticMarkup` 讓 effect／事件不執行、永遠成立的寬鬆斷言 | 審測試時確認斷言失敗得了；前端互動以 Playwright 驗 |
 | Playwright spec 未執行就交（P5-F 建 map payload 不合法） | Muse 環境跑不了瀏覽器；前端步驟的 E2E 由指揮者寫並以 Docker 跑 |
 
-品質面：P5-A～D 結構乾淨、守範圍與 Do-not-touch，每步約需指揮者一至兩處修正；P5-E 起品質下滑（P5-E 藏 5 個 bug，P5-F 前端 7 輪仍有 5 個 bug 靠指揮者跑 E2E 找出）。後端有既有契約與 PostgreSQL 測試可控，前端無法自我驗證——**網頁版 Muse 只派後端步驟**，前端改派 agy、§4c 的 OpenCode Muse 或指揮者自己做。P5-F 的前端品質也受當時 AI 算力壅塞影響（使用者 2026-10-04 補充），不代表 Muse 前端能力本身較弱。
+品質面：P5-A～D 結構乾淨、守範圍與 Do-not-touch，每步約需指揮者一至兩處修正；P5-E 起品質下滑（P5-E 藏 5 個 bug，P5-F 前端 7 輪仍有 5 個 bug 靠指揮者跑 E2E 找出）。後端有既有契約與 PostgreSQL 測試可控，前端無法自我驗證——**網頁版 Muse 只派後端步驟**，前端改派 agy、§4c 的 OpenCode worker 或指揮者自己做。P5-F 的前端品質也受當時 AI 算力壅塞影響（使用者 2026-10-04 補充），不代表 Muse 前端能力本身較弱。
 
 ### 4b.5 prompt 必備（2026-09-28 起）
 
 - **允許回報 blocker**：「發現 server 沒提供需要的欄位／route，或契約有缺口，停下來回報，不要自己補型別或假資料。」一般實作決定不必等確認。不再寫「中途不要停下來等我確認」。
 - **FINAL REPORT 要求可核對的驗證證據，不收「全綠」**：每個新增前端欄位 → 對應的 server model 欄位；每個新增 handler → grep 到的呼叫位置；每條 user flow → 從哪個點擊開始、依序經過哪些函式與 route；每個測試 → 說明它在什麼錯誤實作下會失敗。
-- 前端步驟的 Playwright spec 不派給網頁版 Muse（它的環境跑不了瀏覽器）；§4c 的 OpenCode Muse 可以寫並實跑。
+- 前端步驟的 Playwright spec 不派給網頁版 Muse（它的環境跑不了瀏覽器）；§4c 的 OpenCode worker 跑在本機，可以寫並實跑。
 
-## 4c. Muse 1.3 via OpenCode CLI
+## 4c. OpenCode CLI worker
 
-2026-10-04 依使用者提議於 M07-C 試行並採用：C3 前端、C3b 修正與 `m07c-map-monsters` E2E spec 都由它完成。啟動指令見 [local-tools.md](local-tools.md)「外部 Reviewer / Worker CLI」。
+**2026-10-31 起 OpenCode 已不能用 Muse，模型改為 Nemotron 3.5 Super VL**（`opencode/nemotron-3.5-super-vl-free#high`）。本機流程不變；4c.4 是 Muse 1.3 的品質紀錄，Nemotron 尚未在實作步驟驗證過。
+
+2026-10-04 依使用者提議於 M07-C 試行 Muse 1.3 並採用：C3 前端、C3b 修正與 `m07c-map-monsters` E2E spec 都由它完成。啟動指令見 [local-tools.md](local-tools.md)「外部 Reviewer / Worker CLI」。
 
 ### 4c.1 與網頁版 Muse 的差別
 
-| | 網頁版 Muse（§4b） | OpenCode Muse 1.3（本節） |
+| | 網頁版 Muse（§4b） | OpenCode worker（本節） |
 |---|---|---|
 | 執行環境 | muse.ai 的 Linux VM | 使用者本機 Windows 工作樹、本機 Godot／npm |
 | 派工與讀回報 | Claude in Chrome 操作網頁 composer、讀 innerText | `opencode-cli.exe run` 背景執行，回報讀 log 尾段 |
@@ -260,7 +262,7 @@ document.querySelector('button[aria-label="傳送"]').click();
 
 ### 4c.2 送 prompt 與檢查節奏
 
-- prompt 照 §2.2 骨架寫成檔案，存 `C:\_work\AI_Work\Tools\agy-runs\opencode-muse-<phase>-<step>.prompt.txt`，以 `Get-Content -Raw` 傳入；輸出重導到同名 `.log`。
+- prompt 照 §2.2 骨架寫成檔案，存 `C:\_work\AI_Work\Tools\agy-runs\opencode-<phase>-<step>.prompt.txt`，以 `Get-Content -Raw` 傳入；輸出重導到同名 `.log`。
 - 一律 `run_in_background`。送出後先看 log 有沒有開始出現讀檔動作（等同網頁版的送達確認），確認後才開始每 10 分鐘的進度檢查（看 log 位元組是否增加與最後幾行）。結束時 Claude 會被喚醒，直接讀 log 中 FINAL REPORT 之後的內容。
 - 同一步要修正時開新回合、送自足的修正 prompt（例：C3b），不依賴前一回合的對話脈絡。
 
@@ -270,7 +272,7 @@ document.querySelector('button[aria-label="傳送"]').click();
 - §4b.5 的 blocker 條款與可核對 FINAL REPORT 同樣適用；E2E 步驟另要求連跑兩次都通過、遇到產品 bug 停下回報，不得改產品程式碼或放寬斷言遷就。
 - 已知與本步無關的環境失敗（例：Godot headless 在 sandbox 內 signal 11、`驗證後已知問題.md` 裡已接受的項目）要在 prompt 註明不擋交付，避免它停在 gate 不回報。
 
-### 4c.4 觀察到的品質（M07-C）
+### 4c.4 觀察到的品質（M07-C，Muse 1.3）
 
 - C3 前端約 1,560 行、一回合約 22 分鐘；C3b 約 20 分鐘；E2E spec 一回合含實跑。報告誠實：主動說明 web vitest 沒有 DOM 環境、自己的繞法（選單只有前 50 筆時改用 Acolyte）、需要改的舊斷言與理由，欄位對照與 handler 行號抽查都相符。
 - E2E 抓到一個真的產品缺陷（模板選單只有第一頁、沒有搜尋），它照規定沒有放寬斷言，在回報中列出，由指揮者另派 C3b 修正。
@@ -305,7 +307,7 @@ document.querySelector('button[aria-label="傳送"]').click();
 | 使用者在意時間 | agy 為主；ChatGPT 每步預留兩回合 |
 | 使用者在意審核成本 | ChatGPT 為主 |
 | 大步驟／整個 Subphase、希望 worker 自己跑測試 | Muse（需先建好它的環境，見 §4b.1） |
-| 網頁版前端、E2E spec，或希望 worker 用本機環境驗證、省掉瀏覽器盯場 | Muse 1.3 via OpenCode CLI（§4c；本專案使用前先問使用者，見 local-tools.md） |
+| 網頁版前端、E2E spec，或希望 worker 用本機環境驗證、省掉瀏覽器盯場 | OpenCode CLI（§4c，目前模型 Nemotron 3.5 Super VL；尚未在實作步驟驗證，見 local-tools.md） |
 
 指揮者自己做的判準：剩餘修改幾行、單一檔案、不需重新理解脈絡 → 直接改；否則退回 worker。
 

@@ -55,18 +55,18 @@ python web/prototype/d1-demo/build.py
 |---|---|---|
 | Antigravity CLI | `C:\Users\User\AppData\Local\agy\bin\agy.exe` | agy reviewer / worker |
 | agy 執行紀錄 | `C:\_work\AI_Work\Tools\agy-runs\` | prompt 檔、輸出 JSON、`TEMPLATE.prompt.txt`、`report.py` |
-| OpenCode CLI | `C:\Users\User\AppData\Local\Programs\@opencodedesktop\resources\opencode-cli.exe` | Muse 1.3 worker |
+| OpenCode CLI | `C:\Users\User\AppData\Local\Programs\@opencodedesktop\resources\opencode-cli.exe` | OpenCode worker（Nemotron 3.5 Super VL） |
 
 ### 外部 Worker CLI
 
-把 agy 或 Muse 當 **worker**（實作而非 review）時，流程、step 粒度、檢查節奏與踩坑一律看 `docs/others/conductor-handbook.md`；本段只保留啟動指令。唯讀審查的指令與共通規則在 AGENTS.md，本檔不重抄。
+把 agy 或 OpenCode 當 **worker**（實作而非 review）時，流程、step 粒度、檢查節奏與踩坑一律看 `docs/others/conductor-handbook.md`；本段只保留啟動指令。唯讀審查的指令與共通規則在 AGENTS.md，本檔不重抄。
 
 worker 共通：非互動呼叫必須 `< NUL` 關閉 stdin，否則會停在等待輸入永久卡死；輸出重導到檔案保留；**不得 stage / commit / push，commit 權在 Claude**；結果以 `git status` / `git diff` 確認實際改動，不信口頭回報。
 
 | 觸發語 | 走哪個 |
 |---|---|
 | 「要 agy 做 XXX」（實作） | Antigravity CLI worker |
-| 「要 opencode muse 做 XXX」 | Muse Spark 1.3 via OpenCode CLI |
+| 「要 opencode 做 XXX」 | Nemotron 3.5 Super VL via OpenCode CLI |
 
 **Antigravity CLI（worker）**：binary 在 user PATH，但部分 shell 的 PATH 快照可能沒有，直接用完整路徑最穩。
 
@@ -83,16 +83,17 @@ cmd /c "C:\Users\User\AppData\Local\agy\bin\agy.exe -p `\"<任務>`\" --model `\
 - 每步結束後 Claude 以 `git diff` 審改動、跑該步驗證，通過才 commit；失敗把錯誤餵回同一對話修。**審完若剩餘修改很小（幾行、單一檔案、不需重新理解脈絡），Claude 直接自己改完再 commit，不再開 agy 回合。**
 - Model：`--model` 用 `agy models` 列出的完整顯示字串，未指定時預設 `"Gemini 4 Argon (High)"`。
 
-**Muse Spark 1.3 via OpenCode CLI**（worker）：用 OpenCode 桌面版內建的 CLI；不要再裝 npm 版 `opencode`（舊版資料庫與桌面版不相容，啟動即報 `Database is not empty and has no session table`）。流程、檢查節奏與權責見 [指揮者手冊 §4c](conductor-handbook.md#4c-muse-13-via-opencode-cli)。
+**Nemotron 3.5 Super VL via OpenCode CLI**（worker）：2026-10-31 起 OpenCode 已不能用 Muse，改用 `opencode/nemotron-3.5-super-vl-free`（UI 顯示名 Nemotron 3.5 Super VL Free）。用 OpenCode 桌面版內建的 CLI；不要再裝 npm 版 `opencode`（舊版資料庫與桌面版不相容，啟動即報 `Database is not empty and has no session table`）。流程、檢查節奏與權責見 [指揮者手冊 §4c](conductor-handbook.md#4c-opencode-cli-worker)。
 
 ```powershell
 $c = "C:\Users\User\AppData\Local\Programs\@opencodedesktop\resources\opencode-cli.exe"
 Set-Location C:\_work\AI_Work\Projects\ReturnFare
-& $c run -m "opencode/muse-spark-1.3-contributor-free#high" --auto --title "<步驟>" (Get-Content -Raw -Encoding utf8 "C:\_work\AI_Work\Tools\agy-runs\opencode-muse-<步驟>.prompt.txt") *> "C:\_work\AI_Work\Tools\agy-runs\opencode-muse-<步驟>.log"
+& $c run -m "opencode/nemotron-3.5-super-vl-free#high" --auto --title "<步驟>" (Get-Content -Raw -Encoding utf8 "C:\_work\AI_Work\Tools\agy-runs\opencode-<步驟>.prompt.txt") *> "C:\_work\AI_Work\Tools\agy-runs\opencode-<步驟>.log"
 ```
 
-- 模型字串的 `#high` 是 effort variant；`opencode-cli.exe models` 可列出可用模型。
-- ⚠️ 這是免費、會分享資料的方案。使用者 2026-10-04 是對 adventure-table 同意的；**本專案要用之前先問使用者**（本專案含未公開的劇情文字）。
+- 模型字串的 `#high` 是 effort variant；`opencode-cli.exe models` 可列出可用模型，同系列另有較小的 `opencode/nemotron-3.5-lightning-free`。
+- 2026-10-31 只做過唯讀 smoke test（不加 `--auto`，讀 `PROJECT_BRIEF.md` 第一行並回傳），有無 `#high` 都 exit 0、回傳正確、工作樹無變動。**寫檔、跑 npm／Godot 尚未驗證**，第一次派正式步驟前先用小任務試。
+- ⚠️ 這是免費方案，資料分享條款未核對（Muse 免費方案會分享資料）。使用者 2026-10-31 指定本專案改用此模型；派送含未公開劇情文字的任務前仍先向使用者確認。
 - 加 `--auto` 才能寫檔與跑 shell，代價是 shell 指令不會被擋，禁止事項必須寫進 prompt。
 - **prompt 一律寫成檔案再傳入**；長文字直接放在 PowerShell 命令列，引號會被轉壞。
 - 一律 `run_in_background` 啟動，工作目錄是 repo root；worker 直接改本機工作樹。
