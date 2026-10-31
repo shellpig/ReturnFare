@@ -47,4 +47,10 @@
 
 本機證據（不提交生成檔）：`_qa/web/w1a-conductor-check.log`、`w1a-dev-server.log`、`w1a-mutation.log`、`w1a-no-tests.log`；HTTP／bytes 檢查器為 `_qa/web/w1a-conductor-check.mjs`。
 
-本步契約對照已檢查工具鏈、API、檔案／副作用邊界、Windows 路徑、失敗退出、HTTP 入口與測試有效性，無待修 blocker。未做瀏覽器、Godot、遊戲玩法或軌跡驗證，均不屬 W1-A。指揮者不替 Phase 打勾；正式驗收與 PROJECT_BRIEF 更新交 verifier。W1-B／C 命令尚未具備。
+本步契約對照已檢查工具鏈、API、檔案／副作用邊界、Windows 路徑、失敗退出、HTTP 入口與測試有效性，無待修 blocker。未做瀏覽器、Godot、遊戲玩法或軌跡驗證，均不屬 W1-A。W1-B／C 命令尚未具備。
+
+## Verifier 驗收與文件關門（2026-10-31）
+
+- 判定：**W1-A 通過驗收**；驗證 commit 為 `80f2b7b`。本 session 切換 verifier 角色，逐項核對 W1-A 契約與上述獨立檢查證據；實作者的回報僅作輔助，未以其自評代替驗收。
+- 必要驗證三組均有證據：暫存同步 fixture、安裝／測試／型別檢查與建置及正式 JSON 一致性、dev HTTP 與服務清理；另有最小變異及無測試失敗證據，無未解 blocker 或待補驗收項目。
+- 本次工作區無程式變動，既有證據仍適用；依 commit／push 指示不重跑測試。PROJECT_BRIEF 與 W1 步驟板已同步；本次文件收尾不代表整個 W1 或網頁版玩法驗收完成。
