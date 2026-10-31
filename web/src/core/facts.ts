@@ -7,10 +7,13 @@
  * 不把 tuning.phases_per_day 當成時段機的自由參數。
  */
 
-import { PHASES, type Phase, type When } from '../data/types';
+import { PHASES, type Beat, type Phase, type When } from '../data/types';
 
 /** 全時段與行動時段只定義在 data/types.ts，這裡轉出，不另存一份。 */
 export { PHASES, ACTION_PHASES } from '../data/types';
+
+/** 單輪最後一天（D45 黃昏收束，無第 45 夜） */
+export const LAST_DAY = 45;
 
 /** 章節起始天數（第 1、2、3 章） */
 export const CHAPTER_START_DAYS: readonly number[] = [1, 16, 33];
@@ -69,13 +72,54 @@ export function isPendingCardRefByDesign(cardId: string): boolean {
   return BY_DESIGN_PENDING_CARD_REFS.includes(cardId);
 }
 
-/** 時段先後（同一輪內）：morning → afternoon → evening → night；夜後為 null。 */
-export function nextPhase(phase: Phase): Phase | null {
-  const index = PHASES.indexOf(phase);
-  if (index < 0 || index === PHASES.length - 1) {
+const DAY_45_PHASES: readonly Phase[] = ['morning', 'afternoon', 'evening'];
+
+/** 該日存在哪些時段（D45 收束於黃昏，無夜間）。 */
+export function phasesForDay(day: number): readonly Phase[] {
+  if (day === LAST_DAY) {
+    return DAY_45_PHASES;
+  }
+  return PHASES;
+}
+
+/**
+ * 時段先後（同一輪內）：morning → afternoon → evening → night；夜後為 null。
+ * 若提供 day === 45，evening 之後即為 null（無第 45 夜）。
+ */
+export function nextPhase(phase: Phase, day?: number): Phase | null {
+  const dayPhases = day !== undefined ? phasesForDay(day) : PHASES;
+  const index = dayPhases.indexOf(phase);
+  if (index < 0 || index === dayPhases.length - 1) {
     return null;
   }
-  return PHASES[index + 1];
+  return dayPhases[index + 1];
+}
+
+/**
+ * 單一時段推進的下一個 (day, phase) 目標（Godot GameState.next_phase_target）。
+ * 當日時段走到底時進到 day + 1 的 morning（例如 D45 evening 會得到 { day: 46, phase: 'morning' }，由呼叫端攔截結局或越界）。
+ */
+export function nextPhaseTarget(day: number, phase: Phase): { day: number; phase: Phase } {
+  const next = nextPhase(phase, day);
+  if (next === null) {
+    return { day: day + 1, phase: 'morning' };
+  }
+  return { day, phase: next };
+}
+
+/**
+ * 某一天某個時段有哪些 beat（不解 condition，只挑時間對的，保留 beats 原序）。
+ * 對應 DataLoader.beats_at(day, phase)。
+ */
+export function beatsAt(beats: readonly Beat[], day: number, phase: Phase): Beat[] {
+  const out: Beat[] = [];
+  for (let i = 0; i < beats.length; i += 1) {
+    const b = beats[i];
+    if (beatMatchesTime(b.when, day, phase)) {
+      out.push(b);
+    }
+  }
+  return out;
 }
 
 /**

@@ -8,6 +8,7 @@
     "dev": "node scripts/sync-data.mjs && npm run lint:data && vite",
     "build": "node scripts/sync-data.mjs && npm run lint:data && tsc --noEmit && vite build",
     "test": "vitest run",
+    "trace:web": "tsx scripts/trace-web.ts",
     "trace:compare": "tsx ../tools/trace/cli.ts"
   },
   "dependencies": {
