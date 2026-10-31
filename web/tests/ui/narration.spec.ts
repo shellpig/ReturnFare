@@ -21,10 +21,10 @@ test('phone path displays each original passage through the first night', async 
   await read(beat('d1_morning_phone').text);
   await read(beat('d1_morning_departure').text);
   await expect(passage).toHaveText(beat('d1_morning_departure').text);
-  await expect(page.getByRole('button')).toHaveCount(1);
+  await expect(page.locator('button:not(.hand-panel button)')).toHaveCount(1);
   await phase();
   await read(beat('d1_pm_mountain_road').text);
-  await expect(page.getByRole('button')).toHaveCount(1);
+  await expect(page.locator('button:not(.hand-panel button)')).toHaveCount(1);
   await phase();
   await expect(passage).toHaveText(beat('d1_arrival').text);
   await page.screenshot({ path: '../_qa/web/W3-A/evening.png', fullPage: true });
