@@ -123,6 +123,20 @@ function candidateTuning(tuning: unknown, dotPath: string): unknown {
 /* 共用條件与效果語彙檢查                                              */
 /* ------------------------------------------------------------------ */
 
+function lintRequiredConditionSubNode(
+  node: unknown,
+  bid: string,
+  where: string,
+  ruleId: string,
+  out: Diagnostic[],
+): void {
+  if (node === null || node === undefined) {
+    out.push(makeDiag(ruleId, bid, `${bid} [${where}]：condition 子條件不得為 null 或省略`));
+    return;
+  }
+  lintConditionNode(node, bid, where, ruleId, out);
+}
+
 function lintConditionNode(
   node: unknown,
   bid: string,
@@ -157,19 +171,54 @@ function lintConditionNode(
       continue;
     }
     if (k === 'not') {
-      lintConditionNode(node[k], bid, where, ruleId, out);
+      lintRequiredConditionSubNode(node[k], bid, `${where}.not`, ruleId, out);
     } else if (k === 'all' || k === 'any') {
       const subArr = node[k];
-      if (Array.isArray(subArr)) {
-        for (const sub of subArr) {
-          lintConditionNode(sub, bid, where, ruleId, out);
+      if (!Array.isArray(subArr) || subArr.length === 0) {
+        out.push(makeDiag(ruleId, bid, `${bid} [${where}.${k}]：${k} 必須為非空 Array`));
+      } else {
+        for (let i = 0; i < subArr.length; i += 1) {
+          lintRequiredConditionSubNode(subArr[i], bid, `${where}.${k}[${i}]`, ruleId, out);
         }
       }
     } else if (k === 'count_at_least') {
       const ca = node[k];
-      if (isPlainObject(ca) && Array.isArray(ca.of)) {
-        for (const sub of ca.of) {
-          lintConditionNode(sub, bid, where, ruleId, out);
+      if (!isPlainObject(ca)) {
+        out.push(
+          makeDiag(
+            ruleId,
+            bid,
+            `${bid} [${where}.count_at_least]：count_at_least 必須為 Dictionary`,
+          ),
+        );
+      } else {
+        if (!isWholeNumber(ca.n) || ca.n < 1) {
+          out.push(
+            makeDiag(
+              ruleId,
+              bid,
+              `${bid} [${where}.count_at_least]：count_at_least.n 必須為正整數`,
+            ),
+          );
+        }
+        if (!Array.isArray(ca.of) || ca.of.length === 0) {
+          out.push(
+            makeDiag(
+              ruleId,
+              bid,
+              `${bid} [${where}.count_at_least]：count_at_least.of 必須為非空 Array`,
+            ),
+          );
+        } else {
+          for (let i = 0; i < ca.of.length; i += 1) {
+            lintRequiredConditionSubNode(
+              ca.of[i],
+              bid,
+              `${where}.count_at_least.of[${i}]`,
+              ruleId,
+              out,
+            );
+          }
         }
       }
     }
@@ -2055,6 +2104,7 @@ function lintPageList(
   problems: Diagnostic[],
 ): void {
   if (!Array.isArray(pages)) {
+    problems.push(makeDiag(ruleId, eid, `${eid} [${where}]：頁面列表必須為 Array`));
     return;
   }
   for (const p of pages) {
@@ -2295,7 +2345,7 @@ export function lint_endings(data: GameData): RuleOutput {
         errors.push(makeDiag(ruleId, eid, `${eid}：缺少 first_seen 字典`));
       } else {
         lintPageList(
-          end.first_seen.prefix_pages ?? [],
+          end.first_seen.prefix_pages,
           eid,
           'first_seen.prefix_pages',
           pageIds,
@@ -2303,7 +2353,7 @@ export function lint_endings(data: GameData): RuleOutput {
           errors,
         );
         lintPageList(
-          end.first_seen.suffix_pages ?? [],
+          end.first_seen.suffix_pages,
           eid,
           'first_seen.suffix_pages',
           pageIds,
@@ -2316,7 +2366,7 @@ export function lint_endings(data: GameData): RuleOutput {
         errors.push(makeDiag(ruleId, eid, `${eid}：缺少 repeat 字典`));
       } else {
         lintPageList(
-          end.repeat.prefix_pages ?? [],
+          end.repeat.prefix_pages,
           eid,
           'repeat.prefix_pages',
           pageIds,
@@ -2324,7 +2374,7 @@ export function lint_endings(data: GameData): RuleOutput {
           errors,
         );
         lintPageList(
-          end.repeat.suffix_pages ?? [],
+          end.repeat.suffix_pages,
           eid,
           'repeat.suffix_pages',
           pageIds,
@@ -2424,7 +2474,7 @@ export function lint_endings(data: GameData): RuleOutput {
               }
 
               lintPageList(
-                r.first_seen_pages ?? [],
+                r.first_seen_pages,
                 eid,
                 `${vgid}.${rid}.first_seen_pages`,
                 pageIds,
@@ -2432,7 +2482,7 @@ export function lint_endings(data: GameData): RuleOutput {
                 errors,
               );
               lintPageList(
-                r.repeat_pages ?? [],
+                r.repeat_pages,
                 eid,
                 `${vgid}.${rid}.repeat_pages`,
                 pageIds,
@@ -2477,9 +2527,12 @@ export function lint_endings(data: GameData): RuleOutput {
         }
       }
 
-      if (Array.isArray(end.lookup_fragments)) {
+      if (!Array.isArray(end.lookup_fragments)) {
+        errors.push(makeDiag(ruleId, eid, `${eid}：lookup_fragments 必須是 Array`));
+      } else {
         for (const lf of end.lookup_fragments) {
           if (!isPlainObject(lf)) {
+            errors.push(makeDiag(ruleId, eid, `${eid}：lookup_fragment 元素必須是 Dictionary`));
             continue;
           }
           const lfid = String(lf.id ?? '');
@@ -2516,43 +2569,45 @@ export function lint_endings(data: GameData): RuleOutput {
             errors.push(makeDiag(ruleId, eid, `${eid} [${lfid}]：entries 必須為 Array`));
           } else {
             for (const entry of lf.entries) {
-              if (isPlainObject(entry)) {
-                const npcVal = String(entry.value ?? '');
-                const npc = data.npcsById.get(npcVal);
-                if (!npc) {
-                  errors.push(
-                    makeDiag(
-                      ruleId,
-                      eid,
-                      `${eid} [${lfid}]：entries.value 引用不存在的 NPC → ${npcVal}`,
-                    ),
-                  );
-                } else if (npc.festival_proxy_eligible !== true) {
-                  errors.push(
-                    makeDiag(
-                      ruleId,
-                      eid,
-                      `${eid} [${lfid}]：entries.value 引用非 festival_proxy_eligible NPC → ${npcVal}`,
-                    ),
-                  );
-                }
-                lintPageList(
-                  entry.first_seen_pages ?? [],
-                  eid,
-                  `${lfid}.${npcVal}.first_seen_pages`,
-                  pageIds,
-                  ruleId,
-                  errors,
+              if (!isPlainObject(entry)) {
+                errors.push(makeDiag(ruleId, eid, `${eid} [${lfid}]：entry 必須是 Dictionary`));
+                continue;
+              }
+              const npcVal = String(entry.value ?? '');
+              const npc = data.npcsById.get(npcVal);
+              if (!npc) {
+                errors.push(
+                  makeDiag(
+                    ruleId,
+                    eid,
+                    `${eid} [${lfid}]：entries.value 引用不存在的 NPC → ${npcVal}`,
+                  ),
                 );
-                lintPageList(
-                  entry.repeat_pages ?? [],
-                  eid,
-                  `${lfid}.${npcVal}.repeat_pages`,
-                  pageIds,
-                  ruleId,
-                  errors,
+              } else if (npc.festival_proxy_eligible !== true) {
+                errors.push(
+                  makeDiag(
+                    ruleId,
+                    eid,
+                    `${eid} [${lfid}]：entries.value 引用非 festival_proxy_eligible NPC → ${npcVal}`,
+                  ),
                 );
               }
+              lintPageList(
+                entry.first_seen_pages,
+                eid,
+                `${lfid}.${npcVal}.first_seen_pages`,
+                pageIds,
+                ruleId,
+                errors,
+              );
+              lintPageList(
+                entry.repeat_pages,
+                eid,
+                `${lfid}.${npcVal}.repeat_pages`,
+                pageIds,
+                ruleId,
+                errors,
+              );
             }
           }
         }

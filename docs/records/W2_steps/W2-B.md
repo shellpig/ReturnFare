@@ -35,10 +35,11 @@
 |---|---|
 | Godot 對照基準 `verify_data.gd` | exit 0；卡片 66／地點 48／NPC 18／beat 271／ending 4／opening 3；0 錯誤、Lint 3 已豁免警告 4 筆 |
 | `npm run lint:data`（cwd `web/`） | exit 0；catalog：卡片 66／地點 48／NPC 18／beat 271／ending 4／opening 3／cardTypes 12；已執行規則 22 條；警告 4 筆（`d35_pm_answer`、`d40_tell_someone`、`d43_morning_ask_paper`、`d43_conclusion`）、錯誤 0 筆 |
-| `npm test`（cwd `web/`） | exit 0；5 files、38 tests 全綠（含 `data-lint.test.ts` 7 條案例：正式資料基線、未知引用／tuning、未知語彙、warning vs 未豁免免費槽 error、壞遭遇 `next_round` 與不可達／cycle、缺夜間 `desc` 與劇透名稱、CLI 暫存目錄注入與缺檔回報） |
+| `npm test`（cwd `web/`） | exit 0；5 files、39 tests 全綠（含 `data-lint.test.ts` 8 條案例：正式資料基線、未知引用／tuning、未知語彙與複合條件容器型別檢查、結局頁面列表非陣列與缺欄檢查、warning vs 未豁免免費槽 error、壞遭遇 `next_round` 與不可達／cycle、缺夜間 `desc` 與劇透名稱、CLI 暫存目錄注入與缺檔回報） |
 | `npm run build`（cwd `web/`） | exit 0（依序執行 `sync-data.mjs` → `npm run lint:data` → `tsc --noEmit` → `vite build`） |
 | 變異 1（拔掉 build 的 lint 接線） | 暫存目錄注入 `n_corridor.desc = ""` 時，拔掉 `npm run lint:data` 後 `RETURNFARE_DATA_DIR=<tempDir> npm run build` 誤過（exit 0）；還原 `package.json` 接線後同一命令被 `[lint_night_location_descs]` 擋下（exit 1），正式 `data/` 零改動 |
-| 變異 2（從 `LINT_REGISTRY` 註解 `lint_night_location_descs`） | `npm test` 立即轉紅（`data-lint.test.ts` 3 failed）；還原後 38 tests 全綠 |
+| 變異 2（從 `LINT_REGISTRY` 註解 `lint_night_location_descs`） | `npm test` 立即轉紅（`data-lint.test.ts` 3 failed）；還原後全綠 |
+| 驗收回饋修正（2 項 `[P2]` 漏檢與變異驗證） | ① `lintConditionNode` 補齊 `all`/`any` 非空 Array、`count_at_least` Dictionary／正整數 `n`／非空 Array `of` 及子條件禁止 `null`/`undefined`；② `lintPageList` 對非 Array 明確報錯，並移除 `ending_replaced` 8 處 `?? []` fallback、補檢 `lookup_fragments` 陣列與元素型別。暫時移除這兩處容器型別檢查時 `data-lint.test.ts` 對應 2 條測試立即轉紅（2 failed），還原後 39 tests 與 `npm run build` 全綠 |
 
 ## 下一步
 

@@ -100,12 +100,16 @@ describe('W2-B build-time data lint', () => {
     ).toBe(true);
   });
 
-  it('catches unknown condition operators and effect keys (lint_vocabulary)', async () => {
+  it('catches unknown condition operators, effect keys, and malformed composite condition containers (lint_vocabulary)', async () => {
     const data = await loadPatchedData((relPath, parsed) => {
       if (relPath === 'beats/ch1_d01_d03.json' && !Array.isArray(parsed)) {
         const beats = parsed.beats as Array<Record<string, unknown>>;
         beats[0].condition = { unknown_condition_op: 1 };
         beats[0].on_enter = { unknown_effect_key: true };
+        beats[1].condition = { all: {} };
+        beats[2].condition = { any: 'bad' };
+        beats[3].condition = { count_at_least: { n: 1, of: {} } };
+        beats[4].condition = { not: null };
       }
     });
 
@@ -113,6 +117,51 @@ describe('W2-B build-time data lint', () => {
     const vocabErrors = report.errors.filter((e) => e.ruleId === 'lint_vocabulary');
     expect(vocabErrors.some((e) => e.message.includes('unknown_condition_op'))).toBe(true);
     expect(vocabErrors.some((e) => e.message.includes('unknown_effect_key'))).toBe(true);
+    expect(vocabErrors.some((e) => e.message.includes('all 必須為非空 Array'))).toBe(true);
+    expect(vocabErrors.some((e) => e.message.includes('any 必須為非空 Array'))).toBe(true);
+    expect(
+      vocabErrors.some((e) => e.message.includes('count_at_least.of 必須為非空 Array')),
+    ).toBe(true);
+    expect(
+      vocabErrors.some((e) => e.message.includes('condition 子條件不得為 null 或省略')),
+    ).toBe(true);
+  });
+
+  it('catches non-array or missing ending page list fields (lint_endings)', async () => {
+    const data = await loadPatchedData((relPath, parsed) => {
+      if (relPath === 'endings.json' && Array.isArray(parsed)) {
+        const replaced = parsed.find(
+          (item) => (item as Record<string, unknown>).id === 'ending_replaced',
+        ) as Record<string, unknown> | undefined;
+        if (replaced) {
+          const firstSeen = replaced.first_seen as Record<string, unknown>;
+          firstSeen.prefix_pages = {};
+          const repeat = replaced.repeat as Record<string, unknown>;
+          delete repeat.suffix_pages;
+          const vgs = replaced.variant_groups as Array<Record<string, unknown>>;
+          const rules = vgs[0].rules as Array<Record<string, unknown>>;
+          rules[0].first_seen_pages = {};
+        }
+      }
+    });
+
+    const report = validateData(data);
+    const endingErrors = report.errors.filter((e) => e.ruleId === 'lint_endings');
+    expect(
+      endingErrors.some((e) =>
+        e.message.includes('ending_replaced [first_seen.prefix_pages]：頁面列表必須為 Array'),
+      ),
+    ).toBe(true);
+    expect(
+      endingErrors.some((e) =>
+        e.message.includes('ending_replaced [repeat.suffix_pages]：頁面列表必須為 Array'),
+      ),
+    ).toBe(true);
+    expect(
+      endingErrors.some((e) =>
+        e.message.includes('first_seen_pages]：頁面列表必須為 Array'),
+      ),
+    ).toBe(true);
   });
 
   it('distinguishes warnings (lint_missing_reject_reason & exempted free slots) from errors (non-exempted free-slot panel)', async () => {
