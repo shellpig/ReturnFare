@@ -180,12 +180,13 @@ grep -n "P1-A" 實作規格書.md 開發設計方針.md 測試指南.md
 
 `g2d 生 XXX 圖` shorthand：`XXX` 是地點 / 場景 / 房間 / 街道 / 地圖時用 `$generate2dmap`，否則用 `$generate2dsprite`。名詞已經明確指向其中一類時不要反問使用者。
 
-預設輸出路徑：
+網頁版直接使用的成品圖放 `web/public/art/`，一律轉 WebP：
 
-- 地圖類：`C:\_work\AI_Work\Projects\ReturnFare\assets\generated\maps\<asset_name>\`
-- Sprite 類：`C:\_work\AI_Work\Projects\ReturnFare\assets\generated\sprites\<asset_name>\<action_or_variant>\`
+- 地圖：`web/public/art/map/`
+- 地點場景圖：`web/public/art/scenes/<地點 id>.webp`（檔名＝`data/locations.json` 的地點 id，程式直接用 id 找圖）
+- 其他類別（sprite 等）用到時在 `web/public/art/` 下開對應子資料夾
 
-生成的 raw / processed / frame / prompt / metadata 全部留在該資產資料夾內。檔名帶秒級 timestamp 後綴避免碰撞（例如 `hot-spring-inn-20260811-164029.png`），不要重用 `prompt-used.txt`、`concept.png` 這種通用名。
+生成過程的 raw / prompt / 中間檔不進 repo，只保留上線用的成品。
 
 ### DeepSeek Codex CLI Reviewer
 

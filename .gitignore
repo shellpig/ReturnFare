@@ -10,3 +10,6 @@
 *.translation
 export_presets.cfg
 /tests/ui_sim/manifest.json
+
+# 網頁版示意稿的產出 HTML（由同目錄 build 腳本從 data/ 產生）
+/web/prototype/*/returnfare-*.html

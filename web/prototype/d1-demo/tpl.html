@@ -1,0 +1,150 @@
+<meta charset="utf-8">
+<title>溫泉小鎮</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@300;400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one narrow reading column; header strip on top, text stage, hand tray pinned at bottom. */
+:root{
+  --bg:#12100f; --panel:#1b1816; --line:#332e29; --fg:#e4dccf; --dim:#948a7c; --accent:#c9954a; --accent-dim:#6b5028;
+  --font-body:'LXGW WenKai TC','Noto Serif TC','Kaiti TC','DFKai-SB',serif;
+  --font-ui:'Noto Sans TC','Taipei Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:18px;line-height:1.95;
+  background-image:radial-gradient(ellipse at 50% -10%,#241d17 0,transparent 60%)}
+.app{max-width:640px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{font-family:var(--font-ui);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding-block:18px 14px;border-bottom:1px solid var(--line);font-size:13px;letter-spacing:.18em;color:var(--dim);min-height:52px}
+header b{color:var(--fg);font-weight:500}
+header .loc{color:var(--accent)}
+main{flex:1;padding-block:36px 28px;min-width:0}
+h1,h2{font-weight:400;text-wrap:balance;margin:0}
+.title{font-size:26px;letter-spacing:.3em;margin-bottom:28px;color:var(--fg)}
+.kicker{font-family:var(--font-ui);font-size:12px;letter-spacing:.3em;color:var(--accent);margin-bottom:10px}
+p{margin:0 0 1.1em;overflow-wrap:anywhere}
+.fade{animation:in .7s ease both}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fade,.card{animation:none}}
+.choices{display:flex;flex-direction:column;gap:12px;margin-top:30px}
+.choice{font-family:inherit;text-align:left;background:var(--panel);color:var(--fg);border:1px solid var(--line);padding:16px 18px;cursor:pointer;font-size:17px;line-height:1.7;min-width:0}
+.choice .lbl{font-family:var(--font-ui);font-weight:500;font-size:16px;letter-spacing:.06em;display:block;margin-bottom:4px}
+.choice .pv{color:var(--dim);font-size:15px}
+.choice:hover,.choice:focus-visible{border-color:var(--accent);outline:none}
+.choice[disabled]{opacity:.5;cursor:not-allowed}
+.choice[disabled]:hover{border-color:var(--line)}
+.choice .rej{display:block;margin-top:6px;font-size:14px;color:var(--accent)}
+.next{font-family:var(--font-ui);margin-top:26px;background:none;color:var(--accent);border:1px solid var(--accent-dim);padding:11px 26px;font-size:14px;letter-spacing:.3em;cursor:pointer}
+.next:hover,.next:focus-visible{background:var(--accent);color:var(--bg);outline:none}
+.confirm{font-family:var(--font-ui);font-size:14px;letter-spacing:.2em;color:var(--dim);margin-bottom:6px}
+.place{border:1px solid var(--line);background:var(--panel);padding:14px 16px;margin-bottom:30px;font-size:15px;color:var(--dim);line-height:1.8}
+.place .pn{font-family:var(--font-ui);color:var(--fg);letter-spacing:.12em;font-size:14px;display:block;margin-bottom:2px}
+.slots{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 26px}
+.slot{font-family:var(--font-ui);flex:1 1 120px;min-width:0;border:1px dashed var(--accent-dim);padding:22px 10px;text-align:center;font-size:15px;letter-spacing:.2em;line-height:1.5}
+.slot small{display:block;color:var(--dim);font-size:11px;letter-spacing:.15em;margin-top:6px}
+.onenter{border-top:1px solid var(--line);padding-top:26px;margin-top:6px}
+.gain{font-family:var(--font-ui);font-size:12px;letter-spacing:.2em;color:var(--accent);margin:4px 0 0}
+.end{text-align:center;color:var(--dim);margin-top:34px;font-size:15px;letter-spacing:.15em}
+.end+.next{display:block;margin-inline:auto}
+footer{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);
+  padding-top:12px;padding-bottom:max(14px,env(safe-area-inset-bottom,0px));font-family:var(--font-ui)}
+.hl{font-size:11px;letter-spacing:.3em;color:var(--dim);margin-bottom:8px}
+.hand{display:flex;gap:10px;min-height:96px;align-items:stretch}
+.hand .empty{flex:1;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px;letter-spacing:.2em}
+.card{width:190px;max-width:100%;border:1px solid var(--accent);background:var(--panel);padding:10px 12px;animation:in .7s ease both}
+.card .ct{font-size:11px;letter-spacing:.2em;color:var(--accent)}
+.card .cn{font-size:20px;font-family:var(--font-body);margin:2px 0 4px;line-height:1.3}
+.card .cx{font-family:var(--font-body);font-size:12px;line-height:1.5;color:var(--dim)}
+</style>
+<div class="app">
+  <header><span id="h-left"></span><span id="h-right"></span></header>
+  <main id="stage"></main>
+  <footer><div class="hl">手牌</div><div class="hand" id="hand"></div></footer>
+</div>
+<script>
+const D = __DATA__;
+const stage = document.getElementById('stage');
+const hl = document.getElementById('h-left'), hr = document.getElementById('h-right'), hand = document.getElementById('hand');
+const PH = {morning:'上午', afternoon:'下午', evening:'傍晚'};
+let pick = null, hasCard = false;
+
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function paras(t){return t.split('\n').map(x=>'<p>'+esc(x)+'</p>').join('');}
+function head(day, phase, extra){
+  hl.innerHTML = day ? '<b>第 '+day+' 天</b>・'+PH[phase]+'・第 1 章' : '開局';
+  hr.innerHTML = extra ? '<span class="loc">'+esc(extra)+'</span>' : '';
+}
+function renderHand(){
+  hand.innerHTML = hasCard
+    ? '<div class="card"><div class="ct">主角</div><div class="cn">'+esc(D.card.name)+'</div><div class="cx">'+esc(D.card.text)+'</div></div>'
+    : '<div class="empty">空</div>';
+}
+function cont(label, fn){
+  const b = document.createElement('button');
+  b.className='next'; b.textContent=label; b.onclick=fn; return b;
+}
+function scene(beat, nextFn){
+  stage.innerHTML = '<div class="fade"><div class="kicker">'+esc(beat.title)+'</div>'+paras(beat.text)+'</div>';
+  stage.firstChild.appendChild(cont('繼續', nextFn));
+  window.scrollTo(0,0);
+}
+function opening(){
+  head(null);
+  const s = D.opening.screen;
+  stage.innerHTML = '<div class="fade"><h1 class="title">'+esc(s.title)+'</h1><div>'+paras(s.prompt)+'</div><div class="choices" id="ch"></div></div>';
+  const ch = document.getElementById('ch');
+  D.opening.choices.forEach(c=>{
+    const b = document.createElement('button');
+    b.className='choice';
+    b.innerHTML='<span class="lbl">'+esc(c.label)+'</span><span class="pv">'+esc(c.preview)+'</span>'+(c.requires?'<span class="rej">'+esc(c.reject_reason)+'</span>':'');
+    if(c.requires) b.disabled = true;
+    else b.onclick=()=>{pick=c; confirmPick();};
+    ch.appendChild(b);
+  });
+  window.scrollTo(0,0);
+}
+function confirmPick(){
+  stage.innerHTML = '<div class="fade"><div class="confirm">'+esc(pick.confirm_text)+'</div></div>';
+  stage.firstChild.appendChild(cont('出發', morning));
+}
+function morning(){
+  head(1,'morning');
+  const b = D.beats, seq = [];
+  if(pick.id==='return_missed_call') seq.push(b.d1_morning_phone);
+  seq.push(b.d1_morning_departure);
+  let i=0;
+  (function step(){
+    scene(seq[i], ()=>{ i++; if(i<seq.length) step(); else afternoon(); });
+  })();
+}
+function afternoon(){
+  head(1,'afternoon');
+  scene(D.beats.d1_pm_mountain_road, evening);
+}
+function evening(){
+  const a = D.beats.d1_arrival, loc = D.loc;
+  head(1,'evening',loc.name);
+  let h = '<div class="fade"><div class="place"><span class="pn">'+esc(loc.name)+'</span>'+esc(loc.desc)+'</div>';
+  h += '<div class="kicker">'+esc(a.title)+'</div>'+paras(a.text);
+  h += '<div class="slots">'+a.slots.map(s=>'<div class="slot">'+esc(s.label)+'<small>在場</small></div>').join('')+'</div></div>';
+  stage.innerHTML = h;
+  stage.firstChild.appendChild(cont('繼續', arrivalEnter));
+  window.scrollTo(0,0);
+}
+function arrivalEnter(){
+  const a = D.beats.d1_arrival;
+  const box = document.createElement('div');
+  box.className='onenter fade';
+  box.innerHTML = paras(a.on_enter.text)+'<div class="gain">取得　'+esc(D.card.name)+'</div><div class="end">示意版到此為止</div>';
+  stage.querySelector('.next').remove();
+  stage.firstChild.appendChild(box);
+  hasCard = true; renderHand();
+  box.appendChild(cont('重新開始', ()=>{hasCard=false; renderHand(); pick=null; opening();}));
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+renderHand(); opening();
+</script>

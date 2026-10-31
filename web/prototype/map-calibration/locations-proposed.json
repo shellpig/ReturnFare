@@ -1,0 +1,814 @@
+{
+  "_comment": "第一、二章的白天地點（13 ＋ 4）＋ 全三章的夜間標記。第二章新增 4 個（故事線原本寫 5 個是多算了公共浴場，它第一章就已建檔，已更正）。欄位說明見 data/SCHEMA.md。地圖座標為示意值，但保留相對位置（待決 29 需要地理關係）。價碼規則：收費的是「往裡走」（樓下、後面、再往上、痕跡的下一級），免費的是「夜鎮的地形」。全輪 14 個收費（第一章 6、第二章 4、第三章 4，其中阿宏鏈佔 7），見待決 38。夜間地點的 day_counterpart 指白天去同一個位置是哪裡，第二類必須與它同座標（verify_data 會擋）。",
+  "day": [
+    {
+      "id": "sanquan",
+      "name": "山泉閣",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 58,
+        "y": 38
+      },
+      "desc": "木造長廊連著幾進舊客房，後院能望見對面靜和園的後門。空氣裡常年漂著淡淡的硫磺氣味。",
+      "note": "叔叔的旅館。後院看得到靜和園後門，晚上有車進出"
+    },
+    {
+      "id": "jinghe",
+      "name": "靜和園",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 80,
+        "y": 42
+      },
+      "desc": "挑高的大廳鋪著厚地毯，櫃檯後方的鑰匙格排得整整齊齊。側廊深處隱約傳來溫泉水流聲。",
+      "note": "對面。大廳、櫃檯、林姐、阿薇。玩家只到得了大廳"
+    },
+    {
+      "id": "oldstreet",
+      "name": "老街",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 45,
+        "y": 48
+      },
+      "desc": "石板路兩側擠著雜貨店與土產攤，簷下的幌子在山風裡輕輕晃動。空氣裡混著乾貨與熟食的氣味。",
+      "note": "春阿嬤（雜貨店）、土產店、麵攤"
+    },
+    {
+      "id": "temple",
+      "name": "廟＋廟埕",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 35,
+        "y": 27
+      },
+      "desc": "廟埕鋪著青石，香爐裡插著幾支未燃盡的線香。正殿深處的帷幔垂落，看不清神龕全貌。",
+      "note": "金伯、慶典籌備、信徒名冊"
+    },
+    {
+      "id": "clinic",
+      "name": "診所",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 78,
+        "y": 78
+      },
+      "desc": "候診室擺著兩排長木椅，角落的消毒水氣味有些刺鼻。藥櫃玻璃映著窗外的日光。",
+      "note": "陳醫師、護士、候診室。候診室的人年紀都不大"
+    },
+    {
+      "id": "riverside",
+      "name": "河邊",
+      "phases": [
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 12,
+        "y": 78
+      },
+      "desc": "碎石灘延伸至河岸，溪水在老石橋墩下打著漩渦。沿岸的芒草隨風起伏。",
+      "note": "周先生、父母出事的橋。叔叔會勸你別去"
+    },
+    {
+      "id": "columbarium",
+      "name": "納骨塔",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 10,
+        "y": 12
+      },
+      "desc": "水泥建築背靠山壁，一排排銅牌在微光下泛著冷光。通風窗外傳來隱約的松濤聲。",
+      "note": "父母的位子、鎮民的塔位。玩家可以自己算生卒年"
+    },
+    {
+      "id": "oldschool",
+      "name": "舊國小",
+      "phases": [
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 8,
+        "y": 52
+      },
+      "desc": "操場雜草叢生，木造校舍的走廊積著薄灰。褪色的榮譽榜依然釘在辦公室外牆。",
+      "note": "廢教室、榮譽榜、畢業照"
+    },
+    {
+      "id": "bathhouse",
+      "name": "公共浴場",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 60,
+        "y": 84
+      },
+      "desc": "老舊的水泥浴池泛著水汽，牆面貼著斑駁的白瓷磚。水管深處偶爾傳來沉悶的迴音。",
+      "note": "二手水，不取樣。休館公告越接近慶典越頻繁。⚠️ 待決 29：要確認它在不在老曾聲稱的巡查路線上"
+    },
+    {
+      "id": "busstop",
+      "name": "公車站／山路口",
+      "phases": [
+        "morning"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 90,
+        "y": 16
+      },
+      "desc": "生鏽的站牌立在山路轉角，窄小的候車亭長滿青苔。公路沿著山壁向下蜿蜒。",
+      "note": "車只有上午（下山用）。不是線索地點，是位置——坐它的是被叫回來的年輕人，客戶都自己開車。每一輪的第一個與最後一個畫面都在這裡"
+    },
+    {
+      "id": "communitycenter",
+      "name": "活動中心",
+      "phases": [
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 36,
+        "y": 41
+      },
+      "desc": "白牆的兩層樓建築，門口的鐵捲門半開著。公告欄上貼著幾張泛黃的例行公文。",
+      "note": "慶典籌備會、公告欄。建築太新太好"
+    },
+    {
+      "id": "oldhouse",
+      "name": "老家",
+      "phases": [
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 8,
+        "y": 43
+      },
+      "desc": "木造舊屋門窗緊閉，簷下的木板已經發黑。門前石階縫隙鑽出幾簇野草。",
+      "note": "父母舊屋。叔叔不讓進。裡面是收拾到一半的行李和那份契書"
+    },
+    {
+      "id": "police",
+      "name": "派出所",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 1,
+      "map": {
+        "x": 68,
+        "y": 70
+      },
+      "desc": "門口停著老舊巡邏車，值班桌上堆著厚厚的簿冊。牆上的全鎮地圖邊緣有些泛黃。",
+      "note": "老曾、舊卷宗（二十年前那份事故報告）"
+    },
+    {
+      "id": "clinic_back",
+      "name": "診所後棟",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 2,
+      "map": {
+        "x": 88,
+        "y": 80
+      },
+      "desc": "走廊比前棟更加安靜，兩側病房房門緊閉。空氣裡除了藥味，還混著潮濕的木頭氣息。",
+      "note": "療養區。叔叔住院後才有進診所的理由，但只有第 18–19 天真的繞得進去——之後陳醫師會注意到。住的全是外地老人，沒有一個看起來像在治療（前置療程）。夜版是 n_litcorridor（第 17 夜）"
+    },
+    {
+      "id": "registry_office",
+      "name": "鎮公所戶籍室",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 2,
+      "map": {
+        "x": 52,
+        "y": 44
+      },
+      "desc": "鐵架上排滿褪色的硬皮檔案夾，紙張的陳舊氣味瀰漫在安靜的室內。窗外是公所後院。",
+      "note": "企劃書第十節的第三本簿子。戶籍謄本、遷入遷出、死亡登記——跟廟的名冊比對才有意義。研究生會帶你去，也可以自己去查父母的資料"
+    },
+    {
+      "id": "upstream",
+      "name": "上游源頭",
+      "phases": [
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 2,
+      "map": {
+        "x": 30,
+        "y": 7
+      },
+      "desc": "溪谷在此收窄，巨大的岩石間引出數道粗黑水管。山壁滲出的溫泉冒著白霧。",
+      "note": "第 7 夜 n_source 的白天版，座標刻意相同——企劃書第十五節「夜裡看到的東西，白天可以去驗」在這裡第一次全額兌現。需要登山隊給的路線（第一章第 7–9 天）。取水口、管線房、阿欽伯"
+    },
+    {
+      "id": "old_bathhouse",
+      "name": "舊湯屋",
+      "phases": [
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 2,
+      "map": {
+        "x": 26,
+        "y": 63
+      },
+      "desc": "屋頂塌了一半的木造建築，廢棄的木桶散落在積水的石板上。青苔覆滿了殘存的牆角。",
+      "note": "鎮上第一間旅館，塌了一半。產業的起點——第一批客戶是本地人自己（企劃書第十節）。春阿嬤或阿欽伯提起才知道"
+    },
+    {
+      "id": "jinghe_back",
+      "name": "靜和園後棟",
+      "phases": [
+        "morning",
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 3,
+      "map": {
+        "x": 90,
+        "y": 38
+      },
+      "desc": "側門外堆著洗滌籃與雜物，長廊深處通往工作人員通道。通風口不斷排出一陣陣溫熱水氣。",
+      "note": "第 1 夜那條走廊的白天版，玩家等了 37 天。**只開第 37-38 天**，第三章唯一的硬時窗——慶典客人交接＋大掃除，側門沒鎖。座標與 n_steam_below 相同。它跟「她這兩天去哪」共用同一組格子，只能二選一"
+    },
+    {
+      "id": "oldhouse_room",
+      "name": "老家那間房",
+      "phases": [
+        "afternoon"
+      ],
+      "layer": "day",
+      "chapter": 3,
+      "map": {
+        "x": 8,
+        "y": 43
+      },
+      "desc": "房內光線昏暗，桌几與木櫃蓋著防塵白布。角落整齊碼著幾個未拆封的打包紙箱。",
+      "note": "第 11 夜 n_lockedhouse 的白天版，座標相同。要鑰匙（在叔叔的隨身物品袋裡）。收拾到一半的行李，二十年沒動過——他們本來要搬走，但沒打算解約"
+    },
+    {
+      "id": "temple_back",
+      "name": "廟的後殿／燒金爐",
+      "phases": [
+        "morning"
+      ],
+      "layer": "day",
+      "chapter": 3,
+      "map": {
+        "x": 44,
+        "y": 23
+      },
+      "desc": "高大的磚造金爐矗立在後殿空地，爐口殘留著灰燼。後方竹林在微風中發出沙沙聲。",
+      "note": "還願解約的地方，座標與 n_behind_temple 相同。**打破迴圈的方法就在這裡，而第一輪玩家沒有需要的知識卡**——燒契書需要「你還在契約裡」，那要等主角死過一次才拿得到"
+    }
+  ],
+  "night": [
+    {
+      "id": "n_corridor",
+      "name": "很長的走廊",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 1,
+      "madness_cost": 0,
+      "day_counterpart": "jinghe_back",
+      "night_reveal": "k_night_jinghe_back",
+      "map": {
+        "x": 90,
+        "y": 38
+      },
+      "desc": "兩側的紙拉門全都沒有門牌，腳下的深色木地板泛著暗光。廊道筆直向內延伸，望不到盡頭。",
+      "note": "固定演出，不產生發狂卡。真相：靜和園內部。對位後改名。第三章第 37 天他會站在同一個地方，而那時飯菜是冷的。座標原為 (62,46)＝大廳，已改成與 jinghe_back 一致——走廊在後棟不在大廳，大廳那個座標留給 n_nodoor"
+    },
+    {
+      "id": "n_exit",
+      "name": "石階外的鎮",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 2,
+      "madness_cost": 0,
+      "day_counterpart": "sanquan",
+      "night_reveal": "k_night_sanquan",
+      "map": {
+        "x": 58,
+        "y": 38
+      },
+      "desc": "站在石階頂端向下望去，底下的街道空無一人。兩旁的房舍排列奇異，屋裡全無燈火。",
+      "note": "固定演出，不產生發狂卡。房子的位置不對，一盞燈都沒有"
+    },
+    {
+      "id": "n_queue",
+      "name": "很多人排隊的地方",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 3,
+      "madness_cost": 0,
+      "day_counterpart": "clinic",
+      "night_reveal": "k_night_clinic",
+      "map": {
+        "x": 78,
+        "y": 78
+      },
+      "desc": "屋簷下站著長長的人列，所有人面朝前方一動不動。夜風吹過時，隊伍裡沒有人發出聲響。",
+      "note": "真相：那是名單。他不用排，因為他已經在上面了。第 43 夜這句話會改口"
+    },
+    {
+      "id": "n_litwindow",
+      "name": "亮著的窗",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 3,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 48,
+        "y": 70
+      },
+      "desc": "整排低矮的房舍皆沉在昏暗中，唯獨二樓的一扇木窗透出暖黃光暈。窗內似乎立著一道人影。",
+      "note": "真相：那家人在等一個沒回來的人"
+    },
+    {
+      "id": "n_watersound",
+      "name": "有水聲的地方",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 3,
+      "madness_cost": 0,
+      "day_counterpart": "riverside",
+      "night_reveal": "k_night_riverside",
+      "map": {
+        "x": 12,
+        "y": 78
+      },
+      "desc": "乾涸的石礫河道寸草不生，嘩啦的水聲卻從石縫深處傳來。岸邊整齊排著幾雙沾泥的舊鞋。",
+      "note": "河是乾的，水聲從地底傳來。地上排著大小不一的鞋"
+    },
+    {
+      "id": "n_ahong_1",
+      "name": "有人走過的路",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 6,
+      "madness_cost": 1,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 36,
+        "y": 39
+      },
+      "desc": "泥濘的岔路上留著新鮮的工作鞋印，沿著路緣延伸。路旁的碎石堆裡落著一只磨損的金屬打火機。",
+      "note": "阿宏鏈第一級：工作鞋腳印、他常用的小東西、霧裡的背影。追過去就沒有了"
+    },
+    {
+      "id": "n_woodtags",
+      "name": "數木牌的屋子",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 6,
+      "madness_cost": 0,
+      "day_counterpart": "temple",
+      "night_reveal": "k_night_temple",
+      "map": {
+        "x": 35,
+        "y": 27
+      },
+      "desc": "昏暗的小屋裡點著細香，桌上堆著成排的細長木牌。背對著門口的灰衣人正反覆撥動桌上的名牌。",
+      "note": "有人背對著數小木牌，數到一半重數，永遠數不對——因為他在數簿子上的名字，而有些人的那一格是空的。這是名冊規則的載體（待決 4 結案），也是克蘇魯線與名冊機制唯一的接點。免費地形，每個玩家都負擔得起看一眼"
+    },
+    {
+      "id": "n_source",
+      "name": "上坡／源頭",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 7,
+      "madness_cost": 1,
+      "day_counterpart": "upstream",
+      "night_reveal": "k_night_upstream",
+      "map": {
+        "x": 30,
+        "y": 7
+      },
+      "desc": "沿著陡峭的石徑往上，滾燙的泉水在黑石間蒸騰出白煙。狹窄的岩洞深處傳來沉濁的流動聲。",
+      "note": "水是黑的但很燙。水裡背對著的人轉頭——是主角自己。那是第 2 天泡湯留下的備份，五天前才放進去。第 45 天他會再看到同一個畫面，而那次他沒有醒"
+    },
+    {
+      "id": "n_manydoors",
+      "name": "很多門的巷子",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 8,
+      "madness_cost": 1,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 45,
+        "y": 63
+      },
+      "desc": "兩側高牆逼仄的窄巷內，接連排列著數十扇式樣相同的木門。門扉微啟，縫隙深處不見光亮。",
+      "note": "第一場遭遇。「你叫什麼名字？」「不對。那個名字有人在用了。」價碼仍是 1——遭遇會永久吃掉一兩張卡，那本身就是它的價碼，不再收第二次"
+    },
+    {
+      "id": "n_music",
+      "name": "有音樂的地方",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 9,
+      "madness_cost": 0,
+      "day_counterpart": "temple",
+      "night_reveal": "k_night_temple",
+      "map": {
+        "x": 35,
+        "y": 27
+      },
+      "desc": "空曠的石板廣場傳來單調重複的鑼鼓與絲竹聲。人群背對外圍圍成圓圈，低沉的唱念聲隨風飄散。",
+      "note": "廟埕上在辦儀式，沒有人的臉朝著他。他聽到自己的名字被唱到，沒有人回頭"
+    },
+    {
+      "id": "n_lockedhouse",
+      "name": "上鎖的屋子",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 11,
+      "madness_cost": 0,
+      "day_counterpart": "oldhouse_room",
+      "night_reveal": "k_night_oldhouse_room",
+      "map": {
+        "x": 8,
+        "y": 43
+      },
+      "desc": "老舊的木門外掛著沉重的鐵鎖，窗櫺緊閉。透過破損的紙縫望進去，裡頭的陳設像是剛有人離開。",
+      "note": "擺設和老家一模一樣，但叔叔不讓進的那間房在這裡門是開的。大門鎖著——給玩家一個明確的白天目標：拿鑰匙"
+    },
+    {
+      "id": "n_ahong_2",
+      "name": "有血跡的地方",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 11,
+      "madness_cost": 1,
+      "requires": {
+        "night_seen": "n_ahong_1"
+      },
+      "reject_reason": "你還沒跟完上一段痕跡。",
+      "reject_reason_tag": "prev_trail",
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 36,
+        "y": 39
+      },
+      "desc": "轉角的木箱邊緣殘留著未乾的暗紅痕跡，拖行摩擦的刮痕一路延伸至無燈的巷弄深處。",
+      "note": "阿宏鏈第二級：血是第 3 天那道割傷的位置與形狀，還是新的。搬貨的聲音重複同一段。白天他已經失蹤兩天，這裡卻停在他失蹤之前。第一輪只到「矛盾成立」為止"
+    },
+    {
+      "id": "n_nodoor",
+      "name": "沒有門的建築",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 12,
+      "madness_cost": 0,
+      "day_counterpart": "jinghe",
+      "night_reveal": "k_night_jinghe",
+      "map": {
+        "x": 80,
+        "y": 42
+      },
+      "desc": "高聳的大廳外牆平整延伸，原本該是正門的位置只剩下一整面厚實的封閉木牆，不留任何出入口。",
+      "note": "靜和園的位置。原本不在標記表上，補入"
+    },
+    {
+      "id": "n_landmark",
+      "name": "地標",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 10,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 50,
+        "y": 53
+      },
+      "desc": "路口孤零零立著斷裂半截的石碑，旁邊生長著一株枝幹扭曲的老樹。石面上鑿刻的字跡早已磨平。",
+      "note": "長歪的樹／斷掉的石碑／很特別的轉角。隔天白天在鎮上走會看到同一個東西——這是「夜鎮就是同一個鎮」的證明。原本不在標記表上，補入"
+    },
+    {
+      "id": "n_plaza",
+      "name": "中心廣場",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 14,
+      "madness_cost": 1,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 50,
+        "y": 61
+      },
+      "desc": "開闊的空地上散落著幾張長木桌，黑沉沉的人群圍在周圍。桌面上整齊攤開著厚重的翻頁紙簿。",
+      "note": "桌上攤著簿子，全是名字，有些被劃掉又重寫。他找到自己的名字，旁邊有個看不懂的記號。轉身時看到叔叔也站在人群裡，叫他，他沒有回頭"
+    },
+    {
+      "id": "n_ahong_3",
+      "name": "有人叫他的名字",
+      "layer": "night",
+      "chapter": 1,
+      "earliest_night": 14,
+      "madness_cost": 1,
+      "requires": {
+        "night_seen": "n_ahong_2"
+      },
+      "reject_reason": "你還沒跟完上一段痕跡。",
+      "reject_reason_tag": "prev_trail",
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 36,
+        "y": 39
+      },
+      "desc": "山壁旁的空屋傳來斷續的低語，空洞的回聲在岩縫間回盪。幽暗的通道內堆放著幾隻陳舊的搬運木籃。",
+      "note": "阿宏鏈第三級（第一輪高投入上限）：夜裡有人清楚叫出主角的名字；或拿到一件只有阿宏本人、且失蹤後才可能留下的物件。結論仍只到「他跟夜裡有關」"
+    },
+    {
+      "id": "n_litcorridor",
+      "name": "有燈的走廊",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 17,
+      "madness_cost": 1,
+      "day_counterpart": "clinic_back",
+      "night_reveal": "k_night_clinic_back",
+      "map": {
+        "x": 88,
+        "y": 80
+      },
+      "desc": "兩側緊閉的白色門扉在頂燈照耀下一字排開，光線通明卻毫無發電機的嗡鳴。空氣中帶著濃重的藥水味。",
+      "note": "診所後棟的夜版。燈是亮的，但沒有電"
+    },
+    {
+      "id": "n_higher",
+      "name": "再往上",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 20,
+      "madness_cost": 1,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 24,
+        "y": 8
+      },
+      "desc": "鑿在險峻岩壁上的石級一路向上沒入霧氣，鐵護欄冰冷刺骨。上方的黑暗中不斷傳來更急促的熱水聲。",
+      "note": "源頭更上面。水從哪裡來"
+    },
+    {
+      "id": "n_ahong_4",
+      "name": "聲音停下來的地方",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 20,
+      "madness_cost": 1,
+      "requires": {
+        "night_seen": "n_ahong_3"
+      },
+      "reject_reason": "你還沒跟完上一段痕跡。",
+      "reject_reason_tag": "prev_trail",
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 33,
+        "y": 34
+      },
+      "desc": "沉重的腳步與木箱搬運聲在堆滿石塊的死巷戛然而止。粗糙的石牆根部留下幾道新鮮的刮磨劃痕。",
+      "note": "阿宏鏈第四級。搬貨的聲音第一次有方向——跟著走，它會停。第一個對位點"
+    },
+    {
+      "id": "n_emptyspot",
+      "name": "空的位子",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 21,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 55,
+        "y": 66
+      },
+      "desc": "隊列之間空出了一個人的間距，兩側的人依然平靜站立。那處空下的泥地上印著一雙尚未被踩平的腳印。",
+      "note": "阿財原本站的地方。第一輪玩家不會知道那是他的——白天他只是照約定請假的第二天"
+    },
+    {
+      "id": "n_gathering",
+      "name": "集合的隊伍",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 28,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 39,
+        "y": 50
+      },
+      "desc": "石階下集結著整齊的黑衣隊伍，長列無聲地往鎮外方向排開。隊首點著微弱的白燈籠，沒有人交談。",
+      "note": "遊行隊伍在夜鎮集合。他們每晚多幾個人"
+    },
+    {
+      "id": "n_ahong_5",
+      "name": "被留下的東西",
+      "layer": "night",
+      "chapter": 2,
+      "earliest_night": 28,
+      "madness_cost": 1,
+      "requires": {
+        "has_knowledge": "k_ahong_point_1"
+      },
+      "reject_reason": "你手上的路線知識還少了第一段。",
+      "reject_reason_tag": "route_knowledge_1",
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 29,
+        "y": 29
+      },
+      "desc": "廢棄工寮的木桌上擱著一只磨損的皮質工具包，拉鍊半開。屋角整齊靠著兩根長木撬棍。",
+      "note": "阿宏鏈第五級。一件他失蹤之後才可能留下的物件。第二個對位點。⚠️ 門檻用知識卡不用 flag——知識卡跨輪繼承，所以第二輪玩家不必重爬前面幾級（企劃書第七節：已對位過的標記，之後所有輪次免費）"
+    },
+    {
+      "id": "n_steam_below",
+      "name": "有蒸氣的樓下",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 37,
+      "madness_cost": 1,
+      "day_counterpart": "jinghe_back",
+      "night_reveal": "k_night_jinghe_back",
+      "map": {
+        "x": 90,
+        "y": 38
+      },
+      "desc": "沿著濕滑的窄梯向下走進地下層，滾燙的水霧撲面而來。幽暗的石砌浴池蓄滿了深不見底的黑水。",
+      "note": "靜和園後棟夜版。白天被請出去的那個池子。第 1 夜走廊盡頭的樓下，玩家等了 37 天"
+    },
+    {
+      "id": "n_ahong_6",
+      "name": "新的腳印",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 38,
+      "madness_cost": 1,
+      "requires": {
+        "has_knowledge": "k_ahong_point_2"
+      },
+      "reject_reason": "你手上的路線知識還少了第二段。",
+      "reject_reason_tag": "route_knowledge_2",
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 26,
+        "y": 24
+      },
+      "desc": "覆滿薄灰的石板路上印著一串清晰的膠底鞋印，朝著同一方向延伸。泥印的邊緣尚未風乾。",
+      "note": "阿宏鏈第六級。腳印第一次是新的——不是舊痕跡，是剛剛才踩過的，而且往同一個方向。第三個對位點"
+    },
+    {
+      "id": "n_emptyspot_2",
+      "name": "又一個空的位子",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 39,
+      "madness_cost": 0,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 55,
+        "y": 66
+      },
+      "desc": "前排隊伍中又多了一處突兀的空隙，前後的人自然合攏。地面留有一道被急促拖曳過的淺痕。",
+      "note": "她原本站的地方。對應第 21 夜阿財那個空位"
+    },
+    {
+      "id": "n_behind_temple",
+      "name": "廟的後面",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 42,
+      "madness_cost": 1,
+      "day_counterpart": "temple_back",
+      "night_reveal": "k_night_temple_back",
+      "map": {
+        "x": 44,
+        "y": 23
+      },
+      "desc": "巨大的磚石爐台聳立在空地中央，爐口跳動著淡白色的微光。靠近爐壁時，迎面而來的卻是一股冰冷寒氣。",
+      "note": "燒金爐。火是冷的"
+    },
+    {
+      "id": "n_ahong_7",
+      "name": "三個點指向的地方",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 43,
+      "madness_cost": 1,
+      "requires": {
+        "count_at_least": {
+          "n": 3,
+          "of": [
+            {
+              "has_knowledge": "k_ahong_point_1"
+            },
+            {
+              "has_knowledge": "k_ahong_point_2"
+            },
+            {
+              "has_knowledge": "k_ahong_point_3"
+            }
+          ]
+        }
+      },
+      "reject_reason": "三個對位點尚未連齊。",
+      "reject_reason_tag": "three_points",
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 21,
+        "y": 13
+      },
+      "desc": "山徑在此處突兀中斷，前方是一片寸草不生的平整空地。夜霧在邊緣翻湧，背後的林道無聲隱入黑暗。",
+      "note": "阿宏鏈第七級，第一輪的終點。三個對位點連起來指向一個方向，走過去——那裡地圖上是空的。\n跟「走廊的盡頭」（最早可開 45，而第 45 夜不存在）與開局那行灰掉的「不上車」是同一種語言：看得到、到不了。\n⚠️ 三張知識卡跨輪繼承，所以第二輪玩家在第 43 夜可以直接站到這裡，不必重開前六級。那個空位第二輪要有東西——但那是超脫輪迴／超自然線的事，第一輪不定義"
+    },
+    {
+      "id": "n_corridor_end",
+      "name": "走廊的盡頭",
+      "layer": "night",
+      "chapter": 3,
+      "earliest_night": 45,
+      "teaser_only": true,
+      "reject_reason": "還沒有走到那裡。",
+      "madness_cost": null,
+      "day_counterpart": null,
+      "night_reveal": null,
+      "map": {
+        "x": 76,
+        "y": 58
+      },
+      "desc": "深長走廊的最深處立著一扇未上漆的厚重木門，門底透出微弱的暗紅光芒。門把冰涼，紋絲不動。",
+      "note": "永遠開不了——第 45 夜不存在，主角第 45 天下午就被取走了。它跟開局選單那行灰掉的「不上車」是同一種語言。價碼留 null，玩家看得到這個標記但永遠等不到那一夜"
+    }
+  ],
+  "_pending": {
+    "madness_cost": "待決 38 已結案：第一輪全部 1，多張價碼留給第二輪之後。資料結構支援 2-3，改這個欄位即可"
+  }
+}
