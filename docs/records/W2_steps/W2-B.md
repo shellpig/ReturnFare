@@ -41,6 +41,18 @@
 | 變異 2（從 `LINT_REGISTRY` 註解 `lint_night_location_descs`） | `npm test` 立即轉紅（`data-lint.test.ts` 3 failed）；還原後全綠 |
 | 驗收回饋修正（2 項 `[P2]` 漏檢與變異驗證） | ① `lintConditionNode` 補齊 `all`/`any` 非空 Array、`count_at_least` Dictionary／正整數 `n`／非空 Array `of` 及子條件禁止 `null`/`undefined`；② `lintPageList` 對非 Array 明確報錯，並移除 `ending_replaced` 8 處 `?? []` fallback、補檢 `lookup_fragments` 陣列與元素型別。暫時移除這兩處容器型別檢查時 `data-lint.test.ts` 對應 2 條測試立即轉紅（2 failed），還原後 39 tests 與 `npm run build` 全綠 |
 
+## verifier 複驗與關門（2026-10-31）
+
+- 驗證版本：乾淨的 `main@2a4a507`（與 `origin/main` 一致）；先前半途工作樹的漏檢結論不適用此提交。
+- `npm test`：5 files／39 tests，exit 0；`npm run build`：同步 → lint → tsc → Vite，exit 0。
+- 正式資料：22 條規則全執行、0 errors／4 筆既有豁免 warnings；catalog 維持 66 卡／48 地點／18 NPC／271 beat／4 ending／3 opening／12 cardTypes。
+- 8 個頁面入口各自注入 `{}`、`null`、缺欄，經正式 loader → validateData 共 24 個反例全攔下；8 個合法空陣列案例通過（移除 repeat skip 目標頁時同步設 skip_to 為合法的 complete，避免混入懸空引用）。
+- `{all:{}}`、`{any:"bad"}`、`{count_at_least:{n:1,of:{}}}`、`{not:null}` 四個複合條件反例均被 lint_vocabulary 攔下。
+- 正式資料驗證前後 JSON 序列化逐字相同，未修改輸入。
+- 暫存資料省略 rule.first_seen_pages，經 `RETURNFARE_DATA_DIR` 注入完整 build，exit 1、含 lint_endings 定位訊息，未進入 Vite；暫存資料已清理，正式 data/ 未改。
+- 已核對兩處修正、8 個頁面呼叫點、registry、CLI／dev／build 接線及既有變異紀錄；本次唯讀複驗未修改程式重做變異。
+- 兩項 P2 均已修正，W2-B 驗收通過；W2-A 已於先前完成驗收，W2 整體關門。本次文件關門沿用以上已完成證據，不重跑測試。
+
 ## 下一步
 
-- 待 verifier 驗收 W2（W2-A 與 W2-B）。
+- 依 W3 契約先實作 W3-B（GameState 與初期推進規則），再實作 W3-A（開局與純演出 UI）。

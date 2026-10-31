@@ -4,7 +4,7 @@
 
 最後更新：2026-10-31
 
-> **當前進度（以網頁版為主，Godot 版已凍結）**：專案已拍板轉向**純網頁版（TypeScript + Vite + React）**。`docs/web/` 下的 [網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md) 與 **W1～W7 實作契約**已全數立定；**W1 骨架與軌跡基線（W1-A 網頁骨架與資料同步、W1-B Godot 黃金軌跡產生器、W1-C 軌跡比對器）已全部完成並通過驗收**，詳見 [W1 紀錄](docs/records/W1實作紀錄.md)，**W2-A 資料載入與 TS 型別亦已完成並通過驗收**，詳見 [W2-A 紀錄](docs/records/W2_steps/W2-A.md)；其餘子階段仍為 📐 規格可實作。`web/public/art/` 已備妥小鎮地圖與 13 張白天地點場景圖（WebP），`web/prototype/` 已放入示意版原型。Godot 原版（P1～P5 機器層全綠、T-01～T-04 完工、36 套 headless 與 94 條 UI 契約全綠）**現已凍結為唯讀對照基準，其狀態與進度暫不理會**。**下一步：實作 `W2-B`（資料 lint 移進 build step）。**
+> **當前進度（以網頁版為主，Godot 版已凍結）**：專案已拍板轉向**純網頁版（TypeScript + Vite + React）**。`docs/web/` 下的 [網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md) 與 **W1～W7 實作契約**已全數立定；**W1 骨架與軌跡基線（W1-A 網頁骨架與資料同步、W1-B Godot 黃金軌跡產生器、W1-C 軌跡比對器）已全部完成並通過驗收**，詳見 [W1 紀錄](docs/records/W1實作紀錄.md)，**W2 資料層（W2-A 資料載入與 TS 型別、W2-B build-time 資料 lint）亦已全部完成並通過驗收**，詳見 [W2 紀錄](docs/records/W2實作紀錄.md)；其餘子階段仍為 📐 規格可實作。`web/public/art/` 已備妥小鎮地圖與 13 張白天地點場景圖（WebP），`web/prototype/` 已放入示意版原型。Godot 原版（P1～P5 機器層全綠、T-01～T-04 完工、36 套 headless 與 94 條 UI 契約全綠）**現已凍結為唯讀對照基準，其狀態與進度暫不理會**。**下一步：依 W3 契約先實作 `W3-B`（GameState 與初期推進規則），再實作 `W3-A`（開局與純演出 UI）。**
 
 ---
 
@@ -62,7 +62,7 @@
 | W1-C 軌跡比對器 | ✅ | `174a9fd`；`compareTraces` 與 `trace:compare` CLI，首個差異報到 seq／天／時段／欄位；基線自比 193 筆／48,985 欄位、單欄位反轉、manifest 不符、壞 JSON、前綴不足與變異驗證通過，詳見 [驗收紀錄](docs/records/W1_steps/W1-C.md) |
 | **W2 資料層** | — | 詳見 [`docs/web/W2實作契約.md`](docs/web/W2實作契約.md) |
 | W2-A 資料載入與 TS 型別 | ✅ | `1389d05`、`49799a0`；資料型別、Browser／Node 載入、索引與結構事實完成；2026-10-31 使用者確認驗收完成，詳見 [W2-A 紀錄](docs/records/W2_steps/W2-A.md) |
-| W2-B 資料 lint 移進 build step | 📐 | 搬移 `verify_data.gd` 與 autoload 檢查聯集（Lint 1～22），產出 `data-manifest.json` |
+| W2-B 資料 lint 移進 build step | ✅ | `895e938`、`2a4a507`；7 群組／22 條規則與 dev／build 接線，39 tests、24 個頁面反例、8 個合法空陣列案例及壞頁面 build 阻擋通過，詳見 [驗收紀錄](docs/records/W2_steps/W2-B.md) |
 | **W3 第一個畫面** | — | 施工順序 B → A，詳見 [`docs/web/W3實作契約.md`](docs/web/W3實作契約.md) |
 | W3-B `GameState` 與初期推進規則 | 📐 | 開局依賴的卡片／條件／效果小子集、初期演出（D1 純演出＋前兩夜 fixed）與時段推進至 D2 morning |
 | W3-A 開局選擇與純演出 UI | 📐 | 開局三選一面板 ＋ D1 上午／下午純演出時段渲染；套字型 |
@@ -91,7 +91,7 @@
 
 ### 1. 網頁版命令（在 `web/` 目錄下執行，隨階段推進啟用）
 
-W1 的 `npm ci`、`npm test`、`npm run build`、`npm run dev`、`npm run trace:compare` 已可用；其餘命令尚未實作。
+`npm ci`、`npm test`、`npm run build`、`npm run dev`、`npm run trace:compare`、`npm run lint:data` 已可用；build／dev 已接資料 lint，其餘命令尚未實作。
 
 ```powershell
 npm ci                                           # W1-A 起：從 lockfile 安裝依賴
@@ -149,6 +149,8 @@ $traceRevisionW1 = git rev-parse HEAD
 
 ## 近期動態與下一步
 
+- **2026-10-31**：**W2-B 完成並通過驗收，W2 整體關門**（`895e938`、`2a4a507`）。verifier 於乾淨的 `main@2a4a507` 複驗：5 files／39 tests、build 皆 exit 0；正式資料 22 條規則、0 errors／4 筆既有豁免 warnings。8 個頁面入口各驗物件／null／缺欄，24 個反例全攔下；8 個合法空陣列與 4 個複合條件反例驗證通過，驗證函式未修改輸入。缺頁面欄位的暫存資料使 build exit 1，未進 Vite。兩項 P2 均已修正；先前半途工作樹的結論不適用此提交。詳見 [W2-B 紀錄](docs/records/W2_steps/W2-B.md)。
+
 - **2026-10-31**：**W2-A 完成並通過驗收**（`1389d05`、`49799a0`），依使用者確認更新狀態。資料型別、Browser／Node 載入、索引與結構事實已交付；既有工程紀錄為 4 files／31 tests、build 皆 exit 0，正式資料 catalog 與 Godot 對照一致。本次文件關門未重跑測試；詳見 [W2-A 紀錄](docs/records/W2_steps/W2-A.md)。
 
 - **2026-10-31**：**W1-C 完成並通過驗收，W1 整體關門**（`174a9fd`）。OpenCode Nemotron 實作 `compareTraces` 與 `trace:compare` CLI，指揮者修正忽略路徑單邊缺鍵、actual 前綴不足退出碼與 manifest 不符訊息。verifier 重跑 npm ci／test／build（7 tests）與 HTTP smoke；基線自比 193 筆／48,985 欄位 exit 0，單欄位反轉精確報到 seq／天／時段／欄位 exit 1，壞 JSON exit 2，純量比較變異使 4 個案例轉紅；W1 改動皆在白名單內、未動 data 與 Godot 正式碼；詳見 [W1-C 紀錄](docs/records/W1_steps/W1-C.md)。
@@ -159,4 +161,4 @@ $traceRevisionW1 = git rev-parse HEAD
   - 建立 `web/public/art/`，放入小鎮地圖 `town.webp` 與 13 張白天地點場景圖（WebP），並於 `web/prototype/` 放入示意版原型與座標校準工具。
 - **2026-08-30 ～ 2026-08-31（Godot 基準封存前最後更新）**：完成 P5-F 機器層關門、T-01 測試文案解耦、T-02 全 12 檔套語清理、D1 上午／下午純演出時段、T-03 白天地圖空點解鎖與 20 個白天地點 `desc`（含 `c1acc73` B1–B5 修正）、T-04 夜間 28 個地點 `desc` 與防劇透 Lint 22（`49ab0c7`，Godot headless 共 36 套全綠）。
 - **後續方向**：W-01～W-06 已全數定案，見 `待決事項.md` 第六節；目前美術方向沿用，W7 先完成繁體中文版，再規劃多語系；不考慮 Steam 或 Godot 存檔相容，Godot 維持凍結。
-- **下一步**：依 [`docs/web/W2實作契約.md`](docs/web/W2實作契約.md) 實作 **W2-B（資料 lint 移進 build step）**；W1 與 W2-A 已完成驗收，不重做骨架、資料載入、比對器或重產基線。
+- **下一步**：依 [`docs/web/W3實作契約.md`](docs/web/W3實作契約.md) 先實作 **W3-B（GameState 與初期推進規則）**，再接 **W3-A（開局與純演出 UI）**；W1、W2 已完成驗收，不重做資料層或重產基線。
