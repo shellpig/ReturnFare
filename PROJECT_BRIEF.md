@@ -4,7 +4,7 @@
 
 最後更新：2026-10-31
 
-> **當前進度（以網頁版為主，Godot 版已凍結）**：專案已拍板轉向**純網頁版（TypeScript + Vite + React）**。`docs/web/` 下的 [網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md) 與 **W1～W7 實作契約**已全數立定；**W1-A 網頁骨架與資料同步已完成並通過驗收**（`80f2b7b`），其餘子階段仍為 📐 規格可實作。`web/public/art/` 已備妥小鎮地圖與 13 張白天地點場景圖（WebP），`web/prototype/` 已放入示意版原型。Godot 原版（P1～P5 機器層全綠、T-01～T-04 完工、36 套 headless 與 94 條 UI 契約全綠）**現已凍結為唯讀對照基準，其狀態與進度暫不理會**。**下一步：實作 `W1-B`（Godot 黃金軌跡產生器），再接 `W1-C`（軌跡比對器）。**
+> **當前進度（以網頁版為主，Godot 版已凍結）**：專案已拍板轉向**純網頁版（TypeScript + Vite + React）**。`docs/web/` 下的 [網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md) 與 **W1～W7 實作契約**已全數立定；**W1-A 網頁骨架與資料同步、W1-B Godot 黃金軌跡產生器均已完成並通過驗收**，詳見 [W1 紀錄](docs/records/W1實作紀錄.md)，其餘子階段仍為 📐 規格可實作。`web/public/art/` 已備妥小鎮地圖與 13 張白天地點場景圖（WebP），`web/prototype/` 已放入示意版原型。Godot 原版（P1～P5 機器層全綠、T-01～T-04 完工、36 套 headless 與 94 條 UI 契約全綠）**現已凍結為唯讀對照基準，其狀態與進度暫不理會**。**下一步：實作 `W1-C`（軌跡比對器）。**
 
 ---
 
@@ -35,7 +35,7 @@
 │   ├── public/art/          # WebP 成品圖（map/town.webp、scenes/<地點 id>.webp）
 │   ├── prototype/           # 示意版原型（d1-demo、map-demo、map-calibration），非規則來源
 │   └── src/                 # 已有 main.tsx 與 ui/App.tsx 空殼；core/ 規則與 data/ 載入後續建立
-├── tools/trace/             # （W1-C 建立）引擎無關的黃金軌跡比對器
+├── tools/trace/             # 已有 baselines/greedy-godot.json；W1-C 再建立引擎無關比對器
 ├── scripts/ scenes/ tests/  # Godot 版（已凍結，唯讀對照組；W1-B 於 tests/headless/ 加軌跡產生器）
 └── _舊文件/                 # 本機歷史 archive（gitignore），永遠忽略
 ```
@@ -58,7 +58,7 @@
 |---|---|---|
 | **W1 骨架與軌跡基線** | — | 詳見 [`docs/web/W1實作契約.md`](docs/web/W1實作契約.md) |
 | W1-A `web/` 骨架與資料同步 | ✅ | `80f2b7b`；React 18／Vite／TS 空殼、資料同步、測試與建置完成；19 份 JSON bytes／路徑、HTTP 與變異驗證通過，詳見 [驗收紀錄](docs/records/W1_steps/W1-A.md) |
-| W1-B Godot 黃金軌跡產生器 | 📐 | 在既有 Godot 貪心走查加唯讀觀測，輸出時段邊界與結局狀態快照 `trace-godot.json` |
+| W1-B Godot 黃金軌跡產生器 | ✅ | 唯讀觀測、產生器與正式基線完成；193 筆 checkpoint／179 筆 phase_end／19 份 manifest，雙次生成及失敗保護驗證通過，詳見 [驗收紀錄](docs/records/W1_steps/W1-B.md) |
 | W1-C 軌跡比對器 | 📐 | `tools/trace/` Node CLI 逐筆逐欄位 diff，分岔點精確報到「第幾天・哪個時段・哪個欄位」 |
 | **W2 資料層** | — | 詳見 [`docs/web/W2實作契約.md`](docs/web/W2實作契約.md) |
 | W2-A 資料載入與 TS 型別 | 📐 | `web/src/data/loader.ts` 與 `web/src/core/facts.ts`，對應 `data_loader.gd` 與 `data_facts.gd` |
@@ -108,9 +108,12 @@ npm run test:ui                                  # W3 起：Playwright Headless 
 ```powershell
 C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://scripts/verify_data.gd
 C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . --script res://tests/headless/playthrough_greedy.gd
+$traceRevisionW1 = git rev-parse HEAD
+& 'C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe' --headless --path . --script res://tests/headless/generate_greedy_trace.gd -- --output _qa/web/trace-godot.json --source-revision $traceRevisionW1
 ```
 
 - 在 sandbox 內跑 Godot headless 會因 `user://logs` 權限 crash，需直接以 escalated 權限執行。
+- W1-B 產生器已可用；一般驗證輸出至 `_qa/web/`，不得自動覆寫 `tools/trace/baselines/greedy-godot.json`。基線來源 revision 與觀測接點差異見 W1-B 紀錄；此走法不含正式開局選擇，也不代表 Godot／TS 已對帳。
 
 ---
 
@@ -146,9 +149,10 @@ C:\_work\Godot_v4.6.3\Godot_v4.6.3-stable_win64_console.exe --headless --path . 
 
 ## 近期動態與下一步
 
+- **2026-10-31**：**W1-B 完成並通過驗收**。既有貪心走查只增唯讀 observer；產生器同時驗觀測開關等價，正式基線 1,947,278 bytes。三個既有入口與兩次生成 exit 0，雙次輸出及基線一致，D45 seq 178／179 均為 evening。結局漏採／重採、Windows 更名失敗、雙重失敗備份保留與回報均驗證通過，移除還原成功守衛的變異被攔截；詳見 [W1-B 紀錄](docs/records/W1_steps/W1-B.md)。
 - **2026-10-31**：**W1-A 完成並通過驗收**（`80f2b7b`）。OpenCode Nemotron 實作、指揮者審核修正與獨立驗證；npm ci／test／build exit 0，19 份正式 JSON 相對路徑與原始 bytes 一致，空殼／tuning／地圖 HTTP 皆 200 且服務已關閉。移除 stale 刪除接線時測試轉紅、還原後全綠，無測試時 exit 1，npm audit 0 漏洞。驗收範圍僅 W1-A，不含玩法、瀏覽器或兩引擎軌跡對帳；詳見 [W1-A 紀錄](docs/records/W1_steps/W1-A.md)。
 - **2026-10-31**：**確立純網頁版（TypeScript + Vite + React）移植主線，完成 W1～W7 全套實作契約與美術基底。**
   - 新增 `docs/web/`（[網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md)、[W1實作契約.md](docs/web/W1實作契約.md)～[W7實作契約.md](docs/web/W7實作契約.md)）及 `docs/others/` 指揮手冊，並完成兩輪契約漏洞與夜間／W6 守衛修正（至 `4ee0d79`）。
   - 建立 `web/public/art/`，放入小鎮地圖 `town.webp` 與 13 張白天地點場景圖（WebP），並於 `web/prototype/` 放入示意版原型與座標校準工具。
 - **2026-08-30 ～ 2026-08-31（Godot 基準封存前最後更新）**：完成 P5-F 機器層關門、T-01 測試文案解耦、T-02 全 12 檔套語清理、D1 上午／下午純演出時段、T-03 白天地圖空點解鎖與 20 個白天地點 `desc`（含 `c1acc73` B1–B5 修正）、T-04 夜間 28 個地點 `desc` 與防劇透 Lint 22（`49ab0c7`，Godot headless 共 36 套全綠）。
-- **下一步**：依 [`docs/web/W1實作契約.md`](docs/web/W1實作契約.md) 實作 **W1-B（Godot 黃金軌跡產生器）→ W1-C（軌跡比對器）**；W1-A 已驗收，不重做骨架。
+- **下一步**：依 [`docs/web/W1實作契約.md`](docs/web/W1實作契約.md) 實作 **W1-C（軌跡比對器）**；W1-A／B 已驗收，不重做骨架或重產基線。

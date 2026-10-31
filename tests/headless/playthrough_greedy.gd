@@ -195,7 +195,7 @@ static func advance_until_phase_changes(gs: Node) -> Dictionary:
 
 
 ## 執行 45 天貪心走查（K-36：供 test_p1f 與本腳本共用）
-static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) -> Dictionary:
+static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false, observer: Callable = Callable()) -> Dictionary:
 	# P5-D：fresh boot 停在 opening。走查驗的是 45 天的內容，不是開局選項本身，
 	# 因此用測試 helper 起一輪乾淨的 run（開局選項的正式路徑由 test_p5d 驗）。
 	if str(gs.get("flow_mode")) != "run":
@@ -247,6 +247,9 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 	var errors: Array[String] = []
 	var last_ind_count := int(gs.get("indulgence_count"))
 
+	if observer.is_valid():
+		observer.call("run_start", gs)
+
 	for d in range(1, 46):
 		day_counter = d
 
@@ -269,6 +272,8 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		if res_m.get("placed", false):
 			actions_taken += 1
 		last_ind_count = int(gs.get("indulgence_count"))
+		if observer.is_valid():
+			observer.call("phase_end", gs)
 		gs.advance_phase()
 
 		# 2. Afternoon
@@ -290,6 +295,8 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		if res_a.get("placed", false):
 			actions_taken += 1
 		last_ind_count = int(gs.get("indulgence_count"))
+		if observer.is_valid():
+			observer.call("phase_end", gs)
 		if str(gs.get("phase")) == "afternoon":
 			var adv_a: Dictionary = gs.advance_phase()
 			if not adv_a.get("ok", false):
@@ -312,6 +319,8 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 		if d == 45:
 			coda_path_box[0] = str((gs.get("choices") as Dictionary).get("d45_then::d45_coda", ""))
 		last_ind_count = int(gs.get("indulgence_count"))
+		if observer.is_valid():
+			observer.call("phase_end", gs)
 		gs.advance_phase()
 
 		# 第 45 天 evening 推進：coda 門檻完成後由規則層啟動 ending_replaced，不進第 45 夜。
@@ -326,6 +335,8 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 				push_error(err_n)
 		execute_night_phase(gs, data_node, d)
 		last_ind_count = int(gs.get("indulgence_count"))
+		if observer.is_valid():
+			observer.call("phase_end", gs)
 		advance_until_phase_changes(gs)
 
 	gs.ending_started.disconnect(cb)
@@ -334,18 +345,26 @@ static func run_greedy_walk(gs: Node, data_node: Node, verbose: bool = false) ->
 	# 完成後停在 opening——不自己跳回第 1 天，也不再有 legacy end_run() 這條路。
 	var ending_pages := 0
 	if str(gs.get("flow_mode")) == "ending":
+		if observer.is_valid():
+			observer.call("ending_started", gs)
 		var page_cap := 200
 		while str(gs.get("flow_mode")) == "ending" and page_cap > 0:
 			page_cap -= 1
 			var view: Dictionary = gs.call("ending_view")
 			if bool(view.get("can_complete", false)):
-				gs.call("complete_ending")
+				var complete_res: Dictionary = gs.call("complete_ending")
+				if observer.is_valid() and bool(complete_res.get("ok", false)) and str(gs.get("flow_mode")) == "opening":
+					observer.call("opening_ready", gs)
 				break
 			if not bool(view.get("page_revealed", false)):
 				gs.call("reveal_ending_page")
+				if observer.is_valid():
+					observer.call("ending_step", gs)
 			else:
 				gs.call("advance_ending_page")
 				ending_pages += 1
+				if observer.is_valid():
+					observer.call("ending_step", gs)
 
 	if verbose:
 		print("\n=== 45 天行動時段統計表（共 90 時段）===")
