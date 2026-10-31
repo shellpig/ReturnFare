@@ -6,6 +6,7 @@
  */
 
 import type { Phase } from '../data/types';
+import type { MapLocationView, PanelView } from './panel';
 
 export type FlowMode = 'opening' | 'run' | 'ending';
 
@@ -202,6 +203,11 @@ export interface Game {
   getOpeningScreenView(): OpeningScreenView;
   getOpeningView(): readonly OpeningOptionView[];
   getPhaseView(): PhaseView;
+  availableLocations(): readonly string[];
+  mapView(): readonly MapLocationView[];
+  buildPanel(locationId: string): PanelView;
+  remainingActionsToday(): number;
+  markDayLocationVisited(locationId: string): void;
   chooseOpening(choiceId: string): MutationResult;
   playBeat(beatId: string): MutationResult;
   playEvening(): MutationResult;

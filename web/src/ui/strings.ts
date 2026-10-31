@@ -10,4 +10,11 @@ export const strings = {
   status: (day: number, phase: string, chapter: number) => `第 ${day} 天  ${phase}  第 ${chapter} 章`, // scenes/main.gd _FMT_STATUS
   // Godot 狀態列直接顯示 phase id（morning 等）；中文時段名為 W3-A 新增，Godot 無原文。
   phases: { morning: '上午', afternoon: '下午', evening: '傍晚', night: '夜晚' },
+  backToMap: '返回地圖', // scenes/ui/location_panel.tscn:25 BackButton
+  noTitle: '（無標題）', // scenes/ui/location_panel.gd:41,111
+  reasonFallback: '（條件不足）', // scripts/core/panel_builder.gd:54,97；scripts/autoload/game_state.gd:940
+  soakMorningOnly: '（只能在上午發動）', // scripts/core/panel_builder.gd:104；scripts/autoload/game_state.gd:1299
+  soakInsufficientActions: '（格數不足）', // scripts/core/panel_builder.gd:104；scripts/autoload/game_state.gd:1300
+  slotTypesDelimiter: '、', // scenes/ui/slot_widget.gd:31
+  slotTypes: (types: string) => `（收：${types}）`, // scenes/ui/slot_widget.gd:31
 } as const;

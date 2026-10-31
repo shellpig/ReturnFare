@@ -42,5 +42,6 @@ test('phone path displays each original passage through the first night', async 
   await phase();
   await expect(page.locator('header')).toContainText('第 2 天');
   await expect(advance).toBeDisabled();
-  await expect(page.getByRole('button')).toHaveCount(1);
+  await expect(page.locator('.map-panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: '山泉閣' })).toBeEnabled();
 });

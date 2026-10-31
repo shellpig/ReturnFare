@@ -18,5 +18,25 @@ button:disabled { opacity: .55; cursor: default; }
 dialog { width: min(90vw, 560px); border: 1px solid #ac9b7e; background: #f9f5eb; color: inherit; padding: 2rem; }
 dialog::backdrop { background: #251c16aa; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; }
-.narration header { color: #806e5a; border-bottom: 1px solid #d7cdbb; padding-bottom: 1rem; }
+.narration header, .daytime-shell > header { color: #806e5a; border-bottom: 1px solid #d7cdbb; padding-bottom: 1rem; }
 .passage { min-height: 12rem; margin: 2rem 0; }
+.map-panel, .location-panel { margin: 1.5rem 0; }
+.map-art-frame, .scene-art-frame { margin-bottom: 1.25rem; border: 1px solid #c5b99f; background: #eee6d7; overflow: hidden; }
+.map-art, .scene-art { display: block; width: 100%; max-height: 260px; object-fit: cover; }
+.map-locations { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .75rem; }
+.location-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.location-header h2 { margin: 0; }
+.beat-stage, .slots-stage { margin-top: 1rem; }
+.beat-title, .beat-group-title { font-size: 1.15rem; font-weight: normal; color: #614b39; margin: 1rem 0 .5rem; }
+.beat-text, .location-desc { margin: 1rem 0 1.5rem; }
+.beat-group { border-top: 1px solid #d7cdbb; padding-top: .75rem; margin-top: 1rem; }
+.slot-list { display: grid; gap: .75rem; }
+.slot-item { padding: .85rem 1rem; border: 1px solid #c5b99f; background: #f3ede0; }
+.slot-locked { opacity: .72; background: #ebe4d5; }
+.slot-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+.slot-occupant { color: #6b523d; font-weight: bold; }
+.slot-occupant::before { content: '〔'; }
+.slot-occupant::after { content: '〕'; }
+.slot-accept-types { color: #806e5a; font-size: .92rem; }
+.slot-delegation-preview, .slot-delegation-tendency, .slot-reason { margin: .4rem 0 0; }
+.phase-actions { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d7cdbb; }

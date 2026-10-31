@@ -22,6 +22,14 @@ import {
 } from './facts';
 import { nightBeatCandidates, recordForcedNightVisit } from './night';
 import {
+  availableLocations as calcAvailableLocations,
+  buildPanel as calcBuildPanel,
+  mapView as calcMapView,
+  remainingActionsToday as calcRemainingActionsToday,
+  type MapLocationView,
+  type PanelView,
+} from './panel';
+import {
   cloneSnapshot,
   createInitialSnapshot,
   deepFreeze,
@@ -139,12 +147,7 @@ function playBeatOnDraft(
     next.run.beats_entered[beatId] = true;
   }
 
-  if (typeof beat.location === 'string' && beat.location.length > 0) {
-    const loc = data.locationsById.get(beat.location);
-    if (loc?.layer === 'day') {
-      next.meta.day_locations_visited[beat.location] = true;
-    }
-  }
+  recordDayLocationVisitedOnDraft(next, beat.location, data);
 
   return {
     ok: true,
@@ -153,6 +156,26 @@ function playBeatOnDraft(
     lines,
     nextState: next,
   };
+}
+
+/**
+ * 記錄白天地點造訪（對應 Godot GameState.mark_day_location_visited）。
+ * 僅在 locationId 非空、存在於 data.locationsById 且 layer === 'day' 時寫入。
+ */
+function recordDayLocationVisitedOnDraft(
+  draft: GameSnapshot,
+  locationId: string | undefined,
+  data: GameData,
+): boolean {
+  if (typeof locationId !== 'string' || locationId.length === 0) {
+    return false;
+  }
+  const loc = data.locationsById.get(locationId);
+  if (!loc || loc.layer !== 'day') {
+    return false;
+  }
+  draft.meta.day_locations_visited[locationId] = true;
+  return true;
 }
 
 /** 在 draft 上依陣列順序自動結算當前 (day, phase) 的 fixed + auto_enter beat。 */
@@ -807,6 +830,31 @@ export function createGame(
     };
   }
 
+  function availableLocations(): readonly string[] {
+    return calcAvailableLocations(state, data);
+  }
+
+  function mapView(): readonly MapLocationView[] {
+    return calcMapView(state, data);
+  }
+
+  function buildPanel(locationId: string): PanelView {
+    return calcBuildPanel(locationId, state, data);
+  }
+
+  function remainingActionsToday(): number {
+    return calcRemainingActionsToday(state);
+  }
+
+  function markDayLocationVisited(locationId: string): void {
+    const draft = cloneSnapshot(state as GameSnapshot);
+    if (!recordDayLocationVisitedOnDraft(draft, locationId, data)) {
+      return;
+    }
+    commitState(draft);
+    notifyListeners();
+  }
+
   function chooseOpening(choiceId: string): MutationResult {
     // 1. mode opening
     if (state.flow.mode !== 'opening') {
@@ -1150,6 +1198,11 @@ export function createGame(
     getOpeningScreenView: openingScreenView,
     getOpeningView: openingView,
     getPhaseView,
+    availableLocations,
+    mapView,
+    buildPanel,
+    remainingActionsToday,
+    markDayLocationVisited,
     chooseOpening,
     playBeat,
     playEvening,
