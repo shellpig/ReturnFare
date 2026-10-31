@@ -20,10 +20,11 @@ test('phone path displays each original passage through the first night', async 
   async function phase() { await expect(advance).toBeEnabled(); await advance.click(); }
   await read(beat('d1_morning_phone').text);
   await read(beat('d1_morning_departure').text);
-  await expect(page.locator('[class*=map], [class*=slot]')).toHaveCount(0);
+  await expect(passage).toHaveText(beat('d1_morning_departure').text);
+  await expect(page.getByRole('button')).toHaveCount(1);
   await phase();
   await read(beat('d1_pm_mountain_road').text);
-  await expect(page.locator('[class*=map], [class*=slot]')).toHaveCount(0);
+  await expect(page.getByRole('button')).toHaveCount(1);
   await phase();
   await expect(passage).toHaveText(beat('d1_arrival').text);
   await page.screenshot({ path: '../_qa/web/W3-A/evening.png', fullPage: true });
@@ -41,5 +42,5 @@ test('phone path displays each original passage through the first night', async 
   await phase();
   await expect(page.locator('header')).toContainText('第 2 天');
   await expect(advance).toBeDisabled();
-  await expect(page.locator('[class*=map], [class*=slot]')).toHaveCount(0);
+  await expect(page.getByRole('button')).toHaveCount(1);
 });
