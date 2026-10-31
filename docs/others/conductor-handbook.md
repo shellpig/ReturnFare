@@ -53,7 +53,7 @@ prompt 檔存 `C:\_work\AI_Work\Tools\agy-runs\<worker>-<phase>-<step>.prompt.tx
 ```
 git pull --ff-only（ChatGPT／Muse 網頁版）或 git diff（agy／OpenCode Muse 直接改本機）
 → Godot 版：tests/run_all_headless.ps1 全套（escalated；搬過 .tscn/.gd 先 --import），見 local-tools.md
-→ 網頁版：npm test -- --run、npm run build（cwd web/，只要動到 web/）；有黃金軌跡（W1-C）後再跑軌跡比對
+→ 網頁版：npm test、npm run build（cwd web/，只要動到 web/）；有黃金軌跡（W1-C）後再跑軌跡比對
 → 讀 diff（見 §5 checklist）
 → 關鍵規則／接線：暫時拔掉接線或反轉判斷，確認對應測試轉紅再還原（AGENTS.md 實作守則第 5 條）
 → 修小錯（幾行、單一目的）
@@ -274,7 +274,7 @@ document.querySelector('button[aria-label="傳送"]').click();
 
 - C3 前端約 1,560 行、一回合約 22 分鐘；C3b 約 20 分鐘；E2E spec 一回合含實跑。報告誠實：主動說明 web vitest 沒有 DOM 環境、自己的繞法（選單只有前 50 筆時改用 Acolyte）、需要改的舊斷言與理由，欄位對照與 handler 行號抽查都相符。
 - E2E 抓到一個真的產品缺陷（模板選單只有第一頁、沒有搜尋），它照規定沒有放寬斷言，在回報中列出，由指揮者另派 C3b 修正。
-- 指揮者仍要逐一核對每個新欄位的 server 來源、每個新 handler 的呼叫者，並自己跑一次 `npm test -- --run`／`npm run build`；互動行為以 Docker E2E 為準。
+- 指揮者仍要逐一核對每個新欄位的 server 來源、每個新 handler 的呼叫者，並自己跑一次 `npm test`／`npm run build`；互動行為以 Docker E2E 為準。
 
 ---
 

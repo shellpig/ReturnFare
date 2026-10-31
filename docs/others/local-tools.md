@@ -34,7 +34,7 @@ powershell -ExecutionPolicy Bypass -File tests/run_all_headless.ps1
 規劃中的指令（cwd `web/`，以 W1-A 實際建立的 script 為準）：
 
 ```
-npm test -- --run
+npm test
 npm run build
 ```
 
