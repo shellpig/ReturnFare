@@ -66,6 +66,59 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     expect(game.getSnapshot().meta.knowledge).toEqual({});
   });
 
+  it('getSnapshot() enforces deep runtime read-only protection while keeping reference identity stable', () => {
+    const game = createGame(data);
+    let notified = 0;
+    game.subscribe(() => {
+      notified += 1;
+    });
+
+    const snap = game.getSnapshot();
+    expect(Object.is(snap, game.getSnapshot())).toBe(true);
+
+    // Top-level and nested mutations on getSnapshot() must throw TypeError at runtime
+    expect(() => {
+      (snap as unknown as { flow: unknown }).flow = {
+        mode: 'run',
+        active_ending: null,
+      };
+    }).toThrow(TypeError);
+    expect(() => {
+      (snap.run as unknown as { day: number }).day = 99;
+    }).toThrow(TypeError);
+    expect(() => {
+      (snap.run.hand as unknown as string[]).push('protagonist');
+    }).toThrow(TypeError);
+    expect(() => {
+      (snap.run.flags as unknown as Record<string, boolean>).probe = true;
+    }).toThrow(TypeError);
+    expect(() => {
+      (snap.meta.knowledge as unknown as Record<string, boolean>).k_i_returned =
+        true;
+    }).toThrow(TypeError);
+
+    expect(game.getSnapshot().run.day).toBe(1);
+    expect(game.getSnapshot().run.hand).toEqual([]);
+    expect(notified).toBe(0);
+    expect(Object.is(snap, game.getSnapshot())).toBe(true);
+
+    // After a valid mutation, the new snapshot must also be deeply frozen and stable
+    expect(game.chooseOpening('take_family_album').ok).toBe(true);
+    const runSnap = game.getSnapshot();
+    expect(Object.is(runSnap, game.getSnapshot())).toBe(true);
+    expect(() => {
+      (runSnap.run.hand as unknown as string[]).pop();
+    }).toThrow(TypeError);
+    expect(() => {
+      (runSnap.run.beats_entered as unknown as Record<string, boolean>).hacked =
+        true;
+    }).toThrow(TypeError);
+    expect(game.getSnapshot().run.hand).toEqual([
+      'protagonist',
+      'item_family_album',
+    ]);
+  });
+
   it('subscribe() notifies on state commits, does not notify on rejected mutations, and respects unsubscribe', () => {
     const game = createGame(data);
     let count = 0;
@@ -144,14 +197,51 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     expect(failedPlan.lines).toEqual([]);
     expect(JSON.stringify(draft)).toBe(beforeJson);
     expect(JSON.stringify(failedPlan.nextState)).toBe(beforeJson);
+
+    // planEffects: flag strictly requires Dictionary (Record<string, boolean>); string or array shapes are rejected atomically with data_conflict
+    const badFlagString = planEffects(
+      [{ text: '不應流出', flag: 'probe' as unknown as Record<string, boolean> }],
+      draft,
+      data,
+    );
+    expect(badFlagString.ok).toBe(false);
+    expect(badFlagString.reason_code).toBe('data_conflict');
+    expect(badFlagString.lines).toEqual([]);
+    expect(JSON.stringify(badFlagString.nextState)).toBe(beforeJson);
+
+    const badFlagArray = planEffects(
+      [
+        {
+          text: '不應流出',
+          flag: ['probe'] as unknown as Record<string, boolean>,
+        },
+      ],
+      draft,
+      data,
+    );
+    expect(badFlagArray.ok).toBe(false);
+    expect(badFlagArray.reason_code).toBe('data_conflict');
+    expect(badFlagArray.lines).toEqual([]);
+    expect(JSON.stringify(badFlagArray.nextState)).toBe(beforeJson);
+
+    const validFlagDict = planEffects(
+      [{ flag: { outside_job_waiting: true } }],
+      draft,
+      data,
+    );
+    expect(validFlagDict.ok).toBe(true);
+    expect(validFlagDict.nextState.run.flags).toEqual({
+      outside_job_waiting: true,
+    });
   });
 
-  it('advancePhase() 7-step skeleton rejects not_run, encounter_active, phase_requirements_incomplete, and beyond D2 morning with zero mutation', () => {
+  it('advancePhase() 7-step skeleton and getPhaseView().can_advance stay strictly in sync across all guards', () => {
     // 1. encounter_active
     const encInitial = createRunForTrace(data).serialize();
     encInitial.run.active_encounter = { beat_id: 'dummy', stage: 'intro' };
     const encGame = createGame(data, encInitial);
     const encBefore = JSON.stringify(encGame.serialize());
+    expect(encGame.getPhaseView().can_advance).toBe(false);
     const encRes = encGame.advancePhase();
     expect(encRes.ok).toBe(false);
     expect(encRes.reason_code).toBe('encounter_active');
@@ -183,6 +273,65 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     expect(gateRes.ok).toBe(false);
     expect(gateRes.reason_code).toBe('phase_requirements_incomplete');
     expect(JSON.stringify(gateGame.serialize())).toBe(gateBefore);
+
+    // 3. Night sleep check guard: when a sanquan sleep candidate exists on D1 night, before playNightFixed() (night_location_chosen === ''), Step 3 blocks advancePhase -> can_advance must be false; after playNightFixed() sets night_location_chosen, can_advance becomes true
+    const sleepBeats = [
+      ...data.beats,
+      {
+        id: 'test_sleep_sanquan_ch1',
+        location: 'sanquan',
+        chapter: 1,
+        text: '旅館就寢演出',
+        slots: [],
+      },
+    ];
+    const sleepData: GameData = {
+      ...data,
+      beats: sleepBeats,
+      beatsById: new Map(sleepBeats.map((b) => [b.id, b])),
+    };
+    const nightGame = createGame(sleepData);
+    expect(nightGame.chooseOpening('take_family_album').ok).toBe(true);
+    expect(nightGame.advancePhase().ok).toBe(true); // -> D1 afternoon
+    expect(nightGame.advancePhase().ok).toBe(true); // -> D1 evening
+    expect(nightGame.playEvening().ok).toBe(true);
+    expect(nightGame.advancePhase().ok).toBe(true); // -> D1 night
+    expect(nightGame.getSnapshot().run.night_location_chosen).toBe('');
+    expect(nightGame.getPhaseView().can_advance).toBe(false);
+    const sleepAdvRes = nightGame.advancePhase();
+    expect(sleepAdvRes.ok).toBe(false);
+    expect(sleepAdvRes.reason_code).toBe('not_implemented');
+    expect(nightGame.playNightFixed().ok).toBe(true);
+    expect(nightGame.getSnapshot().run.night_location_chosen).toBe('n_corridor');
+    expect(nightGame.getPhaseView().can_advance).toBe(true);
+
+    // 4. madness_clock guard on night
+    const madnessNightInit = nightGame.serialize();
+    madnessNightInit.run.madness_clock = { test_clock: 2 };
+    const madnessNightGame = createGame(data, madnessNightInit);
+    expect(madnessNightGame.getPhaseView().can_advance).toBe(false);
+    expect(madnessNightGame.advancePhase().reason_code).toBe('not_implemented');
+
+    // 5. actions_spent_ahead guard
+    const aheadInit = createRunForTrace(data).serialize();
+    aheadInit.run.actions_spent_ahead = 1;
+    const aheadGame = createGame(data, aheadInit);
+    expect(aheadGame.getPhaseView().can_advance).toBe(false);
+    expect(aheadGame.advancePhase().reason_code).toBe('not_implemented');
+
+    // 6. forced_pending guard when advancing to an action phase (D1 morning -> D1 afternoon)
+    const forcedInit = createRunForTrace(data).serialize();
+    forcedInit.run.forced_pending = ['indulgence'];
+    const forcedGame = createGame(data, forcedInit);
+    expect(forcedGame.getPhaseView().can_advance).toBe(false);
+    expect(forcedGame.advancePhase().reason_code).toBe('not_implemented');
+
+    // 7. pending_delegation_reports / delegates_used_today guard when advancing to morning (D1 night -> D2 morning)
+    const delegInit = nightGame.serialize();
+    delegInit.run.delegates_used_today = { npc_lin: true };
+    const delegGame = createGame(data, delegInit);
+    expect(delegGame.getPhaseView().can_advance).toBe(false);
+    expect(delegGame.advancePhase().reason_code).toBe('not_implemented');
   });
 
   it('createRunForTrace(data) matches greedy-godot.json seq 0..4 with W3.json scope (0 diff) and is not imported by browser entry/UI', async () => {

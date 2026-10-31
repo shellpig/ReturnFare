@@ -7,7 +7,7 @@
 
 import type { GameData } from '../data/types';
 import { gainCard } from './cards';
-import type { GameSnapshot, RunState } from './state-types';
+import type { DeepReadonly, GameSnapshot, RunState } from './state-types';
 
 /** 建立乾淨的單輪（run 層）初值，不放入 protagonist 卡。 */
 export function createEmptyRunState(): RunState {
@@ -65,6 +65,29 @@ export function createInitialSnapshot(): GameSnapshot {
 /** 深拷貝 GameSnapshot，確保呼叫端修改回傳值不會污染 store 內部狀態。 */
 export function cloneSnapshot(state: Readonly<GameSnapshot>): GameSnapshot {
   return structuredClone(state as GameSnapshot);
+}
+
+/** 遞迴凍結物件／陣列，確保 getSnapshot() 的巢狀欄位不可被外部直接改動。 */
+export function deepFreeze<T>(obj: T): DeepReadonly<T> {
+  if (obj === null || typeof obj !== 'object') {
+    return obj as DeepReadonly<T>;
+  }
+  if (Object.isFrozen(obj)) {
+    return obj as DeepReadonly<T>;
+  }
+  Object.freeze(obj);
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i += 1) {
+      deepFreeze(obj[i]);
+    }
+  } else {
+    const record = obj as Record<string, unknown>;
+    const keys = Object.keys(record);
+    for (let i = 0; i < keys.length; i += 1) {
+      deepFreeze(record[keys[i]]);
+    }
+  }
+  return obj as DeepReadonly<T>;
 }
 
 /**

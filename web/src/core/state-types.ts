@@ -9,6 +9,14 @@ import type { Phase } from '../data/types';
 
 export type FlowMode = 'opening' | 'run' | 'ending';
 
+export type DeepReadonly<T> = T extends (infer R)[]
+  ? readonly DeepReadonly<R>[]
+  : T extends readonly (infer R)[]
+    ? readonly DeepReadonly<R>[]
+    : T extends object
+      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+      : T;
+
 export type ReasonCode =
   | ''
   | 'not_opening'
@@ -185,9 +193,12 @@ export interface AdvanceResult extends MutationResult {
 
 /** Game store 公開介面 */
 export interface Game {
-  getSnapshot(): Readonly<GameSnapshot>;
+  getSnapshot(): DeepReadonly<GameSnapshot>;
   serialize(): GameSnapshot;
   subscribe(listener: () => void): () => void;
+  chapter(): number;
+  openingScreenView(): OpeningScreenView;
+  openingView(): readonly OpeningOptionView[];
   getOpeningScreenView(): OpeningScreenView;
   getOpeningView(): readonly OpeningOptionView[];
   getPhaseView(): PhaseView;

@@ -26,9 +26,22 @@ describe('W3-B opening view, rejection matrix, and formal opening paths (D1 -> D
     data = await loadGameDataNode();
   });
 
-  it('getOpeningView() projects choices in data order without leaking requires/on_select/ending', () => {
+  it('chapter(), openingScreenView(), and openingView() match contract API and project choices in data order without leaking requires/on_select/ending', () => {
     const game = createGame(data);
-    const view = game.getOpeningView();
+    expect(typeof game.chapter).toBe('function');
+    expect(typeof game.openingScreenView).toBe('function');
+    expect(typeof game.openingView).toBe('function');
+
+    expect(game.chapter()).toBe(1);
+    const screen = game.openingScreenView();
+    expect(screen).toEqual({
+      title: data.openingScreen.title,
+      prompt: data.openingScreen.prompt,
+    });
+    expect(game.getOpeningScreenView()).toEqual(screen);
+
+    const view = game.openingView();
+    expect(game.getOpeningView()).toEqual(view);
     expect(view.map((o) => o.id)).toEqual([
       'take_family_album',
       'return_missed_call',

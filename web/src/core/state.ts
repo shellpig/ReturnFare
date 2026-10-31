@@ -24,10 +24,12 @@ import { nightBeatCandidates, recordForcedNightVisit } from './night';
 import {
   cloneSnapshot,
   createInitialSnapshot,
+  deepFreeze,
   initializeRun,
 } from './run-initialization';
 import type {
   AdvanceResult,
+  DeepReadonly,
   Game,
   GameSnapshot,
   MutationResult,
@@ -362,13 +364,345 @@ function isWithinW3PlayableRange(day: number, phase: string): boolean {
   return day === 1 || (day === 2 && phase === 'morning');
 }
 
+interface AdvancePlanResult {
+  readonly ok: boolean;
+  readonly reason_code: ReasonCode;
+  readonly reason_text: string;
+  readonly nextState: GameSnapshot;
+  readonly defaultLines: string[];
+  readonly autoEnterLines: string[];
+}
+
+function rejectAdvancePlan(
+  currentState: Readonly<GameSnapshot>,
+  reason_code: ReasonCode,
+  reason_text: string,
+): AdvancePlanResult {
+  return {
+    ok: false,
+    reason_code,
+    reason_text,
+    nextState: cloneSnapshot(currentState),
+    defaultLines: [],
+    autoEnterLines: [],
+  };
+}
+
+/**
+ * 時段推進的唯一純預檢：
+ * 供 getPhaseView().can_advance 與 advancePhase() 共用同一套七步檢查與入場預演，
+ * 確保 UI 可推進標記與實際命令結果永遠一致。
+ */
+function preflightAdvancePhase(
+  currentState: Readonly<GameSnapshot>,
+  data: GameData,
+): AdvancePlanResult {
+  // ① flow.mode !== 'run' -> not_run
+  if (currentState.flow.mode !== 'run') {
+    return rejectAdvancePlan(currentState, 'not_run', REASON_TEXT_NOT_RUN);
+  }
+
+  // ② active_encounter 非空 -> encounter_active
+  if (Object.keys(currentState.run.active_encounter).length > 0) {
+    return rejectAdvancePlan(
+      currentState,
+      'encounter_active',
+      '遭遇進行中，無法推進時段',
+    );
+  }
+
+  // ③ 夜間停拍：當 phase === 'night' && night_location_chosen === '' && !night_sleep_pending 時檢查就寢候選
+  if (
+    currentState.run.phase === 'night' &&
+    currentState.run.night_location_chosen === '' &&
+    !currentState.run.night_sleep_pending
+  ) {
+    const candidates = nightBeatCandidates(
+      currentState.run.day,
+      'sanquan',
+      chapterForDay(currentState.run.day),
+      data,
+    );
+    const allSleepCandidates = [...candidates.primaries, ...candidates.addons];
+    for (let i = 0; i < allSleepCandidates.length; i += 1) {
+      const sb = allSleepCandidates[i];
+      let condOk = false;
+      try {
+        condOk = evalCondition(sb.condition, currentState, data);
+      } catch (err) {
+        if (err instanceof UnsupportedConditionError) {
+          return rejectAdvancePlan(
+            currentState,
+            'not_implemented',
+            '夜間就寢解析將於 W6-E1 實作',
+          );
+        }
+        if (err instanceof ConditionError) {
+          return rejectAdvancePlan(currentState, 'data_conflict', err.message);
+        }
+        throw err;
+      }
+      if (condOk) {
+        return rejectAdvancePlan(
+          currentState,
+          'not_implemented',
+          '夜間就寢停拍將於 W6-E1 實作',
+        );
+      }
+    }
+  }
+
+  // ④ 逾期 choice group default 預檢（在 draft 上 preflight，不直接落地）
+  let draft = cloneSnapshot(currentState);
+  const defaultLines: string[] = [];
+  const currentBeats = beatsAt(
+    data.beats,
+    currentState.run.day,
+    currentState.run.phase,
+  );
+
+  for (let i = 0; i < currentBeats.length; i += 1) {
+    const b = currentBeats[i];
+    if (b.fixed !== true) {
+      continue;
+    }
+    let beatActive = false;
+    try {
+      beatActive =
+        evalCondition(b.condition, draft, data) &&
+        evalCondition(b.requires, draft, data);
+    } catch (err) {
+      if (err instanceof UnsupportedConditionError) {
+        return rejectAdvancePlan(currentState, 'not_implemented', err.message);
+      }
+      if (err instanceof ConditionError) {
+        return rejectAdvancePlan(
+          currentState,
+          'unresolved_choice_conflict',
+          err.message,
+        );
+      }
+      throw err;
+    }
+    if (!beatActive) {
+      continue;
+    }
+
+    const slots = b.slots ?? [];
+    for (let s = 0; s < slots.length; s += 1) {
+      const slot = slots[s];
+      if (slot.default_if_unresolved !== true) {
+        continue;
+      }
+      const groupId = slot.choice_group ?? '';
+      if (groupId.length === 0) {
+        continue;
+      }
+      const choiceKey = `${b.id}::${groupId}`;
+      if (draft.run.choices[choiceKey] !== undefined) {
+        continue;
+      }
+
+      // 先在複本寫入 bookkeeping，再預演 slot.on_place
+      draft.run.choices[choiceKey] = slot.id;
+      draft.run.slots_placed[`${b.id}::${slot.id}`] = true;
+
+      const pf = planEffects([slot.on_place], draft, data);
+      if (!pf.ok) {
+        if (pf.reason_code === 'not_implemented') {
+          return rejectAdvancePlan(
+            currentState,
+            'not_implemented',
+            pf.reason_text,
+          );
+        }
+        return rejectAdvancePlan(
+          currentState,
+          'unresolved_choice_conflict',
+          pf.reason_text,
+        );
+      }
+      if (pf.endingRequest !== null) {
+        return rejectAdvancePlan(
+          currentState,
+          'unresolved_choice_conflict',
+          '逾期預設不得啟動結局',
+        );
+      }
+      draft = pf.nextState;
+      defaultLines.push(...pf.lines);
+    }
+  }
+
+  // ⑤ fixed beat 的 phase_exit 門檻檢查
+  const gate = evaluatePhaseExitGate(currentState, data);
+  if (!gate.ok) {
+    return rejectAdvancePlan(currentState, gate.reason_code, gate.reason_text);
+  }
+  if (gate.has_gate && !gate.satisfied) {
+    return rejectAdvancePlan(
+      currentState,
+      'phase_requirements_incomplete',
+      '本時段的內容尚未完成',
+    );
+  }
+  if (
+    currentState.run.day === LAST_DAY &&
+    currentState.run.phase === 'evening' &&
+    gate.ending === ''
+  ) {
+    return rejectAdvancePlan(
+      currentState,
+      'phase_requirements_incomplete',
+      '本時段的內容尚未完成',
+    );
+  }
+
+  // ⑥ 目標時段與可能結局／到期遭遇預檢
+  if (gate.ending !== '') {
+    if (!data.endingsById.has(gate.ending)) {
+      return rejectAdvancePlan(
+        currentState,
+        'data_conflict',
+        `未知的結局：${gate.ending}`,
+      );
+    }
+    return rejectAdvancePlan(
+      currentState,
+      'not_implemented',
+      'D45 結局收束將於 W7-A 實作',
+    );
+  }
+
+  const target = nextPhaseTarget(currentState.run.day, currentState.run.phase);
+  if (target.day > LAST_DAY) {
+    return rejectAdvancePlan(
+      currentState,
+      'data_conflict',
+      '推進目標超出最後一天',
+    );
+  }
+
+  // W3 公開推進範圍與後續子階段換時段機制守衛
+  if (!isWithinW3PlayableRange(target.day, target.phase)) {
+    return rejectAdvancePlan(
+      currentState,
+      'not_implemented',
+      'D2 morning 之後的時段推進將於 W4 接手',
+    );
+  }
+  if (
+    currentState.run.phase === 'night' &&
+    Object.keys(draft.run.madness_clock).length > 0
+  ) {
+    return rejectAdvancePlan(
+      currentState,
+      'not_implemented',
+      '發狂倒數計時將於 W6-A 實作',
+    );
+  }
+  if (draft.run.actions_spent_ahead > 0) {
+    return rejectAdvancePlan(
+      currentState,
+      'not_implemented',
+      '預扣行動格將於 W6-B 實作',
+    );
+  }
+  if (
+    (ACTION_PHASES as readonly string[]).includes(target.phase) &&
+    draft.run.forced_pending.length > 0
+  ) {
+    return rejectAdvancePlan(
+      currentState,
+      'not_implemented',
+      '強制縱慾結算將於 W6-B 實作',
+    );
+  }
+  if (
+    target.phase === 'morning' &&
+    (draft.run.pending_delegation_reports.length > 0 ||
+      Object.keys(draft.run.delegates_used_today).length > 0)
+  ) {
+    return rejectAdvancePlan(
+      currentState,
+      'not_implemented',
+      '委託隔日回報將於 W6-C 實作',
+    );
+  }
+
+  // ⑦ 在 draft 上更新 day/phase、重設當日時段狀態、結算新時段 auto_enter 與固定遭遇檢查
+  draft.run.day = target.day;
+  draft.run.phase = target.phase;
+  draft.run.action_spent = false;
+  draft.run.night_location_chosen = '';
+  draft.run.night_sleep_pending = false;
+
+  const autoRes = settleAutoEnterBeatsOnDraft(draft, data);
+  if (!autoRes.ok) {
+    return rejectAdvancePlan(
+      currentState,
+      autoRes.reason_code,
+      autoRes.reason_text,
+    );
+  }
+  draft = autoRes.nextState;
+
+  // 目標時段 fixed encounter 預檢（在 auto_enter 之後檢查，以涵蓋 auto_enter 寫入之條件）
+  const targetBeats = beatsAt(data.beats, target.day, target.phase);
+  for (let i = 0; i < targetBeats.length; i += 1) {
+    const tb = targetBeats[i];
+    if (tb.fixed !== true) {
+      continue;
+    }
+    const rawTb = tb as unknown as Record<string, unknown>;
+    if (!('encounter' in rawTb) || rawTb.encounter === undefined) {
+      continue;
+    }
+    let encActive = false;
+    try {
+      encActive =
+        evalCondition(tb.condition, draft, data) &&
+        evalCondition(tb.requires, draft, data);
+    } catch (err) {
+      if (err instanceof UnsupportedConditionError) {
+        return rejectAdvancePlan(currentState, 'not_implemented', err.message);
+      }
+      if (err instanceof ConditionError) {
+        return rejectAdvancePlan(currentState, 'data_conflict', err.message);
+      }
+      throw err;
+    }
+    if (!encActive) {
+      continue;
+    }
+    const errText = encounterDataError(tb);
+    if (errText.length > 0) {
+      return rejectAdvancePlan(currentState, 'data_conflict', errText);
+    }
+    return rejectAdvancePlan(
+      currentState,
+      'not_implemented',
+      '固定遭遇啟動將於 W6-D 實作',
+    );
+  }
+
+  return {
+    ok: true,
+    reason_code: '',
+    reason_text: '',
+    nextState: draft,
+    defaultLines,
+    autoEnterLines: autoRes.lines,
+  };
+}
+
 export function createGame(
   data: GameData,
   initialState?: GameSnapshot,
 ): Game {
-  let state: GameSnapshot = initialState
-    ? cloneSnapshot(initialState)
-    : createInitialSnapshot();
+  let state: DeepReadonly<GameSnapshot> = deepFreeze(
+    initialState ? cloneSnapshot(initialState) : createInitialSnapshot(),
+  );
 
   // 暫態演出文字（不住在 GameSnapshot / serialize 內）
   let lastChoiceDefaultLines: string[] = [];
@@ -384,15 +718,15 @@ export function createGame(
   }
 
   function commitState(nextState: GameSnapshot): void {
-    state = cloneSnapshot(nextState);
+    state = deepFreeze(cloneSnapshot(nextState));
   }
 
-  function getSnapshot(): Readonly<GameSnapshot> {
+  function getSnapshot(): DeepReadonly<GameSnapshot> {
     return state;
   }
 
   function serialize(): GameSnapshot {
-    return cloneSnapshot(state);
+    return cloneSnapshot(state as GameSnapshot);
   }
 
   function subscribe(listener: () => void): () => void {
@@ -402,7 +736,11 @@ export function createGame(
     };
   }
 
-  function getOpeningScreenView(): OpeningScreenView {
+  function chapter(): number {
+    return chapterForDay(state.run.day);
+  }
+
+  function openingScreenView(): OpeningScreenView {
     return {
       title:
         typeof data.openingScreen.title === 'string'
@@ -415,13 +753,13 @@ export function createGame(
     };
   }
 
-  function getOpeningView(): readonly OpeningOptionView[] {
+  function openingView(): readonly OpeningOptionView[] {
     const out: OpeningOptionView[] = [];
     for (let i = 0; i < data.openingChoices.length; i += 1) {
       const choice = data.openingChoices[i];
       let available = false;
       try {
-        available = evalCondition(choice.requires, state, data);
+        available = evalCondition(choice.requires, state as GameSnapshot, data);
       } catch {
         available = false;
       }
@@ -443,43 +781,13 @@ export function createGame(
   }
 
   function canCurrentlyAdvance(): boolean {
-    if (state.flow.mode !== 'run') {
-      return false;
-    }
-    if (Object.keys(state.run.active_encounter).length > 0) {
-      return false;
-    }
-    const gate = evaluatePhaseExitGate(state, data);
-    if (!gate.ok) {
-      return false;
-    }
-    if (gate.has_gate && !gate.satisfied) {
-      return false;
-    }
-    if (
-      state.run.day === LAST_DAY &&
-      state.run.phase === 'evening' &&
-      gate.ending === ''
-    ) {
-      return false;
-    }
-    if (gate.ending !== '') {
-      return false;
-    }
-    const target = nextPhaseTarget(state.run.day, state.run.phase);
-    if (target.day > LAST_DAY) {
-      return false;
-    }
-    if (!isWithinW3PlayableRange(target.day, target.phase)) {
-      return false;
-    }
-    return true;
+    return preflightAdvancePhase(state as GameSnapshot, data).ok;
   }
 
   function getPhaseView(): PhaseView {
     const day = state.run.day;
     const phase = state.run.phase;
-    const chapter = chapterForDay(day);
+    const ch = chapterForDay(day);
     const narrationOnly = isNarrationOnlyPhase(day, phase);
     const canAdv = canCurrentlyAdvance();
     const lines: string[] = [
@@ -490,7 +798,7 @@ export function createGame(
     return {
       day,
       phase,
-      chapter,
+      chapter: ch,
       narration_only: narrationOnly,
       isNarrationOnly: narrationOnly,
       lines,
@@ -517,7 +825,7 @@ export function createGame(
     // 3. requires 成立
     let unlocked = false;
     try {
-      unlocked = evalCondition(choice.requires, state, data);
+      unlocked = evalCondition(choice.requires, state as GameSnapshot, data);
     } catch (err) {
       if (err instanceof UnsupportedConditionError) {
         return mutationReject('not_implemented', err.message);
@@ -563,7 +871,7 @@ export function createGame(
     }
 
     // on_select 分支：在複本上初始化 run 並預演 on_select 與 D1 morning auto_enter
-    const initDraft = initializeRun(state, data);
+    const initDraft = initializeRun(state as GameSnapshot, data);
     const pf = planEffects([choice.on_select], initDraft, data);
     if (!pf.ok) {
       const code: ReasonCode =
@@ -605,7 +913,7 @@ export function createGame(
   }
 
   function playBeat(beatId: string): MutationResult {
-    const res = playBeatOnDraft(state, beatId, data);
+    const res = playBeatOnDraft(state as GameSnapshot, beatId, data);
     if (!res.ok) {
       return mutationReject(res.reason_code, res.reason_text);
     }
@@ -624,7 +932,7 @@ export function createGame(
       return mutationReject('not_run', REASON_TEXT_NOT_RUN);
     }
 
-    let draft = cloneSnapshot(state);
+    let draft = cloneSnapshot(state as GameSnapshot);
     const lines: string[] = [];
     const curDay = draft.run.day;
 
@@ -720,7 +1028,7 @@ export function createGame(
       return mutationReject('not_run', REASON_TEXT_NOT_RUN);
     }
 
-    let draft = cloneSnapshot(state);
+    let draft = cloneSnapshot(state as GameSnapshot);
     const lines: string[] = [];
     const curDay = draft.run.day;
     const nightBeats = beatsAt(data.beats, curDay, 'night');
@@ -812,238 +1120,14 @@ export function createGame(
   }
 
   function advancePhase(): AdvanceResult {
-    // ① flow.mode !== 'run' -> not_run
-    if (state.flow.mode !== 'run') {
-      return advanceReject('not_run', REASON_TEXT_NOT_RUN);
+    const plan = preflightAdvancePhase(state as GameSnapshot, data);
+    if (!plan.ok) {
+      return advanceReject(plan.reason_code, plan.reason_text);
     }
 
-    // ② active_encounter 非空 -> encounter_active
-    if (Object.keys(state.run.active_encounter).length > 0) {
-      return advanceReject('encounter_active', '遭遇進行中，無法推進時段');
-    }
-
-    // ③ 夜間停拍：當 phase === 'night' && night_location_chosen === '' && !night_sleep_pending 時檢查就寢候選
-    if (
-      state.run.phase === 'night' &&
-      state.run.night_location_chosen === '' &&
-      !state.run.night_sleep_pending
-    ) {
-      const candidates = nightBeatCandidates(
-        state.run.day,
-        'sanquan',
-        chapterForDay(state.run.day),
-        data,
-      );
-      const allSleepCandidates = [...candidates.primaries, ...candidates.addons];
-      for (let i = 0; i < allSleepCandidates.length; i += 1) {
-        const sb = allSleepCandidates[i];
-        let condOk = false;
-        try {
-          condOk = evalCondition(sb.condition, state, data);
-        } catch (err) {
-          if (err instanceof UnsupportedConditionError) {
-            return advanceReject(
-              'not_implemented',
-              '夜間就寢解析將於 W6-E1 實作',
-            );
-          }
-          if (err instanceof ConditionError) {
-            return advanceReject('data_conflict', err.message);
-          }
-          throw err;
-        }
-        if (condOk) {
-          return advanceReject(
-            'not_implemented',
-            '夜間就寢停拍將於 W6-E1 實作',
-          );
-        }
-      }
-    }
-
-    // ④ 逾期 choice group default 預檢（在 draft 上 preflight，不直接落地）
-    let draft = cloneSnapshot(state);
-    const defaultLines: string[] = [];
-    const currentBeats = beatsAt(data.beats, state.run.day, state.run.phase);
-
-    for (let i = 0; i < currentBeats.length; i += 1) {
-      const b = currentBeats[i];
-      if (b.fixed !== true) {
-        continue;
-      }
-      let beatActive = false;
-      try {
-        beatActive =
-          evalCondition(b.condition, draft, data) &&
-          evalCondition(b.requires, draft, data);
-      } catch (err) {
-        if (err instanceof UnsupportedConditionError) {
-          return advanceReject('not_implemented', err.message);
-        }
-        if (err instanceof ConditionError) {
-          return advanceReject('unresolved_choice_conflict', err.message);
-        }
-        throw err;
-      }
-      if (!beatActive) {
-        continue;
-      }
-
-      const slots = b.slots ?? [];
-      for (let s = 0; s < slots.length; s += 1) {
-        const slot = slots[s];
-        if (slot.default_if_unresolved !== true) {
-          continue;
-        }
-        const groupId = slot.choice_group ?? '';
-        if (groupId.length === 0) {
-          continue;
-        }
-        const choiceKey = `${b.id}::${groupId}`;
-        if (draft.run.choices[choiceKey] !== undefined) {
-          continue;
-        }
-
-        // 先在複本寫入 bookkeeping，再預演 slot.on_place
-        draft.run.choices[choiceKey] = slot.id;
-        draft.run.slots_placed[`${b.id}::${slot.id}`] = true;
-
-        const pf = planEffects([slot.on_place], draft, data);
-        if (!pf.ok) {
-          if (pf.reason_code === 'not_implemented') {
-            return advanceReject('not_implemented', pf.reason_text);
-          }
-          return advanceReject('unresolved_choice_conflict', pf.reason_text);
-        }
-        if (pf.endingRequest !== null) {
-          return advanceReject(
-            'unresolved_choice_conflict',
-            '逾期預設不得啟動結局',
-          );
-        }
-        draft = pf.nextState;
-        defaultLines.push(...pf.lines);
-      }
-    }
-
-    // ⑤ fixed beat 的 phase_exit 門檻檢查
-    const gate = evaluatePhaseExitGate(state, data);
-    if (!gate.ok) {
-      return advanceReject(gate.reason_code, gate.reason_text);
-    }
-    if (gate.has_gate && !gate.satisfied) {
-      return advanceReject(
-        'phase_requirements_incomplete',
-        '本時段的內容尚未完成',
-      );
-    }
-    if (
-      state.run.day === LAST_DAY &&
-      state.run.phase === 'evening' &&
-      gate.ending === ''
-    ) {
-      return advanceReject(
-        'phase_requirements_incomplete',
-        '本時段的內容尚未完成',
-      );
-    }
-
-    // ⑥ 目標時段與可能結局／到期遭遇預檢
-    if (gate.ending !== '') {
-      if (!data.endingsById.has(gate.ending)) {
-        return advanceReject('data_conflict', `未知的結局：${gate.ending}`);
-      }
-      return advanceReject('not_implemented', 'D45 結局收束將於 W7-A 實作');
-    }
-
-    const target = nextPhaseTarget(state.run.day, state.run.phase);
-    if (target.day > LAST_DAY) {
-      return advanceReject('data_conflict', '推進目標超出最後一天');
-    }
-
-    // 目標時段 fixed encounter 預檢
-    const targetBeats = beatsAt(data.beats, target.day, target.phase);
-    for (let i = 0; i < targetBeats.length; i += 1) {
-      const tb = targetBeats[i];
-      if (tb.fixed !== true) {
-        continue;
-      }
-      const rawTb = tb as unknown as Record<string, unknown>;
-      if (!('encounter' in rawTb) || rawTb.encounter === undefined) {
-        continue;
-      }
-      let encActive = false;
-      try {
-        encActive =
-          evalCondition(tb.condition, draft, data) &&
-          evalCondition(tb.requires, draft, data);
-      } catch (err) {
-        if (err instanceof UnsupportedConditionError) {
-          return advanceReject('not_implemented', err.message);
-        }
-        if (err instanceof ConditionError) {
-          return advanceReject('data_conflict', err.message);
-        }
-        throw err;
-      }
-      if (!encActive) {
-        continue;
-      }
-      const errText = encounterDataError(tb);
-      if (errText.length > 0) {
-        return advanceReject('data_conflict', errText);
-      }
-      return advanceReject('not_implemented', '固定遭遇啟動將於 W6-D 實作');
-    }
-
-    // W3 公開推進範圍與後續子階段換時段機制守衛
-    if (!isWithinW3PlayableRange(target.day, target.phase)) {
-      return advanceReject(
-        'not_implemented',
-        'D2 morning 之後的時段推進將於 W4 接手',
-      );
-    }
-    if (
-      state.run.phase === 'night' &&
-      Object.keys(draft.run.madness_clock).length > 0
-    ) {
-      return advanceReject('not_implemented', '發狂倒數計時將於 W6-A 實作');
-    }
-    if (draft.run.actions_spent_ahead > 0) {
-      return advanceReject(
-        'not_implemented',
-        '預扣行動格將於 W6-B 實作',
-      );
-    }
-    if (
-      (ACTION_PHASES as readonly string[]).includes(target.phase) &&
-      draft.run.forced_pending.length > 0
-    ) {
-      return advanceReject('not_implemented', '強制縱慾結算將於 W6-B 實作');
-    }
-    if (
-      target.phase === 'morning' &&
-      (draft.run.pending_delegation_reports.length > 0 ||
-        Object.keys(draft.run.delegates_used_today).length > 0)
-    ) {
-      return advanceReject('not_implemented', '委託隔日回報將於 W6-C 實作');
-    }
-
-    // ⑦ 原子提交：更新 day/phase、重設當日時段狀態、在 draft 上結算新時段 auto_enter
-    draft.run.day = target.day;
-    draft.run.phase = target.phase;
-    draft.run.action_spent = false;
-    draft.run.night_location_chosen = '';
-    draft.run.night_sleep_pending = false;
-
-    const autoRes = settleAutoEnterBeatsOnDraft(draft, data);
-    if (!autoRes.ok) {
-      return advanceReject(autoRes.reason_code, autoRes.reason_text);
-    }
-
-    commitState(autoRes.nextState);
-    lastChoiceDefaultLines = defaultLines;
-    lastAutoEnterLines = autoRes.lines;
+    commitState(plan.nextState);
+    lastChoiceDefaultLines = plan.defaultLines;
+    lastAutoEnterLines = plan.autoEnterLines;
     phaseNarrationLines = null;
     notifyListeners();
 
@@ -1051,7 +1135,7 @@ export function createGame(
       ok: true,
       reason_code: '',
       reason_text: '',
-      lines: defaultLines,
+      lines: plan.defaultLines,
       phase_advanced: true,
     };
   }
@@ -1060,8 +1144,11 @@ export function createGame(
     getSnapshot,
     serialize,
     subscribe,
-    getOpeningScreenView,
-    getOpeningView,
+    chapter,
+    openingScreenView,
+    openingView,
+    getOpeningScreenView: openingScreenView,
+    getOpeningView: openingView,
     getPhaseView,
     chooseOpening,
     playBeat,

@@ -216,47 +216,25 @@ export function planEffects(
     // 8. flag
     if ('flag' in raw && raw.flag !== undefined) {
       const fVal = raw.flag;
-      if (typeof fVal === 'string') {
-        if (fVal.length === 0) {
-          return rejectPlan(
-            state,
-            'data_conflict',
-            'EffectApply: flag 名稱不得為空字串',
-          );
-        }
-        draft.run.flags[fVal] = true;
-      } else if (Array.isArray(fVal)) {
-        for (let fi = 0; fi < fVal.length; fi += 1) {
-          const item = fVal[fi];
-          if (typeof item !== 'string' || item.length === 0) {
-            return rejectPlan(
-              state,
-              'data_conflict',
-              'EffectApply: flag 陣列元素必須為非空字串',
-            );
-          }
-          draft.run.flags[item] = true;
-        }
-      } else if (isPlainObject(fVal)) {
-        const fKeys = Object.keys(fVal);
-        for (let fk = 0; fk < fKeys.length; fk += 1) {
-          const flagName = fKeys[fk];
-          const flagBool = fVal[flagName];
-          if (flagName.length === 0 || typeof flagBool !== 'boolean') {
-            return rejectPlan(
-              state,
-              'data_conflict',
-              `EffectApply: flag '${flagName}' 值必須為 boolean`,
-            );
-          }
-          draft.run.flags[flagName] = flagBool;
-        }
-      } else {
+      if (!isPlainObject(fVal)) {
         return rejectPlan(
           state,
           'data_conflict',
-          'EffectApply: flag 必須為字串、字串陣列或布林字典',
+          'EffectApply: flag 必須為 Dictionary',
         );
+      }
+      const fKeys = Object.keys(fVal);
+      for (let fk = 0; fk < fKeys.length; fk += 1) {
+        const flagName = fKeys[fk];
+        const flagBool = fVal[flagName];
+        if (flagName.length === 0 || typeof flagBool !== 'boolean') {
+          return rejectPlan(
+            state,
+            'data_conflict',
+            `EffectApply: flag '${flagName}' 值必須為 boolean`,
+          );
+        }
+        draft.run.flags[flagName] = flagBool;
       }
     }
 
