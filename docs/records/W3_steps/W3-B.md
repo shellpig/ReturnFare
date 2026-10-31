@@ -32,6 +32,18 @@
 | 變異檢查（開局 `auto_enter` + 4 項 `[P2]` 修正） | 暫時移除 `chapter()`、繞過 `deepFreeze`、繞過 `preflightAdvancePhase` 或放行字串 `flag` 時，`opening.test.ts` 與 `state.test.ts` 對應 4 條測試全數立即轉紅（4 failed）；還原後 55 tests 全綠 |
 | 邊界檢查 | `git status` 確認 `data/`、Godot 正式檔、`tools/trace/baselines/greedy-godot.json` 零改動；`main.tsx` 未引用 `trace-entry.ts` |
 
-## 建議 verifier 更新事項
+## verifier 複驗與關門（2026-10-31）
 
-- 驗收通過後，建議於 `PROJECT_BRIEF.md` 將 W3-B 標記為完成，後續推進 W3-A（開局與純演出 UI）。
+- 驗證版本：乾淨的 `main@6bc87b6`，與 `origin/main` 一致。
+- `npm test`：8 files／55 tests、exit 0；`npm run build`：資料同步 → lint → tsc → Vite、exit 0。
+- 重新執行 `trace:web` 與 W3 scope 比對：5 checkpoints／187 fields、equal=true／0 diff；產物 `_qa/web/trace-web-verify-w3b-fixed.json`，未覆寫 Godot 基線。
+- 四項 P2 複驗通過：契約公開 API 均存在；snapshot 巢狀修改拋 TypeError，拒絕外部寫入且 identity 穩定；can_advance 與 advancePhase 共用純預檢；字串／陣列 flag 回 data_conflict，原始狀態、預演狀態與文字皆無半套結果。
+- 獨立核對 10 組推進情況（正常、opening、active encounter、D2 morning 界線、預扣、forced_pending、發狂錶、pending report、今日委託集合、無旅館內容的夜間），查詢結果與命令一致；多次查詢不改 serialize、snapshot identity 或通知次數，所有拒絕保持完整 serialize 逐字相同。
+- 額外核對章節 15／16、32／33 邊界；初態與成功提交後均深層凍結，serialize 仍為可獨立修改的複本；flag 的字串、陣列、null、數字均原子拒絕，合法 boolean 字典通過。
+- 已重新檢視完整 W3-B 範圍及修正後的推進流程、正式開局／演出測試與既有變異紀錄；本次唯讀複驗未修改程式重做變異。
+- core 未依賴 React／DOM／Node I/O；trace-entry 未由 main／UI 引用，也未進瀏覽器 build 產物；正式 data/、Godot scripts/／scenes/ 與黃金基線零改動。
+- default／phase_exit 子集的非阻擋說明已同步於 W3 契約；W3-B 驗收完成。本次文件關門沿用以上既有證據，不重跑測試。
+
+## 下一步
+
+- 實作 W3-A（開局與純演出 UI），使用已驗收的 W3-B API；W3 整體須待 W3-A 驗收後才關門。
