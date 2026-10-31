@@ -36,3 +36,18 @@
 
 - 待 verifier 驗收 W1-C 與 W1 整體收尾（契約第五節）；指揮者不自行打勾。
 - W3 才建立 `tools/trace/scopes/W3.json` 與 `trace:web`。
+
+## Verifier 驗收與 W1 收尾
+
+2026-10-31，HEAD `174a9fd` 起、工作樹乾淨，以 verifier 身分獨立重跑（日誌在 `_qa/web/w1-close-*.log`，不提交）：
+
+| 契約第五節收尾項 | 結果 |
+|---|---|
+| 1. `web/` 的 `npm ci`／`npm test`／`npm run build`，及 A 的 HTTP smoke | 皆 exit 0（7 tests）；`npm run dev` 於 127.0.0.1:5317 讀 `/`、`/data/tuning.json`、`/art/map/town.webp`、`/data/beats/ch1_d01_d03.json` 皆 200，結束後確認埠已無監聽 |
+| 2. B 的既有入口、觀測等價、雙次生成、179 時段與結局收尾 | W1-B 驗收證據仍有效：`2fe83d9` 之後 `tests/` 與基線均無變動，基線 SHA-256 不變 |
+| 3. C 對真實基線成功、單欄位反轉失敗 | 自比 exit 0（193／48,985）；另選 seq 120 反轉 exit 1，報 `seq=120 day=30 phase=night path=/run/action_spent expected=false actual=true` |
+| 4. `git diff --check` 與改動清單符合白名單 | `8418c35..HEAD` 通過；程式改動只在 W1-A／B／C 白名單內，未動 `data/`、`scripts/`、`scenes/`、`web/public/art/`、`web/prototype/` |
+
+另核對 W1-C 契約條文：比對順序（schema／policy／manifest → checkpoint 身份 → state）、缺鍵 MISSING 與 null 分開、物件不計鍵序／陣列計序、throughSeq 前綴兩邊都須具備、ignorePaths 精確路徑且拒絕根與三大區塊及不存在路徑、零 checkpoint／零欄位不算通過、退出碼 0／1／2、工具檔只用 Node 內建且納入 tsc。
+
+驗收判定：**W1-C 通過；W1 整體關門**。不涵蓋 TS 遊戲規則與兩引擎對帳（W3 起）。
