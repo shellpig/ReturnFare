@@ -51,7 +51,7 @@ prompt 檔存 `C:\_work\AI_Work\Tools\agy-runs\<worker>-<phase>-<step>.prompt.tx
 ### 2.3 指揮者驗證 gate（每個 step）
 
 ```
-git pull --ff-only（ChatGPT／Muse 網頁版）或 git diff（agy／OpenCode Muse 直接改本機）
+git pull --ff-only（ChatGPT／Muse 網頁版）或 git diff（agy／OpenCode 直接改本機）
 → Godot 版：tests/run_all_headless.ps1 全套（escalated；搬過 .tscn/.gd 先 --import），見 local-tools.md
 → 網頁版：npm test、npm run build（cwd web/，只要動到 web/）；有黃金軌跡（W1-C）後再跑軌跡比對
 → 讀 diff（見 §5 checklist）
