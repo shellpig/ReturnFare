@@ -258,9 +258,13 @@ export interface OpeningChoice {
   readonly note?: string;
 }
 
+/**
+ * 開局畫面文案的原始資料。相容的頂層陣列格式沒有 screen，欄位可能整個缺；
+ * 畫面查詢（W3）再依 Godot opening_screen_view() 以空字串補。
+ */
 export interface OpeningScreen {
-  readonly title: string;
-  readonly prompt: string;
+  readonly title?: string;
+  readonly prompt?: string;
   readonly note?: string;
 }
 
@@ -345,7 +349,14 @@ export interface Tuning {
   readonly indulgence: IndulgenceTuning;
 }
 
-export type RelationScale = { readonly [state: string]: number };
+/**
+ * relation_scale.json 原樣保留：關係狀態名 → 整數門檻，另有 `_comment` 等
+ * 字串 metadata。取門檻時須先確認值是 number，不能假設每個鍵都是狀態。
+ */
+export interface RelationScale {
+  readonly _comment?: string;
+  readonly [state: string]: number | string | undefined;
+}
 
 export interface DataFile {
   readonly path: string;

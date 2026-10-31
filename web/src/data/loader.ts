@@ -20,7 +20,9 @@ import type {
   Location,
   Npc,
   OpeningChoice,
+  OpeningScreen,
   ReadText,
+  RelationScale,
   Tuning,
 } from './types';
 
@@ -284,7 +286,7 @@ export async function loadGameData(
   const cardTypesById = new Map<string, CardType>();
   for (const ct of cardTypes) cardTypesById.set(ct.id, ct);
 
-  const openingScreen: unknown = screen ?? {};
+  const openingScreen = asObject(screen ?? {}, 'opening_choices.json') as OpeningScreen;
   return {
     cards: Object.freeze(cards),
     locations: Object.freeze(locations),
@@ -299,9 +301,9 @@ export async function loadGameData(
     endingsById,
     openingChoicesById,
     tuning: tuningRaw as Tuning,
-    relationScale: relationScaleRaw as unknown as { readonly [state: string]: number },
+    relationScale: relationScaleRaw as RelationScale,
     cardTypes: Object.freeze(cardTypes),
     cardTypesById,
-    openingScreen: openingScreen as { title: string; prompt: string; note?: string },
+    openingScreen,
   };
 }

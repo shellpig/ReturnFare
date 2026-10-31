@@ -30,6 +30,16 @@
 | 變異：拿掉 beat 重複 id 偵測 | 重複 id 測試轉紅（1 failed）；還原後 22 tests 全綠 |
 | main／ui／core 不 import Node 模組 | 已確認 |
 
+## 外部靜態審查修正（`1389d05` 之後）
+
+2026-10-31 使用者轉來的靜態審查（2 項 P2、1 項 P3），指揮者確認三項都成立並修正：
+
+1. [P2] 重複 id 只測 beat 一類。補七類參數化負向案例（卡型、卡片、白天／夜間跨區地點、NPC、beat、結局、開局選項）。逐類把重複偵測改成永不成立，各自只有對應案例轉紅；還原後全綠。
+2. [P2] 相容的頂層陣列開局格式產生 `screen: {}`，卻被斷言成必有 `title`／`prompt`。`OpeningScreen` 改為三欄皆選填，loader 改用 `asObject` 收窄；空字串補值留給 W3 畫面查詢，照 Godot `opening_screen_view()`。補相容格式案例（同時驗 endings 的 `{endings[]}` 讀法）。
+3. [P3] `RelationScale` 宣告成全數字，但正式 JSON 的 `_comment` 是字串。改為 `_comment?: string` 加 `number | string | undefined` 索引，原始資料不刪鍵；補正式資料案例，確認 metadata 是字串、其餘門檻皆為數字。
+
+驗證：`npm test` 4 files／31 tests、`npm run build` 皆 exit 0。
+
 ## 未解與下一步
 
 - 待 verifier 驗收 W2-A。

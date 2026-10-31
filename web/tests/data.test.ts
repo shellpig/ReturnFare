@@ -185,6 +185,61 @@ describe('W2-A data loader (real data)', () => {
     expect(msg).toContain('.json');
   });
 
+  // 七類集合各自的重複偵測都要有負向案例；刪掉任何一段，對應案例就會轉紅。
+  const emptyFiles = (): Record<string, string> => ({
+    'tuning.json': '{}',
+    'relation_scale.json': '{}',
+    'card_types.json': JSON.stringify({ card_types: [] }),
+    'cards.json': JSON.stringify({ cards: [] }),
+    'locations.json': JSON.stringify({ day: [], night: [] }),
+    'npcs.json': JSON.stringify({ npcs: [] }),
+    'opening_choices.json': JSON.stringify({ screen: {}, opening_choices: [] }),
+    'endings.json': '[]',
+  });
+  const inMemory = (files: Record<string, string>): ReadText => async (relPath: string) => {
+    if (!(relPath in files)) throw new Error(`ENOENT: no such file '${relPath}'`);
+    return files[relPath];
+  };
+  const duplicateCases: Array<{ name: string; file: string; patch: Record<string, string> }> = [
+    { name: 'card type', file: 'card_types.json', patch: { 'card_types.json': JSON.stringify({ card_types: [{ id: 'info' }, { id: 'info' }] }) } },
+    { name: 'card', file: 'cards.json', patch: { 'cards.json': JSON.stringify({ cards: [{ id: 'c1' }, { id: 'c1' }] }) } },
+    { name: 'location across day and night', file: 'locations.json', patch: { 'locations.json': JSON.stringify({ day: [{ id: 'loc1' }], night: [{ id: 'loc1' }] }) } },
+    { name: 'npc', file: 'npcs.json', patch: { 'npcs.json': JSON.stringify({ npcs: [{ id: 'n1' }, { id: 'n1' }] }) } },
+    { name: 'beat', file: 'beats/b.json', patch: { 'beats/a.json': JSON.stringify({ beats: [{ id: 'b1' }] }), 'beats/b.json': JSON.stringify({ beats: [{ id: 'b1' }] }) } },
+    { name: 'ending', file: 'endings.json', patch: { 'endings.json': JSON.stringify([{ id: 'e1' }, { id: 'e1' }]) } },
+    { name: 'opening choice', file: 'opening_choices.json', patch: { 'opening_choices.json': JSON.stringify({ screen: {}, opening_choices: [{ id: 'o1' }, { id: 'o1' }] }) } },
+  ];
+  for (const c of duplicateCases) {
+    it(`duplicate ${c.name} id rejects with ${c.file}`, async () => {
+      const files = { ...emptyFiles(), ...c.patch };
+      const manifest = Object.keys(files).map(asDataFile);
+      await expect(loadGameData(inMemory(files), manifest)).rejects.toThrow(
+        new RegExp(`${c.file.replace(/[.]/g, '\\.')}.*重複`),
+      );
+    });
+  }
+
+  it('top-level array opening format loads choices and leaves screen fields absent', async () => {
+    const files = {
+      ...emptyFiles(),
+      'opening_choices.json': JSON.stringify([{ id: 'o1' }, { id: 'o2' }]),
+      'endings.json': JSON.stringify({ endings: [{ id: 'e1' }] }),
+    };
+    const data = await loadGameData(inMemory(files), Object.keys(files).map(asDataFile));
+    expect(data.openingChoices.map((o) => o.id)).toEqual(['o1', 'o2']);
+    expect(data.openingScreen.title).toBeUndefined();
+    expect(data.openingScreen.prompt).toBeUndefined();
+    expect(data.endings.map((e) => e.id)).toEqual(['e1']);
+  });
+
+  it('relation scale keeps string metadata next to numeric thresholds', async () => {
+    const data = await loadGameDataNode();
+    expect(typeof data.relationScale._comment).toBe('string');
+    const thresholds = Object.entries(data.relationScale).filter(([k]) => !k.startsWith('_'));
+    expect(thresholds.length).toBeGreaterThan(0);
+    for (const [, v] of thresholds) expect(typeof v).toBe('number');
+  });
+
   it('missing required file rejects with the relative file name', async () => {
     const files: Record<string, string> = {
       'relation_scale.json': '{}',
