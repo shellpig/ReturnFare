@@ -116,6 +116,7 @@ import type {
   OpeningOptionView,
   OpeningScreenView,
   PendingDelegationReport,
+  PhaseExitView,
   PhaseView,
   ReasonCode,
 } from './state-types';
@@ -731,6 +732,7 @@ interface PhaseExitGateResult {
   readonly satisfied: boolean;
   readonly ending: string;
   readonly source: string;
+  readonly location_id: string;
 }
 
 function evaluatePhaseExitGate(
@@ -762,6 +764,7 @@ function evaluatePhaseExitGate(
           satisfied: true,
           ending: '',
           source: '',
+          location_id: '',
         };
       }
       if (err instanceof ConditionError) {
@@ -773,6 +776,7 @@ function evaluatePhaseExitGate(
           satisfied: true,
           ending: '',
           source: '',
+          location_id: '',
         };
       }
       throw err;
@@ -810,6 +814,7 @@ function evaluatePhaseExitGate(
       satisfied,
       ending: typeof pe.ending === 'string' ? pe.ending : '',
       source: typeof pe.source === 'string' ? pe.source : '',
+      location_id: b.location,
     };
   }
 
@@ -821,6 +826,7 @@ function evaluatePhaseExitGate(
     satisfied: true,
     ending: '',
     source: '',
+    location_id: '',
   };
 }
 
@@ -1269,14 +1275,14 @@ function preflightAdvancePhase(
 
   // ⑥ 目標時段與可能結局／到期遭遇預檢
   if (gate.ending !== '') {
-    const started = startEndingOnDraft(draft, gate.ending, gate.source, data, {
+    const started_phaseexit = startEndingOnDraft(draft, gate.ending, gate.source, data, {
       fromMode: 'run',
     });
-    if (!started.ok) {
+    if (!started_phaseexit.ok) {
       return rejectAdvancePlan(
         currentState,
-        started.reason_code,
-        started.reason_text,
+        'data_conflict',
+        started_phaseexit.reason_text,
       );
     }
     return {
@@ -1601,6 +1607,14 @@ export function createGame(
       const intro = data.beatsById.get(state.run.active_encounter.beat_id ?? '')?.text;
       if (intro && !lines.includes(intro)) lines.push(intro);
     }
+    const gate_phaseview = evaluatePhaseExitGate(state as GameSnapshot, data);
+    const phaseExit_phaseview: PhaseExitView | null =
+      gate_phaseview.ok && gate_phaseview.has_gate && gate_phaseview.location_id.length > 0
+        ? {
+            location_id: gate_phaseview.location_id,
+            satisfied: gate_phaseview.satisfied,
+          }
+        : null;
     return {
       day,
       phase,
@@ -1614,6 +1628,7 @@ export function createGame(
       can_advance: canAdv,
       canAdvance: canAdv,
       night_advance: nightAdvanceStage(),
+      phase_exit: phaseExit_phaseview,
     };
   }
 

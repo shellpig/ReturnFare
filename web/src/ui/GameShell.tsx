@@ -445,6 +445,15 @@ export function GameShell({ game }: { game: Game }) {
         </p>
       )}
       <div className="phase-actions">
+        {!activeLocation && view.phase_exit !== null && !view.phase_exit.satisfied && (
+          <button
+            type="button"
+            data-testid="phase-exit-open"
+            onClick={() => openLocation(view.phase_exit!.location_id)}
+          >
+            {strings.continue}
+          </button>
+        )}
         <button
           type="button"
           disabled={!view.can_advance}

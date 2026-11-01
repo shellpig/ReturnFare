@@ -207,7 +207,7 @@ describe('planEffects (W5-B)', async () => {
     expect(badPlan.reason_code).toBe('data_conflict');
   });
 
-  it('atomically rolls back all earlier gains, flags, and lines if a later unimplemented effect (festival_proxy) is encountered', () => {
+  it('atomically rolls back earlier gains, flags, and lines if a later festival_proxy has invalid data', () => {
     const state = createInitialSnapshot();
     state.flow.mode = 'run';
     state.run.hand = ['protagonist'];

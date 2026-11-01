@@ -409,58 +409,58 @@ export function planEffects(
           'EffectApply: 慶典代付者已凍結，不得覆寫',
         );
       }
-      const fpRaw = raw.festival_proxy as Record<string, unknown>;
-      const mode = fpRaw.mode;
-      if (mode !== 'fixed' && mode !== 'highest_eligible') {
+      const proxyConfig_e21 = raw.festival_proxy as Record<string, unknown>;
+      const mode_e21 = proxyConfig_e21.mode;
+      if (mode_e21 !== 'fixed' && mode_e21 !== 'highest_eligible') {
         return rejectPlan(
           state,
           'data_conflict',
-          `EffectApply: 未知的 festival_proxy mode：${String(mode)}`,
+          `EffectApply: 未知的 festival_proxy mode：${String(mode_e21)}`,
         );
       }
-      if (mode === 'fixed') {
-        const npcId = typeof fpRaw.npc === 'string' ? fpRaw.npc : '';
+      if (mode_e21 === 'fixed') {
+        const npcId_e21 = typeof proxyConfig_e21.npc === 'string' ? proxyConfig_e21.npc : '';
         if (
-          npcId.length === 0 ||
-          !data.npcsById.has(npcId) ||
-          data.npcsById.get(npcId)?.festival_proxy_eligible !== true
+          npcId_e21.length === 0 ||
+          !data.npcsById.has(npcId_e21) ||
+          data.npcsById.get(npcId_e21)?.festival_proxy_eligible !== true
         ) {
           return rejectPlan(
             state,
             'data_conflict',
-            `EffectApply: fixed 引用非慶典候選 NPC：${npcId}`,
+            `EffectApply: fixed 引用非慶典候選 NPC：${npcId_e21}`,
           );
         }
-        draft.run.selected_festival_proxy_npc = npcId;
+        draft.run.selected_festival_proxy_npc = npcId_e21;
       } else {
-        const fallback =
-          typeof fpRaw.fallback === 'string' ? fpRaw.fallback : '';
+        const fallback_e21 =
+          typeof proxyConfig_e21.fallback === 'string' ? proxyConfig_e21.fallback : '';
         if (
-          fallback.length === 0 ||
-          !data.npcsById.has(fallback) ||
-          data.npcsById.get(fallback)?.festival_proxy_eligible !== true
+          fallback_e21.length === 0 ||
+          !data.npcsById.has(fallback_e21) ||
+          data.npcsById.get(fallback_e21)?.festival_proxy_eligible !== true
         ) {
           return rejectPlan(
             state,
             'data_conflict',
-            `EffectApply: fallback 引用非慶典候選 NPC：${fallback}`,
+            `EffectApply: fallback 引用非慶典候選 NPC：${fallback_e21}`,
           );
         }
-        let best = '';
-        let bestCount = 0;
-        for (let n = 0; n < data.npcs.length; n += 1) {
-          const npc = data.npcs[n];
-          if (npc.festival_proxy_eligible !== true) {
+        let best_e21 = '';
+        let bestCount_e21 = 0;
+        for (let n_e21 = 0; n_e21 < data.npcs.length; n_e21 += 1) {
+          const npc_e21 = data.npcs[n_e21];
+          if (npc_e21.festival_proxy_eligible !== true) {
             continue;
           }
-          const count = draft.run.npc_action_counts[npc.id] ?? 0;
-          if (count > bestCount) {
-            bestCount = count;
-            best = npc.id;
+          const count_e21 = draft.run.npc_action_counts[npc_e21.id] ?? 0;
+          if (count_e21 > bestCount_e21) {
+            bestCount_e21 = count_e21;
+            best_e21 = npc_e21.id;
           }
         }
         draft.run.selected_festival_proxy_npc =
-          best.length > 0 ? best : fallback;
+          best_e21.length > 0 ? best_e21 : fallback_e21;
       }
     }
 

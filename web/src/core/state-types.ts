@@ -206,6 +206,12 @@ export interface OpeningOptionView {
 /** 夜間主按鈕的三態（scenes/main.gd）：尚未選地點＝sleep、已到訪＝end_night、睡覺停拍後＝next_day。 */
 export type NightAdvanceStage = 'sleep' | 'end_night' | 'next_day';
 
+/** phase_exit 門檻投影 */
+export interface PhaseExitView {
+  readonly location_id: string;
+  readonly satisfied: boolean;
+}
+
 /** 當前時段純演出與狀態投影 */
 export interface PhaseView {
   readonly day: number;
@@ -221,6 +227,8 @@ export interface PhaseView {
   readonly canAdvance: boolean;
   /** 非夜間為 null；夜間由 night_sleep_pending／night_location_chosen 衍生。 */
   readonly night_advance: NightAdvanceStage | null;
+  /** 當前時段有生效的 phase_exit 門檻時非空；供 UI 建立通用離場入口。 */
+  readonly phase_exit: PhaseExitView | null;
 }
 
 /** 一般變更操作的回傳結果 */
