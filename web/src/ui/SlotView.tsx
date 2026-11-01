@@ -5,21 +5,25 @@ export function SlotView({
   slot,
   onSelectSlot,
   onPreviewSlot,
+  onChooseSlot,
 }: {
   slot: SlotViewModel;
   onSelectSlot?: () => void;
   onPreviewSlot?: () => void;
+  onChooseSlot?: () => void;
 }) {
   const acceptTypesText =
     slot.acceptTypes.length > 0
       ? strings.slotTypes(slot.acceptTypes.join(strings.slotTypesDelimiter))
       : '';
 
+  const canDirectChoose =
+    slot.tri === TriState.OPEN && slot.isChoice && !slot.choiceRequiresCard;
+
   const canPlace =
-    slot.tri === TriState.OPEN &&
-    slot.accepts.length > 0 &&
-    !slot.isChoice &&
-    !slot.delegation;
+    slot.tri === TriState.OPEN && slot.accepts.length > 0 && !slot.delegation;
+
+  const canInteractive = canPlace || canDirectChoose;
 
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
@@ -29,7 +33,9 @@ export function SlotView({
   }
 
   function handleClick() {
-    if (canPlace && onSelectSlot) {
+    if (canDirectChoose && !canPlace && onChooseSlot) {
+      onChooseSlot();
+    } else if (canPlace && !canDirectChoose && onSelectSlot) {
       onSelectSlot();
     }
   }
@@ -42,7 +48,7 @@ export function SlotView({
           : slot.tri === TriState.RESOLVED
             ? 'slot-resolved'
             : 'slot-open'
-      } ${canPlace ? 'slot-interactive' : ''}`}
+      } ${canInteractive ? 'slot-interactive' : ''}`}
       data-testid={`slot-${slot.id}`}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -65,19 +71,34 @@ export function SlotView({
       {slot.tri === TriState.LOCKED && slot.reason && (
         <p className="reason slot-reason">{slot.reason}</p>
       )}
-      {canPlace && (
+      {(canDirectChoose || canPlace) && (
         <div className="slot-actions">
-          <button
-            type="button"
-            className="slot-place-btn"
-            data-testid={`place-btn-${slot.id}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onSelectSlot) onSelectSlot();
-            }}
-          >
-            {strings.placeCard}
-          </button>
+          {canDirectChoose && (
+            <button
+              type="button"
+              className="slot-choose-btn"
+              data-testid={`choose-btn-${slot.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onChooseSlot) onChooseSlot();
+              }}
+            >
+              {strings.choose}
+            </button>
+          )}
+          {canPlace && (
+            <button
+              type="button"
+              className="slot-place-btn"
+              data-testid={`place-btn-${slot.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectSlot) onSelectSlot();
+              }}
+            >
+              {strings.placeCard}
+            </button>
+          )}
         </div>
       )}
     </div>

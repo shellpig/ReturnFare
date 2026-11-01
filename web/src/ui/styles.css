@@ -41,8 +41,8 @@ dialog::backdrop { background: #251c16aa; }
 .slot-occupant::after { content: '〕'; }
 .slot-accept-types { color: #806e5a; font-size: .92rem; }
 .slot-delegation-preview, .slot-delegation-tendency, .slot-reason { margin: .4rem 0 0; }
-.slot-actions { margin-top: .6rem; }
-.slot-place-btn { padding: .35rem .75rem; font-size: .88rem; }
+.slot-actions { margin-top: .6rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+.slot-choose-btn, .slot-place-btn { padding: .35rem .75rem; font-size: .88rem; }
 .action-result-box { margin-bottom: 1rem; padding: .85rem 1rem; border-left: 3px solid #6b523d; background: #fbf7ef; }
 .action-result-line { margin: .25rem 0; color: #3b2c20; }
 .card-picker-dialog, .slot-preview-dialog { max-height: 80vh; max-width: 500px; width: 90vw; overflow-y: auto; }

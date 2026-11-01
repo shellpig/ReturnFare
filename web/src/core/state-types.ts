@@ -229,6 +229,12 @@ export interface Game {
   playBeat(beatId: string): MutationResult;
   playEvening(): MutationResult;
   playNightFixed(): MutationResult;
+  choose(
+    beatId: string,
+    groupId: string,
+    slotId: string,
+    cardId?: string,
+  ): MutationResult;
   tryPlace(cardId: string, beatId: string, slotId: string): MutationResult;
   placeableCards(beatId: string, slotId: string): readonly string[];
   previewSlot(

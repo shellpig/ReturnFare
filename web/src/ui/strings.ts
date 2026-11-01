@@ -9,6 +9,7 @@ export const strings = {
   advanceHint: '推進時段（目前無可做動作）', // scenes/main.gd _MSG_ADVANCE_HINT
   // Godot 為每張候選卡各一顆放置鈕（_FMT_PLACE_BUTTON）；Web 改「點槽 → 選卡」，此按鈕文字為 W5-B 新增。
   placeCard: '放入卡片',
+  choose: '選擇', // scenes/ui/location_panel.gd _FMT_CHOOSE_BUTTON「選擇：%s」的前綴；Web 按鈕位於槽內，槽名已另行顯示
   preview: '預覽', // scenes/ui/location_panel.gd:369 preview_btn；:468 預覽標題預設值
   placeableCardsTitle: '可放置卡片：', // scenes/ui/location_panel.gd:459
   noPlaceableCards: '目前沒有可放的卡。', // scenes/ui/location_panel.gd _MSG_PREVIEW_EMPTY
@@ -31,6 +32,9 @@ export const strings = {
     already_resolved: '此格已結算完成',
     data_conflict: '委託資料異常',
     encounter_active: '遭遇進行中',
+    card_required: '需要放入卡片', // W5-C 新增
+    not_run: '遊戲尚未開始', // W5-C 新增
+    not_implemented: '功能尚未實作', // W5-C 新增
   } as Record<string, string>,
   loading: '載入中...', // scenes/main.tscn StatusLabel 初始文字
   dataError: '資料載入失敗', // scenes/main.gd _MSG_DATA_ERROR，去掉僅適用 Godot 編輯器的「詳情見 Output。」

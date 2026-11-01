@@ -66,6 +66,7 @@ export function LocationPanel({
   onAdvanceBeat,
   onBack,
   onPlaceCard,
+  onChooseSlot,
 }: {
   game: Game;
   panel: PanelView;
@@ -76,6 +77,7 @@ export function LocationPanel({
   onAdvanceBeat: () => void;
   onBack: () => void;
   onPlaceCard: (cardId: string, beatId: string, slotId: string) => void;
+  onChooseSlot: (beatId: string, groupId: string, slotId: string) => void;
 }) {
   const [pickerTarget, setPickerTarget] = useState<{
     beatId: string;
@@ -161,6 +163,9 @@ export function LocationPanel({
                         }
                         onPreviewSlot={() =>
                           setPreviewTarget({ beatId: beat.id, slot })
+                        }
+                        onChooseSlot={() =>
+                          onChooseSlot(beat.id, slot.choiceGroup, slot.id)
                         }
                       />
                     ))}

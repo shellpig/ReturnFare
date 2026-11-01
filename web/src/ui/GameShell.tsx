@@ -134,6 +134,34 @@ export function GameShell({ game }: { game: Game }) {
     }
   }
 
+  function handleChooseSlot(
+    beatId: string,
+    groupId: string,
+    slotId: string,
+    cardId?: string,
+  ) {
+    const result = game.choose(beatId, groupId, slotId, cardId);
+    if (result.ok) {
+      setError('');
+      setActiveLocation((current) =>
+        current
+          ? {
+              ...current,
+              actionResultLines: result.lines,
+            }
+          : null,
+      );
+    } else {
+      setError(
+        strings.placeFailed(
+          result.reason_text ||
+            strings.reasonCodes[result.reason_code] ||
+            result.reason_code,
+        ),
+      );
+    }
+  }
+
   let advanceText: string = strings.advance;
   if (view.phase === 'morning' || view.phase === 'afternoon') {
     const hasAction = game.hasAnyLegalAction();
@@ -180,6 +208,7 @@ export function GameShell({ game }: { game: Game }) {
           onAdvanceBeat={advanceBeatInLocation}
           onBack={() => setActiveLocation(null)}
           onPlaceCard={handlePlaceCard}
+          onChooseSlot={handleChooseSlot}
         />
       ) : (
         <MapPanel

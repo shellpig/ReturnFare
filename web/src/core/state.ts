@@ -40,6 +40,7 @@ import {
 } from './panel';
 import {
   checkPlace,
+  checkSlotState,
   hasAnyLegalAction as calcHasAnyLegalAction,
   hasUnseenContent as calcHasUnseenContent,
   placeableCards as calcPlaceableCards,
@@ -1382,6 +1383,110 @@ export function createGame(
     };
   }
 
+  function choose(
+    beatId: string,
+    groupId: string,
+    slotId: string,
+    cardId = '',
+  ): MutationResult {
+    // 1. mode not run -> not_run
+    if (state.flow.mode !== 'run') {
+      return mutationReject('not_run', REASON_TEXT_NOT_RUN);
+    }
+
+    // 2. active encounter -> encounter_active
+    if (Object.keys(state.run.active_encounter).length > 0) {
+      return mutationReject('encounter_active', '遭遇進行中，無法選擇');
+    }
+
+    // 3. choices[beatId::groupId] exists -> resolved (no second effect)
+    const choiceKey = `${beatId}::${groupId}`;
+    if (state.run.choices[choiceKey] !== undefined) {
+      return mutationReject('resolved', '');
+    }
+
+    // 4. unknown beat -> unknown_beat
+    const beat = data.beatsById.get(beatId);
+    if (!beat) {
+      return mutationReject('unknown_beat', '');
+    }
+
+    // 5. slot missing OR slot.choice_group != groupId -> unknown_slot
+    const slot = (beat.slots ?? []).find((s) => s.id === slotId);
+    if (!slot || slot.choice_group !== groupId) {
+      return mutationReject('unknown_slot', '');
+    }
+
+    // 6. slot has delegation -> route to delegate (W6: atomic not_implemented)
+    if (slot.delegation) {
+      return mutationReject('not_implemented', '委託系統將於 W6-C 實作');
+    }
+
+    // 7. choice_requires_card && empty cardId -> card_required
+    if (slot.choice_requires_card === true && (!cardId || cardId.length === 0)) {
+      return mutationReject('card_required', '');
+    }
+
+    // 8. checkSlotState fail -> its code/text
+    const stateResult = checkSlotState(beat, slot, state, data);
+    if (!stateResult.ok) {
+      return mutationReject(stateResult.reason_code, stateResult.reason_text);
+    }
+
+    // 9. cardId given -> shared checkPlace fail -> its code/text
+    if (cardId && cardId.length > 0) {
+      const placeResult = checkPlace(cardId, beat, slot, state, data);
+      if (!placeResult.ok) {
+        return mutationReject(placeResult.reason_code, placeResult.reason_text);
+      }
+    }
+
+    // 10. bookkeeping {choice_key, choice_slot_id, slot_key};
+    // ONLY when choice_requires_card && card is protagonist && action phase -> consume_action + attention_npc
+    const bk: SettleBookkeeping = {
+      choice_key: choiceKey,
+      choice_slot_id: slotId,
+      slot_key: `${beatId}::${slotId}`,
+    };
+    if (slot.choice_requires_card === true && cardId && cardId.length > 0) {
+      const crBase = cardBaseId(cardId);
+      const crCard = data.cardsById.get(crBase);
+      const inActionPhase = (ACTION_PHASES as readonly string[]).includes(
+        state.run.phase,
+      );
+      if (crCard?.type === 'protagonist' && inActionPhase) {
+        bk.consume_action = true;
+        if (
+          typeof slot.attention_npc === 'string' &&
+          slot.attention_npc.length > 0
+        ) {
+          bk.attention_npc = slot.attention_npc;
+        }
+      }
+    }
+
+    // 11. settle [slot.on_place] through existing shared settle
+    const settleRes = settleEffectsOnDraft(
+      [slot.on_place],
+      bk,
+      {},
+      state as GameSnapshot,
+      data,
+    );
+    if (!settleRes.ok) {
+      return mutationReject(settleRes.reason_code, settleRes.reason_text);
+    }
+
+    commitState(settleRes.nextState);
+    notifyListeners();
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      lines: settleRes.lines,
+    };
+  }
+
   function tryPlace(
     cardId: string,
     beatId: string,
@@ -1430,10 +1535,7 @@ export function createGame(
       typeof slot.choice_group === 'string' &&
       slot.choice_group.length > 0
     ) {
-      return mutationReject(
-        'not_implemented',
-        'choice_group 互斥選擇將於 W5-C 實作',
-      );
+      return choose(beatId, slot.choice_group, slotId, cardId);
     }
 
     // 9. checkPlace
@@ -1533,6 +1635,7 @@ export function createGame(
     playBeat,
     playEvening,
     playNightFixed,
+    choose,
     tryPlace,
     placeableCards,
     previewSlot,
