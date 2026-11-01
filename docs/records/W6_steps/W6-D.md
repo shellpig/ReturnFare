@@ -60,3 +60,34 @@
 - D8 入夜仍依 Godot 分工：advancePhase 到 night，再由 playNightFixed 強制到訪／收費／演出／啟動；GameShell 與 greedy 均走此管線。超載開場立即 failure 的現行 P4-D 契約優先於舊 prose penalty 描述。
 - 正式 data、Godot、基線、依賴、契約與 verifier 文件未修改。未跑 Godot、未做完整 45 天／跨輪走查或真人體感；本步不擴 trace 前綴。E2、W7 尚未交付。
 - 此為指揮交付工作紀錄，不替 verifier 勾選驗收，不改 PROJECT_BRIEF.md；E2 與全程 runner 保留。
+
+## Verifier 獨立驗收（2026-11-01）
+
+- 結論：**W6-D 已完成並通過驗收**，無 P0／P1／P2；4 項 P3 不阻擋，未修正，列於下方。
+- 受驗版本：`main@043a9e6`（實作 `7eb3d98`、壞定義丟棄修正 `12f6aed`＋指揮紀錄）；本段紀錄與文件關門同一 commit 提交，未改程式碼。
+- 純查詢對照：`encounter.ts` 的 `getRound`／`getFirstRoundId`／`findMatchingResponse`（card／base id 依資料順序）／`hasLegalMoves`（hand → knowledge → discard → escape）／`buildEncounterView` 與 `encounter.gd` 逐分支一致；VM 頂層與候選 key 為固定白名單，不含未到回合與 accepts。
+- Game 對照：`startEncounterOnDraft`（encounter_active → unknown_beat → data_conflict，與 `_encounter_data_error` 同一份形狀檢查）、`acknowledgeEncounterIntro`（超載立即 failure 且 entered_round=false；否則首回合加 cost 後查容量與合法解）、`respondToEncounter` 8 步（K-132 card_not_submittable 先於 data_conflict）、`discardInEncounter` 6 步、`escapeEncounter` 9 步，拒絕碼與 `game_state.gd` 一致；正解釋放本回合佔格、錯答保留，consume_card 僅可丟棄卡，循環回合判 failure。`checkEncounterCapacityFailure` 在 blocked_slots≤0 時只看超載，D45 零成本未改。
+- 交易與接線：出口效果、支付卡與 encounter_set 同一筆 settle；結局啟動後 flow 非 run 不再 after_finish 推進。白天目標時段 fixed 遭遇在 advancePhase draft 內啟動（meta_once、condition／requires 沿資料），D8 night 由 playNightFixed 強制到訪→charge_first_visit→play_beat→start 並中止後續 fixed beat，與 `play_night_fixed` 一致。
+
+| 獨立檢查 | 結果 |
+|---|---|
+| `npm --prefix web test` | exit 0；20 files／210 tests |
+| `npm --prefix web run build` | exit 0 |
+| `npm --prefix web run test:ui` | exit 0；18／18（含 D8 intro→取消→確認→日常封鎖、D45 after_finish 推進兩條） |
+| `trace:web` ＋ `trace:compare`（W5.json／W3.json） | exit 0；12 checkpoints／560 fields、5／187，equal=true（產物 `_qa/web/W6-D/trace-web-verifier.json`） |
+| 白天 transition 接線變異（verifier） | 以假成功取代 advance draft 的 `startEncounterOnDraft`，encounter.test 3 筆轉紅（D45 生命週期、D45 推理轉知識、ending 壓住 after_finish）；`git checkout` 還原 |
+| 入夜接線變異（verifier） | 以假成功取代 playNightFixed 的 `startEncounterOnDraft`，encounter／night 4 筆轉紅（D8 生命週期、repeat_each_run 收費、非遭遇操作封鎖、D8 charge_first_visit）；還原後 git diff 無殘留，33／33 |
+| 正式產物隔離 | dist 無 `__testGame`／`__w6d_snap`／`__origCreateGame`／`createRunForTrace`／`trace-entry`（0 檔） |
+
+- 未重跑：指揮者 effect draft 與出口重複效果兩組變異（沿用上方證據）、Godot、完整 45 天 trace；未做瀏覽器手動點擊，UI 以 Playwright 18 條為證。
+
+| 發現 | 等級 | 建議 |
+|---|---|---|
+| 壞資料路徑比 Godot 嚴：遭遇定義遺失、next_round 不存在、playNightFixed 啟動失敗、條件求值錯誤時 TS 整筆拒絕或判 failure；Godot 照常續行或只 push_error。正式資料不會觸發 | P3 | 維持現狀；若日後要逐字對齊再統一 |
+| `respondToEncounter` 的 on_resolve 預演失敗即拒絕；Godot 待最後 settle 才失敗。最終結果相同，僅時機不同 | P3 | 不需處理 |
+| 修改 `web/src/ui/strings.ts`、`web/tests/night.test.ts` 超出派工白名單；紀錄已交代 | P3 | 程序偏差，後續派工白名單列入 strings 與受影響既有測試 |
+| `encounterView()` 在非 run 模式回 `{}`，Godot 無此檢查 | P3 | 不需處理 |
+
+## 驗收後下一步
+
+- 依 W6 施工順序接 W6-E2（出口規則、全程與跨輪收尾）。
