@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TriState } from '../core/panel';
 import type { Game } from '../core/state-types';
+import { EndingPanel } from './EndingPanel';
 import { HandPanel } from './HandPanel';
 import { LocationPanel } from './LocationPanel';
 import { MapPanel } from './MapPanel';
@@ -25,8 +26,20 @@ export function GameShell({ game }: { game: Game }) {
   const [activeLocation, setActiveLocation] =
     useState<ActiveLocationState | null>(null);
 
+  // 離開 run（進結局或回開局）時清掉上一輪的面板、演出進度與錯誤，避免殘留到下一輪。
+  useEffect(() => {
+    if (snapshot.flow.mode !== 'run') {
+      setActiveLocation(null);
+      setIndex(0);
+      setError('');
+    }
+  }, [snapshot.flow.mode]);
+
   if (snapshot.flow.mode === 'opening') {
     return <OpeningPanel game={game} />;
+  }
+  if (snapshot.flow.mode === 'ending') {
+    return <EndingPanel game={game} />;
   }
 
   const view = game.getPhaseView();

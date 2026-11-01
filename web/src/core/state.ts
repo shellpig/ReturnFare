@@ -18,8 +18,23 @@ import {
   hasKnowledge as checkHasKnowledge,
   knowledgeView as calcKnowledgeView,
 } from './cards';
-import { ConditionError, UnsupportedConditionError, evalCondition } from './condition';
+import {
+  ConditionError,
+  UnsupportedConditionError,
+  evalCondition,
+  hasSeenEnding as checkHasSeenEnding,
+} from './condition';
 import { planEffects } from './effect';
+import {
+  advanceEndingPage as stepAdvanceEndingPage,
+  completeEnding as stepCompleteEnding,
+  endingView as calcEndingView,
+  revealEndingPage as stepRevealEndingPage,
+  skipSeenEnding as stepSkipSeenEnding,
+  startEndingOnDraft,
+  type EndingStep,
+  type EndingView,
+} from './ending';
 import {
   ACTION_PHASES,
   LAST_DAY,
@@ -208,20 +223,32 @@ function settleEffectsOnDraft(
       nextState: cloneSnapshot(state),
     };
   }
-  if (pf.endingRequest !== null) {
-    return {
-      ok: false,
-      reason_code: 'not_implemented',
-      reason_text: 'ending 結算將於 W6 實作',
-      lines: [],
-      nextState: cloneSnapshot(state),
-    };
-  }
 
   const afterEffectsDraft = pf.nextState;
 
   // Bookkeeping applied on draft
   applyBookkeepingOnDraft(afterEffectsDraft, bookkeeping, data);
+
+  // 結局請求：效果與記帳都已在 draft 上成功，最後才驗配對／資料／快照並凍結結果。
+  // 任何一步失敗都回原狀態（零副作用）；成功則與效果、記帳同一筆提交。
+  if (pf.endingRequest !== null) {
+    const started = startEndingOnDraft(
+      afterEffectsDraft,
+      pf.endingRequest.ending_id,
+      pf.endingRequest.source_id,
+      data,
+      { fromMode: 'run' },
+    );
+    if (!started.ok) {
+      return {
+        ok: false,
+        reason_code: started.reason_code,
+        reason_text: started.reason_text,
+        lines: [],
+        nextState: cloneSnapshot(state),
+      };
+    }
+  }
 
   return {
     ok: true,
@@ -1092,14 +1119,26 @@ export function createGame(
     }
 
     if (hasEnding) {
-      const endingId = String(rawChoice.ending);
-      if (!data.endingsById.has(endingId)) {
-        return mutationReject('data_conflict', `未知的結局：${endingId}`);
-      }
-      return mutationReject(
-        'not_implemented',
-        '開局直通結局將於 W7-A 實作',
+      // 不上車：不初始化 run，直接以 opening_choice 來源進結局（對應 _start_ending_from_opening）。
+      const endingDraft = cloneSnapshot(state as GameSnapshot);
+      const started = startEndingOnDraft(
+        endingDraft,
+        String(rawChoice.ending),
+        'opening_choice',
+        data,
+        { fromMode: 'opening' },
       );
+      if (!started.ok) {
+        return mutationReject(started.reason_code, started.reason_text);
+      }
+      commitState(endingDraft);
+      notifyListeners();
+      return {
+        ok: true,
+        reason_code: '',
+        reason_text: '',
+        lines: [],
+      };
     }
 
     // on_select 分支：在複本上初始化 run 並預演 on_select 與 D1 morning auto_enter
@@ -1210,6 +1249,10 @@ export function createGame(
       }
       draft = beatRes.nextState;
       lines.push(...beatRes.lines);
+      // 效果可能把玩家推進結局，之後就不該再播下一個 beat（殘響文字沿 Godot 照收）。
+      if (draft.flow.mode !== 'run') {
+        break;
+      }
     }
 
     // 2. 當日殘響（echo.day === curDay）
@@ -1338,6 +1381,9 @@ export function createGame(
       }
       draft = beatRes.nextState;
       lines.push(...beatRes.lines);
+      if (draft.flow.mode !== 'run') {
+        break;
+      }
 
       if (isPlainObject(b.encounter) && Object.keys(b.encounter).length > 0) {
         return mutationReject('not_implemented', '遭遇戰將於 W6-D 實作');
@@ -1587,6 +1633,46 @@ export function createGame(
     };
   }
 
+  function endingView(): EndingView {
+    return calcEndingView(state, data);
+  }
+
+  function hasSeenEnding(endingId: string): boolean {
+    return checkHasSeenEnding(state, endingId);
+  }
+
+  /** 頁面／結算步驟的共用提交：成功才換入新狀態並通知，失敗零副作用。 */
+  function commitEndingStep(step: EndingStep, clearTransientLines = false): MutationResult {
+    if (!step.ok) {
+      return mutationReject(step.reason_code, step.reason_text);
+    }
+    commitState(step.nextState);
+    if (clearTransientLines) {
+      lastChoiceDefaultLines = [];
+      lastAutoEnterLines = [];
+      phaseNarrationLines = null;
+    }
+    notifyListeners();
+    return { ok: true, reason_code: '', reason_text: '', lines: [] };
+  }
+
+  function revealEndingPage(): MutationResult {
+    return commitEndingStep(stepRevealEndingPage(state, data));
+  }
+
+  function advanceEndingPage(): MutationResult {
+    return commitEndingStep(stepAdvanceEndingPage(state, data));
+  }
+
+  function skipSeenEnding(): MutationResult {
+    return commitEndingStep(stepSkipSeenEnding(state, data));
+  }
+
+  function completeEnding(): MutationResult {
+    // 唯一收尾：run 的暫態演出文字隨輪結束一併清掉，避免進下一輪殘留。
+    return commitEndingStep(stepCompleteEnding(state, data), true);
+  }
+
   function placeableCards(
     beatId: string,
     slotId: string,
@@ -1642,5 +1728,11 @@ export function createGame(
     hasAnyLegalAction,
     hasUnseenContent,
     advancePhase,
+    endingView,
+    hasSeenEnding,
+    revealEndingPage,
+    advanceEndingPage,
+    skipSeenEnding,
+    completeEnding,
   };
 }

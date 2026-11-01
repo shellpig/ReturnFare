@@ -66,7 +66,7 @@ describe('W3-B opening view, rejection matrix, and formal opening paths (D1 -> D
     }
   });
 
-  it('chooseOpening() rejects unknown, locked, unlocked ending-branch (W3 not_implemented), repeat call, and on_select ending conflict with zero state mutation', () => {
+  it('chooseOpening() rejects unknown, locked, repeat call, and on_select ending conflict with zero state mutation; unlocked ending-branch now enters ending mode (W6-E1)', () => {
     const game = createGame(data);
     const initialSerialized = JSON.stringify(game.serialize());
 
@@ -87,19 +87,21 @@ describe('W3-B opening view, rejection matrix, and formal opening paths (D1 -> D
     expect(lockedRes.lines).toEqual([]);
     expect(JSON.stringify(game.serialize())).toBe(initialSerialized);
 
-    // 3. Unlocked refuse_boarding in W3 -> not_implemented with zero state mutation
+    // 3. Unlocked refuse_boarding (W6-E1) -> enters ending mode without building a town run
     const unlockedInit = game.serialize();
     unlockedInit.meta.run_number = 2;
     unlockedInit.meta.ending_history.push(makeReplacedHistoryRecord());
     const unlockedGame = createGame(data, unlockedInit);
-    const unlockedBefore = JSON.stringify(unlockedGame.serialize());
+    const unlockedRunBefore = JSON.stringify(unlockedGame.serialize().run);
     expect(unlockedGame.getOpeningView()[2].available).toBe(true);
 
     const refuseRes = unlockedGame.chooseOpening('refuse_boarding');
-    expect(refuseRes.ok).toBe(false);
-    expect(refuseRes.reason_code).toBe('not_implemented');
+    expect(refuseRes.ok).toBe(true);
     expect(refuseRes.lines).toEqual([]);
-    expect(JSON.stringify(unlockedGame.serialize())).toBe(unlockedBefore);
+    const refuseAfter = unlockedGame.serialize();
+    expect(refuseAfter.flow.mode).toBe('ending');
+    expect(refuseAfter.flow.active_ending?.ending_id).toBe('ending_refuse_boarding');
+    expect(JSON.stringify(refuseAfter.run)).toBe(unlockedRunBefore);
 
     // 4. Repeat chooseOpening after entering run -> not_opening with zero mutation
     const okRes = game.chooseOpening('take_family_album');

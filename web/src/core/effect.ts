@@ -5,7 +5,9 @@
  * - 在獨立狀態複本（draft）上按固定順序預演：
  *   text → lose → gain → switch → switch_progress → relation → madness → flag → festival_proxy → ending
  * - W5 實作：text、lose、gain、switch、switch_progress、relation、flag。
- * - 遇到未實作效果鍵（madness、festival_proxy、ending）或未知鍵時，
+ * - W6-E1 實作：ending 只收集結局請求（source 固定 ending_effect），不在此啟動結局；
+ *   同一動作提出兩個不同請求整筆 data_conflict。配對與快照由呼叫端的結局規劃驗證。
+ * - 遇到未實作效果鍵（madness、festival_proxy）或未知鍵時，
  *   整筆交易回傳 ok: false（not_implemented 或 data_conflict），零半套狀態、零已收集文字。
  */
 
@@ -16,6 +18,9 @@ import { cardBaseId } from './facts';
 import { ConditionError, UnsupportedConditionError, evalCondition } from './condition';
 import { cloneSnapshot } from './run-initialization';
 import type { GameSnapshot, ReasonCode } from './state-types';
+
+/** beat 效果提出的 ending request 固定用這個 source；配對合法性由結局規劃驗（effect_apply.gd EFFECT_ENDING_SOURCE）。 */
+export const EFFECT_ENDING_SOURCE = 'ending_effect';
 
 export interface EndingRequest {
   readonly ending_id: string;
@@ -376,7 +381,7 @@ export function planEffects(
       );
     }
 
-    // 10. ending（W6 接手實作執行；W5 契約驗證結構並回傳 not_implemented）
+    // 10. ending：只收集請求；啟動由呼叫端在 preflight 全數成功後統一處理
     if ('ending' in raw && raw.ending !== undefined) {
       if (typeof raw.ending !== 'string' || raw.ending.length === 0) {
         return rejectPlan(
@@ -392,11 +397,14 @@ export function planEffects(
           `EffectApply: 未知的結局 id '${raw.ending}'`,
         );
       }
-      return rejectPlan(
-        state,
-        'not_implemented',
-        `EffectApply: ending 效果 ('${raw.ending}') 將於 W6 實作`,
-      );
+      if (endingRequest !== null && endingRequest.ending_id !== raw.ending) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: 同一動作提出兩個不同的結局',
+        );
+      }
+      endingRequest = { ending_id: raw.ending, source_id: EFFECT_ENDING_SOURCE };
     }
   }
 

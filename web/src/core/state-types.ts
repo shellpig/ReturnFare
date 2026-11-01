@@ -6,6 +6,7 @@
  */
 
 import type { Phase } from '../data/types';
+import type { EndingView } from './ending';
 import type { MapLocationView, PanelView } from './panel';
 
 export type FlowMode = 'opening' | 'run' | 'ending';
@@ -28,9 +29,11 @@ export type ReasonCode =
   | 'no_active_ending'
   | 'wrong_ending_stage'
   | 'already_revealed'
-  | 'cannot_advance_page'
-  | 'cannot_skip_ending'
-  | 'ending_not_ready'
+  | 'page_not_revealed'
+  | 'last_page'
+  | 'ending_not_seen'
+  | 'not_ready'
+  | 'ending_active'
   | 'unknown_ending'
   | 'invalid_ending_source'
   | 'encounter_active'
@@ -244,4 +247,10 @@ export interface Game {
   hasAnyLegalAction(): boolean;
   hasUnseenContent(): boolean;
   advancePhase(): AdvanceResult;
+  endingView(): EndingView;
+  hasSeenEnding(endingId: string): boolean;
+  revealEndingPage(): MutationResult;
+  advanceEndingPage(): MutationResult;
+  skipSeenEnding(): MutationResult;
+  completeEnding(): MutationResult;
 }

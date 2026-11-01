@@ -35,7 +35,24 @@ export const strings = {
     card_required: '需要放入卡片', // W5-C 新增
     not_run: '遊戲尚未開始', // W5-C 新增
     not_implemented: '功能尚未實作', // W5-C 新增
+    // W6-E1 新增：文字取自 scripts/autoload/game_state.gd 結局相關 reason_text，讓英文碼不外露。
+    not_ending: '目前不在結局中',
+    no_active_ending: '沒有進行中的結局',
+    wrong_ending_stage: '結局已可結算',
+    already_revealed: '本頁已完整顯示',
+    page_not_revealed: '本頁尚未完整顯示',
+    last_page: '已是最後一頁',
+    ending_not_seen: '這個結局還沒看過，不能跳過',
+    not_ready: '結局尚未播完',
+    ending_active: '已有進行中的結局',
   } as Record<string, string>,
+  // scenes/ui/ending_panel.gd
+  endingReveal: '顯示全文', // _MSG_ADVANCE_REVEAL
+  endingNext: '下一頁', // _MSG_ADVANCE_NEXT
+  endingComplete: '完成', // _MSG_ADVANCE_COMPLETE
+  endingSkip: '跳過', // _MSG_SKIP
+  endingPage: (index: number, count: number) => `第 ${index} / ${count} 頁`, // _FMT_PAGE
+  endingRegion: '結局', // W6-E1 新增：區域無障礙標籤，Godot 無對應原文
   loading: '載入中...', // scenes/main.tscn StatusLabel 初始文字
   dataError: '資料載入失敗', // scenes/main.gd _MSG_DATA_ERROR，去掉僅適用 Godot 編輯器的「詳情見 Output。」
   status: (day: number, phase: string, chapter: number) => `第 ${day} 天  ${phase}  第 ${chapter} 章`, // scenes/main.gd _FMT_STATUS

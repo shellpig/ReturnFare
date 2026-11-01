@@ -66,3 +66,7 @@ dialog::backdrop { background: #251c16aa; }
 .knowledge-item { border-bottom: 1px solid #d7cdbb; padding: .5rem 0; }
 .knowledge-item:last-child { border-bottom: none; }
 .empty-knowledge { color: #806e5a; }
+.ending-panel { margin: 1rem 0; }
+.ending-body { cursor: pointer; min-height: 14rem; }
+.ending-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .75rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d7cdbb; }
+.ending-page { margin-right: auto; color: #806e5a; font-size: .95rem; }

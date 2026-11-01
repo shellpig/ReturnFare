@@ -207,7 +207,7 @@ describe('planEffects (W5-B)', async () => {
     expect(badPlan.reason_code).toBe('data_conflict');
   });
 
-  it('atomically rolls back all earlier gains, flags, and lines if a later unimplemented effect (madness, festival_proxy, ending) is encountered', () => {
+  it('atomically rolls back all earlier gains, flags, and lines if a later unimplemented effect (madness, festival_proxy) is encountered', () => {
     const state = createInitialSnapshot();
     state.flow.mode = 'run';
     state.run.hand = ['protagonist'];
@@ -264,7 +264,7 @@ describe('planEffects (W5-B)', async () => {
     expect(gainMadnessPlan.lines).toEqual([]);
     expect(JSON.stringify(gainMadnessPlan.nextState)).toBe(originalSerialized);
 
-    // 4. Valid ending after an earlier block containing text, gain, and flag
+    // 4. Valid ending request (W6-E1: collected, not rejected) after an earlier block
     const validEndingPlan = planEffects(
       [
         {
@@ -280,13 +280,44 @@ describe('planEffects (W5-B)', async () => {
       state,
       data,
     );
-    expect(validEndingPlan.ok).toBe(false);
-    expect(validEndingPlan.reason_code).toBe('not_implemented');
-    expect(validEndingPlan.lines).toEqual([]);
-    expect(JSON.stringify(validEndingPlan.nextState)).toBe(originalSerialized);
+    expect(validEndingPlan.ok).toBe(true);
+    expect(validEndingPlan.endingRequest).toEqual({
+      ending_id: 'ending_replaced',
+      source_id: 'ending_effect',
+    });
+    expect(validEndingPlan.lines).toEqual(['這段文字與取得物不該外洩', '結局區塊']);
+    // planEffects only simulates on a copy: the input state stays untouched
+    expect(JSON.stringify(state)).toBe(originalSerialized);
+
+    // 5. Two different ending requests in one action: whole plan data_conflict, no leaked lines
+    const conflictPlan = planEffects(
+      [
+        { text: '第一個結局', ending: 'ending_inventory_be' },
+        { text: '第二個結局', ending: 'ending_madness_be' },
+      ],
+      state,
+      data,
+    );
+    expect(conflictPlan.ok).toBe(false);
+    expect(conflictPlan.reason_code).toBe('data_conflict');
+    expect(conflictPlan.lines).toEqual([]);
+    expect(conflictPlan.endingRequest).toBeNull();
+    expect(JSON.stringify(conflictPlan.nextState)).toBe(originalSerialized);
+
+    // 6. Identical requests from two blocks collapse to one request
+    const samePlan = planEffects(
+      [{ ending: 'ending_inventory_be' }, { ending: 'ending_inventory_be' }],
+      state,
+      data,
+    );
+    expect(samePlan.ok).toBe(true);
+    expect(samePlan.endingRequest).toEqual({
+      ending_id: 'ending_inventory_be',
+      source_id: 'ending_effect',
+    });
   });
 
-  it('shared settle Game rejects valid ending with not_implemented, zero state mutation, zero bookkeeping, and zero notify', () => {
+  it('shared settle Game rejects a mismatched ending request (ending_replaced via ending_effect) with invalid_ending_source, zero state mutation, zero bookkeeping, and zero notify', () => {
     // Construct isolated fixture beat with a valid ending on slot on_place
     const customBeats = [
       ...data.beats,
@@ -339,7 +370,7 @@ describe('planEffects (W5-B)', async () => {
     unsubscribe();
 
     expect(res.ok).toBe(false);
-    expect(res.reason_code).toBe('not_implemented');
+    expect(res.reason_code).toBe('invalid_ending_source');
     expect(res.lines).toEqual([]);
     expect(notifyCount).toBe(0);
 
