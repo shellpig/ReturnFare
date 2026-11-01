@@ -3,6 +3,7 @@
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
+import { gainCard, loseCard } from '../src/core/cards';
 import {
   ENDING_REFUSE_BOARDING,
   ENDING_REPLACED,
@@ -34,7 +35,7 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
   beforeAll(async () => {
     data = await loadGameDataNode();
 
-    // 驗證測試所用之全部真實 ID 均存在於資料型錄中，絕無捏造
+    // 驗證正式接點使用的卡片、地點與事件 ID。
     expect(data.cardsById.has('protagonist')).toBe(true);
     expect(data.cardsById.has('info_ahong_traces')).toBe(true);
     expect(data.cardsById.has('item_family_album')).toBe(true);
@@ -136,21 +137,12 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
     expect(snap.meta.delegation_tutorial_seen).toBe(contract.delegationTutorialSeen);
 
     // 4. 知識、到訪與持久項精確比對
-    for (const k of contract.expectedKnowledge) {
-      expect(snap.meta.knowledge[k]).toBe(true);
-    }
-    for (const loc of contract.expectedNightSeen) {
-      expect(snap.meta.night_locations_seen[loc]).toBe(true);
-    }
-    for (const beat of contract.expectedNightOnceSeen) {
-      expect(snap.meta.night_once_beats_seen[beat]).toBe(true);
-    }
-    for (const loc of contract.expectedDayVisited) {
-      expect(snap.meta.day_locations_visited[loc]).toBe(true);
-    }
-    for (const item of contract.expectedPersistentItems) {
-      expect(snap.meta.loop_persistent_item_ids[item]).toBe(true);
-    }
+    const asSet = (ids: readonly string[]) => Object.fromEntries(ids.map((id) => [id, true]));
+    expect(snap.meta.knowledge).toEqual(asSet(contract.expectedKnowledge));
+    expect(snap.meta.night_locations_seen).toEqual(asSet(contract.expectedNightSeen));
+    expect(snap.meta.night_once_beats_seen).toEqual(asSet(contract.expectedNightOnceSeen));
+    expect(snap.meta.day_locations_visited).toEqual(asSet(contract.expectedDayVisited));
+    expect(snap.meta.loop_persistent_item_ids).toEqual(asSet(contract.expectedPersistentItems));
 
     // 5. 歷史記錄：嚴格保留原有前綴，且恰好追加一筆新記錄
     expect(snap.meta.ending_history).toHaveLength(contract.historyLength);
@@ -199,7 +191,7 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
       madnessClock[cardId] = countdown;
     }
 
-    // 填充待重置之 dirty run 欄位（覆蓋 beats_entered, switches, switch_progress, forced_pending 等）
+    // 合成髒欄位只驗重置，不代表 D6 走法自然產生了這些後期紀錄。
     run1Init.flow.mode = 'run';
     run1Init.run = {
       ...run1Init.run,
@@ -345,7 +337,7 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
       expectedKnowledge: ['k_town_covers', RETURNED_KNOWLEDGE_CARD, 'k_not_today'],
       expectedNightSeen: ['n_corridor', 'n_ahong_1'],
       expectedNightOnceSeen: ['n_corridor_ch1'],
-      expectedDayVisited: ['bathhouse', 'oldstreet'],
+      expectedDayVisited: ['bathhouse', 'oldstreet', 'busstop', 'jinghe_back'],
       delegationTutorialSeen: true,
       expectedPersistentItems: [],
     });
@@ -392,7 +384,7 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
       expectedKnowledge: ['k_town_covers', RETURNED_KNOWLEDGE_CARD, 'k_not_today'],
       expectedNightSeen: ['n_corridor', 'n_ahong_1'],
       expectedNightOnceSeen: ['n_corridor_ch1'],
-      expectedDayVisited: ['bathhouse', 'oldstreet'],
+      expectedDayVisited: ['bathhouse', 'oldstreet', 'busstop', 'jinghe_back'],
       delegationTutorialSeen: true,
       expectedPersistentItems: [],
     });
@@ -441,7 +433,7 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
       expectedKnowledge: ['k_town_covers', RETURNED_KNOWLEDGE_CARD, 'k_not_today'],
       expectedNightSeen: ['n_corridor', 'n_ahong_1'],
       expectedNightOnceSeen: ['n_corridor_ch1'],
-      expectedDayVisited: ['bathhouse', 'oldstreet'],
+      expectedDayVisited: ['bathhouse', 'oldstreet', 'busstop', 'jinghe_back'],
       delegationTutorialSeen: true,
       expectedPersistentItems: [],
     });
@@ -586,13 +578,20 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
   });
 
   it('[Fixture Scope: 隔離跨輪物品生命週期] 驗證 loop_persistent_item_ids 在開輪恢復、結算保留與全輪清空契約', () => {
-    // 建立合成夾具：將真實卡片 item_family_album 標記為跨輪物品
+    // 隔離卡片夾具；正式卡表與索引不變。
+    const cards = data.cards.map((card) =>
+      card.id === 'item_family_album' ? { ...card, loop_persistent: true } : card,
+    );
+    const fixtureData: GameData = { ...data, cards, cardsById: new Map(cards.map((card) => [card.id, card])) };
     const snap = createInitialSnapshot();
-    snap.meta.loop_persistent_item_ids['item_family_album'] = true;
     snap.meta.run_number = 2;
+    expect(gainCard(snap, 'item_family_album', fixtureData).ok).toBe(true);
+    expect(loseCard(snap, 'item_family_album', fixtureData).ok).toBe(true);
+    expect(snap.run.hand).not.toContain('item_family_album');
+    expect(snap.meta.loop_persistent_item_ids).toEqual({ item_family_album: true });
 
     // 1. 開輪初始化時自動將 loop_persistent_item_ids 恢復至手牌
-    const initialized = initializeRun(snap, data);
+    const initialized = initializeRun(snap, fixtureData);
     expect(initialized.run.hand).toContain('protagonist');
     expect(initialized.run.hand).toContain('item_family_album');
 
@@ -607,12 +606,12 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
       initialized,
       ENDING_INVENTORY_BE,
       'ending_effect',
-      data,
+      fixtureData,
       { fromMode: 'run' },
     );
     expect(started.ok).toBe(true);
 
-    const fixtureGame = createGame(data, initialized);
+    const fixtureGame = createGame(fixtureData, initialized);
     playThroughEnding(fixtureGame);
     expect(fixtureGame.completeEnding().ok).toBe(true);
 
@@ -621,5 +620,8 @@ describe('W6-E2-2 cross-run & reset integration tests', () => {
     expect(snapAfter.run).toEqual(createEmptyRunState());
     expect(snapAfter.meta.loop_persistent_item_ids['item_family_album']).toBe(true);
     expect(snapAfter.meta.run_number).toBe(3);
+    // 電話開局不會自行發相簿，故能辨別跨輪恢復是否真正執行。
+    expect(fixtureGame.chooseOpening('return_missed_call').ok).toBe(true);
+    expect(fixtureGame.getSnapshot().run.hand).toContain('item_family_album');
   });
 });

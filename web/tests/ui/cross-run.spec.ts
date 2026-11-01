@@ -1,7 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import type { GameSnapshot } from '../../src/core/state-types';
 
 const opening = JSON.parse(readFileSync('../data/opening_choices.json', 'utf8'));
+const snapshot = (page: Page) => page.evaluate(() =>
+  (window as unknown as { __crossRunGame: { serialize(): GameSnapshot } }).__crossRunGame.serialize(),
+);
 
 /**
  * 測試專用起點注入（透過 Playwright 路由攔截 dev server 的 state.ts，正式產品無測試入口）。
@@ -98,9 +102,10 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
         active_encounter: {
           stage: 'intro',
           beat_id: 'd45_encounter',
-          round_index: 0,
-          cards_lost: [],
-          lines: [],
+          round_id: '',
+          blocked_slots: 0,
+          attempted_card_ids: [],
+          visited_round_ids: [],
         },
       }),
     );
@@ -124,6 +129,7 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
   // 2. 進入第一回合：點擊主角卡候選按鈕開啟對話框，測試「取消」與「確認」真實 UI 行為
   const candBtn = page.getByTestId('encounter-candidate-protagonist');
   await expect(candBtn).toBeVisible();
+  const beforeSelection = await snapshot(page);
   await candBtn.click();
 
   const cancelRespond = page.getByTestId('dialog-cancel-encounter-respond');
@@ -135,6 +141,7 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
   await cancelRespond.click();
   await expect(cancelRespond).toHaveCount(0);
   await expect(encounterPanel).toBeVisible();
+  expect(await snapshot(page)).toEqual(beforeSelection);
 
   // 再次點選並確認回應
   await candBtn.click();
@@ -146,6 +153,7 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
   await expect(encounterPanel).toHaveCount(0);
   await expect(cancelRespond).toHaveCount(0);
   await expect(confirmRespond).toHaveCount(0);
+  await expect(page.getByTestId('encounter-result')).toBeVisible();
 
   // 4. D45 evening 進入 coda
   const phaseExitBtn = page.getByTestId('phase-exit-open');
@@ -175,7 +183,9 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
     page.evaluate(() => (window as unknown as { __endingTimerStatus: () => { activeCount: number } }).__endingTimerStatus().activeCount);
 
   // 翻閱並揭露頁面直到「完成」
-  let loopGuard = 24;
+  const ending = (await snapshot(page)).flow.active_ending;
+  expect(ending).not.toBeNull();
+  let loopGuard = ending!.page_refs.length * 2 + 1;
   while (loopGuard > 0) {
     loopGuard -= 1;
     const completeButton = page.getByRole('button', { name: '完成' });
@@ -186,10 +196,10 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
     const revealButton = page.getByRole('button', { name: '顯示全文' });
     if (await revealButton.isVisible()) {
       // 逐字輸入中至少存在 1 個活躍 interval
-      expect(await getTimerCount()).toBeGreaterThanOrEqual(1);
+      await expect.poll(getTimerCount).toBeGreaterThanOrEqual(1);
       await revealButton.click();
       // 點擊「顯示全文」後當頁揭露，計時器立即清除歸零
-      expect(await getTimerCount()).toBe(0);
+      await expect.poll(getTimerCount).toBe(0);
       continue;
     }
     const nextButton = page.getByRole('button', { name: '下一頁' });
@@ -197,7 +207,7 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
       await nextButton.click();
       continue;
     }
-    await page.getByTestId('ending-body').click();
+    throw new Error('結局沒有預期的揭露、翻頁或完成入口');
   }
 
   // 6. 回到開局畫面：驗證上一輪面板、遭遇、結局文字與計時器全數清除無殘留
@@ -273,6 +283,9 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
   await expect(page.locator('header')).toContainText('第 2 天');
   await expect(page.locator('.map-panel')).toBeVisible();
   await expect(page.getByRole('button', { name: '山泉閣' })).toBeEnabled();
+  await expect(page.locator('.location-panel, .encounter-panel, .ending-panel, [role="dialog"], dialog')).toHaveCount(0);
+  await expect(page.getByTestId('encounter-result')).toHaveCount(0);
+  expect(await getTimerCount()).toBe(0);
 
   // 最終純唯讀斷言確認
   const finalSnap = await page.evaluate(
