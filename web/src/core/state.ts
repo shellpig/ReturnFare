@@ -77,10 +77,15 @@ import {
   type PanelView,
 } from './panel';
 import {
+  calcDelegationStatus,
+  type DelegationStatus,
+} from './delegation';
+import {
   checkPlace,
   checkSlotState,
   hasAnyLegalAction as calcHasAnyLegalAction,
   hasUnseenContent as calcHasUnseenContent,
+  isBeatTimeValid,
   placeableCards as calcPlaceableCards,
   previewSlot as calcPreviewSlot,
 } from './placement';
@@ -100,6 +105,7 @@ import type {
   NightAdvanceStage,
   OpeningOptionView,
   OpeningScreenView,
+  PendingDelegationReport,
   PhaseView,
   ReasonCode,
 } from './state-types';
@@ -156,6 +162,9 @@ interface SettleBookkeeping {
   forced_pop?: string;
   lose_cards?: readonly string[];
   indulgence_delta?: number;
+  delegate_person?: string;
+  pending_report?: PendingDelegationReport;
+  report_removed?: PendingDelegationReport;
 }
 
 interface SettleResult {
@@ -208,6 +217,25 @@ function applyBookkeepingOnDraft(
     const pos = target.run.forced_pending.indexOf(bk.forced_pop);
     if (pos >= 0) {
       target.run.forced_pending.splice(pos, 1);
+    }
+  }
+  if (bk.delegate_person) {
+    target.run.delegates_used_today[bk.delegate_person] = true;
+  }
+  if (bk.pending_report) {
+    target.run.pending_delegation_reports.push({ ...bk.pending_report });
+  }
+  if (bk.report_removed) {
+    const targetRep = bk.report_removed;
+    const idx = target.run.pending_delegation_reports.findIndex(
+      (item) =>
+        item.due_day === targetRep.due_day &&
+        item.beat_id === targetRep.beat_id &&
+        item.slot_id === targetRep.slot_id &&
+        item.person_id === targetRep.person_id,
+    );
+    if (idx >= 0) {
+      target.run.pending_delegation_reports.splice(idx, 1);
     }
   }
   if (bk.day_location_visited) {
@@ -801,6 +829,7 @@ interface AdvancePlanResult {
   readonly defaultLines: string[];
   readonly forcedLines: string[];
   readonly autoEnterLines: string[];
+  readonly delegationReportLines: string[];
   /** false＝夜間睡覺停拍（或睡覺把玩家推進結局）：狀態已更新但時段不動。 */
   readonly phaseAdvanced: boolean;
   /** 停拍時要讀的睡覺內容；時段真的推進時為空。 */
@@ -820,6 +849,7 @@ function rejectAdvancePlan(
     defaultLines: [],
     forcedLines: [],
     autoEnterLines: [],
+    delegationReportLines: [],
     phaseAdvanced: false,
     stopLines: [],
   };
@@ -890,6 +920,102 @@ function settleForcedIndulgenceOnDraft(
   }
 
   return { ok: true, lines: settle.lines, nextState: settle.nextState };
+}
+
+/**
+ * 隔日上午待回報委託結算（規格書第十三節、P4-B、開發設計方針 P4-B）。
+ * 依 pending 順序回查 beat/slot 的 report 字典並原子結算。
+ * 接點失效或結算失敗時保留於 pending 並 console.error（不靜默丟棄）。
+ */
+function settlePendingDelegationReportsOnDraft(
+  draft: GameSnapshot,
+  data: GameData,
+): { ok: boolean; lines: string[]; nextState: GameSnapshot } {
+  if (
+    draft.flow.mode !== 'run' ||
+    draft.run.pending_delegation_reports.length === 0
+  ) {
+    return { ok: true, lines: [], nextState: draft };
+  }
+
+  const currentDay = draft.run.day;
+  const dueReports: PendingDelegationReport[] = [];
+
+  for (let i = 0; i < draft.run.pending_delegation_reports.length; i += 1) {
+    const r = draft.run.pending_delegation_reports[i];
+    if (r.due_day > currentDay) {
+      continue;
+    }
+
+    // 驗證接點合法性（beat 存在、slot 存在、delegation 為 next_morning 且 report 為非空物件）
+    const bId = r.beat_id;
+    const sId = r.slot_id;
+    const beat = data.beatsById.get(bId);
+    const slot = (beat?.slots ?? []).find((s) => s.id === sId);
+    const del = slot?.delegation;
+    const isValidDel = Boolean(del && del.result_timing === 'next_morning');
+    const rep = isValidDel ? del?.report : undefined;
+    const isValidRep = Boolean(
+      rep &&
+        typeof rep === 'object' &&
+        !Array.isArray(rep) &&
+        Object.keys(rep).length > 0,
+    );
+
+    if (!beat || !slot || !isValidDel || !isValidRep) {
+      console.error(
+        `GameState: pending delegation report data conflict on beat '${bId}', slot '${sId}' (retaining in pending)`,
+      );
+    } else {
+      dueReports.push(r);
+    }
+  }
+
+  // pending 不在這裡整份覆寫：每一筆回報的「出列」與它自己的效果同屬一個動作，
+  // 由 pre bookkeeping 一起落地。未到期、資料壞掉與結算失敗的三種都原樣留在原位。
+  let currentDraft = draft;
+  const repLines: string[] = [];
+
+  for (let i = 0; i < dueReports.length; i += 1) {
+    const r = dueReports[i];
+    const beat = data.beatsById.get(r.beat_id)!;
+    const slot = (beat.slots ?? []).find((s) => s.id === r.slot_id)!;
+    const repDict = slot.delegation!.report!;
+
+    const genBefore = currentDraft.meta.run_number;
+    const preBk: SettleBookkeeping = {
+      report_removed: r,
+    };
+
+    const settle = settleEffectsOnDraft(
+      [repDict],
+      {},
+      preBk,
+      currentDraft,
+      data,
+    );
+    if (!settle.ok) {
+      console.error(
+        `_settle_pending_delegation_reports: 回報效果結算失敗 → ${settle.reason_code}`,
+      );
+      return { ok: true, lines: repLines, nextState: currentDraft };
+    }
+
+    currentDraft = settle.nextState;
+
+    // K-65 防呆：若回報效果觸發 BE / 結局，立即中斷結算、不寫入文字
+    if (
+      currentDraft.meta.run_number !== genBefore ||
+      currentDraft.run.day !== currentDay ||
+      currentDraft.flow.mode !== 'run'
+    ) {
+      return { ok: true, lines: repLines, nextState: currentDraft };
+    }
+
+    repLines.push(...settle.lines);
+  }
+
+  return { ok: true, lines: repLines, nextState: currentDraft };
 }
 
 /**
@@ -1067,20 +1193,6 @@ function preflightAdvancePhase(
     );
   }
 
-  // 仍未接好的機制守衛：依整筆命令與目標時段實際需要才擋，mutation 前原子拒絕；日期本身不是守衛。
-  // 委託隔日回報屬 W6-C；遭遇見下方目標時段預檢（W6-D）。
-  if (
-    target.phase === 'morning' &&
-    (draft.run.pending_delegation_reports.length > 0 ||
-      Object.keys(draft.run.delegates_used_today).length > 0)
-  ) {
-    return rejectAdvancePlan(
-      currentState,
-      'not_implemented',
-      '委託隔日回報將於 W6-C 實作',
-    );
-  }
-
   // ⑦ 在 draft 上更新 day/phase、重設當日時段狀態
   draft.run.day = target.day;
   draft.run.phase = target.phase;
@@ -1117,6 +1229,17 @@ function preflightAdvancePhase(
     const forcedRes = settleForcedIndulgenceOnDraft(draft, data);
     draft = forcedRes.nextState;
     forcedLines = forcedRes.lines;
+  }
+
+  // P4-B: 換日上午先完成既有發狂倒數／強制縱慾，若未進結局再依 pending 順序回查並套 report，最後清前一日 daily set
+  let delegationLines: string[] = [];
+  if (target.phase === 'morning') {
+    if (draft.flow.mode === 'run') {
+      const delRes = settlePendingDelegationReportsOnDraft(draft, data);
+      draft = delRes.nextState;
+      delegationLines = delRes.lines;
+    }
+    draft.run.delegates_used_today = {};
   }
 
   // 換時段途中若被強制縱慾推進到結局，就不再結算 auto_enter 或新遭遇
@@ -1183,6 +1306,7 @@ function preflightAdvancePhase(
     defaultLines,
     forcedLines,
     autoEnterLines: autoLines,
+    delegationReportLines: delegationLines,
     phaseAdvanced: true,
     stopLines: [],
   };
@@ -1200,6 +1324,7 @@ export function createGame(
   let lastChoiceDefaultLines: string[] = [];
   let lastForcedLines: string[] = [];
   let lastAutoEnterLines: string[] = [];
+  let lastDelegationReportLines: string[] = [];
   let phaseNarrationLines: string[] | null = null;
 
   const listeners = new Set<() => void>();
@@ -1294,6 +1419,15 @@ export function createGame(
     const ch = chapterForDay(day);
     const narrationOnly = isNarrationOnlyPhase(day, phase);
     const canAdv = canCurrentlyAdvance();
+    const hasPersonCard =
+      state.flow.mode === 'run' &&
+      state.run.hand.some((cid) => {
+        const baseId = cardBaseId(cid);
+        return data.cardsById.get(baseId)?.type === 'person';
+      });
+    const delegationTutorialAvailable = Boolean(
+      hasPersonCard && !state.meta.delegation_tutorial_seen,
+    );
     const lines: string[] = [
       ...lastChoiceDefaultLines,
       ...lastAutoEnterLines,
@@ -1307,6 +1441,8 @@ export function createGame(
       isNarrationOnly: narrationOnly,
       lines,
       forced_lines: [...lastForcedLines],
+      delegation_report_lines: [...lastDelegationReportLines],
+      delegation_tutorial_available: delegationTutorialAvailable,
       can_advance: canAdv,
       canAdvance: canAdv,
       night_advance: nightAdvanceStage(),
@@ -1431,6 +1567,11 @@ export function createGame(
       if (!started.ok) {
         return mutationReject(started.reason_code, started.reason_text);
       }
+      lastChoiceDefaultLines = [];
+      lastForcedLines = [];
+      lastAutoEnterLines = [];
+      lastDelegationReportLines = [];
+      phaseNarrationLines = null;
       commitState(endingDraft);
       notifyListeners();
       return {
@@ -1484,6 +1625,7 @@ export function createGame(
     lastChoiceDefaultLines = [];
     lastForcedLines = [];
     lastAutoEnterLines = combinedLines;
+    lastDelegationReportLines = [];
     phaseNarrationLines = null;
     notifyListeners();
 
@@ -1738,6 +1880,7 @@ export function createGame(
         lastChoiceDefaultLines = [];
         lastForcedLines = [];
         lastAutoEnterLines = [];
+        lastDelegationReportLines = [];
         phaseNarrationLines = [...plan.stopLines];
       }
       notifyListeners();
@@ -1752,6 +1895,7 @@ export function createGame(
     lastChoiceDefaultLines = plan.defaultLines;
     lastForcedLines = plan.forcedLines;
     lastAutoEnterLines = plan.autoEnterLines;
+    lastDelegationReportLines = plan.delegationReportLines;
     phaseNarrationLines = null;
     notifyListeners();
 
@@ -1845,9 +1989,9 @@ export function createGame(
       return mutationReject('unknown_slot', '');
     }
 
-    // 6. slot has delegation -> route to delegate (W6: atomic not_implemented)
+    // 6. slot has delegation -> route to delegate
     if (slot.delegation) {
-      return mutationReject('not_implemented', '委託系統將於 W6-C 實作');
+      return delegate(beatId, slotId, cardId);
     }
 
     // 7. choice_requires_card && empty cardId -> card_required
@@ -1955,7 +2099,7 @@ export function createGame(
 
     // 7. delegation route
     if (slot.delegation) {
-      return mutationReject('not_implemented', '委託系統將於 W6-C 實作');
+      return delegate(beatId, slotId, cardId);
     }
 
     // 8. choice_group route
@@ -2120,6 +2264,168 @@ export function createGame(
     };
   }
 
+  function delegate(
+    beatId: string,
+    slotId: string,
+    personCardId: string,
+  ): MutationResult {
+    // 0. mode not run -> not_run
+    if (state.flow.mode !== 'run') {
+      return mutationReject('not_run', REASON_TEXT_NOT_RUN);
+    }
+
+    // 0.5. active encounter -> encounter_active
+    if (Object.keys(state.run.active_encounter).length > 0) {
+      return mutationReject('encounter_active', '遭遇進行中，無法委託');
+    }
+
+    // 1. 白天行動時段
+    if (!(ACTION_PHASES as readonly string[]).includes(state.run.phase)) {
+      return mutationReject('not_action_phase', '');
+    }
+
+    // 2. beat 存在、時段吻合且 condition 成立
+    const beat = data.beatsById.get(beatId);
+    if (
+      !beat ||
+      !isBeatTimeValid(beat, state, data) ||
+      !evalCondition(beat.condition, state as GameSnapshot, data)
+    ) {
+      return mutationReject('unknown_beat', '');
+    }
+
+    // 3. slot 存在且 condition 成立
+    const slot = (beat.slots ?? []).find((s) => s.id === slotId);
+    if (!slot || !evalCondition(slot.condition, state as GameSnapshot, data)) {
+      return mutationReject('unknown_slot', '');
+    }
+
+    // 4. slot 必須帶 delegation
+    if (!isPlainObject(slot.delegation)) {
+      return mutationReject('not_delegation', '');
+    }
+    const delegation = slot.delegation;
+
+    // 5. 卡在手
+    if (!personCardId || personCardId.length === 0 || !checkHasCard(state, personCardId)) {
+      return mutationReject('not_held', '');
+    }
+
+    // 6. 卡型別為 person
+    const baseId = cardBaseId(personCardId);
+    const card = data.cardsById.get(baseId);
+    if (card?.type !== 'person') {
+      return mutationReject('not_person', '');
+    }
+
+    // 7. accepts 包含該卡 base_id
+    const accepts = slot.accepts ?? [];
+    if (!accepts.includes(baseId)) {
+      return mutationReject('not_accepted', '');
+    }
+
+    // 8. 今日未曾受託
+    if (state.run.delegates_used_today[baseId] === true) {
+      return mutationReject('already_delegated_today', '');
+    }
+
+    // 9. beat / slot requires 成立（失敗帶 reject_reason）
+    if (!evalCondition(beat.requires, state as GameSnapshot, data)) {
+      const text =
+        typeof beat.reject_reason === 'string' && beat.reject_reason.length > 0
+          ? beat.reject_reason
+          : REASON_LOCKED_FALLBACK;
+      return mutationReject('locked', text);
+    }
+    if (!evalCondition(slot.requires, state as GameSnapshot, data)) {
+      const text =
+        typeof slot.reject_reason === 'string' && slot.reject_reason.length > 0
+          ? slot.reject_reason
+          : REASON_LOCKED_FALLBACK;
+      return mutationReject('locked', text);
+    }
+
+    // 10. choice_group 未結算、槽未放置過
+    const slotKey = `${beatId}::${slotId}`;
+    if (state.run.slots_placed[slotKey] === true) {
+      return mutationReject('already_resolved', '');
+    }
+    const choiceGroup =
+      typeof slot.choice_group === 'string' ? slot.choice_group : '';
+    if (
+      choiceGroup.length > 0 &&
+      state.run.choices[`${beatId}::${choiceGroup}`] !== undefined
+    ) {
+      return mutationReject('already_resolved', '');
+    }
+
+    // 11. timing / report 結構合法
+    const timing = delegation.result_timing;
+    if (timing !== 'immediate' && timing !== 'next_morning') {
+      return mutationReject('data_conflict', '');
+    }
+    if (timing === 'next_morning') {
+      if (!isPlainObject(delegation.report)) {
+        return mutationReject('data_conflict', '');
+      }
+    } else if (timing === 'immediate') {
+      if ('report' in delegation) {
+        return mutationReject('data_conflict', '');
+      }
+    }
+
+    // ── 成功（原子操作：preflight 全過才 commit）──
+    const bookkeeping: SettleBookkeeping = {
+      slot_key: slotKey,
+      delegate_person: baseId,
+    };
+    if (choiceGroup.length > 0) {
+      bookkeeping.choice_key = `${beatId}::${choiceGroup}`;
+      bookkeeping.choice_slot_id = slotId;
+    }
+    if (timing === 'next_morning') {
+      bookkeeping.pending_report = {
+        due_day: state.run.day + 1,
+        beat_id: beatId,
+        slot_id: slotId,
+        person_id: baseId,
+      };
+    }
+
+    const settleRes = settleEffectsOnDraft(
+      [slot.on_place],
+      bookkeeping,
+      {},
+      state as GameSnapshot,
+      data,
+    );
+    if (!settleRes.ok) {
+      return mutationReject(settleRes.reason_code, settleRes.reason_text);
+    }
+
+    commitState(settleRes.nextState);
+    notifyListeners();
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      lines: settleRes.lines,
+    };
+  }
+
+  function delegationStatus(personCardId: string): DelegationStatus {
+    return calcDelegationStatus(state, personCardId);
+  }
+
+  function markDelegationTutorialSeen(): void {
+    if (!state.meta.delegation_tutorial_seen) {
+      const draft = cloneSnapshot(state as GameSnapshot);
+      draft.meta.delegation_tutorial_seen = true;
+      commitState(draft);
+      notifyListeners();
+    }
+  }
+
   function endingView(): EndingView {
     return calcEndingView(state, data);
   }
@@ -2138,6 +2444,7 @@ export function createGame(
       lastChoiceDefaultLines = [];
       lastForcedLines = [];
       lastAutoEnterLines = [];
+      lastDelegationReportLines = [];
       phaseNarrationLines = null;
     }
     notifyListeners();
@@ -2211,6 +2518,9 @@ export function createGame(
     playNightFixed,
     choose,
     tryPlace,
+    delegate,
+    delegationStatus,
+    markDelegationTutorialSeen,
     indulge,
     placeableCards,
     previewSlot,

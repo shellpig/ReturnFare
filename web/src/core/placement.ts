@@ -102,6 +102,16 @@ export function checkSlotState(
     return { ok: false, reason_code: 'locked', reason_text: text };
   }
 
+  // 8. delegation daily used
+  if (slot.delegation) {
+    const accepts = slot.accepts ?? [];
+    for (let i = 0; i < accepts.length; i += 1) {
+      if (state.run.delegates_used_today[cardBaseId(accepts[i])] === true) {
+        return { ok: false, reason_code: 'locked', reason_text: strings.delegatedToday };
+      }
+    }
+  }
+
   return { ok: true, reason_code: '', reason_text: '' };
 }
 

@@ -6,24 +6,34 @@ export function SlotView({
   onSelectSlot,
   onPreviewSlot,
   onChooseSlot,
+  onSelectDelegation,
 }: {
   slot: SlotViewModel;
   onSelectSlot?: () => void;
   onPreviewSlot?: () => void;
   onChooseSlot?: () => void;
+  onSelectDelegation?: () => void;
 }) {
   const acceptTypesText =
     slot.acceptTypes.length > 0
       ? strings.slotTypes(slot.acceptTypes.join(strings.slotTypesDelimiter))
       : '';
 
+  const isDelegation = Boolean(slot.delegation);
+
   const canDirectChoose =
-    slot.tri === TriState.OPEN && slot.isChoice && !slot.choiceRequiresCard;
+    slot.tri === TriState.OPEN &&
+    slot.isChoice &&
+    !slot.choiceRequiresCard &&
+    !isDelegation;
 
   const canPlace =
-    slot.tri === TriState.OPEN && slot.accepts.length > 0 && !slot.delegation;
+    slot.tri === TriState.OPEN && slot.accepts.length > 0 && !isDelegation;
 
-  const canInteractive = canPlace || canDirectChoose;
+  const canDelegate =
+    slot.tri === TriState.OPEN && isDelegation;
+
+  const canInteractive = canPlace || canDirectChoose || canDelegate;
 
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
@@ -33,7 +43,9 @@ export function SlotView({
   }
 
   function handleClick() {
-    if (canDirectChoose && !canPlace && onChooseSlot) {
+    if (canDelegate && onSelectDelegation) {
+      onSelectDelegation();
+    } else if (canDirectChoose && !canPlace && onChooseSlot) {
       onChooseSlot();
     } else if (canPlace && !canDirectChoose && onSelectSlot) {
       onSelectSlot();
@@ -71,7 +83,7 @@ export function SlotView({
       {slot.tri === TriState.LOCKED && slot.reason && (
         <p className="reason slot-reason">{slot.reason}</p>
       )}
-      {(canDirectChoose || canPlace) && (
+      {(canDirectChoose || canPlace || canDelegate) && (
         <div className="slot-actions">
           {canDirectChoose && (
             <button
@@ -97,6 +109,19 @@ export function SlotView({
               }}
             >
               {strings.placeCard}
+            </button>
+          )}
+          {canDelegate && (
+            <button
+              type="button"
+              className="slot-delegate-btn"
+              data-testid={`delegate-btn-${slot.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectDelegation) onSelectDelegation();
+              }}
+            >
+              {strings.delegate}
             </button>
           )}
         </div>

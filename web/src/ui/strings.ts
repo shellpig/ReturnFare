@@ -105,4 +105,16 @@ export const strings = {
   cardDetailTitle: '卡片詳情', // scenes/ui/card_detail.gd:19
   knowledgeListTitle: '知識清單', // scenes/ui/card_detail.gd:55
   emptyKnowledge: '（目前無知識）', // scenes/ui/card_detail.gd:60
+  // W6-C 委託與教學介面文字（對齊 scenes/main.tscn、scenes/ui/location_panel.gd、scenes/ui/hand_bar.gd）
+  delegate: '委託', // scenes/ui/location_panel.gd _FMT_DELEGATE_BUTTON
+  delegatedToday: '今日已受託', // scenes/ui/location_panel.gd _MSG_DELEGATED_TODAY
+  delegatedTodaySuffix: '（今日已受託）', // scenes/ui/hand_bar.gd:11 _SUFFIX_DELEGATED_TODAY
+  delegationDialogTitle: '確認委託', // scenes/ui/location_panel.gd _MSG_DELEGATION_DIALOG_TITLE
+  timingImmediate: '立即回報', // scenes/ui/location_panel.gd _TIMING_LABELS.immediate
+  timingNextMorning: '隔日上午回報', // scenes/ui/location_panel.gd _TIMING_LABELS.next_morning
+  delegationTask: (title: string) => `任務：${title}`, // scenes/ui/location_panel.gd _FMT_DELEGATION_DIALOG_TEXT
+  delegationTendency: (tendency: string) => `傾向：${tendency}`, // scenes/ui/location_panel.gd _FMT_DELEGATION_DIALOG_TEXT
+  delegationTutorialTitle: '委託', // scenes/main.tscn DelegationTutorialDialog.title
+  delegationTutorialText:
+    '你拿到了第一張人物卡。你可以委託他們代你去做某些事——委託不佔用你的行動格，一天只能委託同一人一次，回報有些立即、有些要等到隔天上午。', // scenes/main.tscn DelegationTutorialDialog.dialog_text
 } as const;

@@ -197,19 +197,16 @@ describe('choice_group Mutual Exclusion and Slot Resolution (W5-C)', async () =>
     expect(unheldRes.lines).toEqual([]);
     expect(JSON.stringify(game.serialize())).toBe(baseState);
 
-    // 3. Delegation slot -> not_implemented (W6)
+    // 3. Delegation slot -> routes to delegate (W6-C)
     const delegationSnap = createInitialSnapshot();
     delegationSnap.flow.mode = 'run';
     delegationSnap.run.day = 17;
     delegationSnap.run.phase = 'afternoon';
     delegationSnap.run.hand = ['npc_ajie'];
     const delegationGame = createGame(data, delegationSnap);
-    const beforeDelegation = JSON.stringify(delegationGame.serialize());
     const delRes = delegationGame.choose('d17_19_prescription', 'prescription_route', 'ask_ajie', 'npc_ajie');
-    expect(delRes.ok).toBe(false);
-    expect(delRes.reason_code).toBe('not_implemented');
-    expect(delRes.lines).toEqual([]);
-    expect(JSON.stringify(delegationGame.serialize())).toBe(beforeDelegation);
+    expect(delRes.ok).toBe(true);
+    expect(delegationGame.hasCard('doc_prescription')).toBe(true);
 
     // 4. Mode not run -> not_run
     const openingGame = createGame(data);

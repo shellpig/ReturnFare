@@ -373,14 +373,15 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     expect(forcedGame.getSnapshot().run.forced_pending).toEqual([]);
     expect(forcedGame.getSnapshot().run.action_spent).toBe(true);
 
-    // 7. pending_delegation_reports / delegates_used_today guard when advancing to morning (D1 night -> D2 morning)
+    // 7. delegates_used_today is cleared when advancing to morning (D1 night -> D2 morning)
     const delegInit = nightGame.serialize();
     delegInit.run.night_sleep_pending = false;
     delegInit.run.night_location_chosen = 'n_corridor';
     delegInit.run.delegates_used_today = { npc_lin: true };
     const delegGame = createGame(data, delegInit);
-    expect(delegGame.getPhaseView().can_advance).toBe(false);
-    expect(delegGame.advancePhase().reason_code).toBe('not_implemented');
+    expect(delegGame.getPhaseView().can_advance).toBe(true);
+    expect(delegGame.advancePhase().ok).toBe(true);
+    expect(delegGame.getSnapshot().run.delegates_used_today).toEqual({});
   });
 
   it('assertNightFixedPlayback correctly tracks night-layer fixed beats with empty text and does not mistake skipped meta_once for playback', () => {

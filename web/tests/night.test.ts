@@ -479,15 +479,6 @@ describe('W6-A night locations, sleep and alignment', async () => {
 
     const guards: [string, GameSnapshot][] = [
       [
-        '委託隔日回報',
-        injectAt(10, 'night', (s) => {
-          s.run.night_location_chosen = 'n_exit';
-          s.run.pending_delegation_reports = [
-            { due_day: 11, beat_id: 'b', slot_id: 's', person_id: 'p' },
-          ];
-        }),
-      ],
-      [
         'D45 結局收束（phase_exit ending，E2）',
         injectAt(45, 'evening', (s) => {
           s.run.flags.final_day = true;

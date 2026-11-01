@@ -5,6 +5,7 @@ import { EndingPanel } from './EndingPanel';
 import { HandPanel } from './HandPanel';
 import { LocationPanel } from './LocationPanel';
 import { MapPanel } from './MapPanel';
+import { ModalDialog } from './ModalDialog';
 import { NightDetails } from './NightDetails';
 import { NarrationPanel } from './NarrationPanel';
 import { OpeningPanel } from './OpeningPanel';
@@ -165,8 +166,12 @@ export function GameShell({ game }: { game: Game }) {
     }
   }
 
-  function handlePlaceCard(cardId: string, beatId: string, slotId: string) {
-    const result = game.tryPlace(cardId, beatId, slotId);
+  function handleActionResult(result: {
+    ok: boolean;
+    reason_code: string;
+    reason_text: string;
+    lines: readonly string[];
+  }) {
     if (result.ok) {
       setError('');
       setActiveLocation((current) =>
@@ -188,32 +193,25 @@ export function GameShell({ game }: { game: Game }) {
     }
   }
 
+  function handlePlaceCard(cardId: string, beatId: string, slotId: string) {
+    handleActionResult(game.tryPlace(cardId, beatId, slotId));
+  }
+
   function handleChooseSlot(
     beatId: string,
     groupId: string,
     slotId: string,
     cardId?: string,
   ) {
-    const result = game.choose(beatId, groupId, slotId, cardId);
-    if (result.ok) {
-      setError('');
-      setActiveLocation((current) =>
-        current
-          ? {
-              ...current,
-              actionResultLines: result.lines,
-            }
-          : null,
-      );
-    } else {
-      setError(
-        strings.placeFailed(
-          result.reason_text ||
-            strings.reasonCodes[result.reason_code] ||
-            result.reason_code,
-        ),
-      );
-    }
+    handleActionResult(game.choose(beatId, groupId, slotId, cardId));
+  }
+
+  function handleDelegate(
+    beatId: string,
+    slotId: string,
+    personCardId: string,
+  ) {
+    handleActionResult(game.delegate(beatId, slotId, personCardId));
   }
 
   let advanceText: string = strings.advance;
@@ -238,9 +236,48 @@ export function GameShell({ game }: { game: Game }) {
     advanceText = strings.advanceNextDay;
   }
 
+  const delegationTutorial = view.delegation_tutorial_available && (
+    <ModalDialog
+      className="delegation-tutorial-dialog"
+      labelledBy="delegation-tutorial-title"
+      onClose={() => game.markDelegationTutorialSeen()}
+    >
+      <h3 id="delegation-tutorial-title">{strings.delegationTutorialTitle}</h3>
+      <p className="story tutorial-text">{strings.delegationTutorialText}</p>
+      <div className="dialog-actions">
+        <button
+          type="button"
+          data-testid="dialog-confirm-delegation-tutorial"
+          onClick={() => game.markDelegationTutorialSeen()}
+          autoFocus
+        >
+          {strings.confirm}
+        </button>
+      </div>
+    </ModalDialog>
+  );
+
   if (view.narration_only || index < view.lines.length) {
     return (
       <section className="narration-shell">
+        {view.forced_lines.length > 0 && (
+          <div className="forced-narrative-banner" data-testid="forced-narrative">
+            {view.forced_lines.map((line, idx) => (
+              <p key={idx} className="story forced-line">
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
+        {view.delegation_report_lines.length > 0 && (
+          <div className="delegation-report-banner" data-testid="delegation-report">
+            {view.delegation_report_lines.map((line, idx) => (
+              <p key={idx} className="story delegation-report-line" aria-live="polite">
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
         <NarrationPanel
           view={view}
           index={index}
@@ -251,6 +288,7 @@ export function GameShell({ game }: { game: Game }) {
           onAdvance={advance}
         />
         <HandPanel game={game} />
+        {delegationTutorial}
       </section>
     );
   }
@@ -273,6 +311,7 @@ export function GameShell({ game }: { game: Game }) {
           onPlaceCard={handlePlaceCard}
           onChooseSlot={handleChooseSlot}
           onConfirmAlignment={confirmAlignment}
+          onDelegate={handleDelegate}
         />
       ) : nightDetailId ? (
         <NightDetails
@@ -287,6 +326,15 @@ export function GameShell({ game }: { game: Game }) {
             <div className="forced-narrative-banner" data-testid="forced-narrative">
               {view.forced_lines.map((line, idx) => (
                 <p key={idx} className="story forced-line">
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
+          {view.delegation_report_lines.length > 0 && (
+            <div className="delegation-report-banner" data-testid="delegation-report">
+              {view.delegation_report_lines.map((line, idx) => (
+                <p key={idx} className="story delegation-report-line" aria-live="polite">
                   {line}
                 </p>
               ))}
@@ -313,6 +361,7 @@ export function GameShell({ game }: { game: Game }) {
         </button>
       </div>
       <HandPanel game={game} />
+      {delegationTutorial}
     </section>
   );
 }

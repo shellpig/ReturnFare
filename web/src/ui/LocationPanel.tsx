@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { TriState, type PanelView, type SlotView as SlotViewModel } from '../core/panel';
 import type { Game } from '../core/state-types';
+import { DelegationPreview } from './DelegationPreview';
+import { ModalDialog } from './ModalDialog';
 import { SlotView } from './SlotView';
 import { strings } from './strings';
 
@@ -20,42 +22,6 @@ const SCENE_ART_LOCATIONS = new Set([
   'temple',
 ]);
 
-/** 與 CardDetail 相同以 showModal 開啟，Escape 走 onCancel 關閉。 */
-function ModalDialog({
-  className,
-  labelledBy,
-  onClose,
-  children,
-}: {
-  className: string;
-  labelledBy: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (el && !el.open) {
-      el.showModal();
-    }
-  }, []);
-
-  return (
-    <dialog
-      ref={dialogRef}
-      className={className}
-      onCancel={(e) => {
-        e.preventDefault();
-        onClose();
-      }}
-      aria-labelledby={labelledBy}
-    >
-      {children}
-    </dialog>
-  );
-}
-
 export function LocationPanel({
   game,
   panel,
@@ -68,6 +34,7 @@ export function LocationPanel({
   onPlaceCard,
   onChooseSlot,
   onConfirmAlignment,
+  onDelegate,
 }: {
   game: Game;
   panel: PanelView;
@@ -80,12 +47,17 @@ export function LocationPanel({
   onPlaceCard: (cardId: string, beatId: string, slotId: string) => void;
   onChooseSlot: (beatId: string, groupId: string, slotId: string) => void;
   onConfirmAlignment: (dayLocationId: string) => void;
+  onDelegate: (beatId: string, slotId: string, personCardId: string) => void;
 }) {
   const [pickerTarget, setPickerTarget] = useState<{
     beatId: string;
     slot: SlotViewModel;
   } | null>(null);
   const [previewTarget, setPreviewTarget] = useState<{
+    beatId: string;
+    slot: SlotViewModel;
+  } | null>(null);
+  const [delegationTarget, setDelegationTarget] = useState<{
     beatId: string;
     slot: SlotViewModel;
   } | null>(null);
@@ -187,6 +159,9 @@ export function LocationPanel({
                         }
                         onChooseSlot={() =>
                           onChooseSlot(beat.id, slot.choiceGroup, slot.id)
+                        }
+                        onSelectDelegation={() =>
+                          setDelegationTarget({ beatId: beat.id, slot })
                         }
                       />
                     ))}
@@ -350,6 +325,20 @@ export function LocationPanel({
             );
           })()}
         </ModalDialog>
+      )}
+
+      {delegationTarget && (
+        <DelegationPreview
+          slot={delegationTarget.slot}
+          game={game}
+          onClose={() => setDelegationTarget(null)}
+          onConfirm={(personCardId) => {
+            const bId = delegationTarget.beatId;
+            const sId = delegationTarget.slot.id;
+            setDelegationTarget(null);
+            onDelegate(bId, sId, personCardId);
+          }}
+        />
       )}
     </section>
   );

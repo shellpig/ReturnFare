@@ -60,6 +60,8 @@ export interface SlotView {
     resultTiming: 'immediate' | 'next_morning';
     preview?: string;
     tendency?: string;
+    taskTitle: string;
+    delegationState: 'available' | 'delegated_today';
   };
 }
 
@@ -319,12 +321,36 @@ export function buildPanel(
         } else {
           slotTri = TriState.OPEN;
         }
+
+        // 委託槽：若受託人物今日已受託，OPEN 槽降為 LOCKED 並標註「今日已受託」
+        if (slot.delegation && slotTri === TriState.OPEN) {
+          const accepts = slot.accepts ?? [];
+          for (let a = 0; a < accepts.length; a += 1) {
+            const accId = accepts[a];
+            if (state.run.delegates_used_today[accId] === true) {
+              slotTri = TriState.LOCKED;
+              slotReason = strings.delegatedToday;
+              break;
+            }
+          }
+        }
       }
 
       // beat 為 LOCKED 時，底下未 RESOLVED 的卡槽一併降為 LOCKED 並繼承 beatReason
       if (beatTri === TriState.LOCKED && slotTri !== TriState.RESOLVED) {
         slotTri = TriState.LOCKED;
         slotReason = beatReason;
+      }
+
+      let isDelegatedToday = false;
+      if (slot.delegation) {
+        const accepts = slot.accepts ?? [];
+        for (let a = 0; a < accepts.length; a += 1) {
+          if (state.run.delegates_used_today[accepts[a]] === true) {
+            isDelegatedToday = true;
+            break;
+          }
+        }
       }
 
       let occupant: { id: string; name: string } | null = null;
@@ -335,6 +361,7 @@ export function buildPanel(
       const accepts = [...(slot.accepts ?? [])];
       const acceptTypes = resolveAcceptTypes(accepts, data);
 
+      const taskTitle = typeof b.title === 'string' ? b.title : '';
       const slotView: SlotView = {
         id: slotId,
         label: typeof slot.label === 'string' && slot.label.length > 0 ? slot.label : slotId,
@@ -356,6 +383,8 @@ export function buildPanel(
                 ...(slot.delegation.tendency !== undefined
                   ? { tendency: slot.delegation.tendency }
                   : {}),
+                taskTitle,
+                delegationState: isDelegatedToday ? 'delegated_today' : 'available',
               },
             }
           : {}),

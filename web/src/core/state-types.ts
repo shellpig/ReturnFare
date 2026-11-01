@@ -6,6 +6,7 @@
  */
 
 import type { Phase } from '../data/types';
+import type { DelegationStatus } from './delegation';
 import type { EndingView } from './ending';
 import type {
   AlignmentOffer,
@@ -200,6 +201,8 @@ export interface PhaseView {
   readonly isNarrationOnly: boolean;
   readonly lines: readonly string[];
   readonly forced_lines: readonly string[];
+  readonly delegation_report_lines: readonly string[];
+  readonly delegation_tutorial_available: boolean;
   readonly can_advance: boolean;
   readonly canAdvance: boolean;
   /** 非夜間為 null；夜間由 night_sleep_pending／night_location_chosen 衍生。 */
@@ -263,6 +266,13 @@ export interface Game {
     cardId?: string,
   ): MutationResult;
   tryPlace(cardId: string, beatId: string, slotId: string): MutationResult;
+  delegate(
+    beatId: string,
+    slotId: string,
+    personCardId: string,
+  ): MutationResult;
+  delegationStatus(personCardId: string): DelegationStatus;
+  markDelegationTutorialSeen(): void;
   indulge(
     beatId: string,
     slotId: string,

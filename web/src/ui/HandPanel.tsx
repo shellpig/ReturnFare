@@ -29,10 +29,16 @@ export function HandPanel({ game }: { game: Game }) {
       </div>
       <div className="hand-cards">
         {hand.map((card) => {
-          const label =
+          let label =
             card.countdown !== undefined
               ? strings.cardCountdown(card.name, card.countdown)
               : card.name;
+          if (card.type === 'person') {
+            const status = game.delegationStatus(card.instanceId);
+            if (status.delegated_today) {
+              label = `${label}${strings.delegatedTodaySuffix}`;
+            }
+          }
           return (
             <button
               type="button"
@@ -40,7 +46,7 @@ export function HandPanel({ game }: { game: Game }) {
               className="card-btn"
               data-testid={`card-${card.instanceId}`}
               onClick={() => setSelectedCard(card)}
-              title={card.name}
+              title={label}
             >
               {label}
             </button>
