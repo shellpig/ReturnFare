@@ -47,3 +47,33 @@
 - 工程檢查已完成，交 verifier 獨立驗收 W5-B；不自行勾驗收、不更新 PROJECT_BRIEF.md。
 - 保留 not_implemented：choice_group（W5-C）、一般夜間／睡覺解析、madness gain／倒數／cap／BE、縱慾、委託／回報、遭遇、festival_proxy、ending／重置與相關 phase_exit；可玩範圍停在 D3 evening，未假稱完整 45 天。
 - 環境產物：worker 在 repo 根目錄誤產 node_modules（只含 Vitest caches）及 test-results/.last-run.json。指揮者嘗試限定路徑遞迴清理、再縮為逐一已辨識檔案清理，均遭工具自動審核拒絕（僅提供 blocked by policy）。檔案保留未追蹤，不提交、不為隱藏它們改 gitignore；產品程式與工程檢查不受影響。
+
+## Verifier 獨立驗收與修正（2026-11-01）
+
+- 結論：**W5-B 已完成並通過驗收**。首輪發現 1 項 P2、3 項 P3，經使用者授權全部由 verifier 修正並複驗。
+- 受驗版本：`main@8b9ca03`（W5-B 實作提交）；修正與本段紀錄同一 commit 提交。
+- 規則對照：`checkSlotState`／`checkPlace`／`placeableCards`／`previewSlot`／`hasAnyLegalAction`／`hasUnseenContent` 與 `game_state.gd` 同名函式逐行一致；`tryPlace` 九步分流順序符合契約，madness／delegation／choice 零副作用拒絕。effect 在 draft 上依固定鍵序結算、條件項目讀前序結果，madness／festival_proxy／ending 整筆拒絕且文字不外洩；記帳與效果同一筆提交。推進按鈕三種文案的判斷順序與 `main.gd` 一致。
+
+| 發現 | 等級 | 修正 |
+|---|---|---|
+| 右鍵預覽與放卡失敗把英文拒絕碼（`not_accepted`、`action_spent` 等）直接顯示給玩家；Godot `location_panel.gd` 以 `_REASON_CODE_TEXTS` 轉中文（K-115 同族） | P2 | `strings.reasonCodes` 照搬 Godot 對照表；預覽理由與放卡失敗（`placeFailed`，對應 `_FMT_PLACE_FAILED`）一律先經對照；placement.spec 補「理由：本時段行動已用完」且不含 `action_spent` 的斷言 |
+| 新增 UI 字串未註來源，空清單文字與 Godot「目前沒有可放的卡。」不同；選卡／預覽彈窗為非 modal，Escape 關不掉 | P3 | 字串補 Godot 來源或標 W5-B 新增，空清單改用 `_MSG_PREVIEW_EMPTY` 原文；兩個彈窗改與 CardDetail 相同的 `showModal`＋onCancel，placement.spec 補 Escape 關閉斷言 |
+| effect 的 lose 遇到未持有的已知卡會整筆拒絕；Godot `effect_apply.gd` 只報資料錯並繼續（影響 `d45_then.compare_registry` 的 `k_not_today`） | P3 | effect 管線內未持有的已知卡視為 no-op（永久失去的 meta 照處理），未知 id 仍 data_conflict；直接呼叫 `loseCard` 的 W5-A 語意不變；effect.test 補案例 |
+| 記帳把 `action_cost` 綁在 `consume_action` 之下；Godot `_apply_bookkeeping` 兩者獨立 | P3 | `applyBookkeepingOnDraft` 拆成兩條獨立記帳；W5 公開路徑尚無 `action_cost` 來源，W6 縱慾／遭遇接上時須補測 |
+
+| 獨立檢查（修正後） | 結果 |
+|---|---|
+| `npm test` | exit 0；13 files／96 tests（首輪 95） |
+| `npm run build` | exit 0 |
+| `npm run test:ui -- --workers=1` | exit 0；8／8 |
+| `trace:web` + `trace:compare` | W5 scope 12 checkpoints／560 fields、W3 scope 5／187，皆 equal=true（`_qa/web/trace-web-W5B-verifier.json`） |
+| 正式產物隔離 | `dist/assets` JS 無 `__testGame`、`__w5aGame`、快照 override、`loadTrustedSnapshot` |
+| 行動格變異（首輪） | 將 `bk.consume_action = true` 改 false，placement.test 3 failed（含第二次主角拒絕）；還原後 6／6 |
+| 拒絕碼對照變異 | 預覽理由改回原始 code，placement.spec 轉紅（實際顯示「理由：action_spent」）；還原後 1／1 |
+| lose no-op 變異 | 停用未持有 no-op 分支，effect.test 對應案例轉紅；還原後 10／10 |
+
+- 驗收界線：只驗 W5-B 與受影響的 W3／W4／W5-A 回歸；不含 W5-C choice 與 W6 機制；未跑 Godot。repo 根目錄的未追蹤 `node_modules/`、`test-results/` 為 worker 產物，未提交，需使用者手動清除。
+
+## 下一步
+
+- 依 `docs/web/W5實作契約.md`「五、W5-C：choice_group」接續實作；W5-C 涉及 `d45_then` 時沿用本步 lose no-op 語意。

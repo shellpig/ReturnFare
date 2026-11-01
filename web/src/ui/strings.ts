@@ -7,11 +7,31 @@ export const strings = {
   advance: '推進時段', // scenes/main.gd _MSG_ADVANCE；scenes/main.tscn AdvanceButton
   advanceUnseen: '推進時段（還有演出沒看）', // scenes/main.gd _MSG_ADVANCE_UNSEEN
   advanceHint: '推進時段（目前無可做動作）', // scenes/main.gd _MSG_ADVANCE_HINT
+  // Godot 為每張候選卡各一顆放置鈕（_FMT_PLACE_BUTTON）；Web 改「點槽 → 選卡」，此按鈕文字為 W5-B 新增。
   placeCard: '放入卡片',
-  preview: '預覽',
-  placeableCardsTitle: '可放置卡片：',
-  noPlaceableCards: '無可放置卡片',
-  previewReason: (reason: string) => `理由：${reason}`,
+  preview: '預覽', // scenes/ui/location_panel.gd:369 preview_btn；:468 預覽標題預設值
+  placeableCardsTitle: '可放置卡片：', // scenes/ui/location_panel.gd:459
+  noPlaceableCards: '目前沒有可放的卡。', // scenes/ui/location_panel.gd _MSG_PREVIEW_EMPTY
+  previewReason: (reason: string) => `理由：${reason}`, // scenes/ui/location_panel.gd:467
+  placeFailed: (reason: string) => `（無法放置：${reason}）`, // scenes/ui/location_panel.gd _FMT_PLACE_FAILED
+  // scenes/ui/location_panel.gd _REASON_CODE_TEXTS：拒絕碼不得以英文原樣顯示給玩家（K-115 同族）。
+  reasonCodes: {
+    not_held: '未持有此卡',
+    hidden: '此事件未出現',
+    resolved: '此格已放置完成',
+    not_accepted: '卡片類型不符',
+    action_spent: '本時段行動已用完',
+    unknown_beat: '未知的事件',
+    unknown_slot: '未知的卡槽',
+    locked: '條件不足',
+    not_action_phase: '非白天行動時段',
+    not_delegation: '此格不是委託格',
+    not_person: '此卡不是人物卡',
+    already_delegated_today: '今日已受託',
+    already_resolved: '此格已結算完成',
+    data_conflict: '委託資料異常',
+    encounter_active: '遭遇進行中',
+  } as Record<string, string>,
   loading: '載入中...', // scenes/main.tscn StatusLabel 初始文字
   dataError: '資料載入失敗', // scenes/main.gd _MSG_DATA_ERROR，去掉僅適用 Godot 編輯器的「詳情見 Output。」
   status: (day: number, phase: string, chapter: number) => `第 ${day} 天  ${phase}  第 ${chapter} 章`, // scenes/main.gd _FMT_STATUS

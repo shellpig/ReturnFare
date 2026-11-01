@@ -88,7 +88,7 @@ test('UI real player flow: walks D1-D3, readonly preview equality, free compare 
 
   const previewDialog = page.locator('dialog.slot-preview-dialog');
   await expect(previewDialog).toBeVisible();
-  await expect(previewDialog.getByText('無可放置卡片')).toBeVisible();
+  await expect(previewDialog.getByText('目前沒有可放的卡。')).toBeVisible();
 
   // Close preview dialog
   await previewDialog.getByRole('button', { name: '關閉' }).click();
@@ -205,6 +205,13 @@ test('UI real player flow: walks D1-D3, readonly preview equality, free compare 
 
   // Protagonist card is STILL in hand!
   await expect(handPanel.locator('[data-testid="card-protagonist"]')).toBeVisible();
+
+  // Preview of another protagonist slot shows the Chinese reason, never the raw code; Escape closes it
+  await page.locator('[data-testid="slot-handle_couple"]').click({ button: 'right' });
+  await expect(previewDialog).toContainText('理由：本時段行動已用完');
+  await expect(previewDialog).not.toContainText('action_spent');
+  await page.keyboard.press('Escape');
+  await expect(previewDialog).toHaveCount(0);
 
   // State inspection: action_spent is true, slots_placed has both slots
   const finalState = await page.evaluate(() => {

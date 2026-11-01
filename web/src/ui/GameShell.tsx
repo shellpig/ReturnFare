@@ -124,7 +124,13 @@ export function GameShell({ game }: { game: Game }) {
           : null,
       );
     } else {
-      setError(result.reason_text || result.reason_code);
+      setError(
+        strings.placeFailed(
+          result.reason_text ||
+            strings.reasonCodes[result.reason_code] ||
+            result.reason_code,
+        ),
+      );
     }
   }
 

@@ -114,6 +114,26 @@ describe('planEffects (W5-B)', async () => {
     expect(discardProtagonist.nextState.run.hand).toEqual(state.run.hand);
   });
 
+  it('losing a known card that is not held is a no-op like effect_apply.gd, while unknown ids still reject', () => {
+    const state = createInitialSnapshot();
+    state.flow.mode = 'run';
+    state.run.hand = ['protagonist'];
+
+    const plan = planEffects(
+      [{ text: '後續照常', lose: ['k_not_today'], flag: { after_missing_lose: true } }],
+      state,
+      data,
+    );
+    expect(plan.ok).toBe(true);
+    expect(plan.lines).toEqual(['後續照常']);
+    expect(plan.nextState.run.flags.after_missing_lose).toBe(true);
+    expect(plan.nextState.run.hand).toEqual(['protagonist']);
+
+    const unknown = planEffects([{ lose: ['no_such_card'] }], state, data);
+    expect(unknown.ok).toBe(false);
+    expect(unknown.reason_code).toBe('data_conflict');
+  });
+
   it('accumulates relation and switch_progress additively per block', () => {
     const state = createInitialSnapshot();
     state.flow.mode = 'run';

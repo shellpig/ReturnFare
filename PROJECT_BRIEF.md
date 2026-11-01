@@ -4,7 +4,7 @@
 
 最後更新：2026-10-31
 
-> **當前進度（以網頁版為主，Godot 版已凍結）**：專案已拍板轉向**純網頁版（TypeScript + Vite + React）**。`docs/web/` 下的 [網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md) 與 **W1～W7 實作契約**已全數立定；**W1 骨架與軌跡基線（W1-A 網頁骨架與資料同步、W1-B Godot 黃金軌跡產生器、W1-C 軌跡比對器）已全部完成並通過驗收**，詳見 [W1 紀錄](docs/records/W1實作紀錄.md)，**W2 資料層（W2-A 資料載入與 TS 型別、W2-B build-time 資料 lint）亦已全部完成並通過驗收**，詳見 [W2 紀錄](docs/records/W2實作紀錄.md)；**W3 第一個畫面（W3-B GameState 與初期推進規則、W3-A 開局與純演出 UI）亦已全部完成並通過驗收**，詳見 [W3 紀錄](docs/records/W3實作紀錄.md)；**W4 地圖與面板（W4-A 完整條件求值器、W4-B 白天地圖與地點面板）亦已全部完成並通過驗收**，詳見 [W4 紀錄](docs/records/W4實作紀錄.md)；**W5-A 卡片、手牌與知識已完成並通過驗收**，詳見 [W5 紀錄](docs/records/W5實作紀錄.md)；其餘子階段仍為 📐 規格可實作。`web/public/art/` 已備妥小鎮地圖與 13 張白天地點場景圖（WebP），`web/prototype/` 已放入示意版原型。Godot 原版（P1～P5 機器層全綠、T-01～T-04 完工、36 套 headless 與 94 條 UI 契約全綠）**現已凍結為唯讀對照基準，其狀態與進度暫不理會**。**下一步：實作 `W5-B`（交易、放置、預覽與行動格）。**
+> **當前進度（以網頁版為主，Godot 版已凍結）**：專案已拍板轉向**純網頁版（TypeScript + Vite + React）**。`docs/web/` 下的 [網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md) 與 **W1～W7 實作契約**已全數立定；**W1 骨架與軌跡基線（W1-A 網頁骨架與資料同步、W1-B Godot 黃金軌跡產生器、W1-C 軌跡比對器）已全部完成並通過驗收**，詳見 [W1 紀錄](docs/records/W1實作紀錄.md)，**W2 資料層（W2-A 資料載入與 TS 型別、W2-B build-time 資料 lint）亦已全部完成並通過驗收**，詳見 [W2 紀錄](docs/records/W2實作紀錄.md)；**W3 第一個畫面（W3-B GameState 與初期推進規則、W3-A 開局與純演出 UI）亦已全部完成並通過驗收**，詳見 [W3 紀錄](docs/records/W3實作紀錄.md)；**W4 地圖與面板（W4-A 完整條件求值器、W4-B 白天地圖與地點面板）亦已全部完成並通過驗收**，詳見 [W4 紀錄](docs/records/W4實作紀錄.md)；**W5-A 卡片、手牌與知識、W5-B 交易、放置、預覽與行動格已完成並通過驗收**，詳見 [W5 紀錄](docs/records/W5實作紀錄.md)；其餘子階段仍為 📐 規格可實作。`web/public/art/` 已備妥小鎮地圖與 13 張白天地點場景圖（WebP），`web/prototype/` 已放入示意版原型。Godot 原版（P1～P5 機器層全綠、T-01～T-04 完工、36 套 headless 與 94 條 UI 契約全綠）**現已凍結為唯讀對照基準，其狀態與進度暫不理會**。**下一步：實作 `W5-C`（choice_group 互斥選擇）。**
 
 ---
 
@@ -71,7 +71,7 @@
 | W4-B 地圖、地點面板與卡槽三態 | ✅ | `a7c33f8`；白天地圖、地點簡介、逐段演出與唯讀卡槽完成；相關 Node 5／5、UI 3／3、build、W3 軌跡 5／187 欄位 0 diff 與 LOCKED 傳導變異通過；測試注入入口已隔離，詳見 [驗收紀錄](docs/records/W4_steps/W4-B.md) |
 | **W5 能玩** | — | 詳見 [`docs/web/W5實作契約.md`](docs/web/W5實作契約.md) |
 | W5-A 手牌、卡片實體化與知識分離 | ✅ | `68ba95e`；手牌／知識分區、主角卡不可移除、卡片與知識唯讀詳情完成；npm test 79／79、test:ui 7／7、build、W3 軌跡 5／187 欄位 0 diff 與規則變異通過；narration.spec 斷言已隨手牌面板修正，詳見 [驗收紀錄](docs/records/W5_steps/W5-A.md) |
-| W5-B `EffectApply`、放卡結算與行動格 | 📐 | 預覽、放卡結算、基礎效果套用、行動格消耗（可從開局玩到 D3 evening） |
+| W5-B `EffectApply`、放卡結算與行動格 | ✅ | `8b9ca03`；預覽、放卡結算、基礎效果交易、行動格消耗，可從開局玩到 D3 evening；npm test 96／96、test:ui 8／8、build、W5 軌跡 12／560 與 W3 5／187 欄位 0 diff 與行動格變異通過；拒絕碼中文化等 1 項 P2／3 項 P3 已修正，詳見 [驗收紀錄](docs/records/W5_steps/W5-B.md) |
 | W5-C `choice_group` 互斥選擇 | 📐 | 互斥選擇題（直接選擇與帶卡選擇）、選定即定案與唯讀 RESOLVED 展示 |
 | **W6 全套規則** | — | 施工順序 E1 → A → B → C → D → E2，詳見 [`docs/web/W6實作契約.md`](docs/web/W6實作契約.md) |
 | W6-A 夜間地點與發狂時鐘 | 📐 | 夜間 28 地點進入規則、終身首次收費、對位確認、`madness_clock` 倒數與視野門檻 |
@@ -149,6 +149,8 @@ $traceRevisionW1 = git rev-parse HEAD
 
 ## 近期動態與下一步
 
+- **2026-11-01**：**W5-B 完成並通過驗收**（`8b9ca03`）。verifier 於 `main@8b9ca03` 驗收：放卡判斷、預覽、推進提示與 `game_state.gd` 逐行一致，效果在 draft 上原子提交、未完成機制整筆拒絕；`npm test` 13 files／96 tests、build、`test:ui` 8／8 皆 exit 0，W5 軌跡 12 checkpoints／560 fields、W3 5／187 皆 0 diff，正式產物無測試注入。首輪 P2：預覽與放卡失敗把英文拒絕碼顯示給玩家，改照 Godot `_REASON_CODE_TEXTS` 轉中文；P3：字串來源與空清單原文、彈窗改 modal 可 Escape 關閉、effect 內 lose 未持有的已知卡改為 no-op、`action_cost` 與 `consume_action` 記帳拆開。三組變異（行動格、拒絕碼對照、lose no-op）均轉紅、還原後全綠。未跑 Godot。詳見 [W5-B 紀錄](docs/records/W5_steps/W5-B.md)；下一步 W5-C。
+
 - **2026-11-01**：**W5-A 完成並通過驗收**（`68ba95e`）。verifier 於 `main@91b4a0d` 驗收：卡片規則與 `game_state.gd` 逐分支一致，手牌面板可見性與 Godot HandBar 相同；`npm test` 11 files／79 tests、build、`test:ui` 7／7 皆 exit 0，W3 前綴 5 checkpoints／187 fields、0 diff，正式產物無測試注入標記。首輪 P2：`narration.spec.ts` 以全頁按鈕數守純演出，被新增的手牌面板打紅；經使用者授權由 verifier 將兩處斷言縮為排除手牌面板並複驗，額外按鈕變異仍會轉紅。將知識計入佔格的變異使 cards.test 轉紅、還原後全綠。未跑 Godot。詳見 [W5-A 紀錄](docs/records/W5_steps/W5-A.md)；下一步 W5-B。
 
 - **2026-10-31**：**W4-B 完成並通過驗收，W4 整體關門**（`a7c33f8`）。verifier 於乾淨的 `main@548710c` 複驗 W4-B 全範圍：僅執行相關 `panel.test.ts` 5／5 與 Playwright `map-panel.spec.ts`、`narration.spec.ts` 3／3，build exit 0，W3 前綴 5 checkpoints／187 fields、0 diff。原 P2「測試快照注入進入正式產物」已修正：Game API 與正式 bundle 均無注入入口，可信快照由 Playwright 路由攔截在測試內注入；移除 beat LOCKED 下傳的記憶體變異使對應斷言轉紅，取消後相關 Node 5／5 恢復全綠。未發現其他阻擋或非阻擋問題；未跑全套 Node／UI 或 Godot 測試。詳見 [W4-B 紀錄](docs/records/W4_steps/W4-B.md)；下一步 W5-A。
@@ -171,4 +173,4 @@ $traceRevisionW1 = git rev-parse HEAD
   - 建立 `web/public/art/`，放入小鎮地圖 `town.webp` 與 13 張白天地點場景圖（WebP），並於 `web/prototype/` 放入示意版原型與座標校準工具。
 - **2026-08-30 ～ 2026-08-31（Godot 基準封存前最後更新）**：完成 P5-F 機器層關門、T-01 測試文案解耦、T-02 全 12 檔套語清理、D1 上午／下午純演出時段、T-03 白天地圖空點解鎖與 20 個白天地點 `desc`（含 `c1acc73` B1–B5 修正）、T-04 夜間 28 個地點 `desc` 與防劇透 Lint 22（`49ab0c7`，Godot headless 共 36 套全綠）。
 - **後續方向**：W-01～W-06 已全數定案，見 `待決事項.md` 第六節；目前美術方向沿用，W7 先完成繁體中文版，再規劃多語系；不考慮 Steam 或 Godot 存檔相容，Godot 維持凍結。
-- **下一步**：依 [`docs/web/W5實作契約.md`](docs/web/W5實作契約.md) 實作 **W5-B（交易、放置、預覽與行動格）**；W1～W4 與 W5-A 已完成驗收，不重做已驗收規則或重產基線。
+- **下一步**：依 [`docs/web/W5實作契約.md`](docs/web/W5實作契約.md) 實作 **W5-C（choice_group 互斥選擇）**；W1～W4 與 W5-A／B 已完成驗收，不重做已驗收規則或重產基線。

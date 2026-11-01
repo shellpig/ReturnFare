@@ -11,7 +11,8 @@
 
 import type { Condition, Effect, GameData } from '../data/types';
 import { EFFECT_KEYS } from '../data/vocabulary';
-import { gainCard, loseCard } from './cards';
+import { gainCard, hasCard, loseCard } from './cards';
+import { cardBaseId } from './facts';
 import { ConditionError, UnsupportedConditionError, evalCondition } from './condition';
 import { cloneSnapshot } from './run-initialization';
 import type { GameSnapshot, ReasonCode } from './state-types';
@@ -213,7 +214,17 @@ export function planEffects(
         draft,
         originalState: state,
         data,
-        mutate: (cid, perm) => loseCard(draft, cid, data, perm),
+        // 對齊 effect_apply.gd：lose_card 找不到卡只報資料錯，不中止效果；
+        // 未持有的已知卡視為 no-op（永久失去的 meta 仍由 loseCard 處理）。
+        mutate: (cid, perm) => {
+          if (!hasCard(draft, cid) && data.cardsById.has(cardBaseId(cid))) {
+            if (perm) {
+              loseCard(draft, cid, data, perm);
+            }
+            return { ok: true, reason_code: '', reason_text: '' };
+          }
+          return loseCard(draft, cid, data, perm);
+        },
       });
       if (errPlan !== null) {
         return errPlan;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { TriState, type PanelView, type SlotView as SlotViewModel } from '../core/panel';
 import type { Game } from '../core/state-types';
 import { SlotView } from './SlotView';
@@ -19,6 +19,42 @@ const SCENE_ART_LOCATIONS = new Set([
   'sanquan',
   'temple',
 ]);
+
+/** 與 CardDetail 相同以 showModal 開啟，Escape 走 onCancel 關閉。 */
+function ModalDialog({
+  className,
+  labelledBy,
+  onClose,
+  children,
+}: {
+  className: string;
+  labelledBy: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (el && !el.open) {
+      el.showModal();
+    }
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className={className}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      aria-labelledby={labelledBy}
+    >
+      {children}
+    </dialog>
+  );
+}
 
 export function LocationPanel({
   game,
@@ -137,11 +173,10 @@ export function LocationPanel({
       )}
 
       {pickerTarget && (
-        <dialog
-          open
+        <ModalDialog
           className="card-picker-dialog"
-          onCancel={() => setPickerTarget(null)}
-          aria-labelledby="picker-dialog-title"
+          labelledBy="picker-dialog-title"
+          onClose={() => setPickerTarget(null)}
         >
           <h3 id="picker-dialog-title">
             {strings.placeCard}：{pickerTarget.slot.label}
@@ -205,15 +240,14 @@ export function LocationPanel({
               </div>
             );
           })()}
-        </dialog>
+        </ModalDialog>
       )}
 
       {previewTarget && (
-        <dialog
-          open
+        <ModalDialog
           className="slot-preview-dialog"
-          onCancel={() => setPreviewTarget(null)}
-          aria-labelledby="preview-dialog-title"
+          labelledBy="preview-dialog-title"
+          onClose={() => setPreviewTarget(null)}
         >
           <h3 id="preview-dialog-title">
             {strings.preview}：{previewTarget.slot.label}
@@ -243,7 +277,9 @@ export function LocationPanel({
                     <p className="story">{strings.noPlaceableCards}</p>
                     {preview.reason && (
                       <p className="reason preview-reason">
-                        {strings.previewReason(preview.reason)}
+                        {strings.previewReason(
+                          strings.reasonCodes[preview.reason] ?? preview.reason,
+                        )}
                       </p>
                     )}
                   </div>
@@ -260,7 +296,7 @@ export function LocationPanel({
               </div>
             );
           })()}
-        </dialog>
+        </ModalDialog>
       )}
     </section>
   );

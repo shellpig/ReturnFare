@@ -137,15 +137,19 @@ function applyBookkeepingOnDraft(
   if (bk.slot_key) {
     target.run.slots_placed[bk.slot_key] = true;
   }
+  // 對齊 _apply_bookkeeping：consume_action 與 action_cost 是兩條獨立記帳。
   if (bk.consume_action) {
     target.run.action_spent = true;
-    const cost = bk.action_cost ?? 1;
-    if (cost > 1) {
-      target.run.actions_spent_ahead += cost - 1;
-    }
     if (bk.attention_npc) {
       target.run.npc_action_counts[bk.attention_npc] =
         (target.run.npc_action_counts[bk.attention_npc] ?? 0) + 1;
+    }
+  }
+  const actionCost = bk.action_cost ?? 0;
+  if (actionCost > 0) {
+    target.run.action_spent = true;
+    if (actionCost > 1) {
+      target.run.actions_spent_ahead += actionCost - 1;
     }
   }
   if (bk.day_location_visited) {
