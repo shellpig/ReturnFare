@@ -7,6 +7,12 @@
 
 import type { Phase } from '../data/types';
 import type { EndingView } from './ending';
+import type {
+  AlignmentOffer,
+  AlignmentResult,
+  NightLocationSummary,
+  ResolvedNightContent,
+} from './night';
 import type { MapLocationView, PanelView } from './panel';
 
 export type FlowMode = 'opening' | 'run' | 'ending';
@@ -53,6 +59,18 @@ export type ReasonCode =
   | 'not_person'
   | 'already_delegated_today'
   | 'already_resolved'
+  | 'not_night'
+  | 'overloaded'
+  | 'unknown_location'
+  | 'not_night_layer'
+  | 'teaser'
+  | 'too_early'
+  | 'already_chosen'
+  | 'already_slept'
+  | 'not_day_phase'
+  | 'not_day_layer'
+  | 'no_seen_row'
+  | 'already_known'
   | 'invalid_save_shape'
   | 'data_conflict'
   | 'not_implemented';
@@ -170,6 +188,9 @@ export interface OpeningOptionView {
   readonly reason_text: string;
 }
 
+/** 夜間主按鈕的三態（scenes/main.gd）：尚未選地點＝sleep、已到訪＝end_night、睡覺停拍後＝next_day。 */
+export type NightAdvanceStage = 'sleep' | 'end_night' | 'next_day';
+
 /** 當前時段純演出與狀態投影 */
 export interface PhaseView {
   readonly day: number;
@@ -180,6 +201,8 @@ export interface PhaseView {
   readonly lines: readonly string[];
   readonly can_advance: boolean;
   readonly canAdvance: boolean;
+  /** 非夜間為 null；夜間由 night_sleep_pending／night_location_chosen 衍生。 */
+  readonly night_advance: NightAdvanceStage | null;
 }
 
 /** 一般變更操作的回傳結果 */
@@ -247,6 +270,11 @@ export interface Game {
   hasAnyLegalAction(): boolean;
   hasUnseenContent(): boolean;
   advancePhase(): AdvanceResult;
+  nightLocationSummary(locationId: string): NightLocationSummary;
+  resolvedNightContent(locationId: string): ResolvedNightContent;
+  enterNightLocation(locationId: string): MutationResult;
+  alignmentOffer(dayLocationId: string): AlignmentOffer;
+  confirmNightAlignment(dayLocationId: string): AlignmentResult;
   endingView(): EndingView;
   hasSeenEnding(endingId: string): boolean;
   revealEndingPage(): MutationResult;

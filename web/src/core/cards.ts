@@ -10,7 +10,7 @@
  * - knowledgeView(state, data)：當前知識清單投影（保持取得順序）
  * - gainCard(state, cardId, data)：
  *   - slotless:true → 寫入 meta.knowledge（冪等）
- *   - type === 'madness' → 守衛回傳 not_implemented（W6 接手 cap／BE）
+ *   - type === 'madness' → 新增實例 madness#N 並建立倒數（共用 madness.ts primitive；上限由呼叫端檢查）
  *   - 其餘佔格卡 → unique（已持有則 no-op），loop_persistent:true 同步寫入 meta.loop_persistent_item_ids，加入 run.hand
  * - loseCard(state, cardId, data, permanent)：
  *   - 主角卡不可丟棄（data_conflict，零副作用）
@@ -21,6 +21,7 @@
 
 import type { GameData } from '../data/types';
 import { cardBaseId } from './facts';
+import { gainMadnessCardOnDraft } from './madness';
 import type {
   CardView,
   DeepReadonly,
@@ -57,6 +58,14 @@ export function hasKnowledge(
 /** 手牌佔格數（hand 內每個元素佔一格；knowledge 不算）。 */
 export function handSlotsUsed(state: DeepReadonly<GameSnapshot>): number {
   return state.run.hand.length;
+}
+
+/** 手牌超載：佔格數超過 tuning.hand_size（對應 GameState.is_overloaded）。 */
+export function isOverloaded(
+  state: DeepReadonly<GameSnapshot>,
+  data: GameData,
+): boolean {
+  return handSlotsUsed(state) > Number(data.tuning.hand_size);
 }
 
 /** 單張卡面或知識項目的唯讀投影。 */
@@ -104,8 +113,8 @@ export function knowledgeView(
 
 /**
  * 取得卡片（在傳入的 state 或 draft 上直接變更）。
- * 支援 slotless 知識卡與一般佔格卡（含 protagonist、loop_persistent）；
- * madness 多實例與倒數／上限由 W6 接手，此處保留 not_implemented 守衛。
+ * 支援 slotless 知識卡、一般佔格卡（含 protagonist、loop_persistent）與 madness 多實例；
+ * madness 只發卡與建倒數，不檢查上限——上限由呼叫端以 madness.ts 的 madnessCapRequest 統一處理。
  */
 export function gainCard(
   state: GameSnapshot,
@@ -129,11 +138,8 @@ export function gainCard(
   }
 
   if (card.type === 'madness') {
-    return {
-      ok: false,
-      reason_code: 'not_implemented',
-      reason_text: 'madness 實例與倒數計時將於 W6 實作',
-    };
+    gainMadnessCardOnDraft(state, data, cardId);
+    return { ok: true, reason_code: '', reason_text: '' };
   }
 
   // 其餘佔格卡：unique（已在 hand 或 knowledge 內即為冪等 no-op）

@@ -5,6 +5,7 @@
  * - 使用 trace-entry.ts 的 createRunForTrace(data)
  * - W3: 記錄 seq 0 (run_start) 與 D1 四個時段收尾 checkpoint (seq 1～4)
  * - W5: 記錄 seq 0 (run_start) + D1/D2 四個時段收尾 (seq 1～8) + D3 morning/afternoon/evening (seq 9～11)
+ * - W6-A: 夜間一律走 executeGreedyNightPhase（fixed → 查可進地點 → 進入），睡覺停拍由 advanceGreedyPhase 吸收
  */
 
 import type { GameData } from '../../src/data/types';
@@ -52,6 +53,90 @@ export function assertNightFixedPlayback(
   }
 }
 
+/** 這次 playNightFixed 是否實際播出了掛在 night-layer 地點上的 fixed beat（即強制到訪）。 */
+function playedNightLayerFixed(
+  before: DeepReadonly<GameSnapshot>,
+  after: DeepReadonly<GameSnapshot>,
+  data: GameData,
+): boolean {
+  return Object.keys(after.run.beats_entered).some((bid) => {
+    if (!after.run.beats_entered[bid] || before.run.beats_entered[bid]) {
+      return false;
+    }
+    const b = data.beatsById.get(bid);
+    return (
+      b?.fixed === true && data.locationsById.get(b.location)?.layer === 'night'
+    );
+  });
+}
+
+/**
+ * 夜間走法（對照 Godot playthrough_greedy.gd execute_night_phase）：
+ * 1. 先 playNightFixed（fixed／遭遇）。
+ * 2. 只有本次實際播出 night-layer fixed 並強制到訪，才套 chosen／seen 斷言，並確認沒有第二個可進地點；
+ *    meta_once 已看而未播不佔名額，不靠日期特例略過。
+ * 3. 其餘夜晚查正式夜間地點：優先未 seen 的收費 row，否則依來源順序第一個可進的，進入後播 OPEN beat。
+ */
+export function executeGreedyNightPhase(game: Game, data: GameData): void {
+  const { day } = game.getSnapshot().run;
+  const beforeNf = game.getSnapshot();
+  const nfRes = game.playNightFixed();
+  if (!nfRes.ok) {
+    throw new Error(
+      `[D${day} night] playNightFixed 失敗：${nfRes.reason_code} (${nfRes.reason_text})`,
+    );
+  }
+  const afterNf = game.getSnapshot();
+  const locationIds = game.availableLocations();
+
+  if (playedNightLayerFixed(beforeNf, afterNf, data)) {
+    assertNightFixedPlayback(beforeNf, afterNf, data);
+    const second = locationIds.filter((id) => game.nightLocationSummary(id).can_enter);
+    if (second.length > 0) {
+      throw new Error(`[D${day} night] 強制到訪後仍有可進地點：${second.join(',')}`);
+    }
+    return;
+  }
+
+  const enterable = locationIds.filter((id) => game.nightLocationSummary(id).can_enter);
+  const unseenPaid = enterable.find(
+    (id) =>
+      (data.locationsById.get(id)?.madness_cost ?? 0) > 0 &&
+      !afterNf.meta.night_locations_seen[id],
+  );
+  const chosen = unseenPaid ?? enterable[0];
+  if (chosen === undefined) {
+    return;
+  }
+  const entry = game.enterNightLocation(chosen);
+  if (!entry.ok) {
+    throw new Error(`[D${day} night] enterNightLocation(${chosen}) 失敗：${entry.reason_code}`);
+  }
+  if (game.getSnapshot().flow.mode !== 'run') {
+    return;
+  }
+  for (const beatView of game.buildPanel(chosen).beats) {
+    if (beatView.tri !== TriState.OPEN) continue;
+    const res = game.playBeat(beatView.id);
+    if (!res.ok) {
+      throw new Error(`playBeat 失敗：${beatView.id}: ${res.reason_text}`);
+    }
+  }
+}
+
+/** 推進一個時段；夜間睡覺停拍（phase_advanced:false）時再按一次「進入隔天」。 */
+function advanceGreedyPhase(game: Game, day: number, phase: string): void {
+  let advRes = game.advancePhase();
+  if (advRes.ok && !advRes.phase_advanced && game.getPhaseView().night_advance === 'next_day') {
+    advRes = game.advancePhase();
+  }
+  if (!advRes.ok || !advRes.phase_advanced) {
+    throw new Error(
+      `[D${day} ${phase}] advancePhase 失敗：${advRes.reason_code} (${advRes.reason_text})`,
+    );
+  }
+}
+
 export function runGreedyW3(data: GameData): GreedyWalkResult {
   const game = createRunForTrace(data);
   const checkpoints: GreedyCheckpoint[] = [];
@@ -85,25 +170,13 @@ export function runGreedyW3(data: GameData): GreedyWalkResult {
         );
       }
     } else if (phase === 'night') {
-      const beforeNf = game.getSnapshot();
-      const nfRes = game.playNightFixed();
-      if (!nfRes.ok) {
-        throw new Error(
-          `[D${day} ${phase}] playNightFixed 失敗：${nfRes.reason_code} (${nfRes.reason_text})`,
-        );
-      }
-      assertNightFixedPlayback(beforeNf, game.getSnapshot(), data);
+      executeGreedyNightPhase(game, data);
     }
 
     // 記錄該時段收尾（在 advancePhase 之前）
     recordCheckpoint('phase_end');
 
-    const advRes = game.advancePhase();
-    if (!advRes.ok || !advRes.phase_advanced) {
-      throw new Error(
-        `[D${day} ${phase}] advancePhase 失敗：${advRes.reason_code} (${advRes.reason_text})`,
-      );
-    }
+    advanceGreedyPhase(game, day, phase);
   }
 
   return { game, checkpoints };
@@ -201,14 +274,7 @@ export function runGreedyW5(data: GameData): GreedyWalkResult {
         );
       }
     } else if (phase === 'night') {
-      const beforeNf = game.getSnapshot();
-      const nfRes = game.playNightFixed();
-      if (!nfRes.ok) {
-        throw new Error(
-          `[D${day} ${phase}] playNightFixed 失敗：${nfRes.reason_code} (${nfRes.reason_text})`,
-        );
-      }
-      assertNightFixedPlayback(beforeNf, game.getSnapshot(), data);
+      executeGreedyNightPhase(game, data);
     }
 
     // 記錄該時段收尾 checkpoint (seq 1..11)
@@ -219,12 +285,7 @@ export function runGreedyW5(data: GameData): GreedyWalkResult {
       break;
     }
 
-    const advRes = game.advancePhase();
-    if (!advRes.ok || !advRes.phase_advanced) {
-      throw new Error(
-        `[D${day} ${phase}] advancePhase 失敗：${advRes.reason_code} (${advRes.reason_text})`,
-      );
-    }
+    advanceGreedyPhase(game, day, phase);
   }
 
   return { game, checkpoints };

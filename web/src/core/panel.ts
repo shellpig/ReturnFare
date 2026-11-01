@@ -10,6 +10,7 @@ import type { GameData } from '../data/types';
 import { strings } from '../ui/strings';
 import { evalCondition } from './condition';
 import { beatsAt, chapterForDay, isNarrationOnlyPhase } from './facts';
+import { nightBeatList, nightLocationSummary, resolveNightBeats } from './night';
 import type { DeepReadonly, GameSnapshot } from './state-types';
 
 export const TriState = {
@@ -31,6 +32,8 @@ export interface MapLocationView {
 export interface PanelView {
   location: { id: string; name: string; desc: string };
   beats: readonly BeatView[];
+  /** 夜間合法地點沒有任何可顯示的 beat：UI 顯示通用空結果，不是假 beat。 */
+  empty_result: boolean;
 }
 
 export interface BeatView {
@@ -131,17 +134,45 @@ export function remainingActionsToday(
 }
 
 /**
- * 回傳目前時段在白天地圖上開放的地點 ID 清單（依 data.locations 定義順序）。
+ * 夜間清單：一般 row 看 earliest_night ≤ 當天，teaser 看 chapter ≤ 當章；
+ * earliest_night 由早至晚、同夜照資料順序（穩定排序，狀態改變不跳位）。
+ * 當夜已選或已睡也不從清單移除，location requires 不成立也保留（對應 PanelBuilder.available_locations）。
+ */
+function availableNightLocations(
+  state: DeepReadonly<GameSnapshot> | Readonly<GameSnapshot>,
+  data: GameData,
+): readonly string[] {
+  const curChapter = chapterForDay(state.run.day);
+  const visible: { id: string; earliest: number; index: number }[] = [];
+  data.locations.forEach((loc, index) => {
+    if (loc.layer !== 'night') {
+      return;
+    }
+    const earliest = loc.earliest_night ?? 999;
+    const isVisible =
+      loc.teaser_only === true
+        ? (loc.chapter ?? 1) <= curChapter
+        : earliest <= state.run.day;
+    if (isVisible) {
+      visible.push({ id: loc.id, earliest, index });
+    }
+  });
+  visible.sort((a, b) => a.earliest - b.earliest || a.index - b.index);
+  return visible.map((v) => v.id);
+}
+
+/**
+ * 回傳目前時段開放的地點 ID 清單：白天依 data.locations 定義順序，夜間見 availableNightLocations。
  * 對應 Godot GameState.available_locations()。
  */
 export function availableLocations(
   state: DeepReadonly<GameSnapshot> | Readonly<GameSnapshot>,
   data: GameData,
 ): readonly string[] {
-  if (
-    state.run.phase === 'night' ||
-    isNarrationOnlyPhase(state.run.day, state.run.phase)
-  ) {
+  if (state.run.phase === 'night') {
+    return availableNightLocations(state, data);
+  }
+  if (isNarrationOnlyPhase(state.run.day, state.run.phase)) {
     return [];
   }
 
@@ -202,12 +233,13 @@ export function buildPanel(
     desc: loc?.desc ?? '',
   };
 
+  // 夜間只讀唯一有狀態解析入口（K-30）；其餘時段直接取當時段掛在該地點的 beat。
   const candidateBeats =
     state.run.phase !== 'night'
       ? beatsAt(data.beats, state.run.day, state.run.phase).filter(
           (b) => b.location === locationId,
         )
-      : [];
+      : nightBeatList(resolveNightBeats(state, locationId, data));
 
   const beatsResult: BeatView[] = [];
 
@@ -343,11 +375,13 @@ export function buildPanel(
   return {
     location: locationInfo,
     beats: beatsResult,
+    empty_result: state.run.phase === 'night' && beatsResult.length === 0,
   };
 }
 
 /**
- * 回傳目前時段白天地圖的地點顯示清單（對應 Godot scenes/ui/map_list.gd:26–43）。
+ * 回傳目前時段地圖的地點顯示清單（對應 Godot scenes/ui/map_list.gd:26–43）。
+ * 白天：有可見 beat 或曾到訪才啟用；夜間：名稱＋狀態文字，所有 row 皆可點開詳情（不啟用與否看詳情的進入鈕）。
  * 純查詢，絕不寫入 day_locations_visited。
  */
 export function mapView(
@@ -355,6 +389,18 @@ export function mapView(
   data: GameData,
 ): readonly MapLocationView[] {
   const locIds = availableLocations(state, data);
+  if (state.run.phase === 'night') {
+    return locIds.map((locId) => {
+      const summary = nightLocationSummary(state, locId, data);
+      const loc = data.locationsById.get(locId);
+      return {
+        id: locId,
+        name: strings.nightListEntry(summary.display_name, summary.status_text),
+        enabled: true,
+        ...(loc?.map ? { map: { x: loc.map.x, y: loc.map.y } } : {}),
+      };
+    });
+  }
   return locIds.map((locId) => {
     const loc = data.locationsById.get(locId);
     const panel = buildPanel(locId, state, data);

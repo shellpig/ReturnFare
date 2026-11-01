@@ -207,29 +207,53 @@ describe('planEffects (W5-B)', async () => {
     expect(badPlan.reason_code).toBe('data_conflict');
   });
 
-  it('atomically rolls back all earlier gains, flags, and lines if a later unimplemented effect (madness, festival_proxy) is encountered', () => {
+  it('atomically rolls back all earlier gains, flags, and lines if a later unimplemented effect (festival_proxy) is encountered', () => {
     const state = createInitialSnapshot();
     state.flow.mode = 'run';
     state.run.hand = ['protagonist'];
     const originalSerialized = JSON.stringify(state);
 
-    // 1. Encountering madness after text, gain, and flag
+    // 1. madness effect (W6-A): applied in fixed key order after text/lose/gain/relation, before flag; each card gets its own full countdown
     const madnessPlan = planEffects(
       [
         {
-          text: '這段文字不該外洩',
+          text: '這段文字照常輸出',
           gain: ['info_husband_version'],
-          flag: { leaked_flag: true },
-          madness: 1,
+          flag: { madness_flag: true },
+          madness: 2,
         },
       ],
       state,
       data,
     );
-    expect(madnessPlan.ok).toBe(false);
-    expect(madnessPlan.reason_code).toBe('not_implemented');
-    expect(madnessPlan.lines).toEqual([]);
-    expect(JSON.stringify(madnessPlan.nextState)).toBe(originalSerialized);
+    expect(madnessPlan.ok).toBe(true);
+    expect(madnessPlan.lines).toEqual(['這段文字照常輸出']);
+    expect(madnessPlan.endingRequest).toBeNull();
+    expect(madnessPlan.nextState.run.hand).toEqual([
+      'protagonist',
+      'info_husband_version',
+      'madness#1',
+      'madness#2',
+    ]);
+    expect(madnessPlan.nextState.run.madness_clock).toEqual({
+      'madness#1': data.tuning.madness_countdown_days,
+      'madness#2': data.tuning.madness_countdown_days,
+    });
+    expect(madnessPlan.nextState.run.flags.madness_flag).toBe(true);
+    expect(JSON.stringify(state)).toBe(originalSerialized);
+
+    // 1b. Invalid madness count (non-integer / negative) rejects the whole plan with zero leakage
+    for (const bad of [-1, 1.5, '2']) {
+      const badPlan = planEffects(
+        [{ text: '不該外洩', gain: ['info_husband_version'], madness: bad as unknown as number }],
+        state,
+        data,
+      );
+      expect(badPlan.ok).toBe(false);
+      expect(badPlan.reason_code).toBe('data_conflict');
+      expect(badPlan.lines).toEqual([]);
+      expect(JSON.stringify(badPlan.nextState)).toBe(originalSerialized);
+    }
 
     // 2. Encountering festival_proxy
     const proxyPlan = planEffects(
@@ -248,21 +272,33 @@ describe('planEffects (W5-B)', async () => {
     expect(proxyPlan.lines).toEqual([]);
     expect(JSON.stringify(proxyPlan.nextState)).toBe(originalSerialized);
 
-    // 3. Gain madness card directly
+    // 3. Direct gain of the madness card shares the same primitive; a later unimplemented key still rolls everything back
     const gainMadnessPlan = planEffects(
+      [{ text: '繞道取得發狂卡', gain: ['madness'] }],
+      state,
+      data,
+    );
+    expect(gainMadnessPlan.ok).toBe(true);
+    expect(gainMadnessPlan.nextState.run.hand).toEqual(['protagonist', 'madness#1']);
+    expect(gainMadnessPlan.nextState.run.madness_clock).toEqual({
+      'madness#1': data.tuning.madness_countdown_days,
+    });
+    const madnessThenProxy = planEffects(
       [
         {
-          text: '繞道取得發狂卡',
+          text: '這段文字不該外洩',
           gain: ['madness'],
+          madness: 1,
+          festival_proxy: { mode: 'fixed', npc: 'ajie' },
         },
       ],
       state,
       data,
     );
-    expect(gainMadnessPlan.ok).toBe(false);
-    expect(gainMadnessPlan.reason_code).toBe('not_implemented');
-    expect(gainMadnessPlan.lines).toEqual([]);
-    expect(JSON.stringify(gainMadnessPlan.nextState)).toBe(originalSerialized);
+    expect(madnessThenProxy.ok).toBe(false);
+    expect(madnessThenProxy.reason_code).toBe('not_implemented');
+    expect(madnessThenProxy.lines).toEqual([]);
+    expect(JSON.stringify(madnessThenProxy.nextState)).toBe(originalSerialized);
 
     // 4. Valid ending request (W6-E1: collected, not rejected) after an earlier block
     const validEndingPlan = planEffects(

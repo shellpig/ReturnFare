@@ -5,9 +5,11 @@
  * - 在獨立狀態複本（draft）上按固定順序預演：
  *   text → lose → gain → switch → switch_progress → relation → madness → flag → festival_proxy → ending
  * - W5 實作：text、lose、gain、switch、switch_progress、relation、flag。
+ * - W6-A 實作：madness 效果與直接 gain 發狂卡（共用 madness.ts 發卡 primitive）；每個區塊的 gain／madness
+ *   之後檢查發狂上限，撞 cap 只記錄第一個 madness_cap 請求，最後與明示 ending 合併成至多一個請求。
  * - W6-E1 實作：ending 只收集結局請求（source 固定 ending_effect），不在此啟動結局；
  *   同一動作提出兩個不同請求整筆 data_conflict。配對與快照由呼叫端的結局規劃驗證。
- * - 遇到未實作效果鍵（madness、festival_proxy）或未知鍵時，
+ * - 遇到未實作效果鍵（festival_proxy）或未知鍵時，
  *   整筆交易回傳 ok: false（not_implemented 或 data_conflict），零半套狀態、零已收集文字。
  */
 
@@ -16,6 +18,7 @@ import { EFFECT_KEYS } from '../data/vocabulary';
 import { gainCard, hasCard, loseCard } from './cards';
 import { cardBaseId } from './facts';
 import { ConditionError, UnsupportedConditionError, evalCondition } from './condition';
+import { gainMadnessCardOnDraft, madnessCapRequest } from './madness';
 import { cloneSnapshot } from './run-initialization';
 import type { GameSnapshot, ReasonCode } from './state-types';
 
@@ -179,6 +182,8 @@ export function planEffects(
   const draft = cloneSnapshot(state);
   const lines: string[] = [];
   let endingRequest: EndingRequest | null = null;
+  // 發狂上限請求：第一次撞 cap 就黏住（對齊 simulation 複本的 pending_ending_request），後續 lose 不撤回。
+  let capRequest: EndingRequest | null = null;
 
   for (let i = 0; i < blocks.length; i += 1) {
     const raw = blocks[i];
@@ -250,6 +255,8 @@ export function planEffects(
         return errPlan;
       }
     }
+    // gain 之後固定檢查上限（對齊 effect_apply.gd：不論本區塊有沒有 gain）。
+    capRequest = capRequest ?? madnessCapRequest(draft, data);
 
     // 4. switch
     if ('switch' in raw && raw.switch !== undefined) {
@@ -338,13 +345,24 @@ export function planEffects(
       draft.run.relations[npc] = (draft.run.relations[npc] ?? 0) + delta;
     }
 
-    // 7. madness（W6 接手）
+    // 7. madness：直接發 N 張發狂卡，之後檢查上限
     if ('madness' in raw && raw.madness !== undefined) {
-      return rejectPlan(
-        state,
-        'not_implemented',
-        'EffectApply: madness 效果將於 W6 實作',
-      );
+      const madnessCount = raw.madness;
+      if (
+        typeof madnessCount !== 'number' ||
+        !Number.isInteger(madnessCount) ||
+        madnessCount < 0
+      ) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: madness 必須為非負整數',
+        );
+      }
+      for (let m = 0; m < madnessCount; m += 1) {
+        gainMadnessCardOnDraft(draft, data);
+      }
+      capRequest = capRequest ?? madnessCapRequest(draft, data);
     }
 
     // 8. flag
@@ -406,6 +424,22 @@ export function planEffects(
       }
       endingRequest = { ending_id: raw.ending, source_id: EFFECT_ENDING_SOURCE };
     }
+  }
+
+  // 批次效果只派一個結局請求：發狂上限與明示 ending 不同時 data_conflict。
+  if (capRequest !== null) {
+    if (
+      endingRequest !== null &&
+      (endingRequest.ending_id !== capRequest.ending_id ||
+        endingRequest.source_id !== capRequest.source_id)
+    ) {
+      return rejectPlan(
+        state,
+        'data_conflict',
+        'EffectApply: 同一動作提出兩個不同的結局',
+      );
+    }
+    endingRequest = capRequest;
   }
 
   return {

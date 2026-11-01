@@ -58,7 +58,8 @@ test('D2 morning map and two-stage LocationPanel: plays OPEN beat first without 
     nights.find((b: { id: string }) => b.id === 'n_corridor_ch1').text,
   );
   await nextBtn.click();
-  await advanceBtn.click();
+  // W6-A：夜間已被 fixed 強制到訪，主按鈕為「結束今晚」
+  await page.getByRole('button', { name: '結束今晚' }).click();
 
   // Now at D2 morning: daytime map is visible
   await expect(page.locator('header')).toContainText('第 2 天');

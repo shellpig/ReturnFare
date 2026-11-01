@@ -70,3 +70,9 @@ dialog::backdrop { background: #251c16aa; }
 .ending-body { cursor: pointer; min-height: 14rem; }
 .ending-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .75rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d7cdbb; }
 .ending-page { margin-right: auto; color: #806e5a; font-size: .95rem; }
+.night-status { margin: 0 0 .75rem; color: #806e5a; font-size: .95rem; }
+.night-desc, .night-empty-result { margin: 1rem 0 1.5rem; }
+.night-warning { margin: .5rem 0 0; font-weight: bold; }
+.night-actions { display: flex; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d7cdbb; }
+.night-align-btn { margin: .25rem 0 1rem; }
+.night-align-dialog { max-width: 500px; width: 90vw; }

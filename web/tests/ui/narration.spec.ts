@@ -39,7 +39,9 @@ test('phone path displays each original passage through the first night', async 
   await read(beat('d1_ambient_couple').text);
   await phase();
   await read(nights.find((b: { id: string }) => b.id === 'n_corridor_ch1').text);
-  await phase();
+  // W6-A：D1 night 已被 fixed 強制到訪，夜間主按鈕改為「結束今晚」（scenes/main.gd），不再是通用的「推進時段」
+  await expect(advance).toHaveCount(0);
+  await page.getByRole('button', { name: '結束今晚' }).click();
   await expect(page.locator('header')).toContainText('第 2 天');
   const phaseAdvance = page.locator('.phase-actions button');
   await expect(phaseAdvance).toBeEnabled();

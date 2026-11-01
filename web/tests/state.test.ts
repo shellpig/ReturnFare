@@ -160,8 +160,12 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     expect(hasCard(draft, 'k_i_returned')).toBe(true);
     expect(hasKnowledge(draft, 'k_i_returned')).toBe(true);
 
-    // madness card gain is rejected in W3 with not_implemented
-    expect(gainCard(draft, 'madness', data).reason_code).toBe('not_implemented');
+    // madness card gain creates a countdown instance (W6-A); the cap is checked by the caller
+    expect(gainCard(draft, 'madness', data).ok).toBe(true);
+    expect(draft.run.hand).toEqual(['protagonist', 'item_family_album', 'madness#1']);
+    expect(draft.run.madness_clock['madness#1']).toBe(data.tuning.madness_countdown_days);
+    loseCard(draft, 'madness#1', data);
+    expect(draft.run.hand).toEqual(['protagonist', 'item_family_album']);
     // lose protagonist is rejected with data_conflict
     expect(loseCard(draft, 'protagonist', data).reason_code).toBe(
       'data_conflict',
@@ -195,7 +199,7 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
         {
           text: '這段文字不應流出',
           gain: ['k_not_today'],
-          madness: 1,
+          festival_proxy: { mode: 'fixed', npc: 'ajie' },
         },
       ],
       draft,
@@ -283,7 +287,7 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     expect(gateRes.reason_code).toBe('phase_requirements_incomplete');
     expect(JSON.stringify(gateGame.serialize())).toBe(gateBefore);
 
-    // 3. Night sleep check guard: when a sanquan sleep candidate exists on D1 night, before playNightFixed() (night_location_chosen === ''), Step 3 blocks advancePhase -> can_advance must be false; after playNightFixed() sets night_location_chosen, can_advance becomes true
+    // 3. Night sleep (W6-A): a resolved sanquan sleep beat stops the first advance (phase_advanced:false, night_sleep_pending) and the second advance changes day
     const sleepBeats = [
       ...data.beats,
       {
@@ -306,20 +310,46 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     expect(nightGame.playEvening().ok).toBe(true);
     expect(nightGame.advancePhase().ok).toBe(true); // -> D1 night
     expect(nightGame.getSnapshot().run.night_location_chosen).toBe('');
-    expect(nightGame.getPhaseView().can_advance).toBe(false);
-    const sleepAdvRes = nightGame.advancePhase();
-    expect(sleepAdvRes.ok).toBe(false);
-    expect(sleepAdvRes.reason_code).toBe('not_implemented');
-    expect(nightGame.playNightFixed().ok).toBe(true);
-    expect(nightGame.getSnapshot().run.night_location_chosen).toBe('n_corridor');
+    // 未選地點時 can_advance 為 true（直接睡），按下去只停拍、不換日
     expect(nightGame.getPhaseView().can_advance).toBe(true);
+    expect(nightGame.getPhaseView().night_advance).toBe('sleep');
+    const sleepAdvRes = nightGame.advancePhase();
+    expect(sleepAdvRes.ok).toBe(true);
+    expect(sleepAdvRes.phase_advanced).toBe(false);
+    expect(sleepAdvRes.lines).toEqual(['旅館就寢演出']);
+    expect(nightGame.getSnapshot().run.phase).toBe('night');
+    expect(nightGame.getSnapshot().run.night_sleep_pending).toBe(true);
+    expect(nightGame.getPhaseView().night_advance).toBe('next_day');
+    expect(nightGame.getPhaseView().lines).toEqual(['旅館就寢演出']);
+    // 停拍後不能再進地點，playNightFixed 也不會把今晚改成強制到訪
+    expect(nightGame.enterNightLocation('n_corridor').reason_code).toBe('already_slept');
+    expect(nightGame.playNightFixed().ok).toBe(true);
+    expect(nightGame.getSnapshot().run.night_location_chosen).toBe('');
+    // 先走 D1 的強制到訪也一樣，只是改走另一條：重建一局，先 playNightFixed 再推進，不再解析睡覺
+    const fixedFirstGame = createGame(sleepData);
+    expect(fixedFirstGame.chooseOpening('take_family_album').ok).toBe(true);
+    expect(fixedFirstGame.advancePhase().ok).toBe(true);
+    expect(fixedFirstGame.advancePhase().ok).toBe(true);
+    expect(fixedFirstGame.playEvening().ok).toBe(true);
+    expect(fixedFirstGame.advancePhase().ok).toBe(true);
+    expect(fixedFirstGame.playNightFixed().ok).toBe(true);
+    expect(fixedFirstGame.getSnapshot().run.night_location_chosen).toBe('n_corridor');
+    expect(fixedFirstGame.getPhaseView().night_advance).toBe('end_night');
+    expect(fixedFirstGame.getPhaseView().can_advance).toBe(true);
+    const fixedFirstAdv = fixedFirstGame.advancePhase();
+    expect(fixedFirstAdv.phase_advanced).toBe(true);
+    expect(fixedFirstGame.getSnapshot().run.day).toBe(2);
 
-    // 4. madness_clock guard on night
-    const madnessNightInit = nightGame.serialize();
+    // 4. madness_clock (W6-A): the night→morning transition ticks every card once; no more date/clock guard
+    const madnessNightInit = fixedFirstGame.serialize();
+    madnessNightInit.run.day = 1;
+    madnessNightInit.run.phase = 'night';
+    madnessNightInit.run.night_location_chosen = 'n_corridor';
     madnessNightInit.run.madness_clock = { test_clock: 2 };
     const madnessNightGame = createGame(data, madnessNightInit);
-    expect(madnessNightGame.getPhaseView().can_advance).toBe(false);
-    expect(madnessNightGame.advancePhase().reason_code).toBe('not_implemented');
+    expect(madnessNightGame.getPhaseView().can_advance).toBe(true);
+    expect(madnessNightGame.advancePhase().phase_advanced).toBe(true);
+    expect(madnessNightGame.getSnapshot().run.madness_clock).toEqual({ test_clock: 1 });
 
     // 5. actions_spent_ahead guard
     const aheadInit = createRunForTrace(data).serialize();
@@ -337,6 +367,8 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
 
     // 7. pending_delegation_reports / delegates_used_today guard when advancing to morning (D1 night -> D2 morning)
     const delegInit = nightGame.serialize();
+    delegInit.run.night_sleep_pending = false;
+    delegInit.run.night_location_chosen = 'n_corridor';
     delegInit.run.delegates_used_today = { npc_lin: true };
     const delegGame = createGame(data, delegInit);
     expect(delegGame.getPhaseView().can_advance).toBe(false);

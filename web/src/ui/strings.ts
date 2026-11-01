@@ -45,6 +45,20 @@ export const strings = {
     ending_not_seen: '這個結局還沒看過，不能跳過',
     not_ready: '結局尚未播完',
     ending_active: '已有進行中的結局',
+    // W6-A 新增：夜間進入拒絕碼，文字取自 scenes/ui/location_panel.gd _NIGHT_REJECT_TEXTS（locked／teaser 以資料理由優先）。
+    not_night: '非夜間時段',
+    unknown_location: '未知的地點',
+    not_night_layer: '非夜間地點',
+    teaser: '還沒有走到那裡。',
+    too_early: '時機未到',
+    already_chosen: '今夜已探索過其他地點',
+    already_slept: '今夜已準備就寢',
+    overloaded: '手牌超載，無法進入夜間地點', // scripts/autoload/game_state.gd enter_night_location reason_text
+    // W6-A 新增：對位拒絕碼；Godot 的對位入口只回碼、UI 不顯示，中文為 W6-A 新增。
+    not_day_phase: '現在不是白天時段',
+    not_day_layer: '這裡不是白天地點',
+    no_seen_row: '還沒有在夜裡走到這裡',
+    already_known: '已經對位過了',
   } as Record<string, string>,
   // scenes/ui/ending_panel.gd
   endingReveal: '顯示全文', // _MSG_ADVANCE_REVEAL
@@ -53,6 +67,25 @@ export const strings = {
   endingSkip: '跳過', // _MSG_SKIP
   endingPage: (index: number, count: number) => `第 ${index} / ${count} 頁`, // _FMT_PAGE
   endingRegion: '結局', // W6-E1 新增：區域無障礙標籤，Godot 無對應原文
+  // scenes/main.gd 夜間主按鈕：_MSG_ADVANCE_SLEEP／_MSG_ADVANCE_END_NIGHT／_MSG_ADVANCE_NEXT_DAY
+  advanceSleep: '直接睡',
+  advanceEndNight: '結束今晚',
+  advanceNextDay: '進入隔天',
+  // scripts/core/panel_builder.gd location_summary 狀態文字與風險警告
+  nightStatusUnseen: '[尚未到訪]',
+  nightStatusAligned: '[已對位]',
+  nightStatusSeenUnaligned: '[已到訪，尚未對位]',
+  nightStatusSeen: '[已到訪]',
+  nightWarning: '再往前，你可能回不來。',
+  nightMultiName: (dayName: string, nightName: string) => `${dayName}・${nightName}`, // panel_builder.gd "%s・%s"
+  nightListEntry: (name: string, status: string) => `${name} ${status}`, // scenes/ui/map_list.gd
+  nightEnter: '進入', // scenes/ui/location_panel.gd show_night_details
+  nightAlign: '把兩邊對起來', // scenes/ui/location_panel.gd _rebuild
+  nightAlignDialogTitle: '確認對位', // scenes/ui/location_panel.tscn NightAlignConfirmDialog.title
+  nightAlignDialogText: '要將白天地點與夜間見聞對位嗎？', // 同上 dialog_text
+  nightEnterMadness: (cost: number) => `推開了夜色深處的門。獲得 ${cost} 張發狂卡。`, // game_state.gd enter_night_location
+  // 實作規格書.md 第九節「到訪、收費與一夜一地點」通用空結果；Godot UI 未渲染（只回 empty_result 旗標），文字取自規格書。
+  nightEmptyResult: '走了很久。什麼都沒有遇到。',
   loading: '載入中...', // scenes/main.tscn StatusLabel 初始文字
   dataError: '資料載入失敗', // scenes/main.gd _MSG_DATA_ERROR，去掉僅適用 Godot 編輯器的「詳情見 Output。」
   status: (day: number, phase: string, chapter: number) => `第 ${day} 天  ${phase}  第 ${chapter} 章`, // scenes/main.gd _FMT_STATUS

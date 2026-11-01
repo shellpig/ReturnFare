@@ -5,6 +5,7 @@ import { EndingPanel } from './EndingPanel';
 import { HandPanel } from './HandPanel';
 import { LocationPanel } from './LocationPanel';
 import { MapPanel } from './MapPanel';
+import { NightDetails } from './NightDetails';
 import { NarrationPanel } from './NarrationPanel';
 import { OpeningPanel } from './OpeningPanel';
 import { strings } from './strings';
@@ -25,11 +26,14 @@ export function GameShell({ game }: { game: Game }) {
   const [error, setError] = useState('');
   const [activeLocation, setActiveLocation] =
     useState<ActiveLocationState | null>(null);
+  // 夜間地點詳情（唯讀）；進入前不改任何狀態。
+  const [nightDetailId, setNightDetailId] = useState<string | null>(null);
 
   // 離開 run（進結局或回開局）時清掉上一輪的面板、演出進度與錯誤，避免殘留到下一輪。
   useEffect(() => {
     if (snapshot.flow.mode !== 'run') {
       setActiveLocation(null);
+      setNightDetailId(null);
       setIndex(0);
       setError('');
     }
@@ -51,8 +55,13 @@ export function GameShell({ game }: { game: Game }) {
       return;
     }
     setActiveLocation(null);
+    setNightDetailId(null);
     setIndex(0);
     setError('');
+    // 夜間睡覺停拍沒有換時段：睡覺文字已是這個時段要讀的演出，不再重播入夜 fixed。
+    if (!result.phase_advanced) {
+      return;
+    }
     const phase = game.getPhaseView().phase;
     const performance =
       phase === 'evening'
@@ -65,7 +74,7 @@ export function GameShell({ game }: { game: Game }) {
     }
   }
 
-  function openLocation(locationId: string) {
+  function openLocation(locationId: string, entryLines: readonly string[] = []) {
     setError('');
     game.markDayLocationVisited(locationId);
     const panel = game.buildPanel(locationId);
@@ -82,7 +91,7 @@ export function GameShell({ game }: { game: Game }) {
         playedBeatIds: [firstOpen.id],
         beatTitle: firstOpen.title || strings.noTitle,
         beatLines: res.lines,
-        actionResultLines: [],
+        actionResultLines: entryLines,
       });
     } else {
       setActiveLocation({
@@ -91,10 +100,42 @@ export function GameShell({ game }: { game: Game }) {
         playedBeatIds: [],
         beatTitle: '',
         beatLines: [],
-        actionResultLines: [],
+        actionResultLines: entryLines,
       });
     }
   }
+
+  function enterNightLocation(locationId: string) {
+    const result = game.enterNightLocation(locationId);
+    if (!result.ok) {
+      setError(
+        result.reason_text ||
+          strings.reasonCodes[result.reason_code] ||
+          strings.reasonFallback,
+      );
+      return;
+    }
+    setNightDetailId(null);
+    // 撞發狂上限已進結局：不再開原地點面板，畫面交給結局流程。
+    if (game.getSnapshot().flow.mode !== 'run') {
+      return;
+    }
+    openLocation(locationId, result.lines);
+  }
+
+  function confirmAlignment(dayLocationId: string) {
+    const result = game.confirmNightAlignment(dayLocationId);
+    if (!result.ok) {
+      setError(
+        result.reason_text ||
+          strings.reasonCodes[result.reason_code] ||
+          strings.reasonFallback,
+      );
+      return;
+    }
+    setError('');
+  }
+
 
   function advanceBeatInLocation() {
     if (!activeLocation) return;
@@ -188,7 +229,16 @@ export function GameShell({ game }: { game: Game }) {
     }
   }
 
-  if (view.narration_only || view.phase === 'night' || index < view.lines.length) {
+  // 夜間主按鈕三態沿 scenes/main.gd：直接睡／結束今晚／進入隔天（由規則層的 night_advance 衍生）。
+  if (view.night_advance === 'sleep') {
+    advanceText = strings.advanceSleep;
+  } else if (view.night_advance === 'end_night') {
+    advanceText = strings.advanceEndNight;
+  } else if (view.night_advance === 'next_day') {
+    advanceText = strings.advanceNextDay;
+  }
+
+  if (view.narration_only || index < view.lines.length) {
     return (
       <section className="narration-shell">
         <NarrationPanel
@@ -222,11 +272,19 @@ export function GameShell({ game }: { game: Game }) {
           onBack={() => setActiveLocation(null)}
           onPlaceCard={handlePlaceCard}
           onChooseSlot={handleChooseSlot}
+          onConfirmAlignment={confirmAlignment}
+        />
+      ) : nightDetailId ? (
+        <NightDetails
+          locationId={nightDetailId}
+          summary={game.nightLocationSummary(nightDetailId)}
+          onEnter={enterNightLocation}
+          onBack={() => setNightDetailId(null)}
         />
       ) : (
         <MapPanel
           locations={game.mapView()}
-          onSelectLocation={openLocation}
+          onSelectLocation={view.phase === 'night' ? setNightDetailId : openLocation}
         />
       )}
       {error && (

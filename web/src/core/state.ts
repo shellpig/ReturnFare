@@ -10,12 +10,15 @@
  */
 
 import type { Beat, Condition, Effect, GameData } from '../data/types';
+import { strings } from '../ui/strings';
 import {
   cardView as calcCardView,
+  gainCard,
   handSlotsUsed as calcHandSlotsUsed,
   handView as calcHandView,
   hasCard as checkHasCard,
   hasKnowledge as checkHasKnowledge,
+  isOverloaded,
   knowledgeView as calcKnowledgeView,
 } from './cards';
 import {
@@ -44,7 +47,25 @@ import {
   isNarrationOnlyPhase,
   nextPhaseTarget,
 } from './facts';
-import { nightBeatCandidates, recordForcedNightVisit } from './night';
+import {
+  gainMadnessCardOnDraft,
+  madnessCapRequest,
+  tickMadnessOnDraft,
+} from './madness';
+import {
+  alignmentOffer as calcAlignmentOffer,
+  checkNightAlignment,
+  nightBeatList,
+  nightLocationSummary as calcNightLocationSummary,
+  recordForcedNightVisit,
+  resolveNightBeats,
+  resolvedNightContent as calcResolvedNightContent,
+  wouldNightEntryEndRun,
+  type AlignmentOffer,
+  type AlignmentResult,
+  type NightLocationSummary,
+  type ResolvedNightContent,
+} from './night';
 import {
   availableLocations as calcAvailableLocations,
   buildPanel as calcBuildPanel,
@@ -74,6 +95,7 @@ import type {
   Game,
   GameSnapshot,
   MutationResult,
+  NightAdvanceStage,
   OpeningOptionView,
   OpeningScreenView,
   PhaseView,
@@ -438,6 +460,172 @@ function settleAutoEnterBeatsOnDraft(
   };
 }
 
+/** 條件求值錯誤轉拒絕碼（與全檔其他 try/catch 同義）；非條件錯誤回 null，由呼叫端重拋。 */
+function conditionFailure(
+  err: unknown,
+): { reason_code: ReasonCode; reason_text: string } | null {
+  if (err instanceof UnsupportedConditionError) {
+    return { reason_code: 'not_implemented', reason_text: err.message };
+  }
+  if (err instanceof ConditionError) {
+    return { reason_code: 'data_conflict', reason_text: err.message };
+  }
+  return null;
+}
+
+/** 直接睡＝解析旅館（sanquan）的夜間內容（規格書第九節、P3-C）。 */
+const SLEEP_LOCATION_ID = 'sanquan';
+
+/**
+ * 在 draft 上播出睡覺內容（對應 GameState.sleep_night）：面板與睡覺共用同一份解析，
+ * 只播 requires 成立者（requires 在每個 beat 播放前依當時狀態求值，如 Godot）。
+ * 任一 beat 結算失敗整筆失敗，呼叫端的原 state 不受影響；睡覺效果把玩家推進結局時就地停止。
+ */
+function sleepNightOnDraft(base: GameSnapshot, data: GameData): DraftBeatResult {
+  let current = base;
+  const lines: string[] = [];
+  let sleepBeats: Beat[];
+  try {
+    sleepBeats = nightBeatList(resolveNightBeats(current, SLEEP_LOCATION_ID, data));
+  } catch (err) {
+    const failure = conditionFailure(err);
+    if (failure === null) throw err;
+    return { ok: false, ...failure, lines: [], nextState: base };
+  }
+  for (let i = 0; i < sleepBeats.length; i += 1) {
+    if (current.flow.mode !== 'run') {
+      break;
+    }
+    let playable = false;
+    try {
+      playable = evalCondition(sleepBeats[i].requires, current, data);
+    } catch (err) {
+      const failure = conditionFailure(err);
+      if (failure === null) throw err;
+      return { ok: false, ...failure, lines: [], nextState: base };
+    }
+    if (!playable) {
+      continue;
+    }
+    const played = playBeatOnDraft(current, sleepBeats[i].id, data);
+    if (!played.ok) {
+      return {
+        ok: false,
+        reason_code: played.reason_code,
+        reason_text: played.reason_text,
+        lines: [],
+        nextState: base,
+      };
+    }
+    current = played.nextState;
+    lines.push(...played.lines);
+  }
+  return { ok: true, reason_code: '', reason_text: '', lines, nextState: current };
+}
+
+interface NightEntryPlan {
+  readonly ok: boolean;
+  readonly reason_code: ReasonCode;
+  readonly reason_text: string;
+  readonly lines: readonly string[];
+  readonly nextState: GameSnapshot;
+}
+
+function nightEntryReject(
+  state: Readonly<GameSnapshot>,
+  reason_code: ReasonCode,
+  reason_text = '',
+): NightEntryPlan {
+  return { ok: false, reason_code, reason_text, lines: [], nextState: cloneSnapshot(state) };
+}
+
+/**
+ * 主動進入夜間地點的唯一規劃（對應 GameState.enter_night_location）。
+ * 拒絕順序固定：not_run → not_night → encounter_active → overloaded → unknown_location →
+ * not_night_layer → teaser → too_early → locked → already_chosen → already_slept。
+ * 成功順序：chosen → seen（先於發卡）→ 終身首次才依 madness_cost 發卡並批次檢查 cap →
+ * 撞 cap 就在同一個 draft 啟動 madness_cap 結局（到訪仍保留）。全部在 draft 上完成，失敗零副作用。
+ */
+function planEnterNightLocation(
+  state: Readonly<GameSnapshot>,
+  locationId: string,
+  data: GameData,
+): NightEntryPlan {
+  if (state.flow.mode !== 'run') {
+    return nightEntryReject(state, 'not_run', REASON_TEXT_NOT_RUN);
+  }
+  if (state.run.phase !== 'night') {
+    return nightEntryReject(state, 'not_night');
+  }
+  if (Object.keys(state.run.active_encounter).length > 0) {
+    return nightEntryReject(state, 'encounter_active', '遭遇進行中，無法進入地點');
+  }
+  if (isOverloaded(state, data)) {
+    return nightEntryReject(state, 'overloaded', strings.reasonCodes.overloaded);
+  }
+  const loc = data.locationsById.get(locationId);
+  if (!loc) {
+    return nightEntryReject(state, 'unknown_location');
+  }
+  if (loc.layer !== 'night') {
+    return nightEntryReject(state, 'not_night_layer');
+  }
+  if (loc.teaser_only === true) {
+    return nightEntryReject(state, 'teaser');
+  }
+  if (state.run.day < (loc.earliest_night ?? 1)) {
+    return nightEntryReject(state, 'too_early');
+  }
+  let gateOk = false;
+  try {
+    gateOk = evalCondition(loc.requires, state, data);
+  } catch (err) {
+    const failure = conditionFailure(err);
+    if (failure === null) throw err;
+    return nightEntryReject(state, failure.reason_code, failure.reason_text);
+  }
+  if (!gateOk) {
+    return nightEntryReject(state, 'locked', loc.reject_reason ?? '');
+  }
+  if (state.run.night_location_chosen !== '') {
+    return nightEntryReject(state, 'already_chosen');
+  }
+  if (state.run.night_sleep_pending) {
+    return nightEntryReject(state, 'already_slept');
+  }
+
+  const draft = cloneSnapshot(state);
+  const isFirstTime = !state.meta.night_locations_seen[locationId];
+  const willEndRun = wouldNightEntryEndRun(state, locationId, data);
+  draft.run.night_location_chosen = locationId;
+  draft.meta.night_locations_seen[locationId] = true;
+
+  const lines: string[] = [];
+  const cost = loc.madness_cost ?? 0;
+  if (isFirstTime && cost > 0) {
+    for (let i = 0; i < cost; i += 1) {
+      gainMadnessCardOnDraft(draft, data);
+    }
+    const capRequest = madnessCapRequest(draft, data);
+    if (capRequest !== null) {
+      const started = startEndingOnDraft(
+        draft,
+        capRequest.ending_id,
+        capRequest.source_id,
+        data,
+        { fromMode: 'run' },
+      );
+      if (!started.ok) {
+        return nightEntryReject(state, started.reason_code, started.reason_text);
+      }
+    }
+    if (!willEndRun) {
+      lines.push(strings.nightEnterMadness(cost));
+    }
+  }
+  return { ok: true, reason_code: '', reason_text: '', lines, nextState: draft };
+}
+
 interface PhaseExitGateResult {
   readonly ok: boolean;
   readonly reason_code: ReasonCode;
@@ -560,16 +748,6 @@ function encounterDataError(beat: Beat): string {
   return '';
 }
 
-function isWithinPlayableRange(day: number, phase: string): boolean {
-  if (day === 1 || day === 2) {
-    return true;
-  }
-  if (day === 3) {
-    return phase === 'morning' || phase === 'afternoon' || phase === 'evening';
-  }
-  return false;
-}
-
 interface AdvancePlanResult {
   readonly ok: boolean;
   readonly reason_code: ReasonCode;
@@ -577,6 +755,10 @@ interface AdvancePlanResult {
   readonly nextState: GameSnapshot;
   readonly defaultLines: string[];
   readonly autoEnterLines: string[];
+  /** false＝夜間睡覺停拍（或睡覺把玩家推進結局）：狀態已更新但時段不動。 */
+  readonly phaseAdvanced: boolean;
+  /** 停拍時要讀的睡覺內容；時段真的推進時為空。 */
+  readonly stopLines: string[];
 }
 
 function rejectAdvancePlan(
@@ -591,6 +773,8 @@ function rejectAdvancePlan(
     nextState: cloneSnapshot(currentState),
     defaultLines: [],
     autoEnterLines: [],
+    phaseAdvanced: false,
+    stopLines: [],
   };
 }
 
@@ -617,49 +801,29 @@ function preflightAdvancePhase(
     );
   }
 
-  // ③ 夜間停拍：當 phase === 'night' && night_location_chosen === '' && !night_sleep_pending 時檢查就寢候選
+  // ③ 夜間停拍：尚未選地點也尚未睡才解析睡覺。有文字就只停拍（睡覺效果與 pending 一起提交、時段不動），
+  //    無文字續行；睡覺效果把玩家推進結局時同樣不再推進。全部在 draft 上完成，後面任一步拒絕都整筆丟棄。
+  let draft = cloneSnapshot(currentState);
   if (
     currentState.run.phase === 'night' &&
     currentState.run.night_location_chosen === '' &&
     !currentState.run.night_sleep_pending
   ) {
-    const candidates = nightBeatCandidates(
-      currentState.run.day,
-      'sanquan',
-      chapterForDay(currentState.run.day),
-      data,
-    );
-    const allSleepCandidates = [...candidates.primaries, ...candidates.addons];
-    for (let i = 0; i < allSleepCandidates.length; i += 1) {
-      const sb = allSleepCandidates[i];
-      let condOk = false;
-      try {
-        condOk = evalCondition(sb.condition, currentState, data);
-      } catch (err) {
-        if (err instanceof UnsupportedConditionError) {
-          return rejectAdvancePlan(
-            currentState,
-            'not_implemented',
-            '夜間就寢解析將於 W6-E1 實作',
-          );
-        }
-        if (err instanceof ConditionError) {
-          return rejectAdvancePlan(currentState, 'data_conflict', err.message);
-        }
-        throw err;
-      }
-      if (condOk) {
-        return rejectAdvancePlan(
-          currentState,
-          'not_implemented',
-          '夜間就寢停拍將於 W6-E1 實作',
-        );
-      }
+    const slept = sleepNightOnDraft(draft, data);
+    if (!slept.ok) {
+      return rejectAdvancePlan(currentState, slept.reason_code, slept.reason_text);
+    }
+    draft = slept.nextState;
+    if (slept.lines.length > 0) {
+      draft.run.night_sleep_pending = true;
+      return { ...rejectAdvancePlan(currentState, '', ''), ok: true, nextState: draft, stopLines: slept.lines };
+    }
+    if (draft.flow.mode !== 'run') {
+      return { ...rejectAdvancePlan(currentState, '', ''), ok: true, nextState: draft };
     }
   }
 
   // ④ 逾期 choice group default 預檢（在 draft 上 preflight，不直接落地）
-  let draft = cloneSnapshot(currentState);
   const defaultLines: string[] = [];
   const currentBeats = beatsAt(
     data.beats,
@@ -741,7 +905,7 @@ function preflightAdvancePhase(
   }
 
   // ⑤ fixed beat 的 phase_exit 門檻檢查
-  const gate = evaluatePhaseExitGate(currentState, data);
+  const gate = evaluatePhaseExitGate(draft, data);
   if (!gate.ok) {
     return rejectAdvancePlan(currentState, gate.reason_code, gate.reason_text);
   }
@@ -776,7 +940,7 @@ function preflightAdvancePhase(
     return rejectAdvancePlan(
       currentState,
       'not_implemented',
-      'D45 結局收束將於 W7-A 實作',
+      'D45 結局收束將於 W6-E2 實作',
     );
   }
 
@@ -789,39 +953,13 @@ function preflightAdvancePhase(
     );
   }
 
-  // W5 公開推進範圍與後續子階段換時段機制守衛
-  if (!isWithinPlayableRange(target.day, target.phase)) {
-    return rejectAdvancePlan(
-      currentState,
-      'not_implemented',
-      'D3 evening 之後的時段推進將於 W6 接手',
-    );
-  }
-  if (
-    currentState.run.phase === 'night' &&
-    Object.keys(draft.run.madness_clock).length > 0
-  ) {
-    return rejectAdvancePlan(
-      currentState,
-      'not_implemented',
-      '發狂倒數計時將於 W6-A 實作',
-    );
-  }
+  // 仍未接好的機制守衛：依整筆命令與目標時段實際需要才擋，mutation 前原子拒絕；日期本身不是守衛。
+  // 預扣行動格與強制縱慾結算屬 W6-B，委託隔日回報屬 W6-C；遭遇見下方目標時段預檢（W6-D）。
   if (draft.run.actions_spent_ahead > 0) {
     return rejectAdvancePlan(
       currentState,
       'not_implemented',
       '預扣行動格將於 W6-B 實作',
-    );
-  }
-  if (
-    (ACTION_PHASES as readonly string[]).includes(target.phase) &&
-    draft.run.forced_pending.length > 0
-  ) {
-    return rejectAdvancePlan(
-      currentState,
-      'not_implemented',
-      '強制縱慾結算將於 W6-B 實作',
     );
   }
   if (
@@ -842,6 +980,22 @@ function preflightAdvancePhase(
   draft.run.action_spent = false;
   draft.run.night_location_chosen = '';
   draft.run.night_sleep_pending = false;
+
+  // 每日進 morning 才 tick；剛歸零的卡入列 forced_pending（已歸零者 clamp，不會重複入列）。
+  if (currentState.run.phase === 'night') {
+    draft.run.forced_pending.push(...tickMadnessOnDraft(draft));
+  }
+  // 強制縱慾要在首個可用行動格結算（W6-B）；需要結算的推進必須在 mutation 前整筆拒絕。
+  if (
+    (ACTION_PHASES as readonly string[]).includes(target.phase) &&
+    draft.run.forced_pending.length > 0
+  ) {
+    return rejectAdvancePlan(
+      currentState,
+      'not_implemented',
+      '強制縱慾結算將於 W6-B 實作',
+    );
+  }
 
   const autoRes = settleAutoEnterBeatsOnDraft(draft, data);
   if (!autoRes.ok) {
@@ -899,6 +1053,8 @@ function preflightAdvancePhase(
     nextState: draft,
     defaultLines,
     autoEnterLines: autoRes.lines,
+    phaseAdvanced: true,
+    stopLines: [],
   };
 }
 
@@ -990,6 +1146,17 @@ export function createGame(
     return preflightAdvancePhase(state as GameSnapshot, data).ok;
   }
 
+  /** 夜間主按鈕三態（scenes/main.gd）：睡覺停拍後＝進入隔天；已到訪＝結束今晚；其餘＝直接睡。 */
+  function nightAdvanceStage(): NightAdvanceStage | null {
+    if (state.run.phase !== 'night') {
+      return null;
+    }
+    if (state.run.night_sleep_pending) {
+      return 'next_day';
+    }
+    return state.run.night_location_chosen !== '' ? 'end_night' : 'sleep';
+  }
+
   function getPhaseView(): PhaseView {
     const day = state.run.day;
     const phase = state.run.phase;
@@ -1010,6 +1177,7 @@ export function createGame(
       lines,
       can_advance: canAdv,
       canAdvance: canAdv,
+      night_advance: nightAdvanceStage(),
     };
   }
 
@@ -1358,16 +1526,32 @@ export function createGame(
         if (!recordForcedNightVisit(draft, b.location, data)) {
           continue;
         }
+        // charge_first_visit（P4-A）：強制到訪前保存是否終身 seen，此前未 seen 才按 madness_cost 收一次。
+        const chargeCost_w6a = loc.madness_cost ?? 0;
         if (
           isPlainObject(b.encounter) &&
           b.encounter.charge_first_visit === true &&
           !wasSeen &&
-          (loc.madness_cost ?? 0) > 0
+          chargeCost_w6a > 0
         ) {
-          return mutationReject(
-            'not_implemented',
-            'charge_first_visit 發狂卡計費將於 W6 實作',
-          );
+          for (let c = 0; c < chargeCost_w6a; c += 1) {
+            gainMadnessCardOnDraft(draft, data);
+          }
+          const capRequest_w6a = madnessCapRequest(draft, data);
+          if (capRequest_w6a !== null) {
+            const started_w6a = startEndingOnDraft(
+              draft,
+              capRequest_w6a.ending_id,
+              capRequest_w6a.source_id,
+              data,
+              { fromMode: 'run' },
+            );
+            if (!started_w6a.ok) {
+              return mutationReject(started_w6a.reason_code, started_w6a.reason_text);
+            }
+            // 首次收費撞 BE：已進 ending，不可再播本 beat（否則文字與 beats_entered 會寫進已結束的輪）。
+            break;
+          }
         }
       }
 
@@ -1415,6 +1599,22 @@ export function createGame(
     }
 
     commitState(plan.nextState);
+    if (!plan.phaseAdvanced) {
+      // 夜間睡覺停拍（或睡覺效果把玩家推進結局）：時段不動，睡覺文字成為這個時段要讀的演出。
+      if (plan.stopLines.length > 0) {
+        lastChoiceDefaultLines = [];
+        lastAutoEnterLines = [];
+        phaseNarrationLines = [...plan.stopLines];
+      }
+      notifyListeners();
+      return {
+        ok: true,
+        reason_code: '',
+        reason_text: '',
+        lines: plan.stopLines,
+        phase_advanced: false,
+      };
+    }
     lastChoiceDefaultLines = plan.defaultLines;
     lastAutoEnterLines = plan.autoEnterLines;
     phaseNarrationLines = null;
@@ -1426,6 +1626,53 @@ export function createGame(
       reason_text: '',
       lines: plan.defaultLines,
       phase_advanced: true,
+    };
+  }
+
+  function nightLocationSummary(locationId: string): NightLocationSummary {
+    return calcNightLocationSummary(state, locationId, data);
+  }
+
+  function resolvedNightContent(locationId: string): ResolvedNightContent {
+    return calcResolvedNightContent(state, locationId, data);
+  }
+
+  function enterNightLocation(locationId: string): MutationResult {
+    const planned = planEnterNightLocation(state as GameSnapshot, locationId, data);
+    if (!planned.ok) {
+      return mutationReject(planned.reason_code, planned.reason_text);
+    }
+    commitState(planned.nextState);
+    notifyListeners();
+    return { ok: true, reason_code: '', reason_text: '', lines: planned.lines };
+  }
+
+  function alignmentOffer(dayLocationId: string): AlignmentOffer {
+    return calcAlignmentOffer(state, dayLocationId, data);
+  }
+
+  function confirmNightAlignment(dayLocationId: string): AlignmentResult {
+    const rejectAlignment = (code: ReasonCode, text: string): AlignmentResult => ({
+      ...mutationReject(code, text),
+      knowledge_id: '',
+    });
+    const check = checkNightAlignment(state, dayLocationId, data);
+    if (!check.ok) {
+      return rejectAlignment(check.reason_code, check.reason_text);
+    }
+    const draft = cloneSnapshot(state as GameSnapshot);
+    const gained = gainCard(draft, check.knowledge_id, data);
+    if (!gained.ok) {
+      return rejectAlignment(gained.reason_code, gained.reason_text);
+    }
+    commitState(draft);
+    notifyListeners();
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      lines: [],
+      knowledge_id: check.knowledge_id,
     };
   }
 
@@ -1728,6 +1975,11 @@ export function createGame(
     hasAnyLegalAction,
     hasUnseenContent,
     advancePhase,
+    nightLocationSummary,
+    resolvedNightContent,
+    enterNightLocation,
+    alignmentOffer,
+    confirmNightAlignment,
     endingView,
     hasSeenEnding,
     revealEndingPage,

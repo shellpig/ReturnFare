@@ -129,15 +129,21 @@ describe('W5-A cards, hand, knowledge, and Game queries', () => {
     ]);
   });
 
-  it('ordinary gain remains guarded for madness without cap/BE', () => {
+  it('ordinary gain of madness creates a new countdown instance each time (W6-A shared primitive; cap is checked by the caller)', () => {
     const game = createGame(data);
     const snap = game.serialize();
     const res = gainCard(snap, 'madness', data);
 
-    expect(res.ok).toBe(false);
-    expect(res.reason_code).toBe('not_implemented');
-    expect(hasCard(snap, 'madness')).toBe(false);
-    expect(snap.run.hand).toEqual([]);
+    expect(res.ok).toBe(true);
+    expect(snap.run.hand).toEqual(['madness#1']);
+    expect(snap.run.madness_clock).toEqual({
+      'madness#1': data.tuning.madness_countdown_days,
+    });
+    expect(snap.run._madness_counter).toBe(1);
+
+    expect(gainCard(snap, 'madness', data).ok).toBe(true);
+    expect(snap.run.hand).toEqual(['madness#1', 'madness#2']);
+    expect(Object.keys(snap.run.madness_clock)).toEqual(['madness#1', 'madness#2']);
   });
 
   it('loop_persistent normal vs permanent removal, normal->permanent without hand copy, and repeated permanent loss is idempotent', () => {

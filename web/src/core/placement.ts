@@ -7,11 +7,12 @@
  * - has_any_legal_action / has_unseen_content
  */
 
-import type { Beat, GameData, Phase, Slot } from '../data/types';
+import type { Beat, GameData, Slot } from '../data/types';
 import { strings } from '../ui/strings';
 import { hasCard } from './cards';
 import { evalCondition } from './condition';
 import { ACTION_PHASES, beatMatchesTime, cardBaseId } from './facts';
+import { isResolvedNightBeat } from './night';
 import {
   TriState,
   availableLocations,
@@ -22,12 +23,19 @@ import type { DeepReadonly, GameSnapshot, ReasonCode } from './state-types';
 
 const REASON_LOCKED_FALLBACK = '（條件不足）';
 
+/**
+ * beat 在當前天與時段是否合法（對應 _is_beat_time_valid）。
+ * 非夜間與夜間 fixed 看 when；夜間 non-fixed 只接受該地點當下解析選中的 primary／addons。
+ */
 export function isBeatTimeValid(
   beat: Beat,
-  day: number,
-  phase: Phase,
+  state: DeepReadonly<GameSnapshot> | GameSnapshot,
+  data: GameData,
 ): boolean {
-  return beatMatchesTime(beat.when, day, phase);
+  if (state.run.phase !== 'night' || beat.fixed === true) {
+    return beatMatchesTime(beat.when, state.run.day, state.run.phase);
+  }
+  return isResolvedNightBeat(state, beat, data);
 }
 
 /**
@@ -46,7 +54,7 @@ export function checkSlotState(
   const slotId = slot.id;
 
   // 1. time
-  if (!isBeatTimeValid(beat, state.run.day, state.run.phase)) {
+  if (!isBeatTimeValid(beat, state, data)) {
     return { ok: false, reason_code: 'hidden', reason_text: '' };
   }
 

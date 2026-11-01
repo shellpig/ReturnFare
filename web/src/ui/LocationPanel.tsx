@@ -67,6 +67,7 @@ export function LocationPanel({
   onBack,
   onPlaceCard,
   onChooseSlot,
+  onConfirmAlignment,
 }: {
   game: Game;
   panel: PanelView;
@@ -78,6 +79,7 @@ export function LocationPanel({
   onBack: () => void;
   onPlaceCard: (cardId: string, beatId: string, slotId: string) => void;
   onChooseSlot: (beatId: string, groupId: string, slotId: string) => void;
+  onConfirmAlignment: (dayLocationId: string) => void;
 }) {
   const [pickerTarget, setPickerTarget] = useState<{
     beatId: string;
@@ -88,7 +90,11 @@ export function LocationPanel({
     slot: SlotViewModel;
   } | null>(null);
 
+  const [alignDialogOpen, setAlignDialogOpen] = useState(false);
+
   const hasSceneArt = SCENE_ART_LOCATIONS.has(panel.location.id);
+  // 對位只在白天地點演出播完、進入常態畫面後出現；夜間或不符條件時規則層回 unavailable。
+  const alignment = game.alignmentOffer(panel.location.id);
 
   return (
     <section className="location-panel">
@@ -137,6 +143,21 @@ export function LocationPanel({
           {panel.location.desc && (
             <p className="story location-desc">{panel.location.desc}</p>
           )}
+          {panel.empty_result && (
+            <p className="story night-empty-result" data-testid="night-empty-result">
+              {strings.nightEmptyResult}
+            </p>
+          )}
+          {alignment.available && (
+            <button
+              type="button"
+              className="night-align-btn"
+              data-testid="night-align-btn"
+              onClick={() => setAlignDialogOpen(true)}
+            >
+              {strings.nightAlign}
+            </button>
+          )}
           <div className="beats-list">
             {panel.beats.map((beat) => {
               const visibleSlots = beat.slots.filter(
@@ -175,6 +196,33 @@ export function LocationPanel({
             })}
           </div>
         </div>
+      )}
+
+      {alignDialogOpen && (
+        <ModalDialog
+          className="night-align-dialog"
+          labelledBy="night-align-dialog-title"
+          onClose={() => setAlignDialogOpen(false)}
+        >
+          <h3 id="night-align-dialog-title">{strings.nightAlignDialogTitle}</h3>
+          <p className="story">{strings.nightAlignDialogText}</p>
+          <div className="dialog-actions">
+            <button type="button" onClick={() => setAlignDialogOpen(false)}>
+              {strings.cancel}
+            </button>
+            <button
+              type="button"
+              data-testid="night-align-confirm"
+              onClick={() => {
+                setAlignDialogOpen(false);
+                onConfirmAlignment(panel.location.id);
+              }}
+              autoFocus
+            >
+              {strings.confirm}
+            </button>
+          </div>
+        </ModalDialog>
       )}
 
       {pickerTarget && (

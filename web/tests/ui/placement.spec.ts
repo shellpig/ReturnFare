@@ -61,7 +61,7 @@ test('UI real player flow: walks D1-D3, readonly preview equality, free compare 
   await advanceBtn.click(); // -> D1 night
 
   await nextBtn.click();
-  await advanceBtn.click(); // -> D2 morning
+  await page.getByRole('button', { name: '結束今晚' }).click(); // -> D2 morning（W6-A：夜間主按鈕）
 
   await expect(page.locator('header')).toContainText('第 2 天');
   await expect(page.locator('.map-panel')).toBeVisible();
@@ -162,7 +162,7 @@ test('UI real player flow: walks D1-D3, readonly preview equality, free compare 
 
   // D2 night narration
   await nextBtn.click();
-  await advanceBtn.click(); // -> D3 morning
+  await page.getByRole('button', { name: '結束今晚' }).click(); // -> D3 morning（W6-A：夜間主按鈕）
 
   // D3 morning map
   await expect(page.locator('header')).toContainText('第 3 天');
