@@ -9,7 +9,7 @@
  * - advancePhase() 七步骨架
  */
 
-import type { Beat, Condition, Effect, GameData, Slot } from '../data/types';
+import type { Beat, Condition, Effect, Encounter, GameData, Slot } from '../data/types';
 import { strings } from '../ui/strings';
 import {
   cardView as calcCardView,
@@ -39,6 +39,13 @@ import {
   type EndingStep,
   type EndingView,
 } from './ending';
+import {
+  buildEncounterView,
+  findMatchingResponse,
+  getFirstRoundId,
+  getRound,
+  hasLegalMoves,
+} from './encounter';
 import {
   ACTION_PHASES,
   LAST_DAY,
@@ -96,9 +103,12 @@ import {
   initializeRun,
 } from './run-initialization';
 import type {
+  ActiveEncounterState,
   AdvanceResult,
   CardView,
   DeepReadonly,
+  EncounterAckResult,
+  EncounterView,
   Game,
   GameSnapshot,
   MutationResult,
@@ -165,6 +175,7 @@ interface SettleBookkeeping {
   delegate_person?: string;
   pending_report?: PendingDelegationReport;
   report_removed?: PendingDelegationReport;
+  encounter_set?: ActiveEncounterState;
 }
 
 interface SettleResult {
@@ -240,6 +251,19 @@ function applyBookkeepingOnDraft(
   }
   if (bk.day_location_visited) {
     recordDayLocationVisitedOnDraft(target, bk.day_location_visited, data);
+  }
+  if (bk.encounter_set !== undefined) {
+    target.run.active_encounter = { ...bk.encounter_set };
+    if (bk.encounter_set.attempted_card_ids) {
+      target.run.active_encounter.attempted_card_ids = [
+        ...bk.encounter_set.attempted_card_ids,
+      ];
+    }
+    if (bk.encounter_set.visited_round_ids) {
+      target.run.active_encounter.visited_round_ids = [
+        ...bk.encounter_set.visited_round_ids,
+      ];
+    }
   }
 }
 
@@ -821,6 +845,81 @@ function encounterDataError(beat: Beat): string {
   return '';
 }
 
+/**
+ * 啟動遭遇（規格書第十節、開發設計方針 P4-D）。
+ * 檢查順序固定：
+ * 1. active: 已有進行中遭遇（encounter_active）
+ * 2. unknown beat: 未知的 beat id 或無 encounter 欄位（unknown_beat）
+ * 3. data conflict: 遭遇資料結構異常（data_conflict）
+ * 成功建立 stage === "intro"，blocked_slots 初始化為 0。
+ */
+function startEncounterOnDraft(
+  draft: GameSnapshot,
+  beatId: string,
+  data: GameData,
+): { ok: boolean; reason_code: ReasonCode; reason_text: string } {
+  if (draft.flow.mode !== 'run') {
+    return {
+      ok: false,
+      reason_code: 'not_run',
+      reason_text: REASON_TEXT_NOT_RUN,
+    };
+  }
+
+  // 1. active
+  if (Object.keys(draft.run.active_encounter).length > 0) {
+    return {
+      ok: false,
+      reason_code: 'encounter_active',
+      reason_text: '已有進行中的遭遇',
+    };
+  }
+
+  // 2. unknown beat
+  const beat = data.beatsById.get(beatId);
+  if (!beat || !('encounter' in beat) || !beat.encounter) {
+    return {
+      ok: false,
+      reason_code: 'unknown_beat',
+      reason_text: '未知的遭遇事件',
+    };
+  }
+
+  // 3. data conflict（與換時段前的預檢共用同一份檢查）
+  const encErr = encounterDataError(beat);
+  if (encErr.length > 0) {
+    return {
+      ok: false,
+      reason_code: 'data_conflict',
+      reason_text: encErr,
+    };
+  }
+
+  draft.run.active_encounter = {
+    beat_id: beatId,
+    stage: 'intro',
+    round_id: '',
+    blocked_slots: 0,
+    attempted_card_ids: [],
+    visited_round_ids: [],
+  };
+
+  return { ok: true, reason_code: '', reason_text: '' };
+}
+
+/** 檢查可用格數是否歸零或小於 0（容量超載失敗，K-135/K-136）。 */
+function checkEncounterCapacityFailure(
+  state: GameSnapshot,
+  data: GameData,
+): boolean {
+  const handSize = Number(data.tuning.hand_size);
+  const blocked = state.run.active_encounter.blocked_slots ?? 0;
+  if (blocked <= 0) {
+    return state.run.hand.length > handSize;
+  }
+  return handSize - state.run.hand.length - blocked <= 0;
+}
+
 interface AdvancePlanResult {
   readonly ok: boolean;
   readonly reason_code: ReasonCode;
@@ -1258,7 +1357,7 @@ function preflightAdvancePhase(
   }
 
   // 目標時段 fixed encounter 預檢（在 auto_enter 之後檢查，以涵蓋 auto_enter 寫入之條件）
-  if (draft.flow.mode === 'run') {
+  if (draft.flow.mode === 'run' && target.phase !== 'night') {
     const targetBeats = beatsAt(data.beats, target.day, target.phase);
     for (let i = 0; i < targetBeats.length; i += 1) {
       const tb = targetBeats[i];
@@ -1267,6 +1366,25 @@ function preflightAdvancePhase(
       }
       const rawTb = tb as unknown as Record<string, unknown>;
       if (!('encounter' in rawTb) || rawTb.encounter === undefined) {
+        continue;
+      }
+      const errText = encounterDataError(tb);
+      if (errText.length > 0) {
+        return rejectAdvancePlan(currentState, 'data_conflict', errText);
+      }
+    }
+
+    for (let i = 0; i < targetBeats.length; i += 1) {
+      const tb = targetBeats[i];
+      if (tb.fixed !== true) {
+        continue;
+      }
+      const rawTb = tb as unknown as Record<string, unknown>;
+      if (!('encounter' in rawTb) || rawTb.encounter === undefined) {
+        continue;
+      }
+      const isMetaOnce = tb.meta_once === true;
+      if (isMetaOnce && draft.meta.night_once_beats_seen[tb.id]) {
         continue;
       }
       let encActive = false;
@@ -1286,15 +1404,15 @@ function preflightAdvancePhase(
       if (!encActive) {
         continue;
       }
-      const errText = encounterDataError(tb);
-      if (errText.length > 0) {
-        return rejectAdvancePlan(currentState, 'data_conflict', errText);
+      const startRes = startEncounterOnDraft(draft, tb.id, data);
+      if (!startRes.ok) {
+        return rejectAdvancePlan(
+          currentState,
+          startRes.reason_code,
+          startRes.reason_text,
+        );
       }
-      return rejectAdvancePlan(
-        currentState,
-        'not_implemented',
-        '固定遭遇啟動將於 W6-D 實作',
-      );
+      break;
     }
   }
 
@@ -1309,6 +1427,42 @@ function preflightAdvancePhase(
     delegationReportLines: delegationLines,
     phaseAdvanced: true,
     stopLines: [],
+  };
+}
+
+/**
+ * 遭遇 action plan 的共用組裝：有出口就把出口效果併進同一批 blocks 並清掉遭遇。
+ */
+function planEncounterAction(
+  enc: Encounter,
+  blocks: Effect[],
+  loseCards: string[],
+  finalEnc: ActiveEncounterState,
+  outcome: string,
+): {
+  blocks: Effect[];
+  pre: SettleBookkeeping;
+  advance_after: boolean;
+} {
+  const pre: SettleBookkeeping = {
+    lose_cards: loseCards,
+    encounter_set: { ...finalEnc },
+  };
+  let advanceAfter = false;
+  const outBlocks = [...blocks];
+  if (outcome.length > 0) {
+    const exitKey = `on_${outcome}` as 'on_victory' | 'on_failure' | 'on_escape';
+    const exitEffect = enc[exitKey];
+    if (exitEffect && Object.keys(exitEffect).length > 0) {
+      outBlocks.push(exitEffect);
+    }
+    pre.encounter_set = {};
+    advanceAfter = enc.after_finish === 'advance_phase';
+  }
+  return {
+    blocks: outBlocks,
+    pre,
+    advance_after: advanceAfter,
   };
 }
 
@@ -1433,6 +1587,10 @@ export function createGame(
       ...lastAutoEnterLines,
       ...(phaseNarrationLines ?? []),
     ];
+    if (state.run.active_encounter.stage === 'intro') {
+      const intro = data.beatsById.get(state.run.active_encounter.beat_id ?? '')?.text;
+      if (intro && !lines.includes(intro)) lines.push(intro);
+    }
     return {
       day,
       phase,
@@ -1466,6 +1624,7 @@ export function createGame(
   }
 
   function markDayLocationVisited(locationId: string): void {
+    if (Object.keys(state.run.active_encounter).length > 0) return;
     const draft = cloneSnapshot(state as GameSnapshot);
     if (!recordDayLocationVisitedOnDraft(draft, locationId, data)) {
       return;
@@ -1638,6 +1797,9 @@ export function createGame(
   }
 
   function playBeat(beatId: string): MutationResult {
+    if (state.flow.mode === 'run' && Object.keys(state.run.active_encounter).length > 0) {
+      return mutationReject('encounter_active', '遭遇進行中，無法播放其他事件');
+    }
     const res = playBeatOnDraft(state as GameSnapshot, beatId, data);
     if (!res.ok) {
       return mutationReject(res.reason_code, res.reason_text);
@@ -1655,6 +1817,9 @@ export function createGame(
   function playEvening(): MutationResult {
     if (state.flow.mode !== 'run') {
       return mutationReject('not_run', REASON_TEXT_NOT_RUN);
+    }
+    if (Object.keys(state.run.active_encounter).length > 0) {
+      return mutationReject('encounter_active', '遭遇進行中，無法播放其他事件');
     }
 
     let draft = cloneSnapshot(state as GameSnapshot);
@@ -1756,6 +1921,9 @@ export function createGame(
     if (state.flow.mode !== 'run') {
       return mutationReject('not_run', REASON_TEXT_NOT_RUN);
     }
+    if (Object.keys(state.run.active_encounter).length > 0) {
+      return mutationReject('encounter_active', '遭遇進行中，無法播放其他事件');
+    }
 
     let draft = cloneSnapshot(state as GameSnapshot);
     const lines: string[] = [];
@@ -1845,7 +2013,12 @@ export function createGame(
       }
 
       if (isPlainObject(b.encounter) && Object.keys(b.encounter).length > 0) {
-        return mutationReject('not_implemented', '遭遇戰將於 W6-D 實作');
+        const startRes = startEncounterOnDraft(draft, bid, data);
+        if (!startRes.ok) {
+          return mutationReject(startRes.reason_code, startRes.reason_text);
+        }
+        // 遭遇啟動後不再播同夜後續 fixed beat（對齊 Godot play_night_fixed）
+        break;
       }
     }
 
@@ -2490,6 +2663,420 @@ export function createGame(
     return calcHasUnseenContent(state, data);
   }
 
+  /** 遭遇 action plan 的唯一落地點（對齊 Godot _commit_encounter_action）。 */
+  function commitEncounterAction(plan: {
+    blocks: Effect[];
+    pre: SettleBookkeeping;
+    advance_after: boolean;
+  }): MutationResult {
+    const settleRes = settleEffectsOnDraft(
+      plan.blocks,
+      {},
+      plan.pre,
+      state as GameSnapshot,
+      data,
+    );
+    if (!settleRes.ok) {
+      return mutationReject(settleRes.reason_code, settleRes.reason_text);
+    }
+
+    if (state.run.active_encounter.stage === 'intro') phaseNarrationLines = null;
+    commitState(settleRes.nextState);
+    notifyListeners();
+
+    const lines = [...settleRes.lines];
+    if (plan.advance_after && state.flow.mode === 'run') {
+      const advRes = advancePhase();
+      lines.push(...advRes.lines);
+    }
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      lines,
+    };
+  }
+
+  function encounterView(): EncounterView {
+    if (
+      Object.keys(state.run.active_encounter).length === 0 ||
+      state.flow.mode !== 'run'
+    ) {
+      return {};
+    }
+    const beatId = state.run.active_encounter.beat_id ?? '';
+    const beat = data.beatsById.get(beatId);
+    if (!beat || !beat.encounter) {
+      return {};
+    }
+    return buildEncounterView(
+      beat.encounter,
+      state.run.active_encounter as ActiveEncounterState,
+      state as GameSnapshot,
+      data,
+    );
+  }
+
+  function acknowledgeEncounterIntro(): EncounterAckResult {
+    if (state.flow.mode !== 'run') {
+      return {
+        ...mutationReject('not_run', REASON_TEXT_NOT_RUN),
+        entered_round: false,
+      };
+    }
+
+    // 1. inactive
+    if (Object.keys(state.run.active_encounter).length === 0) {
+      return {
+        ...mutationReject('no_active_encounter', '目前沒有進行中的遭遇'),
+        entered_round: false,
+      };
+    }
+
+    // 2. wrong stage
+    if (state.run.active_encounter.stage !== 'intro') {
+      return {
+        ...mutationReject('wrong_stage', '目前不是開場演出階段'),
+        entered_round: false,
+      };
+    }
+
+    // 3. data conflict
+    const beatId = state.run.active_encounter.beat_id ?? '';
+    const beat = data.beatsById.get(beatId);
+    if (!beat || !beat.encounter) {
+      return {
+        ...mutationReject('data_conflict', '未知的遭遇事件'),
+        entered_round: false,
+      };
+    }
+    const enc = beat.encounter;
+    const firstRoundId = getFirstRoundId(enc);
+    if (!firstRoundId) {
+      return {
+        ...mutationReject('data_conflict', '遭遇資料缺少第一回合定義'),
+        entered_round: false,
+      };
+    }
+    const firstRound = getRound(enc, firstRoundId);
+    if (!firstRound) {
+      return {
+        ...mutationReject('data_conflict', '遭遇第一回合資料遺失'),
+        entered_round: false,
+      };
+    }
+
+    // 進場與「開場就結束」的失敗出口屬同一個動作：先在複本推演，再一次落地。
+    const draft = cloneSnapshot(state as GameSnapshot);
+    const shEnc = draft.run.active_encounter;
+    let enteredRound = true;
+    let outcome = '';
+
+    if (isOverloaded(draft, data)) {
+      // 超載時確認開場後立即結算 failure 出口（不進入第一回合、不增加佔格）
+      enteredRound = false;
+      outcome = 'failure';
+    } else {
+      const cost = enc.per_round_slot_cost;
+      shEnc.stage = 'round';
+      shEnc.round_id = firstRoundId;
+      shEnc.blocked_slots = (shEnc.blocked_slots ?? 0) + cost;
+      const visited = shEnc.visited_round_ids
+        ? [...shEnc.visited_round_ids]
+        : [];
+      if (!visited.includes(firstRoundId)) {
+        visited.push(firstRoundId);
+      }
+      shEnc.visited_round_ids = visited;
+
+      // 佔格達/超出手牌上限，或第一回合就沒有合法動作，都直接走 failure 出口
+      if (checkEncounterCapacityFailure(draft, data)) {
+        outcome = 'failure';
+      } else if (!hasLegalMoves(enc, firstRound, shEnc, draft, data)) {
+        outcome = 'failure';
+      }
+    }
+
+    const plan = planEncounterAction(enc, [], [], shEnc, outcome);
+    const res = commitEncounterAction(plan);
+    return {
+      ...res,
+      entered_round: res.ok ? enteredRound : false,
+    };
+  }
+
+  function respondToEncounter(cardId: string): MutationResult {
+    if (state.flow.mode !== 'run') {
+      return mutationReject('not_run', REASON_TEXT_NOT_RUN);
+    }
+
+    // 1. inactive
+    if (Object.keys(state.run.active_encounter).length === 0) {
+      return mutationReject('no_active_encounter', '目前沒有進行中的遭遇');
+    }
+
+    // 2. wrong stage
+    if (state.run.active_encounter.stage !== 'round') {
+      return mutationReject('wrong_stage', '目前不是回應回合階段');
+    }
+
+    // 3. unknown card
+    if (!cardId || typeof cardId !== 'string') {
+      return mutationReject('unknown_card', '未知的卡片');
+    }
+    const baseId = cardBaseId(cardId);
+    if (!data.cardsById.has(baseId)) {
+      return mutationReject('unknown_card', '未知的卡片');
+    }
+
+    // 4. not held
+    if (!hasCard(cardId)) {
+      return mutationReject('not_held', '未持有該卡片');
+    }
+
+    // 5. madness
+    if (baseId === 'madness' || state.run.madness_clock[cardId] !== undefined) {
+      return mutationReject('madness_blocked', '發狂卡不可作為回應提交');
+    }
+
+    // 6. already attempted
+    const attempted = state.run.active_encounter.attempted_card_ids ?? [];
+    if (attempted.includes(baseId)) {
+      return mutationReject('already_attempted', '此卡片本場已嘗試過');
+    }
+
+    // 取得當前回合定義
+    const beatId = state.run.active_encounter.beat_id ?? '';
+    const beat = data.beatsById.get(beatId);
+    const enc = beat?.encounter;
+    const roundId = state.run.active_encounter.round_id ?? '';
+    const roundData = enc ? getRound(enc, roundId) : null;
+
+    const cardDef = data.cardsById.get(baseId)!;
+    const isDiscardable = cardDef.discardable === true;
+    const matchingResp = roundData
+      ? findMatchingResponse(roundData, cardId, baseId)
+      : null;
+    const fallback = roundData?.fallback;
+    const reqDiscardable = fallback?.requires_discardable === true;
+
+    // 7. card not submittable (K-132: 依方針順序先於 data_conflict)
+    if (matchingResp === null && reqDiscardable && !isDiscardable) {
+      return mutationReject('card_not_submittable', '該卡無法作為錯答提交');
+    }
+
+    // 8. data conflict
+    if (!roundData || !enc) {
+      return mutationReject('data_conflict', '當前回合資料遺失');
+    }
+
+    // 通過所有檢查 → 先在複本上把整回合推演到出口
+    let draft = cloneSnapshot(state as GameSnapshot);
+    let shEnc = draft.run.active_encounter;
+    const loseCards: string[] = [];
+    const blocks: Effect[] = [];
+
+    const currentAttempted = shEnc.attempted_card_ids
+      ? [...shEnc.attempted_card_ids]
+      : [];
+    currentAttempted.push(baseId);
+    shEnc.attempted_card_ids = currentAttempted;
+
+    const cost = enc.per_round_slot_cost;
+    const hit = matchingResp !== null;
+    const branch = hit ? matchingResp : fallback;
+
+    if (hit) {
+      if (matchingResp.consume_card && isDiscardable) {
+        loseCards.push(cardId);
+      }
+      // 正解釋放本回合佔格
+      shEnc.blocked_slots = Math.max(0, (shEnc.blocked_slots ?? 0) - cost);
+    } else if (isDiscardable) {
+      // 錯答保留佔格（不釋放）
+      loseCards.push(cardId);
+    }
+
+    for (let i = 0; i < loseCards.length; i += 1) {
+      loseCard(draft, loseCards[i], data);
+    }
+
+    if (branch?.on_resolve && Object.keys(branch.on_resolve).length > 0) {
+      blocks.push(branch.on_resolve);
+      const pf = planEffects([branch.on_resolve], draft, data);
+      if (!pf.ok) return mutationReject(pf.reason_code, pf.reason_text);
+      draft = pf.nextState;
+      shEnc = draft.run.active_encounter;
+    }
+
+    let outcome = '';
+    const nextRoundVal = branch?.next_round;
+    if (!nextRoundVal) {
+      outcome = hit ? 'victory' : 'failure';
+    } else {
+      const nextRid = nextRoundVal;
+      const visited = shEnc.visited_round_ids
+        ? [...shEnc.visited_round_ids]
+        : [];
+      if (visited.includes(nextRid)) {
+        // cycle detected
+        outcome = 'failure';
+      } else {
+        visited.push(nextRid);
+        shEnc.visited_round_ids = visited;
+        shEnc.round_id = nextRid;
+        shEnc.blocked_slots = (shEnc.blocked_slots ?? 0) + cost;
+
+        const nextRoundData = getRound(enc, nextRid);
+        if (checkEncounterCapacityFailure(draft, data)) {
+          outcome = 'failure';
+        } else if (
+          !nextRoundData ||
+          !hasLegalMoves(enc, nextRoundData, shEnc, draft, data)
+        ) {
+          outcome = 'failure';
+        }
+      }
+    }
+
+    const plan = planEncounterAction(enc, blocks, loseCards, shEnc, outcome);
+    return commitEncounterAction(plan);
+  }
+
+  function discardInEncounter(cardId: string): MutationResult {
+    if (state.flow.mode !== 'run') {
+      return mutationReject('not_run', REASON_TEXT_NOT_RUN);
+    }
+
+    // 1. inactive
+    if (Object.keys(state.run.active_encounter).length === 0) {
+      return mutationReject('no_active_encounter', '目前沒有進行中的遭遇');
+    }
+
+    // 2. wrong stage
+    if (state.run.active_encounter.stage !== 'round') {
+      return mutationReject('wrong_stage', '目前不是回應回合階段');
+    }
+
+    // 3. discard disabled
+    const beatId = state.run.active_encounter.beat_id ?? '';
+    const beat = data.beatsById.get(beatId);
+    const enc = beat?.encounter;
+    if (enc?.allow_discard === false) {
+      return mutationReject('discard_disabled', '此遭遇不允許主動丟棄');
+    }
+
+    // 4. unknown card
+    if (!cardId || typeof cardId !== 'string') {
+      return mutationReject('unknown_card', '未知的卡片');
+    }
+    const baseId = cardBaseId(cardId);
+    if (!data.cardsById.has(baseId)) {
+      return mutationReject('unknown_card', '未知的卡片');
+    }
+
+    // 5. not held
+    if (!hasCard(cardId)) {
+      return mutationReject('not_held', '未持有該卡片');
+    }
+
+    // 6. not discardable
+    if (baseId === 'madness' || state.run.madness_clock[cardId] !== undefined) {
+      return mutationReject('not_discardable', '發狂卡不可丟棄');
+    }
+    const cardDef = data.cardsById.get(baseId)!;
+    if (cardDef.discardable !== true) {
+      return mutationReject('not_discardable', '此卡片不可丟棄');
+    }
+
+    // 丟棄先在複本判定，再一次落地
+    const draft = cloneSnapshot(state as GameSnapshot);
+    loseCard(draft, cardId, data);
+    const roundId = state.run.active_encounter.round_id ?? '';
+    const roundData = enc ? getRound(enc, roundId) : null;
+    const shEnc = draft.run.active_encounter;
+    const outOfMoves =
+      !enc || !roundData || !hasLegalMoves(enc, roundData, shEnc, draft, data);
+    const plan = planEncounterAction(
+      enc ?? ({} as Encounter),
+      [],
+      [cardId],
+      shEnc,
+      outOfMoves ? 'failure' : '',
+    );
+    return commitEncounterAction(plan);
+  }
+
+  function escapeEncounter(cardIds: readonly string[]): MutationResult {
+    if (state.flow.mode !== 'run') {
+      return mutationReject('not_run', REASON_TEXT_NOT_RUN);
+    }
+
+    // 1. inactive
+    if (Object.keys(state.run.active_encounter).length === 0) {
+      return mutationReject('no_active_encounter', '目前沒有進行中的遭遇');
+    }
+
+    // 2. wrong stage
+    if (state.run.active_encounter.stage !== 'round') {
+      return mutationReject('wrong_stage', '目前不是回應回合階段');
+    }
+
+    // 3. cannot escape
+    const beatId = state.run.active_encounter.beat_id ?? '';
+    const beat = data.beatsById.get(beatId);
+    const enc = beat?.encounter;
+    const escVal = enc?.escape_cost;
+    if (escVal === null || escVal === undefined) {
+      return mutationReject('cannot_escape', '此遭遇無法逃離');
+    }
+
+    // 4. wrong escape count
+    const escCost = escVal;
+    if (cardIds.length !== escCost) {
+      return mutationReject('wrong_escape_count', '逃離支付張數不正確');
+    }
+
+    // 5. duplicate payment
+    const seenIds = new Set<string>();
+    for (let i = 0; i < cardIds.length; i += 1) {
+      const cid = cardIds[i];
+      if (seenIds.has(cid)) {
+        return mutationReject('duplicate_payment', '支付卡片重複');
+      }
+      seenIds.add(cid);
+    }
+
+    // 6. unknown card, 7. not held, 8. not discardable
+    for (let i = 0; i < cardIds.length; i += 1) {
+      const cid = cardIds[i];
+      if (!cid || typeof cid !== 'string') {
+        return mutationReject('unknown_card', '未知的卡片');
+      }
+      const baseId = cardBaseId(cid);
+      if (!data.cardsById.has(baseId)) {
+        return mutationReject('unknown_card', '未知的卡片');
+      }
+      if (!hasCard(cid)) {
+        return mutationReject('not_held', '未持有支付卡片');
+      }
+      if (baseId === 'madness' || state.run.madness_clock[cid] !== undefined) {
+        return mutationReject('not_discardable', '發狂卡不可作為逃離代價');
+      }
+      const cardDef = data.cardsById.get(baseId)!;
+      if (cardDef.discardable !== true) {
+        return mutationReject(
+          'not_discardable',
+          '不可丟棄卡無法作為逃離代價',
+        );
+      }
+    }
+
+    const paid = [...cardIds];
+    const plan = planEncounterAction(enc!, [], paid, {}, 'escape');
+    return commitEncounterAction(plan);
+  }
+
   return {
     getSnapshot,
     serialize,
@@ -2538,5 +3125,10 @@ export function createGame(
     advanceEndingPage,
     skipSeenEnding,
     completeEnding,
+    encounterView,
+    acknowledgeEncounterIntro,
+    respondToEncounter,
+    discardInEncounter,
+    escapeEncounter,
   };
 }

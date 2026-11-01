@@ -441,15 +441,24 @@ describe('W6-A night locations, sleep and alignment', async () => {
     expect(d24.enterNightLocation('n_queue').ok).toBe(true);
   });
 
-  it('D8 charge_first_visit：首次強制到訪先收費；遭遇本身仍原子拒絕（W6-D），撞 cap 則進 BE', () => {
-    // 遭遇未接：整筆拒絕，連收費也不留下
+  it('D8 charge_first_visit：首次強制到訪先收費並啟動遭遇（W6-D），撞 cap 則進 BE', () => {
+    // 首次到訪 D8 night：收取 1 張發狂卡，啟動遭遇進入 intro stage
     const d8 = createGame(data, injectAt(8, 'night'));
-    const rejected = expectRejectsWithoutChange(d8, () => d8.playNightFixed(), 'not_implemented');
-    expect(rejected.reason_text).toContain('W6-D');
-    // 前一時段進 D8 night 同樣在 mutation 前原子拒絕（遭遇由 W6-D 負責）
+    const initialHandCount = d8.getSnapshot().run.hand.length;
+    const res = d8.playNightFixed();
+    expect(res.ok).toBe(true);
+    expect(d8.getSnapshot().run.hand.length).toBe(initialHandCount + 1);
+    expect(d8.getSnapshot().meta.night_locations_seen.n_manydoors).toBe(true);
+    expect(d8.encounterView().stage).toBe('intro');
+
+    // 前一時段進 D8 night：正常推進至 night
     const eve = createGame(data, injectAt(8, 'evening'));
-    expect(eve.getPhaseView().can_advance).toBe(false);
-    expectRejectsWithoutChange(eve, () => eve.advancePhase(), 'not_implemented');
+    expect(eve.getPhaseView().can_advance).toBe(true);
+    const advRes = eve.advancePhase();
+    expect(advRes.ok).toBe(true);
+    expect(advRes.phase_advanced).toBe(true);
+    expect(eve.getSnapshot().run.phase).toBe('night');
+
     // 首次收費撞 cap：進 madness_cap 結局，不播 beat，到訪保留
     const capped = createGame(
       data,
@@ -632,7 +641,7 @@ describe('W6-A night locations, sleep and alignment', async () => {
     expect(both.confirmNightAlignment('temple').reason_code).toBe('already_known');
   });
 
-  it('greedy 夜間走查（自然從開局走到 D8 evening）：先 fixed 再查可進地點，未 seen 收費 row 優先，D8 night 前被遭遇守衛擋下', () => {
+  it('greedy 夜間走查（自然從開局走到 D8）：先 fixed 再查可進地點，未 seen 收費 row 優先，D8 遭遇完整結算並退出', () => {
     const game = createRunForTrace(data);
     const log: string[] = [];
     for (let guard = 0; guard < 60; guard += 1) {
@@ -642,18 +651,25 @@ describe('W6-A night locations, sleep and alignment', async () => {
       } else if (phase === 'night') {
         executeGreedyNightPhase(game, data);
         log.push(`D${day}:${game.getSnapshot().run.night_location_chosen}`);
+        if (day === 8) {
+          // D8 night 遭遇結算完畢後退出，在此有效檢查點驗證狀態
+          break;
+        }
       }
       let res = game.advancePhase();
       if (res.ok && !res.phase_advanced && game.getPhaseView().night_advance === 'next_day') {
         res = game.advancePhase();
       }
       if (!res.ok) {
-        expect(res.reason_code).toBe('not_implemented');
         break;
       }
     }
     const snap = game.getSnapshot();
-    expect([snap.run.day, snap.run.phase]).toEqual([8, 'evening']);
+    expect([snap.run.day, snap.run.phase]).toEqual([8, 'night']);
+    // 遭遇已結算且清空
+    expect(game.encounterView()).toEqual({});
+    // D8 首次收費強制到訪 n_manydoors 已被記錄在 log
+    expect(log[7]).toBe('D8:n_manydoors');
     // D1／D2 為 fixed 強制到訪；D3 引導不佔名額，之後逐夜依規則進入
     expect(log.slice(0, 3)).toEqual(['D1:n_corridor', 'D2:n_exit', 'D3:n_corridor']);
     // D6 起第一個未 seen 的收費 row（n_ahong_1）、D7 的 n_source 各發一張卡，倒數各走各的
@@ -662,6 +678,7 @@ describe('W6-A night locations, sleep and alignment', async () => {
     expect(snap.run.madness_clock).toEqual({
       'madness#1': countdown - 2,
       'madness#2': countdown - 1,
+      'madness#3': countdown,
     });
   });
 });

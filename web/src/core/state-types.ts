@@ -7,6 +7,9 @@
 
 import type { Phase } from '../data/types';
 import type { DelegationStatus } from './delegation';
+import type { EncounterView } from './encounter';
+export type { EncounterCandidateView, EncounterIntroView, EncounterRoundView, EncounterView } from './encounter';
+
 import type { EndingView } from './ending';
 import type {
   AlignmentOffer,
@@ -44,6 +47,17 @@ export type ReasonCode =
   | 'unknown_ending'
   | 'invalid_ending_source'
   | 'encounter_active'
+  | 'no_active_encounter'
+  | 'wrong_stage'
+  | 'unknown_card'
+  | 'madness_blocked'
+  | 'already_attempted'
+  | 'card_not_submittable'
+  | 'discard_disabled'
+  | 'not_discardable'
+  | 'cannot_escape'
+  | 'wrong_escape_count'
+  | 'duplicate_payment'
   | 'unresolved_choice_conflict'
   | 'phase_requirements_incomplete'
   | 'unknown_beat'
@@ -222,6 +236,11 @@ export interface AdvanceResult extends MutationResult {
   readonly phase_advanced: boolean;
 }
 
+/** 遭遇開場確認結果 */
+export interface EncounterAckResult extends MutationResult {
+  readonly entered_round?: boolean;
+}
+
 /** 卡片與知識唯讀投影（W5-A） */
 export interface CardView {
   readonly instanceId: string;
@@ -297,4 +316,9 @@ export interface Game {
   advanceEndingPage(): MutationResult;
   skipSeenEnding(): MutationResult;
   completeEnding(): MutationResult;
+  encounterView(): EncounterView;
+  acknowledgeEncounterIntro(): EncounterAckResult;
+  respondToEncounter(cardId: string): MutationResult;
+  discardInEncounter(cardId: string): MutationResult;
+  escapeEncounter(cardIds: readonly string[]): MutationResult;
 }

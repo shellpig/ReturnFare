@@ -59,6 +59,18 @@ export const strings = {
     not_day_layer: '這裡不是白天地點',
     no_seen_row: '還沒有在夜裡走到這裡',
     already_known: '已經對位過了',
+    // W6-D 新增：遭遇相關拒絕碼（scenes/ui/encounter_panel.gd _DISABLED_TEXTS 與 scripts/autoload/game_state.gd）。
+    madness_blocked: '發狂卡無法使用', // _DISABLED_TEXTS.madness_blocked
+    already_attempted: '本場已嘗試過', // _DISABLED_TEXTS.already_attempted
+    card_not_submittable: '無法提交此卡', // _DISABLED_TEXTS.card_not_submittable
+    no_active_encounter: '目前沒有進行中的遭遇', // scripts/autoload/game_state.gd
+    wrong_stage: '目前不是回應回合階段', // scripts/autoload/game_state.gd
+    unknown_card: '未知的卡片', // scripts/autoload/game_state.gd
+    discard_disabled: '此遭遇不允許主動丟棄', // scripts/autoload/game_state.gd
+    not_discardable: '此卡片不可丟棄', // scripts/autoload/game_state.gd
+    cannot_escape: '此遭遇無法逃離', // scripts/autoload/game_state.gd
+    wrong_escape_count: '逃離支付張數不正確', // scripts/autoload/game_state.gd
+    duplicate_payment: '支付卡片重複', // scripts/autoload/game_state.gd
   } as Record<string, string>,
   // scenes/ui/ending_panel.gd
   endingReveal: '顯示全文', // _MSG_ADVANCE_REVEAL
@@ -117,4 +129,22 @@ export const strings = {
   delegationTutorialTitle: '委託', // scenes/main.tscn DelegationTutorialDialog.title
   delegationTutorialText:
     '你拿到了第一張人物卡。你可以委託他們代你去做某些事——委託不佔用你的行動格，一天只能委託同一人一次，回報有些立即、有些要等到隔天上午。', // scenes/main.tscn DelegationTutorialDialog.dialog_text
+  // W6-D 遭遇介面文字（對齊 scenes/ui/encounter_panel.gd）
+  encounterRegion: '遭遇', // W6-D 新增：區域無障礙標籤，Godot 無對應原文
+  encounterIntroAck: '確認開場', // scenes/ui/encounter_panel.gd _MSG_INTRO_ACK
+  encounterCapacity: (available: number, capacity: number, blocked: number) =>
+    `可用格數 ${available} / ${capacity}（壓力佔 ${blocked}）`, // scenes/ui/encounter_panel.gd _FMT_CAPACITY
+  encounterCandidateKnowledge: (name: string) => `${name}（知識）`, // scenes/ui/encounter_panel.gd _FMT_CANDIDATE_KNOWLEDGE
+  encounterDetail: '詳情', // scenes/ui/encounter_panel.gd detail_btn.text
+  encounterDiscardBtn: (name: string) => `丟棄：${name}`, // scenes/ui/encounter_panel.gd _FMT_DISCARD_BTN
+  encounterEscapeFree: '逃離', // scenes/ui/encounter_panel.gd _MSG_ESCAPE_FREE
+  encounterEscapeCost: (cost: number) => `逃離（支付 ${cost} 張）`, // scenes/ui/encounter_panel.gd _FMT_ESCAPE_COST
+  encounterEscapePay: (name: string) => `支付 ${name} 逃離`, // scenes/ui/encounter_panel.gd _FMT_ESCAPE_PAY
+  encounterRespondTitle: '確認提交', // scenes/ui/encounter_panel.gd _MSG_RESPOND_TITLE
+  encounterRespondText: (name: string) => `提交「${name}」回應遭遇？`, // scenes/ui/encounter_panel.gd _FMT_RESPOND_TEXT
+  encounterDiscardTitle: '確認丟棄', // scenes/ui/encounter_panel.gd _MSG_DISCARD_TITLE
+  encounterDiscardText: (name: string) => `丟棄「${name}」？這張卡會從手上消失。`, // scenes/ui/encounter_panel.gd _FMT_DISCARD_TEXT
+  encounterEscapeTitle: '確認逃離', // scenes/ui/encounter_panel.gd _MSG_ESCAPE_TITLE
+  encounterEscapeFreeText: '確定逃離遭遇？', // scenes/ui/encounter_panel.gd _MSG_ESCAPE_FREE_TEXT
+  encounterEscapeText: (name: string) => `支付「${name}」逃離遭遇？`, // scenes/ui/encounter_panel.gd _FMT_ESCAPE_TEXT
 } as const;

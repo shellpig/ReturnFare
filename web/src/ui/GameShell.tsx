@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TriState } from '../core/panel';
 import type { Game } from '../core/state-types';
+import { EncounterPanel } from './EncounterPanel';
 import { EndingPanel } from './EndingPanel';
 import { HandPanel } from './HandPanel';
 import { LocationPanel } from './LocationPanel';
@@ -29,6 +30,9 @@ export function GameShell({ game }: { game: Game }) {
     useState<ActiveLocationState | null>(null);
   // 夜間地點詳情（唯讀）；進入前不改任何狀態。
   const [nightDetailId, setNightDetailId] = useState<string | null>(null);
+  // 遭遇歷程文字與結束後的結果文字（W6-D）。
+  const [encounterActionLines, setEncounterActionLines] = useState<readonly string[]>([]);
+  const [encounterResultLines, setEncounterResultLines] = useState<readonly string[]>([]);
 
   // 離開 run（進結局或回開局）時清掉上一輪的面板、演出進度與錯誤，避免殘留到下一輪。
   useEffect(() => {
@@ -37,6 +41,8 @@ export function GameShell({ game }: { game: Game }) {
       setNightDetailId(null);
       setIndex(0);
       setError('');
+      setEncounterActionLines([]);
+      setEncounterResultLines([]);
     }
   }, [snapshot.flow.mode]);
 
@@ -59,6 +65,8 @@ export function GameShell({ game }: { game: Game }) {
     setNightDetailId(null);
     setIndex(0);
     setError('');
+    setEncounterActionLines([]);
+    setEncounterResultLines([]);
     // 夜間睡覺停拍沒有換時段：睡覺文字已是這個時段要讀的演出，不再重播入夜 fixed。
     if (!result.phase_advanced) {
       return;
@@ -214,6 +222,46 @@ export function GameShell({ game }: { game: Game }) {
     handleActionResult(game.delegate(beatId, slotId, personCardId));
   }
 
+  function handleEncounterMutation(result: {
+    ok: boolean;
+    reason_code: string;
+    reason_text: string;
+    lines: readonly string[];
+  }) {
+    if (!result.ok) {
+      setError(
+        result.reason_text ||
+          strings.reasonCodes[result.reason_code] ||
+          result.reason_code,
+      );
+      return;
+    }
+    setError('');
+    const curEnc = game.encounterView();
+    if (!('stage' in curEnc)) {
+      setEncounterResultLines(result.lines);
+      setEncounterActionLines([]);
+    } else {
+      setEncounterActionLines(result.lines);
+    }
+  }
+
+  function handleAckIntro() {
+    handleEncounterMutation(game.acknowledgeEncounterIntro());
+  }
+
+  function handleRespondEncounter(cardId: string) {
+    handleEncounterMutation(game.respondToEncounter(cardId));
+  }
+
+  function handleDiscardEncounter(cardId: string) {
+    handleEncounterMutation(game.discardInEncounter(cardId));
+  }
+
+  function handleEscapeEncounter(cardIds: readonly string[]) {
+    handleEncounterMutation(game.escapeEncounter(cardIds));
+  }
+
   let advanceText: string = strings.advance;
   if (view.phase === 'morning' || view.phase === 'afternoon') {
     const hasAction = game.hasAnyLegalAction();
@@ -257,9 +305,45 @@ export function GameShell({ game }: { game: Game }) {
     </ModalDialog>
   );
 
+  const encounterView = game.encounterView();
+  if ('stage' in encounterView) {
+    return (
+      <section className="encounter-shell">
+        <header>
+          {strings.status(view.day, strings.phases[view.phase], view.chapter)}
+        </header>
+        <EncounterPanel
+          game={game}
+          introLines={view.lines}
+          lastActionLines={encounterActionLines}
+          onAckIntro={handleAckIntro}
+          onRespond={handleRespondEncounter}
+          onDiscard={handleDiscardEncounter}
+          onEscape={handleEscapeEncounter}
+        />
+        {error && (
+          <p role="alert" className="reason">
+            {error}
+          </p>
+        )}
+        <HandPanel game={game} />
+        {delegationTutorial}
+      </section>
+    );
+  }
+
   if (view.narration_only || index < view.lines.length) {
     return (
       <section className="narration-shell">
+        {encounterResultLines.length > 0 && (
+          <div className="encounter-result-banner" data-testid="encounter-result">
+            {encounterResultLines.map((line, idx) => (
+              <p key={idx} className="story encounter-result-line">
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
         {view.forced_lines.length > 0 && (
           <div className="forced-narrative-banner" data-testid="forced-narrative">
             {view.forced_lines.map((line, idx) => (
@@ -322,6 +406,15 @@ export function GameShell({ game }: { game: Game }) {
         />
       ) : (
         <>
+          {encounterResultLines.length > 0 && (
+            <div className="encounter-result-banner" data-testid="encounter-result">
+              {encounterResultLines.map((line, idx) => (
+                <p key={idx} className="story encounter-result-line">
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
           {view.forced_lines.length > 0 && (
             <div className="forced-narrative-banner" data-testid="forced-narrative">
               {view.forced_lines.map((line, idx) => (

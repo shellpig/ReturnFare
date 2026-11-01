@@ -71,6 +71,82 @@ function playedNightLayerFixed(
 }
 
 /**
+ * 自動完整結算遭遇（對齊 Godot playthrough_greedy.gd solve_active_encounter_if_any，K-142）。
+ * 依序嘗試：intro 確認 -> round 合法回應 -> 逃離 -> 主動丟棄。
+ */
+export function solveActiveEncounterIfAny(game: Game): void {
+  let safetyCap = 25;
+  while ('stage' in game.encounterView() && safetyCap > 0) {
+    safetyCap -= 1;
+    const view = game.encounterView();
+    if (view.stage === 'intro') {
+      const ackRes = game.acknowledgeEncounterIntro();
+      if (!ackRes.ok) {
+        break;
+      }
+      continue;
+    } else if (view.stage === 'round') {
+      let responded = false;
+      for (const cand of view.candidates) {
+        if (cand.submittable) {
+          const res = game.respondToEncounter(cand.card_id);
+          if (res.ok) {
+            responded = true;
+            break;
+          }
+        }
+      }
+      if (responded) {
+        continue;
+      }
+
+      // 無法回應時嘗試逃離
+      if (view.can_escape) {
+        const escCost = view.escape_cost ?? 0;
+        const discCards: string[] = [];
+        for (const cand of view.candidates) {
+          if (discCards.length === escCost) break;
+          if (cand.source === 'hand' && cand.discardable) {
+            discCards.push(cand.card_id);
+            if (discCards.length === escCost) {
+              break;
+            }
+          }
+        }
+        if (discCards.length === escCost) {
+          const escRes = game.escapeEncounter(discCards);
+          if (escRes.ok) {
+            break;
+          }
+        }
+      }
+
+      // 無法逃離時嘗試主動丟棄
+      if (view.allow_discard) {
+        let discarded = false;
+        for (const cand of view.candidates) {
+          if (cand.source === 'hand' && cand.discardable) {
+            const dRes = game.discardInEncounter(cand.card_id);
+            if (dRes.ok) {
+              discarded = true;
+              break;
+            }
+          }
+        }
+        if (discarded) {
+          continue;
+        }
+      }
+
+      break;
+    }
+  }
+  if ('stage' in game.encounterView()) {
+    throw new Error('Greedy 遭遇未能結算，不得略過仍進行中的遭遇');
+  }
+}
+
+/**
  * 夜間走法（對照 Godot playthrough_greedy.gd execute_night_phase）：
  * 1. 先 playNightFixed（fixed／遭遇）。
  * 2. 只有本次實際播出 night-layer fixed 並強制到訪，才套 chosen／seen 斷言，並確認沒有第二個可進地點；
@@ -86,6 +162,7 @@ export function executeGreedyNightPhase(game: Game, data: GameData): void {
       `[D${day} night] playNightFixed 失敗：${nfRes.reason_code} (${nfRes.reason_text})`,
     );
   }
+  solveActiveEncounterIfAny(game);
   const afterNf = game.getSnapshot();
   const locationIds = game.availableLocations();
 
@@ -126,6 +203,7 @@ export function executeGreedyNightPhase(game: Game, data: GameData): void {
 
 /** 推進一個時段；夜間睡覺停拍（phase_advanced:false）時再按一次「進入隔天」。 */
 function advanceGreedyPhase(game: Game, day: number, phase: string): void {
+  solveActiveEncounterIfAny(game);
   let advRes = game.advancePhase();
   if (advRes.ok && !advRes.phase_advanced && game.getPhaseView().night_advance === 'next_day') {
     advRes = game.advancePhase();
@@ -183,6 +261,10 @@ export function runGreedyW3(data: GameData): GreedyWalkResult {
 }
 
 function executeGreedyActionPhase(game: Game): void {
+  if ('stage' in game.encounterView()) {
+    solveActiveEncounterIfAny(game);
+    return;
+  }
   const locs = game.availableLocations();
   const playedBeats: Record<string, boolean> = {};
   let changed = true;
