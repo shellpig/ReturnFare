@@ -192,21 +192,21 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
       ),
     ).toThrow(ConditionError);
 
-    // planEffects: if a later key in the same or subsequent block is unimplemented, zero state and zero lines leak
+    // planEffects: if a later key in the same or subsequent block has bad data, zero state and zero lines leak
     const beforeJson = JSON.stringify(draft);
     const failedPlan = planEffects(
       [
         {
           text: '這段文字不應流出',
           gain: ['k_not_today'],
-          festival_proxy: { mode: 'fixed', npc: 'ajie' },
+          festival_proxy: { mode: 'fixed', npc: 'nonexistent_candidate' },
         },
       ],
       draft,
       data,
     );
     expect(failedPlan.ok).toBe(false);
-    expect(failedPlan.reason_code).toBe('not_implemented');
+    expect(failedPlan.reason_code).toBe('data_conflict');
     expect(failedPlan.lines).toEqual([]);
     expect(JSON.stringify(draft)).toBe(beforeJson);
     expect(JSON.stringify(failedPlan.nextState)).toBe(beforeJson);

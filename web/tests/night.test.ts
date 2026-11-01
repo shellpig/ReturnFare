@@ -473,7 +473,7 @@ describe('W6-A night locations, sleep and alignment', async () => {
     expect(snap.meta.night_once_beats_seen).toEqual({});
   });
 
-  it('機制守衛：日期不再是守衛，仍未接的系統在 mutation 前原子拒絕', () => {
+  it('一般推進不受日期守衛；D45 缺少凍結代付者時原子拒絕', () => {
     // D3 之後的一般推進（含夜間換日）直接通過
     const d10 = createGame(data, injectAt(10, 'morning'));
     expect(d10.advancePhase().phase_advanced).toBe(true);
@@ -488,7 +488,7 @@ describe('W6-A night locations, sleep and alignment', async () => {
 
     const guards: [string, GameSnapshot][] = [
       [
-        'D45 結局收束（phase_exit ending，E2）',
+        'D45 結局缺少凍結代付者',
         injectAt(45, 'evening', (s) => {
           s.run.flags.final_day = true;
           s.run.choices['d45_then::d45_coda'] = 'empty_handed';
@@ -502,7 +502,7 @@ describe('W6-A night locations, sleep and alignment', async () => {
       expect(game.getPhaseView().can_advance, label).toBe(false);
       const res = game.advancePhase();
       expect(res.ok, label).toBe(false);
-      expect(res.reason_code, label).toBe('not_implemented');
+      expect(res.reason_code, label).toBe('data_conflict');
       expect(JSON.stringify(game.serialize()), label).toBe(before);
     }
   });

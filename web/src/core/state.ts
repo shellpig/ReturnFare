@@ -1269,18 +1269,28 @@ function preflightAdvancePhase(
 
   // ⑥ 目標時段與可能結局／到期遭遇預檢
   if (gate.ending !== '') {
-    if (!data.endingsById.has(gate.ending)) {
+    const started = startEndingOnDraft(draft, gate.ending, gate.source, data, {
+      fromMode: 'run',
+    });
+    if (!started.ok) {
       return rejectAdvancePlan(
         currentState,
-        'data_conflict',
-        `未知的結局：${gate.ending}`,
+        started.reason_code,
+        started.reason_text,
       );
     }
-    return rejectAdvancePlan(
-      currentState,
-      'not_implemented',
-      'D45 結局收束將於 W6-E2 實作',
-    );
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      nextState: draft,
+      defaultLines,
+      forcedLines: [],
+      autoEnterLines: [],
+      delegationReportLines: [],
+      phaseAdvanced: false,
+      stopLines: [],
+    };
   }
 
   const target = nextPhaseTarget(currentState.run.day, currentState.run.phase);
@@ -2049,19 +2059,22 @@ export function createGame(
     commitState(plan.nextState);
     if (!plan.phaseAdvanced) {
       // 夜間睡覺停拍（或睡覺效果把玩家推進結局）：時段不動，睡覺文字成為這個時段要讀的演出。
+      // D45 phase_exit 結局：時段不動，逾期預設文字依序保留。
       if (plan.stopLines.length > 0) {
         lastChoiceDefaultLines = [];
         lastForcedLines = [];
         lastAutoEnterLines = [];
         lastDelegationReportLines = [];
         phaseNarrationLines = [...plan.stopLines];
+      } else {
+        lastChoiceDefaultLines = plan.defaultLines;
       }
       notifyListeners();
       return {
         ok: true,
         reason_code: '',
         reason_text: '',
-        lines: plan.stopLines,
+        lines: plan.stopLines.length > 0 ? plan.stopLines : plan.defaultLines,
         phase_advanced: false,
       };
     }

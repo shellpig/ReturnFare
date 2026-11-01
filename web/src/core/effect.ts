@@ -9,8 +9,8 @@
  *   之後檢查發狂上限，撞 cap 只記錄第一個 madness_cap 請求，最後與明示 ending 合併成至多一個請求。
  * - W6-E1 實作：ending 只收集結局請求（source 固定 ending_effect），不在此啟動結局；
  *   同一動作提出兩個不同請求整筆 data_conflict。配對與快照由呼叫端的結局規劃驗證。
- * - 遇到未實作效果鍵（festival_proxy）或未知鍵時，
- *   整筆交易回傳 ok: false（not_implemented 或 data_conflict），零半套狀態、零已收集文字。
+ * - W6-E2 實作：festival_proxy（fixed 與 highest_eligible，一次性寫入 selected_festival_proxy_npc）。
+ * - 遇到未知效果鍵時，整筆交易回傳 ok: false（data_conflict），零半套狀態、零已收集文字。
  */
 
 import type { Condition, Effect, GameData } from '../data/types';
@@ -390,13 +390,78 @@ export function planEffects(
       }
     }
 
-    // 9. festival_proxy（W6-E2 接手）
+    // 9. festival_proxy（W6-E2）
     if ('festival_proxy' in raw && raw.festival_proxy !== undefined) {
-      return rejectPlan(
-        state,
-        'not_implemented',
-        'EffectApply: festival_proxy 效果將於 W6-E2 實作',
-      );
+      if (!isPlainObject(raw.festival_proxy)) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: festival_proxy 必須為物件',
+        );
+      }
+      if (
+        draft.run.selected_festival_proxy_npc !== null &&
+        draft.run.selected_festival_proxy_npc.length > 0
+      ) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: 慶典代付者已凍結，不得覆寫',
+        );
+      }
+      const fpRaw = raw.festival_proxy as Record<string, unknown>;
+      const mode = fpRaw.mode;
+      if (mode !== 'fixed' && mode !== 'highest_eligible') {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          `EffectApply: 未知的 festival_proxy mode：${String(mode)}`,
+        );
+      }
+      if (mode === 'fixed') {
+        const npcId = typeof fpRaw.npc === 'string' ? fpRaw.npc : '';
+        if (
+          npcId.length === 0 ||
+          !data.npcsById.has(npcId) ||
+          data.npcsById.get(npcId)?.festival_proxy_eligible !== true
+        ) {
+          return rejectPlan(
+            state,
+            'data_conflict',
+            `EffectApply: fixed 引用非慶典候選 NPC：${npcId}`,
+          );
+        }
+        draft.run.selected_festival_proxy_npc = npcId;
+      } else {
+        const fallback =
+          typeof fpRaw.fallback === 'string' ? fpRaw.fallback : '';
+        if (
+          fallback.length === 0 ||
+          !data.npcsById.has(fallback) ||
+          data.npcsById.get(fallback)?.festival_proxy_eligible !== true
+        ) {
+          return rejectPlan(
+            state,
+            'data_conflict',
+            `EffectApply: fallback 引用非慶典候選 NPC：${fallback}`,
+          );
+        }
+        let best = '';
+        let bestCount = 0;
+        for (let n = 0; n < data.npcs.length; n += 1) {
+          const npc = data.npcs[n];
+          if (npc.festival_proxy_eligible !== true) {
+            continue;
+          }
+          const count = draft.run.npc_action_counts[npc.id] ?? 0;
+          if (count > bestCount) {
+            bestCount = count;
+            best = npc.id;
+          }
+        }
+        draft.run.selected_festival_proxy_npc =
+          best.length > 0 ? best : fallback;
+      }
     }
 
     // 10. ending：只收集請求；啟動由呼叫端在 preflight 全數成功後統一處理

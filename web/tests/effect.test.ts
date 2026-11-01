@@ -255,24 +255,24 @@ describe('planEffects (W5-B)', async () => {
       expect(JSON.stringify(badPlan.nextState)).toBe(originalSerialized);
     }
 
-    // 2. Encountering festival_proxy
+    // 2. Encountering bad festival_proxy (non-eligible candidate) atomically rejects with data_conflict
     const proxyPlan = planEffects(
       [
         {
           text: '這段也不該外洩',
           flag: { leaked_flag2: true },
-          festival_proxy: { mode: 'fixed', npc: 'ajie' },
+          festival_proxy: { mode: 'fixed', npc: 'uncle' },
         },
       ],
       state,
       data,
     );
     expect(proxyPlan.ok).toBe(false);
-    expect(proxyPlan.reason_code).toBe('not_implemented');
+    expect(proxyPlan.reason_code).toBe('data_conflict');
     expect(proxyPlan.lines).toEqual([]);
     expect(JSON.stringify(proxyPlan.nextState)).toBe(originalSerialized);
 
-    // 3. Direct gain of the madness card shares the same primitive; a later unimplemented key still rolls everything back
+    // 3. Direct gain of the madness card shares the same primitive; a later bad festival_proxy key still rolls everything back
     const gainMadnessPlan = planEffects(
       [{ text: '繞道取得發狂卡', gain: ['madness'] }],
       state,
@@ -289,14 +289,14 @@ describe('planEffects (W5-B)', async () => {
           text: '這段文字不該外洩',
           gain: ['madness'],
           madness: 1,
-          festival_proxy: { mode: 'fixed', npc: 'ajie' },
+          festival_proxy: { mode: 'highest_eligible', fallback: 'uncle' },
         },
       ],
       state,
       data,
     );
     expect(madnessThenProxy.ok).toBe(false);
-    expect(madnessThenProxy.reason_code).toBe('not_implemented');
+    expect(madnessThenProxy.reason_code).toBe('data_conflict');
     expect(madnessThenProxy.lines).toEqual([]);
     expect(JSON.stringify(madnessThenProxy.nextState)).toBe(originalSerialized);
 
