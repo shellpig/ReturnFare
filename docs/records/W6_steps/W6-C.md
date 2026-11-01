@@ -55,3 +55,29 @@ Catalog（實際 build）：66 卡／48 地點／18 NPC／271 beat／4 ending／
 
 - 交 verifier 驗收 W6-C；驗收後才更新 PROJECT_BRIEF.md 與本步驗收結論。
 - 通過後依 W6 契約接 W6-D（遭遇）。
+
+## Verifier 獨立驗收（2026-11-01）
+
+- 結論：**W6-C 已完成並通過驗收**，無 P0／P1／P2；2 項 P3 不阻擋，未修正，列於下方。
+- 受驗版本：`main@ca39037`（實作 `639584a`＋指揮紀錄）；本段紀錄與文件關門同一 commit 提交，未改程式碼。
+- 規則對照：`delegate` 與 `game_state.gd` `delegate()` 11 步逐條一致（not_run → encounter_active → not_action_phase → unknown_beat（時段／condition）→ unknown_slot → not_delegation → not_held → not_person → not_accepted → already_delegated_today → locked（beat／slot requires，帶 reject_reason）→ already_resolved（slots_placed／choice_group）→ data_conflict（timing／report 結構））；成功時寫 slot／choice 記帳與 delegates_used_today，next_morning 才排 pending（只存 due_day／beat_id／slot_id／person_id），不扣主角行動；`tryPlace`／`choose` 委託槽轉 `delegate`。
+- 換日：morning 先 tick／forced，再依 pending 順序結算 report，與 `_settle_pending_delegation_reports` 一致（接點壞或效果失敗保留並報錯、每筆出列與效果同提交、進結局即停），最後清 delegates_used_today。教學在顯示並關閉後才寫 meta。
+
+| 獨立檢查（使用者指定只跑相關測試） | 結果 |
+|---|---|
+| `npx vitest run tests/delegation.test.ts tests/choice.test.ts tests/placement.test.ts tests/state.test.ts` | exit 0；4 files／28 tests |
+| `npm run build` | exit 0 |
+| `npx playwright test tests/ui/delegation.spec.ts tests/ui/choice.spec.ts --workers=1` | exit 0；4／4 |
+| 每日限制變異（verifier） | 停用 bookkeeping 寫入 delegates_used_today，delegation.test 3 筆轉紅（immediate 阿杰、next_morning 阿珠、同人每日限制）；還原後 git diff 無殘留，12／12 |
+| 正式產物隔離 | dist JS 無 `__testGame`、`__w6c`、`snap_override`、`createRunForTrace`（0 檔） |
+
+- 未重跑：全套 Node／UI、W5／W3 軌跡、指揮者 morning report 變異（沿用上方證據 191／191、16／16、12／560 與 5／187 0 diff）、Godot。
+
+| 發現 | 等級 | 建議 |
+|---|---|---|
+| 回報中途失敗或觸發結局時，Godot 不寫本輪 `last_delegation_report_lines`；TS 保留中斷前已成功各筆文字。狀態相同，僅顯示文字不同；結局時改顯示結局畫面 | P3 | E2 整合時決定是否對齊 Godot |
+| `settlePendingDelegationReportsOnDraft` 回傳的 `ok` 恆為 true（與 W6-B 同類） | P3 | 後續動到該函式時移除或改為真實狀態 |
+
+## 驗收後下一步
+
+- 依 W6 施工順序接 W6-D（遭遇）。
