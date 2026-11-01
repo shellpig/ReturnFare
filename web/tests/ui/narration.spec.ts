@@ -41,7 +41,9 @@ test('phone path displays each original passage through the first night', async 
   await read(nights.find((b: { id: string }) => b.id === 'n_corridor_ch1').text);
   await phase();
   await expect(page.locator('header')).toContainText('第 2 天');
-  await expect(advance).toBeDisabled();
+  const phaseAdvance = page.locator('.phase-actions button');
+  await expect(phaseAdvance).toBeEnabled();
+  await expect(phaseAdvance).toHaveText('推進時段（還有演出沒看）');
   await expect(page.locator('.map-panel')).toBeVisible();
   await expect(page.getByRole('button', { name: '山泉閣' })).toBeEnabled();
 });

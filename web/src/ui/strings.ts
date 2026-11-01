@@ -5,6 +5,13 @@ export const strings = {
   cancel: '取消',
   continue: '繼續演出', // scenes/ui/location_panel.tscn AdvanceBeatButton
   advance: '推進時段', // scenes/main.gd _MSG_ADVANCE；scenes/main.tscn AdvanceButton
+  advanceUnseen: '推進時段（還有演出沒看）', // scenes/main.gd _MSG_ADVANCE_UNSEEN
+  advanceHint: '推進時段（目前無可做動作）', // scenes/main.gd _MSG_ADVANCE_HINT
+  placeCard: '放入卡片',
+  preview: '預覽',
+  placeableCardsTitle: '可放置卡片：',
+  noPlaceableCards: '無可放置卡片',
+  previewReason: (reason: string) => `理由：${reason}`,
   loading: '載入中...', // scenes/main.tscn StatusLabel 初始文字
   dataError: '資料載入失敗', // scenes/main.gd _MSG_DATA_ERROR，去掉僅適用 Godot 編輯器的「詳情見 Output。」
   status: (day: number, phase: string, chapter: number) => `第 ${day} 天  ${phase}  第 ${chapter} 章`, // scenes/main.gd _FMT_STATUS

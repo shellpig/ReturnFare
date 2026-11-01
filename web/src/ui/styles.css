@@ -32,6 +32,8 @@ dialog::backdrop { background: #251c16aa; }
 .beat-group { border-top: 1px solid #d7cdbb; padding-top: .75rem; margin-top: 1rem; }
 .slot-list { display: grid; gap: .75rem; }
 .slot-item { padding: .85rem 1rem; border: 1px solid #c5b99f; background: #f3ede0; }
+.slot-interactive { cursor: pointer; transition: background-color .15s ease; }
+.slot-interactive:hover { background: #eae2d1; }
 .slot-locked { opacity: .72; background: #ebe4d5; }
 .slot-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
 .slot-occupant { color: #6b523d; font-weight: bold; }
@@ -39,6 +41,18 @@ dialog::backdrop { background: #251c16aa; }
 .slot-occupant::after { content: '〕'; }
 .slot-accept-types { color: #806e5a; font-size: .92rem; }
 .slot-delegation-preview, .slot-delegation-tendency, .slot-reason { margin: .4rem 0 0; }
+.slot-actions { margin-top: .6rem; }
+.slot-place-btn { padding: .35rem .75rem; font-size: .88rem; }
+.action-result-box { margin-bottom: 1rem; padding: .85rem 1rem; border-left: 3px solid #6b523d; background: #fbf7ef; }
+.action-result-line { margin: .25rem 0; color: #3b2c20; }
+.card-picker-dialog, .slot-preview-dialog { max-height: 80vh; max-width: 500px; width: 90vw; overflow-y: auto; }
+.candidate-list { display: flex; flex-direction: column; gap: .5rem; margin: 1rem 0; }
+.candidate-card-btn { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: .6rem .8rem; }
+.candidate-name { font-weight: bold; color: #614b39; }
+.candidate-text { font-size: .88rem; margin: .25rem 0 0; }
+.preview-list { margin: .5rem 0 1rem 1.5rem; }
+.preview-item { margin: .25rem 0; }
+.preview-heading { font-weight: bold; color: #614b39; }
 .phase-actions { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d7cdbb; }
 .hand-panel { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #d7cdbb; }
 .hand-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; font-size: .95rem; color: #614b39; }

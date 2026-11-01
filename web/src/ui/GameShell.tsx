@@ -15,6 +15,7 @@ interface ActiveLocationState {
   playedBeatIds: string[];
   beatTitle: string;
   beatLines: readonly string[];
+  actionResultLines: readonly string[];
 }
 
 export function GameShell({ game }: { game: Game }) {
@@ -68,6 +69,7 @@ export function GameShell({ game }: { game: Game }) {
         playedBeatIds: [firstOpen.id],
         beatTitle: firstOpen.title || strings.noTitle,
         beatLines: res.lines,
+        actionResultLines: [],
       });
     } else {
       setActiveLocation({
@@ -76,6 +78,7 @@ export function GameShell({ game }: { game: Game }) {
         playedBeatIds: [],
         beatTitle: '',
         beatLines: [],
+        actionResultLines: [],
       });
     }
   }
@@ -94,7 +97,7 @@ export function GameShell({ game }: { game: Game }) {
         return;
       }
       setActiveLocation({
-        locationId: activeLocation.locationId,
+        ...activeLocation,
         isPlaying: true,
         playedBeatIds: [...activeLocation.playedBeatIds, nextOpen.id],
         beatTitle: nextOpen.title || strings.noTitle,
@@ -105,6 +108,36 @@ export function GameShell({ game }: { game: Game }) {
         ...activeLocation,
         isPlaying: false,
       });
+    }
+  }
+
+  function handlePlaceCard(cardId: string, beatId: string, slotId: string) {
+    const result = game.tryPlace(cardId, beatId, slotId);
+    if (result.ok) {
+      setError('');
+      setActiveLocation((current) =>
+        current
+          ? {
+              ...current,
+              actionResultLines: result.lines,
+            }
+          : null,
+      );
+    } else {
+      setError(result.reason_text || result.reason_code);
+    }
+  }
+
+  let advanceText: string = strings.advance;
+  if (view.phase === 'morning' || view.phase === 'afternoon') {
+    const hasAction = game.hasAnyLegalAction();
+    const hasUnseen = game.hasUnseenContent();
+    if (hasAction) {
+      advanceText = strings.advance;
+    } else if (hasUnseen) {
+      advanceText = strings.advanceUnseen;
+    } else {
+      advanceText = strings.advanceHint;
     }
   }
 
@@ -132,12 +165,15 @@ export function GameShell({ game }: { game: Game }) {
       </header>
       {activeLocation ? (
         <LocationPanel
+          game={game}
           panel={game.buildPanel(activeLocation.locationId)}
           isPlaying={activeLocation.isPlaying}
           beatTitle={activeLocation.beatTitle}
           beatLines={activeLocation.beatLines}
+          actionResultLines={activeLocation.actionResultLines}
           onAdvanceBeat={advanceBeatInLocation}
           onBack={() => setActiveLocation(null)}
+          onPlaceCard={handlePlaceCard}
         />
       ) : (
         <MapPanel
@@ -156,7 +192,7 @@ export function GameShell({ game }: { game: Game }) {
           disabled={!view.can_advance}
           onClick={advance}
         >
-          {strings.advance}
+          {advanceText}
         </button>
       </div>
       <HandPanel game={game} />

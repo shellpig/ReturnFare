@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildManifest, loadGameDataNode } from '../src/data/load-node';
-import { runGreedyW3 } from '../tests/support/greedy';
+import { runGreedyW5 } from '../tests/support/greedy';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,7 +48,7 @@ function getGitRevision(): string {
 export async function buildWebTrace(dataDir?: string) {
   const data = await loadGameDataNode(dataDir);
   const manifest = await buildManifest(dataDir);
-  const { checkpoints } = runGreedyW3(data);
+  const { checkpoints } = runGreedyW5(data);
   return {
     schema_version: 1 as const,
     policy: 'greedy-v1',

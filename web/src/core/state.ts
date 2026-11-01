@@ -9,7 +9,7 @@
  * - advancePhase() 七步骨架
  */
 
-import type { Beat, Condition, GameData } from '../data/types';
+import type { Beat, Condition, Effect, GameData } from '../data/types';
 import {
   cardView as calcCardView,
   handSlotsUsed as calcHandSlotsUsed,
@@ -21,9 +21,10 @@ import {
 import { ConditionError, UnsupportedConditionError, evalCondition } from './condition';
 import { planEffects } from './effect';
 import {
-   ACTION_PHASES,
+  ACTION_PHASES,
   LAST_DAY,
   beatsAt,
+  cardBaseId,
   chapterForDay,
   isNarrationOnlyPhase,
   nextPhaseTarget,
@@ -37,6 +38,13 @@ import {
   type MapLocationView,
   type PanelView,
 } from './panel';
+import {
+  checkPlace,
+  hasAnyLegalAction as calcHasAnyLegalAction,
+  hasUnseenContent as calcHasUnseenContent,
+  placeableCards as calcPlaceableCards,
+  previewSlot as calcPreviewSlot,
+} from './placement';
 import {
   cloneSnapshot,
   createInitialSnapshot,
@@ -96,6 +104,129 @@ interface DraftBeatResult {
   readonly nextState: GameSnapshot;
 }
 
+interface SettleBookkeeping {
+  beat_entered?: string;
+  choice_key?: string;
+  choice_slot_id?: string;
+  slot_key?: string;
+  consume_action?: boolean;
+  action_cost?: number;
+  attention_npc?: string;
+  day_location_visited?: string;
+}
+
+interface SettleResult {
+  ok: boolean;
+  reason_code: ReasonCode;
+  reason_text: string;
+  lines: string[];
+  nextState: GameSnapshot;
+}
+
+function applyBookkeepingOnDraft(
+  target: GameSnapshot,
+  bk: SettleBookkeeping,
+  data: GameData,
+): void {
+  if (bk.beat_entered) {
+    target.run.beats_entered[bk.beat_entered] = true;
+  }
+  if (bk.choice_key && bk.choice_slot_id) {
+    target.run.choices[bk.choice_key] = bk.choice_slot_id;
+  }
+  if (bk.slot_key) {
+    target.run.slots_placed[bk.slot_key] = true;
+  }
+  if (bk.consume_action) {
+    target.run.action_spent = true;
+    const cost = bk.action_cost ?? 1;
+    if (cost > 1) {
+      target.run.actions_spent_ahead += cost - 1;
+    }
+    if (bk.attention_npc) {
+      target.run.npc_action_counts[bk.attention_npc] =
+        (target.run.npc_action_counts[bk.attention_npc] ?? 0) + 1;
+    }
+  }
+  if (bk.day_location_visited) {
+    recordDayLocationVisitedOnDraft(target, bk.day_location_visited, data);
+  }
+}
+
+function hasAnyEffect(
+  blocks: readonly (Effect | Record<string, unknown> | null | undefined)[],
+): boolean {
+  for (let i = 0; i < blocks.length; i += 1) {
+    const b = blocks[i];
+    if (b && typeof b === 'object' && Object.keys(b).length > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * action bookkeeping 與效果合併的唯一入口（對齊 Godot GameState._settle_effects）。
+ * 全部在 draft 上操作；成功才一次提交，失敗零副作用。
+ */
+function settleEffectsOnDraft(
+  blocks: readonly (Effect | Record<string, unknown> | null | undefined)[],
+  bookkeeping: SettleBookkeeping,
+  preBookkeeping: SettleBookkeeping,
+  state: GameSnapshot,
+  data: GameData,
+): SettleResult {
+  const draft = cloneSnapshot(state);
+
+  if (!hasAnyEffect(blocks)) {
+    applyBookkeepingOnDraft(draft, preBookkeeping, data);
+    applyBookkeepingOnDraft(draft, bookkeeping, data);
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      lines: [],
+      nextState: draft,
+    };
+  }
+
+  // Pre-bookkeeping applied on shadow
+  applyBookkeepingOnDraft(draft, preBookkeeping, data);
+
+  const pf = planEffects(blocks, draft, data);
+  if (!pf.ok) {
+    return {
+      ok: false,
+      reason_code: pf.reason_code,
+      reason_text: pf.reason_text,
+      lines: [],
+      nextState: cloneSnapshot(state),
+    };
+  }
+  if (pf.endingRequest !== null) {
+    return {
+      ok: false,
+      reason_code: 'not_implemented',
+      reason_text: 'ending 結算將於 W6 實作',
+      lines: [],
+      nextState: cloneSnapshot(state),
+    };
+  }
+
+  const afterEffectsDraft = pf.nextState;
+
+  // Bookkeeping applied on draft
+  applyBookkeepingOnDraft(afterEffectsDraft, bookkeeping, data);
+
+  return {
+    ok: true,
+    reason_code: '',
+    reason_text: '',
+    lines: [...pf.lines],
+    nextState: afterEffectsDraft,
+  };
+}
+
 /** 在 draft 上執行單一 beat 的呈現與首次 on_enter 結算。 */
 function playBeatOnDraft(
   draft: GameSnapshot,
@@ -128,34 +259,39 @@ function playBeatOnDraft(
     lines.push(beat.text);
   }
 
-  let next = cloneSnapshot(draft);
-  const isFirst = !next.run.beats_entered[beatId];
-
+  const isFirst = !draft.run.beats_entered[beatId];
   if (isFirst) {
-    const pf = planEffects([beat.on_enter], next, data);
-    if (!pf.ok) {
+    const bk: SettleBookkeeping = {
+      beat_entered: beatId,
+      day_location_visited: beat.location,
+    };
+    const settleRes = settleEffectsOnDraft(
+      [beat.on_enter],
+      bk,
+      {},
+      draft,
+      data,
+    );
+    if (!settleRes.ok) {
       return {
         ok: false,
-        reason_code: pf.reason_code,
-        reason_text: pf.reason_text,
+        reason_code: settleRes.reason_code,
+        reason_text: settleRes.reason_text,
         lines: [],
         nextState: draft,
       };
     }
-    if (pf.endingRequest !== null) {
-      return {
-        ok: false,
-        reason_code: 'not_implemented',
-        reason_text: '結局轉換將於 W7-A 實作',
-        lines: [],
-        nextState: draft,
-      };
-    }
-    next = pf.nextState;
-    lines.push(...pf.lines);
-    next.run.beats_entered[beatId] = true;
+    lines.push(...settleRes.lines);
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      lines,
+      nextState: settleRes.nextState,
+    };
   }
 
+  const next = cloneSnapshot(draft);
   recordDayLocationVisitedOnDraft(next, beat.location, data);
 
   return {
@@ -392,8 +528,14 @@ function encounterDataError(beat: Beat): string {
   return '';
 }
 
-function isWithinW3PlayableRange(day: number, phase: string): boolean {
-  return day === 1 || (day === 2 && phase === 'morning');
+function isWithinPlayableRange(day: number, phase: string): boolean {
+  if (day === 1 || day === 2) {
+    return true;
+  }
+  if (day === 3) {
+    return phase === 'morning' || phase === 'afternoon' || phase === 'evening';
+  }
+  return false;
 }
 
 interface AdvancePlanResult {
@@ -615,12 +757,12 @@ function preflightAdvancePhase(
     );
   }
 
-  // W3 公開推進範圍與後續子階段換時段機制守衛
-  if (!isWithinW3PlayableRange(target.day, target.phase)) {
+  // W5 公開推進範圍與後續子階段換時段機制守衛
+  if (!isWithinPlayableRange(target.day, target.phase)) {
     return rejectAdvancePlan(
       currentState,
       'not_implemented',
-      'D2 morning 之後的時段推進將於 W4 接手',
+      'D3 evening 之後的時段推進將於 W6 接手',
     );
   }
   if (
@@ -956,6 +1098,17 @@ export function createGame(
     }
 
     // on_select 分支：在複本上初始化 run 並預演 on_select 與 D1 morning auto_enter
+    if (
+      isPlainObject(choice.on_select) &&
+      'ending' in choice.on_select &&
+      choice.on_select.ending !== undefined
+    ) {
+      return mutationReject(
+        'data_conflict',
+        '開局選項的 on_select 不得啟動結局',
+      );
+    }
+
     const initDraft = initializeRun(state as GameSnapshot, data);
     const pf = planEffects([choice.on_select], initDraft, data);
     if (!pf.ok) {
@@ -1225,6 +1378,131 @@ export function createGame(
     };
   }
 
+  function tryPlace(
+    cardId: string,
+    beatId: string,
+    slotId: string,
+  ): MutationResult {
+    // 1. mode !== 'run'
+    if (state.flow.mode !== 'run') {
+      return mutationReject('not_run', REASON_TEXT_NOT_RUN);
+    }
+
+    // 2. active_encounter
+    if (Object.keys(state.run.active_encounter).length > 0) {
+      return mutationReject('encounter_active', '遭遇進行中，無法放置卡片');
+    }
+
+    // 3. cardId empty -> not_held
+    if (cardId.length === 0) {
+      return mutationReject('not_held', '');
+    }
+
+    // 4. madness instance routed BEFORE beat lookup
+    const baseId = cardBaseId(cardId);
+    if (baseId === 'madness') {
+      return mutationReject('not_implemented', '縱慾系統將於 W6-B 實作');
+    }
+
+    // 5. beat exists
+    const beat = data.beatsById.get(beatId);
+    if (!beat) {
+      return mutationReject('unknown_beat', `未知的 beat：${beatId}`);
+    }
+
+    // 6. slot exists
+    const slot = (beat.slots ?? []).find((s) => s.id === slotId);
+    if (!slot) {
+      return mutationReject('unknown_slot', `未知的 slot：${slotId}`);
+    }
+
+    // 7. delegation route
+    if (slot.delegation) {
+      return mutationReject('not_implemented', '委託系統將於 W6-C 實作');
+    }
+
+    // 8. choice_group route
+    if (
+      typeof slot.choice_group === 'string' &&
+      slot.choice_group.length > 0
+    ) {
+      return mutationReject(
+        'not_implemented',
+        'choice_group 互斥選擇將於 W5-C 實作',
+      );
+    }
+
+    // 9. checkPlace
+    const checkResult = checkPlace(cardId, beat, slot, state, data);
+    if (!checkResult.ok) {
+      return mutationReject(
+        checkResult.reason_code,
+        checkResult.reason_text,
+      );
+    }
+
+    const card = data.cardsById.get(baseId);
+    const isProtagonist = card?.type === 'protagonist';
+    const inActionPhase = (ACTION_PHASES as readonly string[]).includes(
+      state.run.phase,
+    );
+
+    const bk: SettleBookkeeping = {
+      slot_key: `${beatId}::${slotId}`,
+    };
+    if (isProtagonist && inActionPhase) {
+      bk.consume_action = true;
+      if (
+        typeof slot.attention_npc === 'string' &&
+        slot.attention_npc.length > 0
+      ) {
+        bk.attention_npc = slot.attention_npc;
+      }
+    }
+
+    const settleRes = settleEffectsOnDraft(
+      [slot.on_place],
+      bk,
+      {},
+      state as GameSnapshot,
+      data,
+    );
+    if (!settleRes.ok) {
+      return mutationReject(settleRes.reason_code, settleRes.reason_text);
+    }
+
+    commitState(settleRes.nextState);
+    notifyListeners();
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      lines: settleRes.lines,
+    };
+  }
+
+  function placeableCards(
+    beatId: string,
+    slotId: string,
+  ): readonly string[] {
+    return calcPlaceableCards(state, data, beatId, slotId);
+  }
+
+  function previewSlot(
+    beatId: string,
+    slotId: string,
+  ): { cards: readonly string[]; reason: string } {
+    return calcPreviewSlot(state, data, beatId, slotId);
+  }
+
+  function hasAnyLegalAction(): boolean {
+    return calcHasAnyLegalAction(state, data);
+  }
+
+  function hasUnseenContent(): boolean {
+    return calcHasUnseenContent(state, data);
+  }
+
   return {
     getSnapshot,
     serialize,
@@ -1251,6 +1529,11 @@ export function createGame(
     playBeat,
     playEvening,
     playNightFixed,
+    tryPlace,
+    placeableCards,
+    previewSlot,
+    hasAnyLegalAction,
+    hasUnseenContent,
     advancePhase,
   };
 }

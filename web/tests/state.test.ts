@@ -24,6 +24,7 @@ import { createRunForTrace } from '../src/core/trace-entry';
 import { loadGameDataNode } from '../src/data/load-node';
 import type { GameData } from '../src/data/types';
 import { buildWebTrace } from '../scripts/trace-web';
+import { assertNightFixedPlayback } from './support/greedy';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -194,7 +195,7 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
         {
           text: '這段文字不應流出',
           gain: ['k_not_today'],
-          switch: 'some_switch',
+          madness: 1,
         },
       ],
       draft,
@@ -340,6 +341,93 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     const delegGame = createGame(data, delegInit);
     expect(delegGame.getPhaseView().can_advance).toBe(false);
     expect(delegGame.advancePhase().reason_code).toBe('not_implemented');
+  });
+
+  it('assertNightFixedPlayback correctly tracks night-layer fixed beats with empty text and does not mistake skipped meta_once for playback', () => {
+    // 1. Fixture with an empty-text fixed night beat on night layer
+    const emptyTextNightBeat = {
+      id: 'test_empty_text_night_beat',
+      location: 'n_corridor',
+      chapter: 1,
+      when: { day: 1, phase: 'night' as const },
+      fixed: true,
+      text: '',
+      slots: [],
+    };
+    const beatsMap1 = new Map(data.beatsById);
+    beatsMap1.set(emptyTextNightBeat.id, emptyTextNightBeat);
+    const fixtureData: GameData = {
+      ...data,
+      beats: [
+        ...data.beats.filter(
+          (b) => !(b.when?.day === 1 && b.when?.phase === 'night' && b.fixed),
+        ),
+        emptyTextNightBeat,
+      ],
+      beatsById: beatsMap1,
+    };
+
+    // Initial night state
+    const nightState = createRunForTrace(fixtureData).serialize();
+    nightState.run.day = 1;
+    nightState.run.phase = 'night';
+    const game = createGame(fixtureData, nightState);
+
+    const before = game.getSnapshot();
+    const playRes = game.playNightFixed();
+    expect(playRes.ok).toBe(true);
+    expect(playRes.lines).toEqual([]); // empty text emits zero lines
+
+    const after = game.getSnapshot();
+    // assertNightFixedPlayback must still recognize newly entered beat and assert forced visit
+    expect(() =>
+      assertNightFixedPlayback(before, after, fixtureData),
+    ).not.toThrow();
+    expect(after.run.night_location_chosen).toBe('n_corridor');
+    expect(after.meta.night_locations_seen.n_corridor).toBe(true);
+
+    // 2. Skipped meta_once: second play of a meta_once beat should not enter beats_entered and must NOT assert forced visit
+    const metaOnceBeat = {
+      id: 'test_meta_once_night_beat',
+      location: 'n_exit',
+      chapter: 1,
+      when: { day: 2, phase: 'night' as const },
+      fixed: true,
+      meta_once: true,
+      text: '一次性固定夜晚演出',
+      slots: [],
+    };
+    const beatsMap2 = new Map(data.beatsById);
+    beatsMap2.set(metaOnceBeat.id, metaOnceBeat);
+    const metaOnceData: GameData = {
+      ...data,
+      beats: [
+        ...data.beats.filter(
+          (b) => !(b.when?.day === 2 && b.when?.phase === 'night' && b.fixed),
+        ),
+        metaOnceBeat,
+      ],
+      beatsById: beatsMap2,
+    };
+
+    const metaState = createRunForTrace(metaOnceData).serialize();
+    metaState.run.day = 2;
+    metaState.run.phase = 'night';
+    // Mark as already seen in meta
+    metaState.meta.night_once_beats_seen[metaOnceBeat.id] = true;
+    metaState.run.night_location_chosen = ''; // not visited
+
+    const metaGame = createGame(metaOnceData, metaState);
+    const beforeSkip = metaGame.getSnapshot();
+    const skipRes = metaGame.playNightFixed();
+    expect(skipRes.ok).toBe(true);
+    const afterSkip = metaGame.getSnapshot();
+
+    // assertNightFixedPlayback sees zero newly entered fixed night beats, so it does NOT throw even though night_location_chosen is empty
+    expect(() =>
+      assertNightFixedPlayback(beforeSkip, afterSkip, metaOnceData),
+    ).not.toThrow();
+    expect(afterSkip.run.night_location_chosen).toBe('');
   });
 
   it('createRunForTrace(data) matches greedy-godot.json seq 0..4 with W3.json scope (0 diff) and is not imported by browser entry/UI', async () => {

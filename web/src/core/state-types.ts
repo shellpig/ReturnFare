@@ -229,5 +229,13 @@ export interface Game {
   playBeat(beatId: string): MutationResult;
   playEvening(): MutationResult;
   playNightFixed(): MutationResult;
+  tryPlace(cardId: string, beatId: string, slotId: string): MutationResult;
+  placeableCards(beatId: string, slotId: string): readonly string[];
+  previewSlot(
+    beatId: string,
+    slotId: string,
+  ): { cards: readonly string[]; reason: string };
+  hasAnyLegalAction(): boolean;
+  hasUnseenContent(): boolean;
   advancePhase(): AdvanceResult;
 }

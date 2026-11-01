@@ -1,17 +1,17 @@
 /**
- * ReturnFare Web — 效果預演與兩階段交易器（W3-B 初期子集；W5-B／W6 補齊完整 10 鍵）。
+ * ReturnFare Web — 效果預演與交易器（W5-B；W6 補齊未開放機制）。
  *
  * 對齊 Godot scripts/core/effect_apply.gd：
  * - 在獨立狀態複本（draft）上按固定順序預演：
  *   text → lose → gain → switch → switch_progress → relation → madness → flag → festival_proxy → ending
- * - W3 實作：text、gain（字串與 { card, if }）、flag，以及 ending 請求攔截與驗證。
- * - 遇到未實作效果鍵（lose、switch、switch_progress、relation、madness、festival_proxy）或未知鍵時，
+ * - W5 實作：text、lose、gain、switch、switch_progress、relation、flag。
+ * - 遇到未實作效果鍵（madness、festival_proxy、ending）或未知鍵時，
  *   整筆交易回傳 ok: false（not_implemented 或 data_conflict），零半套狀態、零已收集文字。
  */
 
 import type { Condition, Effect, GameData } from '../data/types';
 import { EFFECT_KEYS } from '../data/vocabulary';
-import { gainCard } from './cards';
+import { gainCard, loseCard } from './cards';
 import { ConditionError, UnsupportedConditionError, evalCondition } from './condition';
 import { cloneSnapshot } from './run-initialization';
 import type { GameSnapshot, ReasonCode } from './state-types';
@@ -49,6 +49,120 @@ function rejectPlan(
     nextState: cloneSnapshot(originalState),
     endingRequest: null,
   };
+}
+
+interface ProcessCardEntriesOptions {
+  readonly kind: 'gain' | 'lose';
+  readonly entries: unknown;
+  readonly draft: GameSnapshot;
+  readonly originalState: Readonly<GameSnapshot>;
+  readonly data: GameData;
+  readonly mutate: (
+    cardId: string,
+    permanent: boolean,
+  ) => { ok: boolean; reason_code: ReasonCode; reason_text: string };
+}
+
+function processCardEntries(
+  opts: ProcessCardEntriesOptions,
+): EffectPlan | null {
+  const { kind, entries, draft, originalState, data, mutate } = opts;
+  if (!Array.isArray(entries)) {
+    return rejectPlan(
+      originalState,
+      'data_conflict',
+      `EffectApply: ${kind} 必須為陣列`,
+    );
+  }
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i];
+    let cardId: string;
+    let permanent = false;
+    if (typeof entry === 'string') {
+      if (entry.length === 0) {
+        return rejectPlan(
+          originalState,
+          'data_conflict',
+          `EffectApply: ${kind} 卡片 id 不得為空字串`,
+        );
+      }
+      cardId = entry;
+    } else if (isPlainObject(entry)) {
+      const entryKeys = Object.keys(entry);
+      for (let ek = 0; ek < entryKeys.length; ek += 1) {
+        const eKey = entryKeys[ek];
+        if (kind === 'gain' && eKey === 'permanent') {
+          return rejectPlan(
+            originalState,
+            'data_conflict',
+            'EffectApply: gain 項目不支援 permanent 欄位',
+          );
+        }
+        if (
+          eKey !== 'card' &&
+          eKey !== 'if' &&
+          (kind !== 'lose' || eKey !== 'permanent')
+        ) {
+          return rejectPlan(
+            originalState,
+            'data_conflict',
+            `EffectApply: ${kind} 項目含未知鍵 '${eKey}'`,
+          );
+        }
+      }
+      if (typeof entry.card !== 'string' || entry.card.length === 0) {
+        return rejectPlan(
+          originalState,
+          'data_conflict',
+          `EffectApply: ${kind} 項目缺少有效 card 字串`,
+        );
+      }
+      cardId = entry.card;
+      if (
+        kind === 'lose' &&
+        'permanent' in entry &&
+        entry.permanent !== undefined
+      ) {
+        if (typeof entry.permanent !== 'boolean') {
+          return rejectPlan(
+            originalState,
+            'data_conflict',
+            'EffectApply: permanent 必須為 boolean',
+          );
+        }
+        permanent = entry.permanent;
+      }
+      if ('if' in entry && entry.if !== undefined) {
+        let condPassed = false;
+        try {
+          condPassed = evalCondition(entry.if as Condition, draft, data);
+        } catch (err) {
+          if (err instanceof UnsupportedConditionError) {
+            return rejectPlan(originalState, 'not_implemented', err.message);
+          }
+          if (err instanceof ConditionError) {
+            return rejectPlan(originalState, 'data_conflict', err.message);
+          }
+          throw err;
+        }
+        if (!condPassed) {
+          continue;
+        }
+      }
+    } else {
+      return rejectPlan(
+        originalState,
+        'data_conflict',
+        `EffectApply: ${kind} 項目必須為字串或物件`,
+      );
+    }
+
+    const res = mutate(cardId, permanent);
+    if (!res.ok) {
+      return rejectPlan(originalState, res.reason_code, res.reason_text);
+    }
+  }
+  return null;
 }
 
 export function planEffects(
@@ -91,117 +205,121 @@ export function planEffects(
       }
     }
 
-    // 2. lose（W5-B 接手）
+    // 2. lose
     if ('lose' in raw && raw.lose !== undefined) {
-      return rejectPlan(
-        state,
-        'not_implemented',
-        'EffectApply: lose 效果將於 W5-B 實作',
-      );
+      const errPlan = processCardEntries({
+        kind: 'lose',
+        entries: raw.lose,
+        draft,
+        originalState: state,
+        data,
+        mutate: (cid, perm) => loseCard(draft, cid, data, perm),
+      });
+      if (errPlan !== null) {
+        return errPlan;
+      }
     }
 
     // 3. gain
     if ('gain' in raw && raw.gain !== undefined) {
-      if (!Array.isArray(raw.gain)) {
-        return rejectPlan(state, 'data_conflict', 'EffectApply: gain 必須為陣列');
+      const errPlan = processCardEntries({
+        kind: 'gain',
+        entries: raw.gain,
+        draft,
+        originalState: state,
+        data,
+        mutate: (cid) => gainCard(draft, cid, data),
+      });
+      if (errPlan !== null) {
+        return errPlan;
       }
-      for (let g = 0; g < raw.gain.length; g += 1) {
-        const entry = raw.gain[g];
-        if (typeof entry === 'string') {
-          if (entry.length === 0) {
-            return rejectPlan(
-              state,
-              'data_conflict',
-              'EffectApply: gain 卡片 id 不得為空字串',
-            );
-          }
-          const res = gainCard(draft, entry, data);
-          if (!res.ok) {
-            return rejectPlan(state, res.reason_code, res.reason_text);
-          }
-        } else if (isPlainObject(entry)) {
-          const entryKeys = Object.keys(entry);
-          for (let ek = 0; ek < entryKeys.length; ek += 1) {
-            const eKey = entryKeys[ek];
-            if (eKey === 'permanent') {
-              return rejectPlan(
-                state,
-                'data_conflict',
-                'EffectApply: gain 項目不支援 permanent 欄位',
-              );
-            }
-            if (eKey !== 'card' && eKey !== 'if') {
-              return rejectPlan(
-                state,
-                'data_conflict',
-                `EffectApply: gain 項目含未知鍵 '${eKey}'`,
-              );
-            }
-          }
-          const cardId = entry.card;
-          if (typeof cardId !== 'string' || cardId.length === 0) {
-            return rejectPlan(
-              state,
-              'data_conflict',
-              'EffectApply: gain 項目缺少有效 card 字串',
-            );
-          }
-          if ('if' in entry && entry.if !== undefined) {
-            let condPassed = false;
-            try {
-              condPassed = evalCondition(entry.if as Condition, draft, data);
-            } catch (err) {
-              if (err instanceof UnsupportedConditionError) {
-                return rejectPlan(state, 'not_implemented', err.message);
-              }
-              if (err instanceof ConditionError) {
-                return rejectPlan(state, 'data_conflict', err.message);
-              }
-              throw err;
-            }
-            if (!condPassed) {
-              continue;
-            }
-          }
-          const res = gainCard(draft, cardId, data);
-          if (!res.ok) {
-            return rejectPlan(state, res.reason_code, res.reason_text);
-          }
-        } else {
+    }
+
+    // 4. switch
+    if ('switch' in raw && raw.switch !== undefined) {
+      if (typeof raw.switch !== 'string' || raw.switch.length === 0) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: switch 必須為非空字串',
+        );
+      }
+      draft.run.switches[raw.switch] = true;
+    }
+
+    // 5. switch_progress
+    if ('switch_progress' in raw && raw.switch_progress !== undefined) {
+      if (!isPlainObject(raw.switch_progress)) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: switch_progress 必須為 Dictionary',
+        );
+      }
+      const spEntries = Object.entries(raw.switch_progress);
+      for (let sp = 0; sp < spEntries.length; sp += 1) {
+        const [swId, n] = spEntries[sp];
+        if (
+          typeof swId !== 'string' ||
+          swId.length === 0 ||
+          typeof n !== 'number' ||
+          !Number.isInteger(n)
+        ) {
           return rejectPlan(
             state,
             'data_conflict',
-            'EffectApply: gain 項目必須為字串或物件',
+            `EffectApply: switch_progress '${swId}' 值必須為整數`,
           );
         }
+        draft.run.switch_progress[swId] =
+          (draft.run.switch_progress[swId] ?? 0) + n;
       }
     }
 
-    // 4. switch（W5-B 接手）
-    if ('switch' in raw && raw.switch !== undefined) {
-      return rejectPlan(
-        state,
-        'not_implemented',
-        'EffectApply: switch 效果將於 W5-B 實作',
-      );
-    }
-
-    // 5. switch_progress（W5-B 接手）
-    if ('switch_progress' in raw && raw.switch_progress !== undefined) {
-      return rejectPlan(
-        state,
-        'not_implemented',
-        'EffectApply: switch_progress 效果將於 W5-B 實作',
-      );
-    }
-
-    // 6. relation（W5-B 接手）
+    // 6. relation
     if ('relation' in raw && raw.relation !== undefined) {
-      return rejectPlan(
-        state,
-        'not_implemented',
-        'EffectApply: relation 效果將於 W5-B 實作',
-      );
+      if (!isPlainObject(raw.relation)) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: relation 必須為 Dictionary',
+        );
+      }
+      const relKeys = Object.keys(raw.relation);
+      for (let rk = 0; rk < relKeys.length; rk += 1) {
+        const rKey = relKeys[rk];
+        if (rKey !== 'npc' && rKey !== 'delta') {
+          return rejectPlan(
+            state,
+            'data_conflict',
+            `EffectApply: relation 含未知鍵 '${rKey}'`,
+          );
+        }
+      }
+      const npc = raw.relation.npc;
+      const delta = raw.relation.delta;
+      if (typeof npc !== 'string' || npc.length === 0) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: relation 缺少有效 npc 字串',
+        );
+      }
+      if (!data.npcsById.has(npc)) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          `EffectApply: 未知的 NPC id '${npc}'`,
+        );
+      }
+      if (typeof delta !== 'number' || !Number.isInteger(delta)) {
+        return rejectPlan(
+          state,
+          'data_conflict',
+          'EffectApply: relation delta 必須為整數',
+        );
+      }
+      draft.run.relations[npc] = (draft.run.relations[npc] ?? 0) + delta;
     }
 
     // 7. madness（W6 接手）
@@ -247,7 +365,7 @@ export function planEffects(
       );
     }
 
-    // 10. ending
+    // 10. ending（W6 接手實作執行；W5 契約驗證結構並回傳 not_implemented）
     if ('ending' in raw && raw.ending !== undefined) {
       if (typeof raw.ending !== 'string' || raw.ending.length === 0) {
         return rejectPlan(
@@ -263,21 +381,11 @@ export function planEffects(
           `EffectApply: 未知的結局 id '${raw.ending}'`,
         );
       }
-      if (
-        endingRequest !== null &&
-        (endingRequest.ending_id !== raw.ending ||
-          endingRequest.source_id !== 'ending_effect')
-      ) {
-        return rejectPlan(
-          state,
-          'data_conflict',
-          'EffectApply: 同一批效果含衝突的結局請求',
-        );
-      }
-      endingRequest = {
-        ending_id: raw.ending,
-        source_id: 'ending_effect',
-      };
+      return rejectPlan(
+        state,
+        'not_implemented',
+        `EffectApply: ending 效果 ('${raw.ending}') 將於 W6 實作`,
+      );
     }
   }
 
