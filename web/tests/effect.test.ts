@@ -180,24 +180,43 @@ describe('planEffects (W5-B)', async () => {
     expect(JSON.stringify(arrPlan.nextState)).toBe(originalSerialized);
   });
 
-  it('strictly validates flag dictionary structure and rejects non-boolean values', () => {
+  it('validates flag dictionary structure, accepts boolean and string truthiness, and rejects unsupported shapes', () => {
     const state = createInitialSnapshot();
     state.flow.mode = 'run';
+    const originalSerialized = JSON.stringify(state);
 
     const goodPlan = planEffects(
-      [{ flag: { valid_flag: true, off_flag: false } }],
+      [
+        {
+          flag: {
+            valid_flag: true,
+            off_flag: false,
+            empty_str: '',
+            nonempty_str: 'some_text',
+            authored_high: 'high',
+            authored_mid: 'mid',
+            authored_low: 'low',
+          },
+        },
+      ],
       state,
       data,
     );
     expect(goodPlan.ok).toBe(true);
     expect(goodPlan.nextState.run.flags.valid_flag).toBe(true);
     expect(goodPlan.nextState.run.flags.off_flag).toBe(false);
+    expect(goodPlan.nextState.run.flags.empty_str).toBe(false);
+    expect(goodPlan.nextState.run.flags.nonempty_str).toBe(true);
+    expect(goodPlan.nextState.run.flags.authored_high).toBe(true);
+    expect(goodPlan.nextState.run.flags.authored_mid).toBe(true);
+    expect(goodPlan.nextState.run.flags.authored_low).toBe(true);
 
-    // Malformed flag value
+    // Unsupported value shapes (e.g. object / array) rejected with full byte-identical state and no lines
     const badPlan = planEffects(
       [
         {
-          flag: { invalid_flag: 'not_a_bool' as unknown as boolean },
+          text: '若失敗不應輸出文字',
+          flag: { invalid_flag: { nested: true } as unknown as boolean },
         },
       ],
       state,
@@ -205,6 +224,23 @@ describe('planEffects (W5-B)', async () => {
     );
     expect(badPlan.ok).toBe(false);
     expect(badPlan.reason_code).toBe('data_conflict');
+    expect(badPlan.lines).toEqual([]);
+    expect(JSON.stringify(badPlan.nextState)).toBe(originalSerialized);
+
+    const emptyNamePlan = planEffects(
+      [
+        {
+          text: '空旗標名稱不應輸出文字',
+          flag: { '': true },
+        },
+      ],
+      state,
+      data,
+    );
+    expect(emptyNamePlan.ok).toBe(false);
+    expect(emptyNamePlan.reason_code).toBe('data_conflict');
+    expect(emptyNamePlan.lines).toEqual([]);
+    expect(JSON.stringify(emptyNamePlan.nextState)).toBe(originalSerialized);
   });
 
   it('atomically rolls back earlier gains, flags, and lines if a later festival_proxy has invalid data', () => {

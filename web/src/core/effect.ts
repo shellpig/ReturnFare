@@ -378,15 +378,27 @@ export function planEffects(
       const fKeys = Object.keys(fVal);
       for (let fk = 0; fk < fKeys.length; fk += 1) {
         const flagName = fKeys[fk];
-        const flagBool = fVal[flagName];
-        if (flagName.length === 0 || typeof flagBool !== 'boolean') {
+        const flagRaw = fVal[flagName];
+        if (flagName.length === 0) {
           return rejectPlan(
             state,
             'data_conflict',
-            `EffectApply: flag '${flagName}' 值必須為 boolean`,
+            'EffectApply: flag 名稱不得為空',
           );
         }
-        draft.run.flags[flagName] = flagBool;
+        if (typeof flagRaw === 'boolean') {
+          draft.run.flags[flagName] = flagRaw;
+        } else if (typeof flagRaw === 'string') {
+          // 對齊 Godot effect_apply.gd:142 (`true if f_raw[flag_name] else false`)：
+          // GDScript 字串以真值轉為 boolean（非空字串為 true、空字串為 false）。
+          draft.run.flags[flagName] = flagRaw.length > 0;
+        } else {
+          return rejectPlan(
+            state,
+            'data_conflict',
+            `EffectApply: flag '${flagName}' 值必須為 boolean 或 string`,
+          );
+        }
       }
     }
 

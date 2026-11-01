@@ -1,11 +1,17 @@
 /**
- * ReturnFare Web — Greedy 走查輔助（W3-B: seq 0～4；W5-B: seq 0～11 共 12 個 checkpoints）。
+ * ReturnFare Web — Greedy 走查輔助（W3-B: seq 0～4；W5-B: seq 0～11；W6-E2-3: seq 0～192 全程 45 天）。
  *
- * 對齊 Godot tests/headless/playthrough_greedy.gd 的無開局走查基線：
+ * 對齊 Godot tests/headless/playthrough_greedy.gd 與 generate_greedy_trace.gd 的無開局走查基線：
  * - 使用 trace-entry.ts 的 createRunForTrace(data)
  * - W3: 記錄 seq 0 (run_start) 與 D1 四個時段收尾 checkpoint (seq 1～4)
  * - W5: 記錄 seq 0 (run_start) + D1/D2 四個時段收尾 (seq 1～8) + D3 morning/afternoon/evening (seq 9～11)
- * - W6-A: 夜間一律走 executeGreedyNightPhase（fixed → 查可進地點 → 進入），睡覺停拍由 advanceGreedyPhase 吸收
+ * - W6-E2-3: 45 天完整走查 193 筆快照：
+ *   - seq 0: run_start (D1 morning 初態)
+ *   - seq 1～179: 179 個 phase_end（含 D45 afternoon 遭遇結算 auto-advance 使 seq 178/179 均為 evening）
+ *   - seq 180: ending_started (D45 evening, mode='ending', page_index=0, page_revealed=false, ready_to_complete=false)
+ *   - seq 181～191: 11 個 ending_step 逐頁 reveal/advance 序列 (2 * page_count - 1)
+ *   - seq 192: opening_ready (completeEnding 後回到 D1 morning, mode='opening'，停在開局選擇)
+ * - 夜間一律走 executeGreedyNightPhase（fixed → 查可進地點 → 進入），睡覺停拍由 advanceGreedyPhase 吸收
  */
 
 import type { GameData } from '../../src/data/types';
@@ -201,11 +207,41 @@ export function executeGreedyNightPhase(game: Game, data: GameData): void {
   }
 }
 
+function executeGreedyEveningPhase(game: Game, day: number): void {
+  const evRes = game.playEvening();
+  if (!evRes.ok) {
+    throw new Error(
+      `[D${day} evening] playEvening 失敗：${evRes.reason_code} (${evRes.reason_text})`,
+    );
+  }
+  if (day === 45) {
+    if (game.hasCard('info_registry')) {
+      const res = game.tryPlace('info_registry', 'd45_then', 'compare_registry');
+      if (!res.ok) {
+        throw new Error(
+          `[D45 evening] tryPlace info_registry 失敗：${res.reason_code} (${res.reason_text})`,
+        );
+      }
+    } else {
+      const res = game.choose('d45_then', 'd45_coda', 'empty_handed');
+      if (!res.ok) {
+        throw new Error(
+          `[D45 evening] choose empty_handed 失敗：${res.reason_code} (${res.reason_text})`,
+        );
+      }
+    }
+  }
+}
+
 /** 推進一個時段；夜間睡覺停拍（phase_advanced:false）時再按一次「進入隔天」。 */
 function advanceGreedyPhase(game: Game, day: number, phase: string): void {
   solveActiveEncounterIfAny(game);
   let advRes = game.advancePhase();
-  if (advRes.ok && !advRes.phase_advanced && game.getPhaseView().night_advance === 'next_day') {
+  if (
+    advRes.ok &&
+    !advRes.phase_advanced &&
+    (game.getPhaseView().night_advance === 'next_day' || game.getSnapshot().flow.mode === 'run')
+  ) {
     advRes = game.advancePhase();
   }
   if (!advRes.ok || !advRes.phase_advanced) {
@@ -310,6 +346,168 @@ function executeGreedyActionPhase(game: Game): void {
     }
     if (placed) break;
   }
+}
+
+/**
+ * 45 天完整貪心走查（W6-E2-3：193 個 checkpoints：seq 0～192）。
+ *
+ * 走查時序與觀測點（對齊 Godot playthrough_greedy.gd 與 generate_greedy_trace.gd）：
+ * - seq 0: run_start (D1 morning 初態)
+ * - seq 1～176: D1～D44 每天 4 個時段收尾 (176 phase_end)
+ * - seq 177: D45 morning phase_end
+ * - seq 178: D45 afternoon phase_end（因 D45 afternoon 遭遇結算 auto-advance 至 evening，採樣時 phase 為 evening）
+ * - seq 179: D45 evening phase_end（執行 coda 選擇後、advancePhase 進結局前採樣）
+ *   （合計 179 個 phase_end）
+ * - seq 180: ending_started (D45 evening, mode='ending', page_index=0, page_revealed=false, ready_to_complete=false)
+ * - seq 181～191: ending_step (共 2 * page_count - 1 = 11 步逐頁 reveal 與 advance)
+ * - seq 192: opening_ready (completeEnding 後回到 D1 morning, mode='opening'，不自動開始下一輪)
+ */
+export function runGreedyFull(data: GameData): GreedyWalkResult {
+  const game = createRunForTrace(data);
+  const checkpoints: GreedyCheckpoint[] = [];
+  let seq = 0;
+
+  const recordCheckpoint = (label: string): void => {
+    const snap = game.serialize();
+    checkpoints.push({
+      seq,
+      label,
+      day: snap.run.day,
+      phase: snap.run.phase,
+      state: snap,
+    });
+    seq += 1;
+  };
+
+  // seq 0: run_start (D1 morning 初態)
+  recordCheckpoint('run_start');
+
+  for (let d = 1; d <= 45; d += 1) {
+    // 1. Morning
+    const snapM = game.getSnapshot();
+    if (snapM.run.day !== d || snapM.run.phase !== 'morning') {
+      throw new Error(
+        `時間同步錯誤 (morning): 預期第 ${d} 天 morning，實際第 ${snapM.run.day} 天 ${snapM.run.phase}`,
+      );
+    }
+    executeGreedyActionPhase(game);
+    recordCheckpoint('phase_end');
+    const advM = game.advancePhase();
+    if (!advM.ok || !advM.phase_advanced) {
+      throw new Error(
+        `[D${d} morning] advancePhase 失敗：${advM.reason_code} (${advM.reason_text})`,
+      );
+    }
+
+    // 2. Afternoon
+    const snapA = game.getSnapshot();
+    if (snapA.run.day !== d || snapA.run.phase !== 'afternoon') {
+      throw new Error(
+        `時間同步錯誤 (afternoon): 預期第 ${d} 天 afternoon，實際第 ${snapA.run.day} 天 ${snapA.run.phase}`,
+      );
+    }
+    executeGreedyActionPhase(game);
+    recordCheckpoint('phase_end');
+    if (game.getSnapshot().run.phase === 'afternoon') {
+      const advA = game.advancePhase();
+      if (!advA.ok || !advA.phase_advanced) {
+        throw new Error(
+          `[D${d} afternoon] advancePhase 失敗：${advA.reason_code} (${advA.reason_text})`,
+        );
+      }
+    }
+
+    // 3. Evening
+    const snapE = game.getSnapshot();
+    if (snapE.run.day !== d || snapE.run.phase !== 'evening') {
+      throw new Error(
+        `時間同步錯誤 (evening): 預期第 ${d} 天 evening，實際第 ${snapE.run.day} 天 ${snapE.run.phase}`,
+      );
+    }
+    executeGreedyEveningPhase(game, d);
+    recordCheckpoint('phase_end');
+    const advE = game.advancePhase();
+    if (!advE.ok) {
+      throw new Error(
+        `[D${d} evening] advancePhase 失敗：${advE.reason_code} (${advE.reason_text})`,
+      );
+    }
+
+    if (d === 45) {
+      break;
+    }
+
+    // 4. Night
+    const snapN = game.getSnapshot();
+    if (snapN.run.day !== d || snapN.run.phase !== 'night') {
+      throw new Error(
+        `時間同步錯誤 (night): 預期第 ${d} 天 night，實際第 ${snapN.run.day} 天 ${snapN.run.phase}`,
+      );
+    }
+    executeGreedyNightPhase(game, data);
+    recordCheckpoint('phase_end');
+    advanceGreedyPhase(game, d, 'night');
+  }
+
+  // 結局走查
+  let completedEnding = false;
+  if (game.getSnapshot().flow.mode === 'ending') {
+    recordCheckpoint('ending_started');
+    let pageCap = 200;
+    while (game.getSnapshot().flow.mode === 'ending' && pageCap > 0) {
+      pageCap -= 1;
+      const view = game.endingView();
+      if (view.can_complete) {
+        const completeRes = game.completeEnding();
+        if (!completeRes.ok) {
+          throw new Error(
+            `completeEnding 失敗：${completeRes.reason_code} (${completeRes.reason_text})`,
+          );
+        }
+        if (game.getSnapshot().flow.mode === 'opening') {
+          recordCheckpoint('opening_ready');
+          completedEnding = true;
+        } else {
+          throw new Error(
+            `completeEnding 成功但 flow.mode 為 ${game.getSnapshot().flow.mode}，預期為 opening`,
+          );
+        }
+        break;
+      }
+      if (!view.page_revealed) {
+        const res = game.revealEndingPage();
+        if (!res.ok) {
+          throw new Error(
+            `revealEndingPage 失敗：${res.reason_code} (${res.reason_text})`,
+          );
+        }
+        recordCheckpoint('ending_step');
+      } else {
+        const res = game.advanceEndingPage();
+        if (!res.ok) {
+          throw new Error(
+            `advanceEndingPage 失敗：${res.reason_code} (${res.reason_text})`,
+          );
+        }
+        recordCheckpoint('ending_step');
+      }
+    }
+    if (pageCap === 0) {
+      throw new Error('ending 翻頁超過安全上限 200');
+    }
+  } else {
+    throw new Error(
+      `D45 推進後 flow.mode 為 ${game.getSnapshot().flow.mode}，預期為 ending`,
+    );
+  }
+
+  if (!completedEnding || game.getSnapshot().flow.mode !== 'opening') {
+    throw new Error(
+      `runGreedyFull 異常終止：未完成 completeEnding 且未抵達 opening_ready (flow.mode=${game.getSnapshot().flow.mode})`,
+    );
+  }
+
+  return { game, checkpoints };
 }
 
 /**

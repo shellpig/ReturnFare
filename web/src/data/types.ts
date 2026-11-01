@@ -136,7 +136,7 @@ export interface Effect {
   readonly switch_progress?: { readonly [switchId: string]: number };
   readonly relation?: { readonly npc: string; readonly delta: number };
   readonly madness?: number;
-  readonly flag?: { readonly [flagName: string]: boolean };
+  readonly flag?: { readonly [flagName: string]: boolean | string };
   readonly festival_proxy?: FestivalProxy;
   readonly ending?: string;
 }
