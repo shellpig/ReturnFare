@@ -43,3 +43,29 @@
 
 - 工程檢查已完成，交 verifier 獨立驗收 W5-C；指揮者不標記驗收完成，不修改 PROJECT_BRIEF.md。
 - 仍為 not_implemented：委託、default_if_unresolved 離開時段結算、慶典代付、phase_exit 及其他 W6 機制；D3 evening 之後推進仍受開發界線阻擋。
+
+## Verifier 獨立驗收（2026-11-01）
+
+- 結論：**W5-C 已完成並通過驗收**，無 P0／P1／P2；3 項 P3 不阻擋，未修正，列於下方供後續處理。
+- 受驗版本：`main@63c896c`（W5-C 實作提交）；本段紀錄與文件關門同一 commit 提交，未改程式碼。
+- 規則對照：`choose()` 與 `game_state.gd` `choose()` 逐行一致（not_run → encounter_active → 已結算 resolved → unknown_beat → 槽不存在或不屬該組 → 委託 not_implemented → card_required → `checkSlotState` → 帶卡 `checkPlace` → 記帳 → 共用 settle）；只有 `choice_requires_card`＋主角卡＋行動時段才 consume_action 與記 attention。`tryPlace` 第 8 步轉 `choose` 與 Godot `try_place` 一致。
+- UI 對照：SlotView 直選鈕條件（choice 且非 `choice_requires_card`）與帶卡放置鈕並列，對應 `location_panel.gd:395-410`；`handleChooseSlot` 成功顯示結果、失敗經 `reasonCodes` 中文化，對應 `_on_choose_pressed`；被選項 RESOLVED 唯讀、同組其他選項消失沿用 W4 `panel.ts`。關面板不提早套 default；委託仍原子拒絕。
+
+| 獨立檢查（使用者指定只跑必要測試） | 結果 |
+|---|---|
+| `npx vitest run tests/choice.test.ts tests/placement.test.ts` | exit 0；2 files／9 tests |
+| `npm run build` | exit 0 |
+| `npx playwright test tests/ui/choice.spec.ts tests/ui/placement.spec.ts --workers=1` | exit 0；3／3 |
+| 正式產物隔離 | `dist/assets` JS 無 `__testGame`、`__w5c`、`__origCreateGame`、`snap_override`（0 筆） |
+
+- 未重跑：全套 `npm test`、其餘 UI spec、W5／W3 軌跡、變異與 Godot；沿用上方指揮者證據（99／99、10／10、12／560 與 5／187 0 diff、成本與已結算變異）。
+
+| 發現 | 等級 | 建議 |
+|---|---|---|
+| choice.test 的「關面板未選不改狀態」只呼叫純查詢 `buildPanel`，未實際關面板；choice.spec 只測選卡彈窗 Escape，未測地點面板「返回」 | P3 | choice.spec 補「返回地圖後完整 serialize 不變」；現行返回只清 UI 狀態，風險低 |
+| D43 案例標題稱「sets attention_npc if defined」，但正式 `say_yes_boss` 無 `attention_npc`，實際未驗正向 attention 記帳 | P3 | 標題改為實際涵蓋內容；正向 attention 待正式資料出現案例或 W6 一併補 |
+| 單獨移除 `choose()` 開頭已結算守衛不轉紅（`checkSlotState` 雙重檢查，Godot 同） | P3（紀錄） | 已記錄；成本變異轉紅已滿足契約「擇一」 |
+
+## 下一步
+
+- W5 三個子階段全部通過驗收，W5 整體關門；下一步依 `docs/web/W6實作契約.md` 施工順序先實作 W6-E1（結局底座），再接 W6-A。
