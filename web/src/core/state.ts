@@ -2989,16 +2989,18 @@ export function createGame(
       return mutationReject('not_discardable', '此卡片不可丟棄');
     }
 
+    const roundId = state.run.active_encounter.round_id ?? '';
+    const roundData = enc ? getRound(enc, roundId) : null;
+    if (!enc || !roundData) {
+      return mutationReject('data_conflict', '當前回合資料遺失');
+    }
     // 丟棄先在複本判定，再一次落地
     const draft = cloneSnapshot(state as GameSnapshot);
     loseCard(draft, cardId, data);
-    const roundId = state.run.active_encounter.round_id ?? '';
-    const roundData = enc ? getRound(enc, roundId) : null;
     const shEnc = draft.run.active_encounter;
-    const outOfMoves =
-      !enc || !roundData || !hasLegalMoves(enc, roundData, shEnc, draft, data);
+    const outOfMoves = !hasLegalMoves(enc, roundData, shEnc, draft, data);
     const plan = planEncounterAction(
-      enc ?? ({} as Encounter),
+      enc,
       [],
       [cardId],
       shEnc,

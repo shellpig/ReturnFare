@@ -670,6 +670,11 @@ describe('W6-D encounter system (core rules & lifecycle)', async () => {
     });
     const game = createGame(localData, snap);
     expectRejectsWithoutChange(game, () => game.escapeEncounter(['item_gradphoto']), 'data_conflict');
+    const missingEncounter = structuredClone(snap);
+    missingEncounter.run.active_encounter.beat_id = 'unknown';
+    const corruptedGame = createGame(data, missingEncounter);
+    expectRejectsWithoutChange(corruptedGame,
+      () => corruptedGame.discardInEncounter('item_gradphoto'), 'data_conflict');
     const d45 = localData.beatsById.get('d45_encounter')!;
     localData.beatsById.set(d45.id, { ...d45, encounter: {
       ...d45.encounter!, on_victory: { ending: 'ending_inventory_be' },
