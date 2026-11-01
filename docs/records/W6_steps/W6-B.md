@@ -53,3 +53,30 @@
 - 指揮者已完成契約、生命週期／架構、公開簽名與型別、序列化拒絕原子性、正式資料接線、UI 可達性、錯誤保債、跨檔一致性與測試反證檢查；未發現尚未處理的阻擋問題。
 - 尚未由獨立 verifier 驗收；未修改 PROJECT_BRIEF.md 或勾選全案驗收。下一步是 W6-B 獨立驗收，之後才接 W6-C。
 - 未跑 Godot；只對帳既有 W3／W5 前綴，不代表 45 天或所有分支已一致。W6-C／D／E2 守衛保留。
+
+## Verifier 獨立驗收（2026-11-01）
+
+- 結論：**W6-B 已完成並通過驗收**，無 P0／P1／P2；2 項 P3 不阻擋，未修正，列於下方。
+- 受驗版本：`main@f4dfd13`（實作 `1672747`＋指揮紀錄）；本段紀錄與文件關門同一 commit 提交，未改程式碼。
+- 規則對照：`pickExit` 與 `indulgence.gd` `pick_exit` 逐行一致（beat／slot condition 與 requires、不看 when／地點、排除 auto:false、嚴格大於取來源順序第一、不寫 slots_placed）；`levelFor` 以含本次的次數查 tuning。`indulge` 檢查順序與 `indulge()` 一致（not_run → encounter_active → not_held → not_accepted → unknown_beat → unknown_slot → 無 indulgence → checkSlotState → 泡湯／action_spent），扣卡、扣格、次數先記帳再套 base＋強度效果，整筆提交；`tryPlace` 以原實例 id 轉 `indulge`。
+- 強制結算與 `_commit_phase_transition` 一致：night→morning tick 入列，預扣行動格先抵，首個可用行動格才結算；不在手的舊隊首清理，出口無效或效果失敗保留債、卡與格；強制效果進結局後不結算 auto_enter 與遭遇。`loseCard` 對發狂卡刪倒數並累計清卡數，同 `lose_card`。
+
+| 獨立檢查 | 結果 |
+|---|---|
+| `npm test` | exit 0；18 files／179 tests |
+| `npm run build` | exit 0 |
+| `npx playwright test --workers=1` | exit 0；14／14 |
+| W5／W3 軌跡 | `_qa/web/W6-B-verifier/trace-web.json`：W5 12 checkpoints／560 fields、W3 5／187，皆 equal=true |
+| 泡湯預扣變異（verifier） | 換時段抵預扣時 `action_spent` 改 false，泡湯預扣與推進骨架 2 筆轉紅；還原後 git diff 無殘留 |
+| 正式產物隔離 | dist JS 無 `__testGame`、`__w6b`、`snap_override`、trace-entry（0 檔） |
+
+- 未重跑：指揮者四組變異（沿用 `_qa/web/W6-B/mutation-*.log`）、Godot。
+
+| 發現 | 等級 | 建議 |
+|---|---|---|
+| 泡湯 TS 先擋非 morning；Godot 只看剩餘格數，`soak_phase_cost` 調為 1 時 Godot 允許下午泡湯。現值 2 兩者行為相同，TS 依 W6 契約「泡湯限 morning」 | P3 | 接受；若日後調 tuning 為 1，需回頭確認意圖 |
+| `settleForcedIndulgenceOnDraft` 回傳的 `ok` 恆為 true，欄位無作用 | P3 | 後續動到該函式時移除或改為真實狀態 |
+
+## 驗收後下一步
+
+- 依 W6 施工順序接 W6-C（委託與隔日回報）。
