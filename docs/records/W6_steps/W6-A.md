@@ -44,6 +44,7 @@
 ## 未解問題與下一步
 
 - 對位可達性（與 Godot 相同）：白天地點無可見 beat 且未到訪時地圖按鈕停用，對位鈕無法到達，例如 D17 `upstream`、D38 `jinghe_back`、D43 `temple_back`；交 verifier 判斷是否需記入待決。
-- 空結果文字「走了很久。什麼都沒有遇到。」取自規格書，Godot UI 不顯示；交 verifier 確認。
+- 空結果文字「走了很久。什麼都沒有遇到。」：實作規格書.md 第九節明文要求合法地點無內容時顯示此通用結果，網頁版照規格顯示，不改；Godot UI 未渲染屬凍結版缺口，不跟。
+- 更正：上方「4 行超過 140 字元」為誤判。指揮者用 awk 依 bytes 計長，中文行被高估；以 UTF-8 字元重算，madness.ts／night.ts／NightDetails.tsx 與 W6-E1 的 ending.ts 皆 0 行超過 140 字元，無需修改。
 - 交 W6-B：forced_pending 守衛、放發狂卡、預扣行動格；交 C／D／E2 見上方守衛清單。
 - 工程檢查已完成，交 verifier 獨立驗收 W6-A。
