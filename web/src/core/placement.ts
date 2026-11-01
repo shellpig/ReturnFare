@@ -149,14 +149,13 @@ export function checkPlace(
   const isMadness = cardType === 'madness';
   if (isMadness) {
     if (slot.indulgence?.soak === true) {
+      if (state.run.phase !== 'morning') {
+        return { ok: false, reason_code: 'locked', reason_text: strings.soakMorningOnly };
+      }
       const soakCost = data.tuning.indulgence.soak_phase_cost;
       const remActions = remainingActionsToday(state);
       if (remActions < soakCost) {
-        const lockReason =
-          state.run.phase !== 'morning'
-            ? strings.soakMorningOnly
-            : strings.soakInsufficientActions;
-        return { ok: false, reason_code: 'locked', reason_text: lockReason };
+        return { ok: false, reason_code: 'locked', reason_text: strings.soakInsufficientActions };
       }
     } else {
       if (inActionPhase && state.run.action_spent) {

@@ -199,6 +199,7 @@ export interface PhaseView {
   readonly narration_only: boolean;
   readonly isNarrationOnly: boolean;
   readonly lines: readonly string[];
+  readonly forced_lines: readonly string[];
   readonly can_advance: boolean;
   readonly canAdvance: boolean;
   /** 非夜間為 null；夜間由 night_sleep_pending／night_location_chosen 衍生。 */
@@ -262,6 +263,11 @@ export interface Game {
     cardId?: string,
   ): MutationResult;
   tryPlace(cardId: string, beatId: string, slotId: string): MutationResult;
+  indulge(
+    beatId: string,
+    slotId: string,
+    cardInstanceId: string,
+  ): MutationResult;
   placeableCards(beatId: string, slotId: string): readonly string[];
   previewSlot(
     beatId: string,

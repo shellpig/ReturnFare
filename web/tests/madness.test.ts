@@ -104,19 +104,25 @@ describe('W6-A madness clock, cap and vision', async () => {
     expect(now.run.forced_pending).toEqual([]);
   });
 
-  it('剛歸零需要強制縱慾結算的推進，在 mutation 前原子拒絕（W6-B 才接）', () => {
+  it('剛歸零在換日 morning 自動結算強制縱慾（W6-B）', () => {
     const snap = injectAt(10, 'night', (s) => {
       s.run.night_location_chosen = 'n_exit';
       addMadness(s, { 'madness#1': 1 });
     });
     const game = createGame(data, snap);
-    const before = JSON.stringify(game.serialize());
-    expect(game.getPhaseView().can_advance).toBe(false);
+    expect(game.getPhaseView().can_advance).toBe(true);
     const res = game.advancePhase();
-    expect(res.ok).toBe(false);
-    expect(res.reason_code).toBe('not_implemented');
-    expect(res.reason_text).toContain('W6-B');
-    expect(JSON.stringify(game.serialize())).toBe(before); // 倒數、day、phase、chosen 都沒動
+    expect(res.ok).toBe(true);
+    expect(res.phase_advanced).toBe(true);
+    const after = game.getSnapshot();
+    expect(after.run.day).toBe(11);
+    expect(after.run.phase).toBe('morning');
+    expect(after.run.action_spent).toBe(true);
+    expect(after.run.forced_pending).toEqual([]);
+    expect(after.run.hand.includes('madness#1')).toBe(false);
+    expect(after.run.madness_clock['madness#1']).toBeUndefined();
+    expect(after.run.madness_cards_cleared).toBe(1);
+    expect(after.run.flags.binge_eaten).toBe(true); // exit_sanquan x_binge flag
     // 還沒到歸零（剩 2 天）則照常推進並倒數
     const ok = createGame(
       data,

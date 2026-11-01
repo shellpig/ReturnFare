@@ -351,19 +351,27 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     expect(madnessNightGame.advancePhase().phase_advanced).toBe(true);
     expect(madnessNightGame.getSnapshot().run.madness_clock).toEqual({ test_clock: 1 });
 
-    // 5. actions_spent_ahead guard
+    // 5. actions_spent_ahead applies prepaid action in next action phase (W6-B)
     const aheadInit = createRunForTrace(data).serialize();
     aheadInit.run.actions_spent_ahead = 1;
     const aheadGame = createGame(data, aheadInit);
-    expect(aheadGame.getPhaseView().can_advance).toBe(false);
-    expect(aheadGame.advancePhase().reason_code).toBe('not_implemented');
+    expect(aheadGame.getPhaseView().can_advance).toBe(true);
+    expect(aheadGame.advancePhase().phase_advanced).toBe(true);
+    expect(aheadGame.getSnapshot().run.phase).toBe('afternoon');
+    expect(aheadGame.getSnapshot().run.action_spent).toBe(true);
+    expect(aheadGame.getSnapshot().run.actions_spent_ahead).toBe(0);
 
-    // 6. forced_pending guard when advancing to an action phase (D1 morning -> D1 afternoon)
+    // 6. forced_pending settles at action phase (W6-B)
     const forcedInit = createRunForTrace(data).serialize();
-    forcedInit.run.forced_pending = ['indulgence'];
+    forcedInit.run.hand.push('madness#1');
+    forcedInit.run.madness_clock['madness#1'] = 0;
+    forcedInit.run.forced_pending = ['madness#1'];
     const forcedGame = createGame(data, forcedInit);
-    expect(forcedGame.getPhaseView().can_advance).toBe(false);
-    expect(forcedGame.advancePhase().reason_code).toBe('not_implemented');
+    expect(forcedGame.getPhaseView().can_advance).toBe(true);
+    const forcedAdv = forcedGame.advancePhase();
+    expect(forcedAdv.phase_advanced).toBe(true);
+    expect(forcedGame.getSnapshot().run.forced_pending).toEqual([]);
+    expect(forcedGame.getSnapshot().run.action_spent).toBe(true);
 
     // 7. pending_delegation_reports / delegates_used_today guard when advancing to morning (D1 night -> D2 morning)
     const delegInit = nightGame.serialize();

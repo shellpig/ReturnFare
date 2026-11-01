@@ -478,8 +478,6 @@ describe('W6-A night locations, sleep and alignment', async () => {
     expect(d20Night.getSnapshot().run.day).toBe(21);
 
     const guards: [string, GameSnapshot][] = [
-      ['預扣行動格', injectAt(10, 'morning', (s) => { s.run.actions_spent_ahead = 1; })],
-      ['強制縱慾待辦', injectAt(10, 'morning', (s) => { s.run.forced_pending = ['madness#1']; })],
       [
         '委託隔日回報',
         injectAt(10, 'night', (s) => {

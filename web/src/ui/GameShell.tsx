@@ -282,10 +282,21 @@ export function GameShell({ game }: { game: Game }) {
           onBack={() => setNightDetailId(null)}
         />
       ) : (
-        <MapPanel
-          locations={game.mapView()}
-          onSelectLocation={view.phase === 'night' ? setNightDetailId : openLocation}
-        />
+        <>
+          {view.forced_lines.length > 0 && (
+            <div className="forced-narrative-banner" data-testid="forced-narrative">
+              {view.forced_lines.map((line, idx) => (
+                <p key={idx} className="story forced-line">
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
+          <MapPanel
+            locations={game.mapView()}
+            onSelectLocation={view.phase === 'night' ? setNightDetailId : openLocation}
+          />
+        </>
       )}
       {error && (
         <p role="alert" className="reason">

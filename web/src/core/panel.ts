@@ -304,15 +304,17 @@ export function buildPanel(
               ? slot.reject_reason
               : strings.reasonFallback;
         } else if (slot.indulgence?.soak === true) {
-          const cost = data.tuning.indulgence.soak_phase_cost;
-          if (remainingActionsToday(state) < cost) {
+          if (state.run.phase !== 'morning') {
             slotTri = TriState.LOCKED;
-            slotReason =
-              state.run.phase !== 'morning'
-                ? strings.soakMorningOnly
-                : strings.soakInsufficientActions;
+            slotReason = strings.soakMorningOnly;
           } else {
-            slotTri = TriState.OPEN;
+            const cost = data.tuning.indulgence.soak_phase_cost;
+            if (remainingActionsToday(state) < cost) {
+              slotTri = TriState.LOCKED;
+              slotReason = strings.soakInsufficientActions;
+            } else {
+              slotTri = TriState.OPEN;
+            }
           }
         } else {
           slotTri = TriState.OPEN;

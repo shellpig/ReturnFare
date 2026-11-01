@@ -9,7 +9,7 @@
  * - advancePhase() 七步骨架
  */
 
-import type { Beat, Condition, Effect, GameData } from '../data/types';
+import type { Beat, Condition, Effect, GameData, Slot } from '../data/types';
 import { strings } from '../ui/strings';
 import {
   cardView as calcCardView,
@@ -20,6 +20,7 @@ import {
   hasKnowledge as checkHasKnowledge,
   isOverloaded,
   knowledgeView as calcKnowledgeView,
+  loseCard,
 } from './cards';
 import {
   ConditionError,
@@ -47,6 +48,7 @@ import {
   isNarrationOnlyPhase,
   nextPhaseTarget,
 } from './facts';
+import { levelFor, pickExit } from './indulgence';
 import {
   gainMadnessCardOnDraft,
   madnessCapRequest,
@@ -151,6 +153,9 @@ interface SettleBookkeeping {
   action_cost?: number;
   attention_npc?: string;
   day_location_visited?: string;
+  forced_pop?: string;
+  lose_cards?: readonly string[];
+  indulgence_delta?: number;
 }
 
 interface SettleResult {
@@ -188,6 +193,21 @@ function applyBookkeepingOnDraft(
     target.run.action_spent = true;
     if (actionCost > 1) {
       target.run.actions_spent_ahead += actionCost - 1;
+    }
+  }
+  if (bk.lose_cards && bk.lose_cards.length > 0) {
+    for (let i = 0; i < bk.lose_cards.length; i += 1) {
+      loseCard(target, bk.lose_cards[i], data);
+    }
+  }
+  const indulgenceDelta = bk.indulgence_delta ?? 0;
+  if (indulgenceDelta !== 0) {
+    target.run.indulgence_count += indulgenceDelta;
+  }
+  if (bk.forced_pop) {
+    const pos = target.run.forced_pending.indexOf(bk.forced_pop);
+    if (pos >= 0) {
+      target.run.forced_pending.splice(pos, 1);
     }
   }
   if (bk.day_location_visited) {
@@ -279,6 +299,31 @@ function settleEffectsOnDraft(
     lines: [...pf.lines],
     nextState: afterEffectsDraft,
   };
+}
+
+/**
+ * 縱慾效果的共用結算：基底 on_place 與當次強度級追加塊合併成同一個動作。
+ * 出口槽不記入 slots_placed（可重複使用）。
+ */
+function settleIndulgenceEffects(
+  slot: Slot,
+  preBookkeeping: SettleBookkeeping,
+  state: GameSnapshot,
+  data: GameData,
+): SettleResult {
+  const blocks: (Effect | Record<string, unknown>)[] = [slot.on_place ?? {}];
+  const byLevel = slot.on_place_by_level;
+  if (byLevel && typeof byLevel === 'object') {
+    // 強度級看的是「含這一次」的縱慾次數，因此用尚未落地的 delta 先加上去。
+    const effectiveCount =
+      state.run.indulgence_count + (preBookkeeping.indulgence_delta ?? 0);
+    const lvl = levelFor(effectiveCount, data.tuning);
+    const lvlEffect = byLevel[lvl];
+    if (lvlEffect && typeof lvlEffect === 'object') {
+      blocks.push(lvlEffect);
+    }
+  }
+  return settleEffectsOnDraft(blocks, {}, preBookkeeping, state, data);
 }
 
 /** 在 draft 上執行單一 beat 的呈現與首次 on_enter 結算。 */
@@ -754,6 +799,7 @@ interface AdvancePlanResult {
   readonly reason_text: string;
   readonly nextState: GameSnapshot;
   readonly defaultLines: string[];
+  readonly forcedLines: string[];
   readonly autoEnterLines: string[];
   /** false＝夜間睡覺停拍（或睡覺把玩家推進結局）：狀態已更新但時段不動。 */
   readonly phaseAdvanced: boolean;
@@ -772,10 +818,78 @@ function rejectAdvancePlan(
     reason_text,
     nextState: cloneSnapshot(currentState),
     defaultLines: [],
+    forcedLines: [],
     autoEnterLines: [],
     phaseAdvanced: false,
     stopLines: [],
   };
+}
+
+/**
+ * 強制縱慾結算（規格書第八節、P2-C、開發設計方針 P2-C）。
+ * 由 advance_phase 於行動時段開始時自動呼叫：
+ * 1. 取 forced_pending 隊首有效的發狂卡（若已被消則取下一張）
+ * 2. pickExit 挑選當前條件成立之最高權重出口
+ * 3. 隊首出列、消耗行動格、消除發狂卡、縱慾次數+1、套用效果同屬一個動作
+ * 結算失敗則債留在 forced_pending，行動格與手牌都不動。
+ */
+function settleForcedIndulgenceOnDraft(
+  draft: GameSnapshot,
+  data: GameData,
+): { ok: boolean; lines: string[]; nextState: GameSnapshot } {
+  if (draft.run.forced_pending.length === 0 || draft.run.action_spent) {
+    return { ok: true, lines: [], nextState: draft };
+  }
+
+  // 清理前面已不在手上的無效實例
+  while (
+    draft.run.forced_pending.length > 0 &&
+    !checkHasCard(draft, draft.run.forced_pending[0])
+  ) {
+    draft.run.forced_pending.shift();
+  }
+
+  if (draft.run.forced_pending.length === 0) {
+    return { ok: true, lines: [], nextState: draft };
+  }
+
+  // 先驗證出口，若出口異常或找不到槽則不 pop 隊首，債留在 forced_pending（帳不豁免）
+  const exitResult = pickExit(draft, data);
+  if (!exitResult) {
+    console.error(
+      '_settle_forced_indulgence: Indulgence.pick_exit returned empty exit (data bug)',
+    );
+    return { ok: true, lines: [], nextState: draft };
+  }
+
+  const beat = data.beatsById.get(exitResult.beatId);
+  const slot = (beat?.slots ?? []).find((s) => s.id === exitResult.slotId);
+  if (!beat || !slot) {
+    console.error(
+      `_settle_forced_indulgence: slot not found '${exitResult.beatId}::${exitResult.slotId}'`,
+    );
+    return { ok: true, lines: [], nextState: draft };
+  }
+
+  // 隊首出列、行動格、發狂卡與效果同屬一個動作：結算失敗則債留在 forced_pending，
+  // 行動格與手牌都不動（帳不豁免，也不會被扣兩次）。
+  const cardInstId = draft.run.forced_pending[0];
+  const preBk: SettleBookkeeping = {
+    forced_pop: cardInstId,
+    action_cost: 1,
+    lose_cards: [cardInstId],
+    indulgence_delta: 1,
+  };
+
+  const settle = settleIndulgenceEffects(slot, preBk, draft, data);
+  if (!settle.ok) {
+    console.error(
+      `_settle_forced_indulgence: 效果結算失敗 → ${settle.reason_code}`,
+    );
+    return { ok: true, lines: [], nextState: draft };
+  }
+
+  return { ok: true, lines: settle.lines, nextState: settle.nextState };
 }
 
 /**
@@ -954,14 +1068,7 @@ function preflightAdvancePhase(
   }
 
   // 仍未接好的機制守衛：依整筆命令與目標時段實際需要才擋，mutation 前原子拒絕；日期本身不是守衛。
-  // 預扣行動格與強制縱慾結算屬 W6-B，委託隔日回報屬 W6-C；遭遇見下方目標時段預檢（W6-D）。
-  if (draft.run.actions_spent_ahead > 0) {
-    return rejectAdvancePlan(
-      currentState,
-      'not_implemented',
-      '預扣行動格將於 W6-B 實作',
-    );
-  }
+  // 委託隔日回報屬 W6-C；遭遇見下方目標時段預檢（W6-D）。
   if (
     target.phase === 'morning' &&
     (draft.run.pending_delegation_reports.length > 0 ||
@@ -974,10 +1081,9 @@ function preflightAdvancePhase(
     );
   }
 
-  // ⑦ 在 draft 上更新 day/phase、重設當日時段狀態、結算新時段 auto_enter 與固定遭遇檢查
+  // ⑦ 在 draft 上更新 day/phase、重設當日時段狀態
   draft.run.day = target.day;
   draft.run.phase = target.phase;
-  draft.run.action_spent = false;
   draft.run.night_location_chosen = '';
   draft.run.night_sleep_pending = false;
 
@@ -985,65 +1091,88 @@ function preflightAdvancePhase(
   if (currentState.run.phase === 'night') {
     draft.run.forced_pending.push(...tickMadnessOnDraft(draft));
   }
-  // 強制縱慾要在首個可用行動格結算（W6-B）；需要結算的推進必須在 mutation 前整筆拒絕。
+
+  // prepaid actions（泡湯預扣）：
+  if (
+    draft.run.actions_spent_ahead > 0 &&
+    (ACTION_PHASES as readonly string[]).includes(target.phase)
+  ) {
+    draft.run.actions_spent_ahead -= 1;
+    draft.run.action_spent = true;
+  } else {
+    draft.run.action_spent = false;
+  }
+
+  if (!(ACTION_PHASES as readonly string[]).includes(target.phase)) {
+    draft.run.actions_spent_ahead = 0;
+  }
+
+  // P2-C: 行動時段開始時執行強制縱慾（每個行動時段最多一次）
+  let forcedLines: string[] = [];
   if (
     (ACTION_PHASES as readonly string[]).includes(target.phase) &&
+    !draft.run.action_spent &&
     draft.run.forced_pending.length > 0
   ) {
-    return rejectAdvancePlan(
-      currentState,
-      'not_implemented',
-      '強制縱慾結算將於 W6-B 實作',
-    );
+    const forcedRes = settleForcedIndulgenceOnDraft(draft, data);
+    draft = forcedRes.nextState;
+    forcedLines = forcedRes.lines;
   }
 
-  const autoRes = settleAutoEnterBeatsOnDraft(draft, data);
-  if (!autoRes.ok) {
-    return rejectAdvancePlan(
-      currentState,
-      autoRes.reason_code,
-      autoRes.reason_text,
-    );
+  // 換時段途中若被強制縱慾推進到結局，就不再結算 auto_enter 或新遭遇
+  let autoLines: string[] = [];
+  if (draft.flow.mode === 'run') {
+    const autoRes = settleAutoEnterBeatsOnDraft(draft, data);
+    if (!autoRes.ok) {
+      return rejectAdvancePlan(
+        currentState,
+        autoRes.reason_code,
+        autoRes.reason_text,
+      );
+    }
+    draft = autoRes.nextState;
+    autoLines = autoRes.lines;
   }
-  draft = autoRes.nextState;
 
   // 目標時段 fixed encounter 預檢（在 auto_enter 之後檢查，以涵蓋 auto_enter 寫入之條件）
-  const targetBeats = beatsAt(data.beats, target.day, target.phase);
-  for (let i = 0; i < targetBeats.length; i += 1) {
-    const tb = targetBeats[i];
-    if (tb.fixed !== true) {
-      continue;
-    }
-    const rawTb = tb as unknown as Record<string, unknown>;
-    if (!('encounter' in rawTb) || rawTb.encounter === undefined) {
-      continue;
-    }
-    let encActive = false;
-    try {
-      encActive =
-        evalCondition(tb.condition, draft, data) &&
-        evalCondition(tb.requires, draft, data);
-    } catch (err) {
-      if (err instanceof UnsupportedConditionError) {
-        return rejectAdvancePlan(currentState, 'not_implemented', err.message);
+  if (draft.flow.mode === 'run') {
+    const targetBeats = beatsAt(data.beats, target.day, target.phase);
+    for (let i = 0; i < targetBeats.length; i += 1) {
+      const tb = targetBeats[i];
+      if (tb.fixed !== true) {
+        continue;
       }
-      if (err instanceof ConditionError) {
-        return rejectAdvancePlan(currentState, 'data_conflict', err.message);
+      const rawTb = tb as unknown as Record<string, unknown>;
+      if (!('encounter' in rawTb) || rawTb.encounter === undefined) {
+        continue;
       }
-      throw err;
+      let encActive = false;
+      try {
+        encActive =
+          evalCondition(tb.condition, draft, data) &&
+          evalCondition(tb.requires, draft, data);
+      } catch (err) {
+        if (err instanceof UnsupportedConditionError) {
+          return rejectAdvancePlan(currentState, 'not_implemented', err.message);
+        }
+        if (err instanceof ConditionError) {
+          return rejectAdvancePlan(currentState, 'data_conflict', err.message);
+        }
+        throw err;
+      }
+      if (!encActive) {
+        continue;
+      }
+      const errText = encounterDataError(tb);
+      if (errText.length > 0) {
+        return rejectAdvancePlan(currentState, 'data_conflict', errText);
+      }
+      return rejectAdvancePlan(
+        currentState,
+        'not_implemented',
+        '固定遭遇啟動將於 W6-D 實作',
+      );
     }
-    if (!encActive) {
-      continue;
-    }
-    const errText = encounterDataError(tb);
-    if (errText.length > 0) {
-      return rejectAdvancePlan(currentState, 'data_conflict', errText);
-    }
-    return rejectAdvancePlan(
-      currentState,
-      'not_implemented',
-      '固定遭遇啟動將於 W6-D 實作',
-    );
   }
 
   return {
@@ -1052,7 +1181,8 @@ function preflightAdvancePhase(
     reason_text: '',
     nextState: draft,
     defaultLines,
-    autoEnterLines: autoRes.lines,
+    forcedLines,
+    autoEnterLines: autoLines,
     phaseAdvanced: true,
     stopLines: [],
   };
@@ -1068,6 +1198,7 @@ export function createGame(
 
   // 暫態演出文字（不住在 GameSnapshot / serialize 內）
   let lastChoiceDefaultLines: string[] = [];
+  let lastForcedLines: string[] = [];
   let lastAutoEnterLines: string[] = [];
   let phaseNarrationLines: string[] | null = null;
 
@@ -1175,6 +1306,7 @@ export function createGame(
       narration_only: narrationOnly,
       isNarrationOnly: narrationOnly,
       lines,
+      forced_lines: [...lastForcedLines],
       can_advance: canAdv,
       canAdvance: canAdv,
       night_advance: nightAdvanceStage(),
@@ -1350,6 +1482,7 @@ export function createGame(
     const combinedLines = [...pf.lines, ...autoRes.lines];
     commitState(autoRes.nextState);
     lastChoiceDefaultLines = [];
+    lastForcedLines = [];
     lastAutoEnterLines = combinedLines;
     phaseNarrationLines = null;
     notifyListeners();
@@ -1603,6 +1736,7 @@ export function createGame(
       // 夜間睡覺停拍（或睡覺效果把玩家推進結局）：時段不動，睡覺文字成為這個時段要讀的演出。
       if (plan.stopLines.length > 0) {
         lastChoiceDefaultLines = [];
+        lastForcedLines = [];
         lastAutoEnterLines = [];
         phaseNarrationLines = [...plan.stopLines];
       }
@@ -1616,6 +1750,7 @@ export function createGame(
       };
     }
     lastChoiceDefaultLines = plan.defaultLines;
+    lastForcedLines = plan.forcedLines;
     lastAutoEnterLines = plan.autoEnterLines;
     phaseNarrationLines = null;
     notifyListeners();
@@ -1803,7 +1938,7 @@ export function createGame(
     // 4. madness instance routed BEFORE beat lookup
     const baseId = cardBaseId(cardId);
     if (baseId === 'madness') {
-      return mutationReject('not_implemented', '縱慾系統將於 W6-B 實作');
+      return indulge(beatId, slotId, cardId);
     }
 
     // 5. beat exists
@@ -1880,6 +2015,111 @@ export function createGame(
     };
   }
 
+  function indulge(
+    beatId: string,
+    slotId: string,
+    cardInstanceId: string,
+  ): MutationResult {
+    // 1. flow mode gate
+    if (state.flow.mode !== 'run') {
+      return mutationReject('not_run', REASON_TEXT_NOT_RUN);
+    }
+
+    // 2. encounter active
+    if (Object.keys(state.run.active_encounter).length > 0) {
+      return mutationReject('encounter_active', '遭遇進行中，無法縱慾');
+    }
+
+    // 3. card possession & base_id check
+    if (!cardInstanceId || !checkHasCard(state, cardInstanceId)) {
+      return mutationReject('not_held', '');
+    }
+    const baseId = cardBaseId(cardInstanceId);
+    if (baseId !== 'madness') {
+      return mutationReject('not_accepted', '');
+    }
+
+    // 4. beat & slot existence, indulgence presence, checkSlotState
+    const beat = data.beatsById.get(beatId);
+    if (!beat) {
+      return mutationReject('unknown_beat', `未知的 beat：${beatId}`);
+    }
+    const slot = (beat.slots ?? []).find((s) => s.id === slotId);
+    if (!slot) {
+      return mutationReject('unknown_slot', `未知的 slot：${slotId}`);
+    }
+    if (!slot.indulgence || typeof slot.indulgence !== 'object') {
+      return mutationReject('not_accepted', '');
+    }
+
+    const stateResult = checkSlotState(beat, slot, state, data);
+    if (!stateResult.ok) {
+      return mutationReject(stateResult.reason_code, stateResult.reason_text);
+    }
+
+    // 5. soak special case or action spent check
+    const isSoak = slot.indulgence.soak === true;
+    const soakCost = data.tuning.indulgence.soak_phase_cost;
+    if (isSoak) {
+      if (state.run.phase !== 'morning') {
+        return mutationReject('locked', strings.soakMorningOnly);
+      }
+      const remActions = remainingActionsToday();
+      if (remActions < soakCost) {
+        return mutationReject('locked', strings.soakInsufficientActions);
+      }
+    } else {
+      if (
+        (ACTION_PHASES as readonly string[]).includes(state.run.phase) &&
+        state.run.action_spent
+      ) {
+        return mutationReject('action_spent', '');
+      }
+    }
+
+    // 6. cards to lose
+    const cardsToLose: string[] = [cardInstanceId];
+    if (isSoak) {
+      const cardsCleared = data.tuning.indulgence.soak_cards_cleared;
+      if (cardsCleared > 1) {
+        for (let i = 0; i < state.run.hand.length; i += 1) {
+          const c = state.run.hand[i];
+          if (cardBaseId(c) === 'madness' && c !== cardInstanceId) {
+            cardsToLose.push(c);
+            if (cardsToLose.length === cardsCleared) {
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    const preBk: SettleBookkeeping = {
+      action_cost: isSoak ? soakCost : 1,
+      lose_cards: cardsToLose,
+      indulgence_delta: 1,
+    };
+
+    const settleRes = settleIndulgenceEffects(
+      slot,
+      preBk,
+      state as GameSnapshot,
+      data,
+    );
+    if (!settleRes.ok) {
+      return mutationReject(settleRes.reason_code, settleRes.reason_text);
+    }
+
+    commitState(settleRes.nextState);
+    notifyListeners();
+    return {
+      ok: true,
+      reason_code: '',
+      reason_text: '',
+      lines: settleRes.lines,
+    };
+  }
+
   function endingView(): EndingView {
     return calcEndingView(state, data);
   }
@@ -1896,6 +2136,7 @@ export function createGame(
     commitState(step.nextState);
     if (clearTransientLines) {
       lastChoiceDefaultLines = [];
+      lastForcedLines = [];
       lastAutoEnterLines = [];
       phaseNarrationLines = null;
     }
@@ -1970,6 +2211,7 @@ export function createGame(
     playNightFixed,
     choose,
     tryPlace,
+    indulge,
     placeableCards,
     previewSlot,
     hasAnyLegalAction,

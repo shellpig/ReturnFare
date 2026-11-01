@@ -232,14 +232,16 @@ describe('Card Placement and Slot Execution (W5-B)', async () => {
     expect(emptyCardRes.ok).toBe(false);
     expect(emptyCardRes.reason_code).toBe('not_held');
 
-    // 4. madness instance routed BEFORE unknown beat check
-    const madnessRes = runGame.tryPlace(
+    // 4. madness instance routed to indulge (W6-B)
+    runInit.run.hand.push('madness#1');
+    const madnessGame = createGame(data, runInit);
+    const madnessRes = madnessGame.tryPlace(
       'madness#1',
       'unknown_beat_123',
       'unknown_slot',
     );
     expect(madnessRes.ok).toBe(false);
-    expect(madnessRes.reason_code).toBe('not_implemented');
+    expect(madnessRes.reason_code).toBe('unknown_beat');
 
     // 5. unknown beat
     const unknownBeatRes = runGame.tryPlace(
