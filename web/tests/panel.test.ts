@@ -48,6 +48,7 @@ describe('W4-B panel.ts tri-state evaluation, mapView(), and visit recording', (
     const mv = game.mapView();
     const enabledIds = mv.filter((loc) => loc.enabled).map((loc) => loc.id);
     expect(enabledIds).toEqual(['sanquan', 'oldstreet', 'temple']);
+    expect(mv.filter(loc => loc.hasEvent).map(loc => loc.id)).toEqual(['sanquan', 'oldstreet', 'temple']);
 
     // 2. sanquan on D3 afternoon: d3_pm_sanquan is OPEN, exit_sanquan is HIDDEN (omitted)
     const sanquanPanel = game.buildPanel('sanquan');
@@ -220,6 +221,7 @@ describe('W4-B panel.ts tri-state evaluation, mapView(), and visit recording', (
     expect(notifyCount).toBe(1);
     expect(game.getSnapshot().meta.day_locations_visited.clinic).toBe(true);
     expect(game.mapView().find((m) => m.id === 'clinic')?.enabled).toBe(true);
+    expect(game.mapView().find((m) => m.id === 'clinic')?.hasEvent).toBe(false);
 
     // 3. playBeat() on a daytime beat (d3_pm_temple) also records meta.day_locations_visited.temple = true
     expect(game.getSnapshot().meta.day_locations_visited.temple).toBeUndefined();

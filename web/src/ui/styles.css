@@ -63,8 +63,51 @@ dialog::backdrop { background: var(--backdrop); }
 .passage { min-height: 12rem; margin: 2rem 0; }
 .map-panel, .location-panel { margin: 1.5rem 0; }
 .map-art-frame, .scene-art-frame { margin-bottom: 1.25rem; border: 1px solid var(--border); background: var(--button); overflow: hidden; }
-.map-art, .scene-art { display: block; width: 100%; max-height: 260px; object-fit: cover; }
-.map-locations { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .75rem; }
+.map-art, .scene-art { display: block; width: 100%; height: auto; }
+.zoomable-art { position: relative; min-width: 0; }
+.art-viewport { overflow: hidden; }
+.art-canvas { position: relative; transform-origin: top left; }
+.art-canvas img { user-select: none; -webkit-user-drag: none; }
+.art-toolbar, .art-zoom-toggle { display: none; }
+.scene-art-frame { display: grid; background: #201d19; }
+.scene-art-view { grid-area: 1 / 1; align-self: start; }
+.scene-text-overlay { grid-area: 1 / 1; align-self: end; margin-top: 30%; min-width: 0; padding: 3rem 1.5rem 1rem; color: #f6eddd; background: linear-gradient(to bottom, transparent, #201d19b8 25%, #201d19 85%); text-shadow: 0 1px 3px #0008; }
+.scene-text-overlay .beat-title { color: #f1d9af; margin-top: 0; }
+.scene-text-overlay .story { font-size: 1.05rem; line-height: 1.85; margin: 0; }
+.map-art-frame { position: relative; }
+.map-markers { position: absolute; inset: 0; pointer-events: none; }
+.map-marker { position: absolute; color: #ede0c5; }
+.map-marker-dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 2px solid #d4c6ac; box-shadow: 0 0 0 3px #30271985, 0 1px 7px #0009; pointer-events: auto; cursor: pointer; }
+.map-marker-dot::before { content: ''; position: absolute; inset: -10px; }
+.map-marker-line { position: absolute; height: 1px; background: #e5ce9c9c; transform-origin: left center; }
+.map-marker-name { position: absolute; width: max-content; max-width: 160px; padding: .3rem .55rem; border: 1px solid #d9bf855c; border-radius: 3px; background: #27241fdb; color: #f4e7cd; font-family: WenKai, serif; font-size: .8rem; line-height: 1.4; text-shadow: 0 1px 2px #0009; box-shadow: 0 2px 8px #0004; pointer-events: auto; }
+.map-marker-name:disabled { opacity: 1; }
+.map-marker[data-enabled="true"] .map-marker-name { border-color: #e5c184; color: #fff1d3; box-shadow: 0 0 9px #e2b96c35, 0 2px 8px #0006; }
+.map-marker[data-enabled="true"] .map-marker-dot { border-color: #ffe4ac; }
+.map-marker[data-has-event="true"] .map-marker-dot { background: #e5c184; border-color: #fff0ce; }
+.map-marker[data-has-event="true"] .map-marker-name { border: 2px solid #e5c184; color: #fff1d3; box-shadow: 0 0 9px #e2b96c35, 0 2px 8px #0006; }
+.map-marker[data-enabled="false"] .map-marker-dot { cursor: default; }
+.map-marker[data-enabled="false"] .map-marker-name { color: #d1c7b4; background: #2a2824cc; border-color: #c5b99f42; }
+.map-marker[data-highlighted="true"] { z-index: 1; }
+.map-marker[data-highlighted="true"] .map-marker-name { background: #443522f2; border-color: #f2d39a; color: #fff4d9; }
+.map-marker[data-highlighted="true"] .map-marker-dot { box-shadow: 0 0 0 5px #ebc47b4d, 0 0 12px #e8c07f; }
+@media (max-width: 520px) {
+  .app-shell { width: calc(100% - .75rem); padding: 1rem; }
+  .map-art-frame, .scene-art-frame { margin-inline: -.75rem; }
+  .map-marker-name { font-size: .75rem; max-width: 128px; padding: .3rem .4rem; }
+  .art-toolbar { display: flex; justify-content: flex-end; padding-bottom: .5rem; background: var(--surface); }
+  .art-zoom-toggle, [data-typing="true"] .art-zoom-toggle { display: block; min-height: 40px; padding: .45rem .65rem; border-color: #d4c6ac; border-radius: 4px; background: #27241fe8; color: #fff1d3; font-size: .8rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .art-zoom-toggle:hover:not(:disabled), .art-zoom-toggle:active { background: #27241fe8; color: #fff1d3; }
+  .map-art-frame, .scene-art-frame { border: 0; }
+  .zoomable-art > .art-viewport { border: 1px solid var(--border); }
+  .zoomable-art[data-zoomed="true"] .art-viewport { touch-action: none; cursor: grab; }
+  .zoomable-art[data-zoomed="true"] .art-viewport:active { cursor: grabbing; }
+  .scene-art-frame { display: block; }
+  .scene-text-overlay { position: relative; z-index: 1; margin-top: -30%; padding: 2rem .9rem .9rem; }
+  .scene-art-frame:has(.zoomable-art[data-zoomed="true"]) .scene-text-overlay { margin-top: 0; }
+  .scene-text-overlay .story { font-size: .85rem; line-height: 1.65; }
+  .scene-text-overlay .beat-title { font-size: .95rem; margin-bottom: .4rem; }
+}
 .location-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .location-header h2 { margin: 0; }
 .beat-stage, .slots-stage { margin-top: 1rem; }

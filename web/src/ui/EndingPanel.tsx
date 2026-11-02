@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Game, MutationResult } from '../core/state-types';
 import { strings } from './strings';
 import { useGame } from './use-game';
+import { preserveStoryInput } from './use-story-text';
 
 /** 逐字速度：scenes/ui/flow_text.gd start_typewriter 的預設 35 字／秒（純呈現參數，不屬遊戲規則）。 */
 const TYPEWRITER_CHARS_PER_SEC = 35;
@@ -63,6 +64,18 @@ export function EndingPanel({ game }: { game: Game }) {
       report(game.completeEnding());
     }
   }
+
+  useEffect(() => {
+    if (view.page_revealed) return;
+    function onClick(event: MouseEvent) {
+      if (preserveStoryInput(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      report(game.revealEndingPage());
+    }
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [game, view.page_index, view.page_revealed]);
 
   // 鍵盤：空白／Enter／→／↓。焦點在按鈕上時交給按鈕原生 click，避免同一次輸入觸發兩次。
   useEffect(() => {

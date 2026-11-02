@@ -19,7 +19,7 @@ test('story types, click reveals without advancing, next passage resets, natural
   const partial = await passage.innerText();
   expect(partial.length).toBeGreaterThan(0);
   expect(partial.length).toBeLessThan(beat('d1_morning_phone').text.length);
-  await story.click();
+  await page.mouse.click(2, 2);
   await expect(passage).toHaveText(beat('d1_morning_phone').text);
   await expect(page.locator('header')).toContainText('第 1 天 上午');
   await expect(page.getByRole('button', { name: '繼續演出' })).toBeVisible();
@@ -56,14 +56,14 @@ test('location story and description gate buttons and people until revealed', as
   await expect(panel).toHaveAttribute('data-typing', 'true');
   await expect(page.getByRole('button', { name: '繼續演出' })).toBeHidden();
   await expect(page.locator('.phase-actions')).toBeHidden();
-  await panel.click();
+  await page.locator('.scene-art').click({ position: { x: 5, y: 5 } });
   await expect(page.locator('.beat-text')).toHaveText(beat('d2_morning_intro').text);
   await expect(page.locator('.location-desc')).toHaveCount(0);
   await page.getByRole('button', { name: '繼續演出' }).click();
   await expect(panel).toHaveAttribute('data-typing', 'true');
   await expect(page.locator('.beats-list')).toBeHidden();
   await expect(page.getByRole('button', { name: '返回地圖' })).toBeHidden();
-  await panel.click();
+  await page.mouse.click(2, 2);
   await expect(panel).toHaveAttribute('data-typing', 'false');
   await expect(page.locator('.slot-display')).toHaveCount(2);
   await expect(page.locator('.beats-list')).toBeVisible();

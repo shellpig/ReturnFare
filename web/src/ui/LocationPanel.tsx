@@ -6,6 +6,7 @@ import { ModalDialog } from './ModalDialog';
 import { SlotView } from './SlotView';
 import { strings } from './strings';
 import { useStoryText } from './use-story-text';
+import { ZoomableArt } from './ZoomableArt';
 
 const SCENE_ART_LOCATIONS = new Set([
   'bathhouse',
@@ -73,6 +74,15 @@ export function LocationPanel({
     `${panel.location.id}:${isPlaying}:${beatTitle}`,
   );
 
+  const sceneText = isPlaying ? (
+    <>
+      <h3 className="beat-title">{beatTitle || strings.noTitle}</h3>
+      <p className="story beat-text" aria-live="polite">{story.visibleLines[0]}</p>
+    </>
+  ) : panel.location.desc ? (
+    <p className="story location-desc">{story.visibleLines[actionResultLines.length]}</p>
+  ) : null;
+
   return (
     <section className="location-panel" {...story.revealProps}>
       <div className="location-header">
@@ -84,20 +94,20 @@ export function LocationPanel({
 
       {hasSceneArt && (
         <div className="scene-art-frame">
+          <ZoomableArt className="scene-art-view" key={panel.location.id}>
           <img
             className="scene-art"
             src={`/art/scenes/${panel.location.id}.webp`}
             alt={panel.location.name}
           />
+          </ZoomableArt>
+          {sceneText && <div className="scene-text-overlay">{sceneText}</div>}
         </div>
       )}
 
       {isPlaying ? (
         <div className="beat-stage">
-          <h3 className="beat-title">{beatTitle || strings.noTitle}</h3>
-          <p className="story beat-text" aria-live="polite">
-            {story.visibleLines[0]}
-          </p>
+          {!hasSceneArt && sceneText}
           <button type="button" onClick={onAdvanceBeat}>
             {strings.continue}
           </button>
@@ -117,7 +127,7 @@ export function LocationPanel({
               ))}
             </div>
           )}
-          {panel.location.desc && (
+          {!hasSceneArt && panel.location.desc && (
             <p className="story location-desc">{story.visibleLines[actionResultLines.length]}</p>
           )}
           {panel.empty_result && (

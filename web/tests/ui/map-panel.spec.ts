@@ -15,6 +15,8 @@ const locations = JSON.parse(
   readFileSync('../data/locations.json', 'utf8'),
 ).day;
 
+test.use({ hasTouch: true });
+
 const ch1Beat = (id: string) =>
   ch1Beats.find((b: { id: string }) => b.id === id);
 const ch2Beat = (id: string) =>
@@ -61,23 +63,95 @@ test('D2 morning map and two-stage LocationPanel: plays OPEN beat first without 
   await expect(page.locator('header')).toContainText('第 2 天');
   await expect(page.locator('.map-panel')).toBeVisible();
 
+  const mapImage = page.locator('.map-art');
+  await expect.poll(() => mapImage.evaluate((image: HTMLImageElement) =>
+    Math.abs(image.clientHeight - image.clientWidth * image.naturalHeight / image.naturalWidth),
+  )).toBeLessThan(1);
+  const sanquanMarker = page.locator('.map-marker[data-location="sanquan"]');
+  await expect(sanquanMarker.locator('.map-marker-name')).toHaveText('山泉閣');
+  // Previously calibrated artwork position, distinct from the logical data coordinates.
+  await expect(sanquanMarker).toHaveAttribute('data-x', '58');
+  await expect(sanquanMarker).toHaveAttribute('data-y', '38');
+  const artworkPosition = await sanquanMarker.evaluate(marker => {
+    const frame = marker.closest('.map-art-frame')!;
+    const image = frame.querySelector('img')!.getBoundingClientRect();
+    const point = marker.getBoundingClientRect();
+    return { x: (point.x - image.x) / image.width, y: (point.y - image.y) / image.height };
+  });
+  expect(artworkPosition.x).toBeCloseTo(.58, 2);
+  expect(artworkPosition.y).toBeCloseTo(.38, 2);
+  expect(await page.locator('.map-marker-name').count()).toBe(await page.locator('.map-marker').count());
+  await expect(page.locator('.map-locations')).toHaveCount(0);
+  await expect(sanquanMarker).toHaveAttribute('data-has-event', 'true');
+  await expect(sanquanMarker.locator('.map-marker-name')).toHaveCSS('border-top-width', '2px');
+  await expect(page.locator('.map-marker[data-location="clinic"]')).toHaveAttribute('data-has-event', 'false');
+  await expect(page.locator('.map-marker[data-location="clinic"] .map-marker-dot')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await page.getByRole('button', { name: '山泉閣', exact: true }).hover();
+  await expect(sanquanMarker).toHaveAttribute('data-highlighted', 'true');
+  await page.screenshot({ path: '../_qa/web/map-complete-labels.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect((await mapImage.boundingBox())!.width).toBeGreaterThan(365);
+  await page.screenshot({ path: '../_qa/web/map-direct-mobile.png', fullPage: true });
+
   // Unvisited empty locations on D2 morning (e.g. 診所, 老街) are disabled and cannot be clicked into LocationPanel
   const clinicBtn = page.getByRole('button', { name: locById('clinic').name });
   await expect(clinicBtn).toBeDisabled();
+  const clinicMarker = page.locator('.map-marker[data-location="clinic"]');
+  const clinicAppearance = () => clinicMarker.evaluate(marker => ({
+    dotShadow: getComputedStyle(marker.querySelector('.map-marker-dot')!).boxShadow,
+    labelBorder: getComputedStyle(marker.querySelector('.map-marker-name')!).borderColor,
+    labelBackground: getComputedStyle(marker.querySelector('.map-marker-name')!).backgroundColor,
+  }));
+  const disabledAppearance = await clinicAppearance();
+  await clinicBtn.hover();
+  await expect(clinicMarker).toHaveAttribute('data-highlighted', 'false');
+  await clinicMarker.locator('.map-marker-dot').hover();
+  await expect(clinicMarker).toHaveAttribute('data-highlighted', 'false');
+  expect(await clinicAppearance()).toEqual(disabledAppearance);
   await clinicBtn.dispatchEvent('click');
   await expect(page.locator('.location-panel')).toHaveCount(0);
+
+  // A visited location stays enterable without events: hollow point, scene and description.
+  const busstopMarker = page.locator('.map-marker[data-location="busstop"]');
+  await expect(busstopMarker).toHaveAttribute('data-has-event', 'false');
+  await expect(busstopMarker.locator('.map-marker-name')).toHaveCSS('border-top-color', 'rgb(229, 193, 132)');
+  await expect(busstopMarker.locator('.map-marker-name')).toHaveCSS('color', 'rgb(255, 241, 211)');
+  await expect(busstopMarker.locator('.map-marker-dot')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const busstopBtn = page.getByRole('button', { name: locById('busstop').name, exact: true });
+  await expect(busstopBtn).toBeEnabled();
+  await busstopBtn.tap();
+  await expect(page.locator('.scene-art')).toHaveAttribute('src', '/art/scenes/busstop.webp');
+  await expect(page.locator('.location-desc')).toHaveText(locById('busstop').desc);
+  await expect(page.locator('.beat-group')).toHaveCount(0);
+  await page.getByRole('button', { name: '返回地圖', exact: true }).tap();
 
   // Open 山泉閣 (sanquan)
   const sanquanBtn = page.getByRole('button', {
     name: locById('sanquan').name,
   });
   await expect(sanquanBtn).toBeEnabled();
-  await sanquanBtn.click();
+  await sanquanBtn.tap();
 
   // Stage 1: OPEN beat d2_morning_intro text is immediately shown; desc and slots are NOT rendered yet
   const d2Intro = ch1Beat('d2_morning_intro');
   await expect(page.locator('.location-panel')).toBeVisible();
   await expect(page.locator('.beat-title')).toHaveText(d2Intro.title);
+  await expect(page.locator('.scene-text-overlay .beat-text')).toHaveText(d2Intro.text);
+  await expect(page.locator('.scene-art-frame')).toHaveCSS('display', 'block');
+  await expect(page.locator('.scene-text-overlay')).toHaveCSS('background-image', /linear-gradient/);
+  await expect.poll(() => page.locator('.scene-art').evaluate((image: HTMLImageElement) =>
+    Math.abs(image.clientHeight - image.clientWidth * image.naturalHeight / image.naturalWidth),
+  )).toBeLessThan(1);
+  expect((await page.locator('.scene-art').boundingBox())!.width).toBeGreaterThan(365);
+  const sceneTextFits = await page.locator('.scene-text-overlay').evaluate(overlay => {
+    const frame = overlay.closest('.scene-art-frame')!.getBoundingClientRect();
+    const text = overlay.querySelector('.beat-text')!.getBoundingClientRect();
+    return text.bottom <= frame.bottom && overlay.scrollHeight <= overlay.clientHeight + 1;
+  });
+  expect(sceneTextFits).toBe(true);
+  await page.screenshot({ path: '../_qa/web/scene-complete-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.screenshot({ path: '../_qa/web/scene-complete.png', fullPage: true });
   await expect(page.locator('.beat-text')).toHaveText(d2Intro.text);
   await expect(page.locator('.location-desc')).toHaveCount(0);
   await expect(page.locator('.slot-item')).toHaveCount(0);
@@ -170,6 +244,7 @@ test('D19 afternoon upstream (only LOCKED beat) records visit on UI click withou
 
   // Upstream has a LOCKED beat on D19 afternoon, so its map button is Enabled
   const upstreamBtn = page.getByRole('button', { name: upstreamLoc.name });
+  await expect(page.locator('.map-marker[data-location="upstream"]')).toHaveAttribute('data-has-event', 'true');
   await expect(upstreamBtn).toBeEnabled();
   await upstreamBtn.click();
 
@@ -212,6 +287,8 @@ test('D19 afternoon upstream (only LOCKED beat) records visit on UI click withou
   await expect(page.locator('header')).toContainText('第 20 天');
   // Even though upstream has 0 beats on D20 afternoon, it was visited on D19 so it remains Enabled on the map
   await expect(upstreamBtn).toBeEnabled();
+  await expect(page.locator('.map-marker[data-location="upstream"]')).toHaveAttribute('data-has-event', 'false');
+  await expect(page.locator('.map-marker[data-location="upstream"] .map-marker-dot')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await upstreamBtn.click();
 
   // Clicking upstream on D20 afternoon displays only its formal desc (no beats, no slots)

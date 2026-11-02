@@ -26,6 +26,7 @@ export interface MapLocationView {
   id: string;
   name: string;
   enabled: boolean;
+  hasEvent: boolean;
   map?: { x: number; y: number };
 }
 
@@ -428,6 +429,7 @@ export function mapView(
         id: locId,
         name: strings.nightListEntry(summary.display_name, summary.status_text),
         enabled: true,
+        hasEvent: buildPanel(locId, state, data).beats.length > 0,
         ...(loc?.map ? { map: { x: loc.map.x, y: loc.map.y } } : {}),
       };
     });
@@ -441,6 +443,7 @@ export function mapView(
       id: locId,
       name: loc?.name ?? locId,
       enabled: hasVisibleBeat || visitedBefore,
+      hasEvent: hasVisibleBeat,
       ...(loc?.map ? { map: { x: loc.map.x, y: loc.map.y } } : {}),
     };
   });

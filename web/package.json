@@ -7,6 +7,7 @@
     "lint:data": "tsx scripts/lint-data.ts",
     "dev": "node scripts/sync-data.mjs && npm run lint:data && vite",
     "build": "node scripts/sync-data.mjs && npm run lint:data && tsc --noEmit && vite build",
+    "preview": "vite preview",
     "test": "vitest run",
     "fonts:collect": "tsx scripts/collect-font-text.ts",
     "fonts:subset": "npm run fonts:collect && ..\\.venv\\Scripts\\python.exe ..\\tools\\fonts\\subset_fonts.py",

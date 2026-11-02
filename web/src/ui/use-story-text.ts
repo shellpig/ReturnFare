@@ -4,6 +4,12 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 /** 純呈現速度，約每秒 33 字；不進入遊戲狀態或存檔。 */
 const CHARACTER_INTERVAL_MS = 30;
 
+export function preserveStoryInput(target: EventTarget | null): boolean {
+  return Boolean(document.querySelector('dialog[open]')) || (target instanceof Element && Boolean(target.closest(
+    '[data-art-control], [data-art-dragged="true"], .save-panel button, .save-panel input, dialog, a, input, textarea, select',
+  )));
+}
+
 export function useStoryText(lines: readonly string[], identity: string) {
   const key = JSON.stringify([identity, ...lines]);
   const characters = lines.map(line => Array.from(line));
@@ -24,6 +30,13 @@ export function useStoryText(lines: readonly string[], identity: string) {
     // 同一段文字只建立一個計時器；換段、補完或卸載時清除。
   }, [key, typing, length]);
 
+  useEffect(() => {
+    if (!typing) return;
+    const onClick = (event: globalThis.MouseEvent) => reveal(event);
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [key, typing, length]);
+
   let remaining = count;
   const visibleLines = characters.map(line => {
     const text = line.slice(0, Math.max(0, remaining)).join('');
@@ -31,8 +44,9 @@ export function useStoryText(lines: readonly string[], identity: string) {
     return text;
   });
 
-  function reveal(event: MouseEvent | KeyboardEvent) {
+  function reveal(event: MouseEvent | KeyboardEvent | globalThis.MouseEvent) {
     if (!typing) return;
+    if (preserveStoryInput(event.target)) return;
     event.preventDefault();
     event.stopPropagation();
     setProgress({ key, count: length });

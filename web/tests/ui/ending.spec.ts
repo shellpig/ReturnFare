@@ -56,7 +56,7 @@ test('refuse boarding: fill -> flip -> last page -> complete back to opening, wi
   await expect(page.getByText(secondPage.text)).toHaveCount(0);
 
   // 一次點擊只補完當頁，不翻頁
-  await page.getByTestId('ending-body').click();
+  await page.mouse.click(2, 2);
   await expect(text).toHaveText(firstPage.text);
   await expect(label).toHaveText('第 1 / 2 頁');
   await expect(page.getByRole('button', { name: '下一頁' })).toBeVisible();
