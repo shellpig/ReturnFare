@@ -4,7 +4,7 @@
 
 最後更新：2026-11-02
 
-> **當前進度（以網頁版為主，Godot 版已凍結）**：專案已拍板轉向**純網頁版（TypeScript + Vite + React）**。`docs/web/` 下的 [網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md) 與 **W1～W7 實作契約**已全數立定；**W1 骨架與軌跡基線（W1-A 網頁骨架與資料同步、W1-B Godot 黃金軌跡產生器、W1-C 軌跡比對器）已全部完成並通過驗收**，詳見 [W1 紀錄](docs/records/W1實作紀錄.md)，**W2 資料層（W2-A 資料載入與 TS 型別、W2-B build-time 資料 lint）亦已全部完成並通過驗收**，詳見 [W2 紀錄](docs/records/W2實作紀錄.md)；**W3 第一個畫面（W3-B GameState 與初期推進規則、W3-A 開局與純演出 UI）亦已全部完成並通過驗收**，詳見 [W3 紀錄](docs/records/W3實作紀錄.md)；**W4 地圖與面板（W4-A 完整條件求值器、W4-B 白天地圖與地點面板）亦已全部完成並通過驗收**，詳見 [W4 紀錄](docs/records/W4實作紀錄.md)；**W5 能玩（W5-A 卡片、手牌與知識、W5-B 交易、放置、預覽與行動格、W5-C choice_group 互斥選擇）亦已全部完成並通過驗收**，詳見 [W5 紀錄](docs/records/W5實作紀錄.md)；**W6 全套規則已完成 W6-E1 結局底座、W6-A 夜間、發狂錶與對位、W6-B 主動／強制縱慾、W6-C 委託與隔日回報、W6-D 遭遇與 W6-E2（E2-1 出口與結局接線、E2-2 跨輪與重新開局、E2-3 45 天 runner 與全程對帳）並通過機器驗收**，詳見 [W6 紀錄](docs/records/W6實作紀錄.md)；**W7 已完成 W7-A 全程對帳（Godot 基線重產後無 scope 嚴格比較 193 checkpoints equal）與 W7-B 本機存讀、JSON 匯入／匯出並通過驗收**，詳見 [W7 紀錄](docs/records/W7實作紀錄.md)；W7-C／D 為 📐 規格可實作。`web/public/art/` 已備妥小鎮地圖與 13 張白天地點場景圖（WebP），`web/prototype/` 已放入示意版原型。Godot 原版（P1～P5 機器層全綠、T-01～T-04 完工、36 套 headless 與 94 條 UI 契約全綠）**現已凍結為唯讀對照基準，其狀態與進度暫不理會**。**下一步：W7-C 字型自託管與子集化；網頁版人工體感驗收（W6 契約九）仍待做。**
+> **當前進度（以網頁版為主，Godot 版已凍結）**：專案已拍板轉向**純網頁版（TypeScript + Vite + React）**。`docs/web/` 下的 [網頁版移植計畫.md](docs/web/網頁版移植計畫.md)、[共用契約.md](docs/web/共用契約.md) 與 **W1～W7 實作契約**已全數立定；**W1 骨架與軌跡基線（W1-A 網頁骨架與資料同步、W1-B Godot 黃金軌跡產生器、W1-C 軌跡比對器）已全部完成並通過驗收**，詳見 [W1 紀錄](docs/records/W1實作紀錄.md)，**W2 資料層（W2-A 資料載入與 TS 型別、W2-B build-time 資料 lint）亦已全部完成並通過驗收**，詳見 [W2 紀錄](docs/records/W2實作紀錄.md)；**W3 第一個畫面（W3-B GameState 與初期推進規則、W3-A 開局與純演出 UI）亦已全部完成並通過驗收**，詳見 [W3 紀錄](docs/records/W3實作紀錄.md)；**W4 地圖與面板（W4-A 完整條件求值器、W4-B 白天地圖與地點面板）亦已全部完成並通過驗收**，詳見 [W4 紀錄](docs/records/W4實作紀錄.md)；**W5 能玩（W5-A 卡片、手牌與知識、W5-B 交易、放置、預覽與行動格、W5-C choice_group 互斥選擇）亦已全部完成並通過驗收**，詳見 [W5 紀錄](docs/records/W5實作紀錄.md)；**W6 全套規則已完成 W6-E1 結局底座、W6-A 夜間、發狂錶與對位、W6-B 主動／強制縱慾、W6-C 委託與隔日回報、W6-D 遭遇與 W6-E2（E2-1 出口與結局接線、E2-2 跨輪與重新開局、E2-3 45 天 runner 與全程對帳）並通過機器驗收**，詳見 [W6 紀錄](docs/records/W6實作紀錄.md)；**W7 已完成 W7-A 全程對帳（Godot 基線重產後無 scope 嚴格比較 193 checkpoints equal）、W7-B 本機存讀、JSON 匯入／匯出與 W7-C 字型自託管子集化（12.7MB → 1.2MB、零缺字）並通過驗收**，詳見 [W7 紀錄](docs/records/W7實作紀錄.md)；W7-D 為 📐 規格可實作。`web/public/art/` 已備妥小鎮地圖與 13 張白天地點場景圖（WebP），`web/prototype/` 已放入示意版原型。Godot 原版（P1～P5 機器層全綠、T-01～T-04 完工、36 套 headless 與 94 條 UI 契約全綠）**現已凍結為唯讀對照基準，其狀態與進度暫不理會**。**下一步：W7-D Cloudflare Pages 上線；網頁版人工體感驗收（W6 契約九）仍待做。**
 
 ---
 
@@ -86,7 +86,7 @@
 | **W7 收尾與上線** | — | 詳見 [`docs/web/W7實作契約.md`](docs/web/W7實作契約.md) |
 | W7-A 45 天全程軌跡對帳全綠 | ✅ | `5949140`；Godot 基線明示重產（`313bf1a`，只改 manifest hash，狀態不變），無 scope／ignore 嚴格比較 193 checkpoints／48,985 欄 equal；P3 寫死 193 於 W7-B3 修正，詳見 [驗收紀錄](docs/records/W7_steps/W7-A2.md) |
 | W7-B 本機存檔與 UI | ✅ | `c25a4a8`、`a500505`；`localStorage` 自動／手動檔、JSON 匯入匯出、嚴格 decode、驗證成功才替換 Game；P2 壞或未支援版本 auto 被新局覆寫已改為暫停 autosave 待確認；Node 273、UI 16／16、嚴格 trace equal，詳見 [驗收紀錄](docs/records/W7_steps/W7-B3.md) |
-| W7-C 字型自託管與子集化 | 📐 | 霞鶩文楷 TC／台北黑體子集化 `woff2` 自託管與 `OFL.txt` 確認 |
+| W7-C 字型自託管與子集化 | ✅ | 正式 data／TS／TSX／CSS／HTML 語料 2,293 字，兩套 woff2 合計 12,741,344 → 1,203,060 bytes、缺字 0，授權與 name 0／13／14 保留；P2 CSS 卡槽括號〔〕漏收已修；Node 279、Python 6／6，詳見 [驗收紀錄](docs/records/W7_steps/W7-C.md) |
 | W7-D Cloudflare Pages 上線 | 📐 | 靜態建置產物驗證與 Cloudflare Pages 部署 |
 
 ---
@@ -153,6 +153,8 @@ $traceRevisionW1 = git rev-parse HEAD
 
 ## 近期動態與下一步
 
+- **2026-11-02**：**W7-C 字型自託管與子集化完成並通過驗收**。agy Gemini 3.8 Flash (High) 經共用控制器實作：`collect-font-text.ts` 收正式 data、TS／TSX、CSS 與 index.html 字串，`tools/fonts/subset_fonts.py` 自已核對 SHA256 的原始 TTF 產真 WOFF2，驗 cmap 後成對替換、失敗回復。文楷 694,244、台北黑體 508,816 bytes（合計約 -90.6%），檔名、font-family、swap 與授權不變。verifier 靜態審查發現 P2：CSS `content` 的卡槽括號〔〕未進語料、兩字型缺字；修正後另收語料 2,293 字、缺字 0，npm test 279、build、Python 6／6 皆 exit 0，CSS 接線變異與卡槽實際渲染沿用指揮者證據。P3：無已提交字型涵蓋語料的回歸測試、`fonts:subset` 限 Windows、台北黑體來源無備援。未驗其他瀏覽器、真人體感。詳見 [W7-C](docs/records/W7_steps/W7-C.md)；下一步 W7-D。
+
 - **2026-11-02**：**W7-A 全程對帳、W7-B 本機存讀與 JSON 搬移完成並通過驗收**（`5949140`、`c25a4a8`、`a500505`）。W7-A 以 W1-B 產生器明示重產 Godot 基線（來源 `313bf1a`；13 個 manifest hash 變更＝12 檔換行正規化＋locations.json 文案，193 checkpoints 狀態不變），無 scope／ignore 嚴格比較 193／48,985 欄 equal。W7-B 含 localStorage auto／manual、啟動繼續、JSON 匯入匯出與夜間配色。verifier 靜態審查發現 P2：壞或未支援版本的自動檔提示「已保留」卻被新局第一步覆寫；與 6 項 P3 經使用者指示於 W7-B3 修正（暫停 autosave 待明示覆蓋、版本先於欄位檢查、本地時間顯示、延後撤銷下載 URL、繼續後隱藏橫幅、殘響選文共用、full-trace 以基線長度為準）。重跑 npm test 273、build、嚴格 trace equal、相關 UI 16／16 皆 exit 0；暫停判斷變異轉紅。殘留：fixed beat／夜間／自動進場讀檔選文仍為投影實作（顯示層）、iOS Safari 下載未實機驗。未跑 Godot、真人體感。詳見 [W7 紀錄](docs/records/W7實作紀錄.md)；下一步 W7-C。
 
 - **2026-11-01**：**W6-E2-2 跨輪與重新開局、W6-E2-3 45 天 runner 與全程對帳完成並通過驗收，W6 全部子步驟機器驗收完成**（`d756175`、`7f77cab`、`2de715e`、`957d6f2`）。verifier 於 `main@cc965b4` 獨立重跑 npm test 23 files／231 tests、build、相關 UI 5／5 皆 exit 0；`trace:web` 自然走完 45 天，193 checkpoints（run_start 1／phase_end 179／ending_started 1／ending_step 11／opening_ready 1），D45 經 empty_handed 進 ending_replaced 並回到 opening；runner 推進與 D45 收尾和 `playthrough_greedy.gd` 一致，字串旗標與 `effect_apply.gd:142` 一致；註解收尾輪數 +1 的變異使 cross-run 2／4 轉紅，還原後全綠；dist 無測試注入。P2：`0f4c56c` 把 n_litcorridor 文案改為木門，使舊 Godot 基線 manifest 不適用，嚴格 CLI（含 W3／W5 scope）exit 1；verifier 定位 manifest 只差 locations.json 且該文字不進狀態，換回 manifest 後 193／48,985 欄 equal；使用者明示接受限制並關門。P3：部分測試未斷言 playBeat／choose 回傳、TS 旗標值比 Godot 嚴、inherit_version 三值皆塌成 true 且無讀取者、翻頁上限邊界誤報不可達。未跑 Godot、全套 UI、真人體感。詳見 [W6-E2-2](docs/records/W6_steps/W6-E2-2.md)、[W6-E2-3](docs/records/W6_steps/W6-E2-3.md)；下一步網頁版人工體感與 W7-A 前重產基線。
@@ -195,4 +197,4 @@ $traceRevisionW1 = git rev-parse HEAD
   - 建立 `web/public/art/`，放入小鎮地圖 `town.webp` 與 13 張白天地點場景圖（WebP），並於 `web/prototype/` 放入示意版原型與座標校準工具。
 - **2026-08-30 ～ 2026-08-31（Godot 基準封存前最後更新）**：完成 P5-F 機器層關門、T-01 測試文案解耦、T-02 全 12 檔套語清理、D1 上午／下午純演出時段、T-03 白天地圖空點解鎖與 20 個白天地點 `desc`（含 `c1acc73` B1–B5 修正）、T-04 夜間 28 個地點 `desc` 與防劇透 Lint 22（`49ab0c7`，Godot headless 共 36 套全綠）。
 - **後續方向**：W-01～W-06 已全數定案，見 `待決事項.md` 第六節；目前美術方向沿用，W7 先完成繁體中文版，再規劃多語系；不考慮 Steam 或 Godot 存檔相容，Godot 維持凍結。
-- **下一步**：W7-A、W7-B 已驗收。依 [`docs/web/W7實作契約.md`](docs/web/W7實作契約.md) 四進 W7-C 字型自託管與子集化，再進 W7-D；網頁版人工體感驗收（[`docs/web/W6實作契約.md`](docs/web/W6實作契約.md) 九）仍待做。
+- **下一步**：W7-A、W7-B、W7-C 已驗收。依 [`docs/web/W7實作契約.md`](docs/web/W7實作契約.md) 五進 W7-D Cloudflare Pages 上線；網頁版人工體感驗收（[`docs/web/W6實作契約.md`](docs/web/W6實作契約.md) 九）仍待做。
