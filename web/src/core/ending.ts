@@ -503,7 +503,14 @@ function cardCatalogOrder(cardId: string, data: GameData): number {
  * 十欄結果的逐欄驗證（HISTORY_RECORD_KEYS）。任一不合法回 null。
  * 含 ending 專屬 nullable 矩陣：泛用 nullable 過關不代表這個 ending 收得起這組值。
  */
-function parseEndingResultFields(raw: Raw, data: GameData): EndingHistoryRecord | null {
+export function parseEndingResultFields(
+  rawInput: unknown,
+  data: GameData,
+): EndingHistoryRecord | null {
+  if (!isRaw(rawInput)) {
+    return null;
+  }
+  const raw = rawInput;
   const endingId = raw.ending_id;
   if (typeof endingId !== 'string' || !data.endingsById.has(endingId)) {
     return null;

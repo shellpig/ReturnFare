@@ -1482,6 +1482,115 @@ function planEncounterAction(
   };
 }
 
+/**
+ * 純資料投影：從既有已進入事件（beats_entered）中投影當前時段的主要演出文字（W7-B2）。
+ *
+ * 僅在載入已儲存之可信快照時供 createGame 初始化暫態演出變數使用：
+ * - 絕不重套效果（no gain/lose/charge）
+ * - 絕不重新啟動遭遇、結局或夜間收費
+ * - 絕不更動 GameSnapshot 任何欄位（查詢前後 serialize 100% 相同）
+ */
+function collectBeatText(b: Beat): string[] {
+  const lines: string[] = [];
+  if (typeof b.text === 'string' && b.text.length > 0) {
+    lines.push(b.text);
+  }
+  const onEnterText = (b.on_enter as { text?: unknown } | null | undefined)?.text;
+  if (typeof onEnterText === 'string' && onEnterText.length > 0) {
+    lines.push(onEnterText);
+  }
+  return lines;
+}
+
+function projectRestoredNarrationLines(
+  currentState: GameSnapshot,
+  data: GameData,
+): { autoEnterLines: string[]; phaseNarrationLines: string[] | null } {
+  if (currentState.flow.mode !== 'run') {
+    return { autoEnterLines: [], phaseNarrationLines: null };
+  }
+  const day = currentState.run.day;
+  const phase = currentState.run.phase;
+
+  // 1. 夜間就寢停拍階段（時段未前進，睡覺文字為當前時段主畫面演出）
+  if (phase === 'night' && currentState.run.night_sleep_pending) {
+    const lines: string[] = [];
+    const sleepBeats = nightBeatList(resolveNightBeats(currentState, SLEEP_LOCATION_ID, data));
+    for (let i = 0; i < sleepBeats.length; i += 1) {
+      const b = sleepBeats[i];
+      if (currentState.run.beats_entered[b.id]) {
+        lines.push(...collectBeatText(b));
+      }
+    }
+    return { autoEnterLines: [], phaseNarrationLines: lines.length > 0 ? lines : null };
+  }
+
+  // 2. 傍晚固定演出（playEvening 已播演出）
+  if (phase === 'evening') {
+    const lines: string[] = [];
+    const eveningBeats = beatsAt(data.beats, day, 'evening');
+    for (let i = 0; i < eveningBeats.length; i += 1) {
+      const b = eveningBeats[i];
+      if (b.fixed === true && currentState.run.beats_entered[b.id]) {
+        lines.push(...collectBeatText(b));
+      }
+    }
+    for (let i = 0; i < data.beats.length; i += 1) {
+      const b = data.beats[i];
+      if (!isPlainObject(b.echo)) {
+        continue;
+      }
+      const echo = b.echo as { day?: number; text?: string; condition?: unknown; requires?: unknown };
+      if (echo.day !== day) {
+        continue;
+      }
+      if (
+        evalCondition(echo.condition as Condition | undefined, currentState, data) &&
+        evalCondition(
+          (echo as unknown as { requires?: Condition }).requires,
+          currentState,
+          data,
+        )
+      ) {
+        const t = typeof echo.text === 'string' ? echo.text.trim() : '';
+        if (t.length > 0) {
+          lines.push(t);
+        }
+      }
+    }
+    return { autoEnterLines: [], phaseNarrationLines: lines.length > 0 ? lines : null };
+  }
+
+  // 3. 夜間固定見聞（playNightFixed 已播演出，依本輪 run.beats_entered 為準）
+  if (phase === 'night') {
+    const lines: string[] = [];
+    const nightBeats = beatsAt(data.beats, day, 'night');
+    for (let i = 0; i < nightBeats.length; i += 1) {
+      const b = nightBeats[i];
+      if (b.fixed === true && currentState.run.beats_entered[b.id]) {
+        lines.push(...collectBeatText(b));
+      }
+    }
+    return { autoEnterLines: [], phaseNarrationLines: lines.length > 0 ? lines : null };
+  }
+
+  // 4. 白天純演出／自動進場（D1 morning, D1 afternoon 等）
+  const lines: string[] = [];
+  const dayBeats = beatsAt(data.beats, day, phase);
+  for (let i = 0; i < dayBeats.length; i += 1) {
+    const b = dayBeats[i];
+    if (
+      b.fixed === true &&
+      (b.auto_enter === true || isNarrationOnlyPhase(day, phase)) &&
+      currentState.run.beats_entered[b.id]
+    ) {
+      lines.push(...collectBeatText(b));
+    }
+  }
+
+  return { autoEnterLines: lines, phaseNarrationLines: null };
+}
+
 export function createGame(
   data: GameData,
   initialState?: GameSnapshot,
@@ -1490,12 +1599,16 @@ export function createGame(
     initialState ? cloneSnapshot(initialState) : createInitialSnapshot(),
   );
 
+  const restoredNarration = initialState
+    ? projectRestoredNarrationLines(initialState, data)
+    : { autoEnterLines: [], phaseNarrationLines: null };
+
   // 暫態演出文字（不住在 GameSnapshot / serialize 內）
   let lastChoiceDefaultLines: string[] = [];
   let lastForcedLines: string[] = [];
-  let lastAutoEnterLines: string[] = [];
+  let lastAutoEnterLines: string[] = restoredNarration.autoEnterLines;
   let lastDelegationReportLines: string[] = [];
-  let phaseNarrationLines: string[] | null = null;
+  let phaseNarrationLines: string[] | null = restoredNarration.phaseNarrationLines;
 
   const listeners = new Set<() => void>();
 

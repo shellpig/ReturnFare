@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { TriState } from '../core/panel';
 import { BackgroundMusic } from './BackgroundMusic';
 import type { Game } from '../core/state-types';
+import type { SaveController } from '../save/controller';
 import { EncounterPanel } from './EncounterPanel';
 import { EndingPanel } from './EndingPanel';
 import { HandPanel } from './HandPanel';
@@ -11,6 +12,7 @@ import { ModalDialog } from './ModalDialog';
 import { NightDetails } from './NightDetails';
 import { NarrationPanel } from './NarrationPanel';
 import { OpeningPanel } from './OpeningPanel';
+import { SavePanel } from './SavePanel';
 import { strings } from './strings';
 import { useGame } from './use-game';
 
@@ -23,8 +25,27 @@ interface ActiveLocationState {
   actionResultLines: readonly string[];
 }
 
-export function GameShell({ game }: { game: Game }) {
+export function GameShell({
+  gameKey,
+  game,
+  controller,
+  onReplaceGame,
+  storageError,
+  onClearStorageError,
+}: {
+  gameKey: number;
+  game: Game;
+  controller: SaveController;
+  onReplaceGame: (newGame: Game) => void;
+  storageError?: string;
+  onClearStorageError?: () => void;
+}) {
   const snapshot = useGame(game);
+  const nightTheme = snapshot.flow.mode !== 'opening' && snapshot.run.phase === 'night';
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = nightTheme ? 'night' : 'day';
+    return () => { delete document.documentElement.dataset.theme; };
+  }, [nightTheme]);
   const version = snapshot.run.day % 2 === 1 ? 'a' : 'b';
   const chapter = game.chapter();
   const track = snapshot.flow.mode === 'opening' ? 'bgm_01_opening' :
@@ -33,7 +54,14 @@ export function GameShell({ game }: { game: Game }) {
         chapter === 2 ? 'bgm_03_day_ch2' : `bgm_04_day_ch3_${version}`;
   return <>
     <BackgroundMusic src={`/audio/bgm/${track}.mp3`} />
-    <GameContent game={game} />
+    <SavePanel
+      game={game}
+      controller={controller}
+      onReplaceGame={onReplaceGame}
+      storageError={storageError}
+      onClearStorageError={onClearStorageError}
+    />
+    <GameContent key={gameKey} game={game} />
   </>;
 }
 

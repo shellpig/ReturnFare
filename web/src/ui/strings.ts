@@ -147,4 +147,40 @@ export const strings = {
   encounterEscapeTitle: '確認逃離', // scenes/ui/encounter_panel.gd _MSG_ESCAPE_TITLE
   encounterEscapeFreeText: '確定逃離遭遇？', // scenes/ui/encounter_panel.gd _MSG_ESCAPE_FREE_TEXT
   encounterEscapeText: (name: string) => `支付「${name}」逃離遭遇？`, // scenes/ui/encounter_panel.gd _FMT_ESCAPE_TEXT
+  // W7-B 存讀介面文字（對齊 W-02、W7 實作契約）
+  save: '手動存檔',
+  load: '讀取手動檔',
+  continueAuto: '繼續進度',
+  exportSave: '匯出存檔',
+  importSave: '匯入存檔',
+  saveStorageLocal: '儲存在此瀏覽器',
+  saveRegion: '存檔與進度管理',
+  saveAutoInfo: (time: string) => `自動存檔：${time}`,
+  saveManualInfo: (time: string) => `手動存檔：${time}`,
+  saveNoSlot: '無',
+  saveConfirmOverwriteTitle: '確認覆蓋手動存檔',
+  saveConfirmOverwriteText: (time: string) =>
+    `已有手動存檔（儲存時間：${time}）。確定要以目前進度覆蓋嗎？`,
+  loadConfirmTitle: '確認讀取存檔',
+  loadConfirmText: (time: string) =>
+    `確定要讀取手動存檔（儲存時間：${time}）嗎？目前未儲存的進度將會遺失。`,
+  importConfirmTitle: '確認匯入存檔',
+  importConfirmText: (time: string) =>
+    `已成功驗證存檔檔案（儲存時間：${time}）。確定要匯入並取代目前進度嗎？`,
+  saveSuccess: '存檔成功',
+  loadSuccess: '讀取成功',
+  importSuccess: '匯入成功',
+  continueSuccess: '進度已載入',
+  saveError: (err: string) => `存檔失敗：${err}`,
+  loadError: (err: string) => `讀取失敗：${err}`,
+  importError: (err: string) => `匯入失敗：${err}`,
+  importFileReadError: '讀取檔案失敗',
+  noManualSave: '尚無手動存檔',
+  autoSaveDetected: (day: number, phaseName: string, time: string) =>
+    `偵測到進度：第 ${day} 天 ${phaseName}（${time}）`,
+  autoSaveCorrupted: (err: string) =>
+    `自動存檔無法讀取：${err}（已保留原檔案，可正常遊玩新局）`,
+  autoSaveReadError: (err: string) =>
+    `自動存檔讀取失敗：${err}（可正常遊玩新局）`,
+  storageUnavailable: '本機儲存空間不可用（仍可於記憶體中正常遊玩）',
 } as const;
