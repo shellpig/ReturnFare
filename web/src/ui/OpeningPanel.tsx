@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Game, OpeningOptionView } from '../core/state-types';
 import { strings } from './strings';
+import { OPENING_ART } from './story-art';
 export function OpeningPanel({ game }: { game: Game }) {
   const [selected, setSelected] = useState<OpeningOptionView | null>(null);
   const [error, setError] = useState('');
@@ -15,7 +16,9 @@ export function OpeningPanel({ game }: { game: Game }) {
     if (!result.ok) { setError(result.reason_text); close(); }
   }
   return <section className="opening">
-    <h1>{screen.title}</h1><p className="story">{screen.prompt}</p>
+    <h1>{screen.title}</h1>
+    <div className="scene-art-frame"><img className="scene-art story-art" src={OPENING_ART} alt="" /></div>
+    <p className="story">{screen.prompt}</p>
     <div className="choices">{choices.map(choice => <div key={choice.id}>
       <button disabled={!choice.available} onClick={() => { setError(''); setSelected(choice); }}>{choice.label}</button>
       {!choice.available && <p className="reason">{choice.reason_text}</p>}

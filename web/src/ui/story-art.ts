@@ -1,0 +1,21 @@
+import type { GameData } from '../data/types';
+
+/** 開場畫面插圖。 */
+export const OPENING_ART = '/art/story/opening.webp';
+
+/** 敘事段落插圖：beat id → 圖檔。未列入的段落不顯示圖。 */
+export const STORY_ART: Readonly<Record<string, string>> = {
+  d1_morning_departure: '/art/story/d1_morning_departure.webp',
+  d1_arrival: '/art/story/d1_arrival.webp',
+  d1_ambient_couple: '/art/story/d1_ambient_couple.webp',
+  n_corridor_ch1: '/art/scenes/n_corridor.webp',
+};
+
+/** 段落文字即 beat.text（state.ts playBeatOnDraft），以此反查插圖。 */
+export function storyArtFor(data: GameData, passage: string | undefined): string | null {
+  if (!passage) return null;
+  for (const [beatId, src] of Object.entries(STORY_ART)) {
+    if (data.beatsById.get(beatId)?.text === passage) return src;
+  }
+  return null;
+}

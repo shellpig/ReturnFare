@@ -1,0 +1,42 @@
+import { test, expect } from './story-fixture';
+import { readFileSync } from 'node:fs';
+const opening = JSON.parse(readFileSync('../data/opening_choices.json', 'utf8'));
+const beats = JSON.parse(readFileSync('../data/beats/ch1_d01_d03.json', 'utf8')).beats;
+const nights = JSON.parse(readFileSync('../data/beats/ch1_nights.json', 'utf8')).beats;
+const beat = (id: string) => [...beats, ...nights].find((b: { id: string }) => b.id === id);
+
+test('開場與第 1 天敘事段落顯示對應插圖，未對照段落不顯示', async ({ page }) => {
+  await page.goto('/');
+  const art = page.locator('.story-art');
+  await expect(art).toHaveAttribute('src', '/art/story/opening.webp');
+  await expect(art).toHaveJSProperty('complete', true);
+  expect(await art.evaluate(img => (img as HTMLImageElement).naturalWidth)).toBe(1536);
+  await page.getByRole('button', { name: opening.opening_choices[1].label }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '確認', exact: true }).click();
+
+  const passage = page.locator('.passage');
+  const next = page.getByRole('button', { name: '繼續演出' });
+  const advance = page.getByRole('button', { name: '推進時段' });
+  await expect(passage).toHaveText(beat('d1_morning_phone').text);
+  await expect(art).toHaveCount(0);
+  await next.click();
+  await expect(passage).toHaveText(beat('d1_morning_departure').text);
+  await expect(art).toHaveAttribute('src', '/art/story/d1_morning_departure.webp');
+  await advance.click();
+  await expect(passage).toHaveText(beat('d1_pm_mountain_road').text);
+  await expect(art).toHaveCount(0);
+  await advance.click();
+  await expect(passage).toHaveText(beat('d1_arrival').text);
+  await expect(art).toHaveAttribute('src', '/art/story/d1_arrival.webp');
+  await next.click();
+  await expect(passage).toHaveText(beat('d1_arrival').on_enter.text);
+  await expect(art).toHaveCount(0);
+  await next.click();
+  await expect(passage).toHaveText(beat('d1_ambient_couple').text);
+  await expect(art).toHaveAttribute('src', '/art/story/d1_ambient_couple.webp');
+  await advance.click();
+  await expect(passage).toHaveText(beat('n_corridor_ch1').text);
+  await expect(art).toHaveAttribute('src', '/art/scenes/n_corridor.webp');
+  await expect(art).toHaveJSProperty('complete', true);
+  expect(await art.evaluate(img => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+});

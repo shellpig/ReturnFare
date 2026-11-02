@@ -3,6 +3,7 @@ import { TriState } from '../core/panel';
 import { BackgroundMusic } from './BackgroundMusic';
 import type { Game } from '../core/state-types';
 import type { SaveController } from '../save/controller';
+import type { GameData } from '../data/types';
 import { EncounterPanel } from './EncounterPanel';
 import { EndingPanel } from './EndingPanel';
 import { HandPanel } from './HandPanel';
@@ -28,6 +29,7 @@ interface ActiveLocationState {
 export function GameShell({
   gameKey,
   game,
+  data,
   controller,
   onReplaceGame,
   storageError,
@@ -35,6 +37,7 @@ export function GameShell({
 }: {
   gameKey: number;
   game: Game;
+  data: GameData;
   controller: SaveController;
   onReplaceGame: (newGame: Game) => void;
   storageError?: string;
@@ -61,11 +64,11 @@ export function GameShell({
       storageError={storageError}
       onClearStorageError={onClearStorageError}
     />
-    <GameContent key={gameKey} game={game} />
+    <GameContent key={gameKey} game={game} data={data} />
   </>;
 }
 
-function GameContent({ game }: { game: Game }) {
+function GameContent({ game, data }: { game: Game; data: GameData }) {
   const snapshot = useGame(game);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
@@ -407,6 +410,7 @@ function GameContent({ game }: { game: Game }) {
         )}
         <NarrationPanel
           view={view}
+          data={data}
           index={index}
           error={error}
           canAdvanceDirect={view.narration_only ||

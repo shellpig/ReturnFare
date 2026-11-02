@@ -105,6 +105,7 @@ export default function App() {
         <GameShell
           gameKey={state.gameKey}
           game={state.game}
+          data={state.data}
           controller={state.controller}
           onReplaceGame={handleReplaceGame}
           storageError={storageError}
