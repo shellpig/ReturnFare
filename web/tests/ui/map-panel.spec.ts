@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './story-fixture';
 import { readFileSync } from 'node:fs';
 
 const opening = JSON.parse(readFileSync('../data/opening_choices.json', 'utf8'));
@@ -40,15 +40,12 @@ test('D2 morning map and two-stage LocationPanel: plays OPEN beat first without 
   const advanceBtn = page.getByRole('button', { name: '推進時段' });
 
   // D1 morning: d1_morning_departure
-  await nextBtn.click();
   await advanceBtn.click();
 
   // D1 afternoon: d1_pm_mountain_road
-  await nextBtn.click();
   await advanceBtn.click();
 
   // D1 evening: d1_arrival (text + on_enter.text) + d1_ambient_couple
-  await nextBtn.click();
   await nextBtn.click();
   await nextBtn.click();
   await advanceBtn.click();
@@ -57,7 +54,6 @@ test('D2 morning map and two-stage LocationPanel: plays OPEN beat first without 
   await expect(page.locator('.passage')).toHaveText(
     nights.find((b: { id: string }) => b.id === 'n_corridor_ch1').text,
   );
-  await nextBtn.click();
   // W6-A：夜間已被 fixed 強制到訪，主按鈕為「結束今晚」
   await page.getByRole('button', { name: '結束今晚' }).click();
 
@@ -94,6 +90,22 @@ test('D2 morning map and two-stage LocationPanel: plays OPEN beat first without 
   await expect(page.locator('.slot-item')).toHaveCount(2);
   await expect(page.locator('.slot-label').nth(0)).toHaveText('阿婕（前台）');
   await expect(page.locator('.slot-label').nth(1)).toHaveText('中年夫妻');
+  const displaySlots = page.locator('.slot-display');
+  await expect(displaySlots).toHaveCount(2);
+  await expect(displaySlots.locator('button')).toHaveCount(0);
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    const left = await displaySlots.nth(0).boundingBox();
+    const right = await displaySlots.nth(1).boundingBox();
+    expect(left).not.toBeNull();
+    expect(right).not.toBeNull();
+    expect(Math.abs(left!.y - right!.y)).toBeLessThan(1);
+    expect(right!.x).toBeGreaterThanOrEqual(left!.x + left!.width);
+    await expect(displaySlots.nth(0)).toHaveCSS('border-top-width', '0px');
+    await expect(displaySlots.nth(0)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  }
+  await page.screenshot({ path: '../_qa/web/display-slots-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
 
   // Return to map and re-enter 山泉閣 -> beat text replays in Stage 1
   await page.getByRole('button', { name: '返回地圖' }).click();

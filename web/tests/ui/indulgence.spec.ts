@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { finishStory } from './story-fixture';
+import { expect, test, type Page } from './story-fixture';
 
 type TestWindow = {
   __testGame?: {
@@ -75,7 +76,7 @@ test('W6-B UI: 主動放置發狂卡至縱慾出口，扣除行動格且主角�
 
   // 點選「繼續演出」直到所有新事件播放完畢，進入卡槽階段
   const continueBeatBtn = page.getByRole('button', { name: '繼續演出' });
-  while (await continueBeatBtn.isVisible()) {
+  while (await finishStory(page), await continueBeatBtn.isVisible()) {
     await continueBeatBtn.click();
   }
 
@@ -156,7 +157,7 @@ test('W6-B UI: 夜間進上午自動強制縱慾，演出文字顯示、扣格�
   const sanquanBtn = page.getByRole('button', { name: /山泉閣/ });
   await sanquanBtn.click();
   const continueBeatBtn = page.getByRole('button', { name: '繼續演出' });
-  while (await continueBeatBtn.isVisible()) {
+  while (await finishStory(page), await continueBeatBtn.isVisible()) {
     await continueBeatBtn.click();
   }
   await page.getByTestId('place-btn-checkin').click();

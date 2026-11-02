@@ -8,6 +8,18 @@ h1, h2 { font-weight: normal; color: #614b39; }
 h1 { font-size: 2rem; margin-top: 0; }
 h2 { font-size: 1.4rem; }
 .story { font-family: WenKai, serif; font-size: 1.15rem; line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+[data-typing="true"] { outline: none; }
+[data-typing="true"] button,
+[data-typing="true"] .beats-list,
+[data-typing="true"] .night-status,
+[data-typing="true"] .night-reason,
+[data-typing="true"] .night-warning,
+.narration-shell:has([data-typing="true"]) .hand-panel,
+.daytime-shell:has([data-typing="true"]) .phase-actions,
+.daytime-shell:has([data-typing="true"]) .hand-panel { display: none; }
+.encounter-panel[data-typing="true"] > :not(.encounter-intro-text):not(.encounter-demand):not(.encounter-action-lines),
+.encounter-shell:has([data-typing="true"]) .hand-panel,
+[data-ending-typing="true"] .ending-controls button { display: none; }
 .choices { display: grid; gap: 1rem; margin-top: 2rem; }
 button { font: inherit; color: #554435; background: #eee6d7; border: 1px solid #ac9b7e; padding: .8rem 1.2rem; cursor: pointer; }
 button:hover:not(:disabled) { background: #ded0b8; }
@@ -31,8 +43,9 @@ dialog::backdrop { background: #251c16aa; }
 .beat-title, .beat-group-title { font-size: 1.15rem; font-weight: normal; color: #614b39; margin: 1rem 0 .5rem; }
 .beat-text, .location-desc { margin: 1rem 0 1.5rem; }
 .beat-group { border-top: 1px solid #d7cdbb; padding-top: .75rem; margin-top: 1rem; }
-.slot-list { display: grid; gap: .75rem; }
-.slot-item { padding: .85rem 1rem; border: 1px solid #c5b99f; background: #f3ede0; }
+.slot-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.slot-item { grid-column: 1 / -1; padding: .85rem 1rem; border: 1px solid #c5b99f; background: #f3ede0; }
+.slot-display { grid-column: auto; padding: .35rem 0; border: 0; background: transparent; overflow-wrap: anywhere; }
 .slot-interactive { cursor: pointer; transition: background-color .15s ease; }
 .slot-interactive:hover { background: #eae2d1; }
 .slot-locked { opacity: .72; background: #ebe4d5; }

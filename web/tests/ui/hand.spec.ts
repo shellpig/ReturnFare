@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './story-fixture';
 import { readFileSync } from 'node:fs';
 
 const opening = JSON.parse(readFileSync('../data/opening_choices.json', 'utf8'));

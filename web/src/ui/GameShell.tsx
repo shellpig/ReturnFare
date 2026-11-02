@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TriState } from '../core/panel';
+import { BackgroundMusic } from './BackgroundMusic';
 import type { Game } from '../core/state-types';
 import { EncounterPanel } from './EncounterPanel';
 import { EndingPanel } from './EndingPanel';
@@ -23,6 +24,20 @@ interface ActiveLocationState {
 }
 
 export function GameShell({ game }: { game: Game }) {
+  const snapshot = useGame(game);
+  const version = snapshot.run.day % 2 === 1 ? 'a' : 'b';
+  const chapter = game.chapter();
+  const track = snapshot.flow.mode === 'opening' ? 'bgm_01_opening' :
+    snapshot.run.phase === 'night' ? `bgm_05_night_${version}` :
+      chapter === 1 ? `bgm_02_day_ch1_${version === 'a' ? 'b' : 'a'}` :
+        chapter === 2 ? 'bgm_03_day_ch2' : `bgm_04_day_ch3_${version}`;
+  return <>
+    <BackgroundMusic src={`/audio/bgm/${track}.mp3`} />
+    <GameContent game={game} />
+  </>;
+}
+
+function GameContent({ game }: { game: Game }) {
   const snapshot = useGame(game);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
@@ -366,6 +381,10 @@ export function GameShell({ game }: { game: Game }) {
           view={view}
           index={index}
           error={error}
+          canAdvanceDirect={view.narration_only ||
+            (view.phase === 'evening' && !game.hasAnyLegalAction() && !game.hasUnseenContent()) ||
+            view.night_advance === 'end_night' || view.night_advance === 'next_day'}
+          advanceText={view.narration_only ? strings.advance : advanceText}
           onContinue={() =>
             setIndex((current) => Math.min(current + 1, view.lines.length))
           }

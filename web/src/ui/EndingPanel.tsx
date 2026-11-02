@@ -88,7 +88,7 @@ export function EndingPanel({ game }: { game: Game }) {
       : strings.endingComplete;
 
   return (
-    <section className="ending-panel" aria-label={strings.endingRegion}>
+    <section className="ending-panel" aria-label={strings.endingRegion} data-ending-typing={typing}>
       <div className="ending-body" data-testid="ending-body" onClick={onAdvance}>
         <p className="story passage ending-text" data-testid="ending-text">
           {text}

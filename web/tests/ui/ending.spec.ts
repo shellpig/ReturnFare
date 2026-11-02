@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './story-fixture';
 import { readFileSync } from 'node:fs';
 
 const endings = JSON.parse(readFileSync('../data/endings.json', 'utf8'));
@@ -48,8 +48,7 @@ test('refuse boarding: fill -> flip -> last page -> complete back to opening, wi
   const label = page.getByTestId('ending-page');
   // 結局模式：沒有地圖、手牌、推進時段，也沒有開局選項；首見沒有跳過
   await expect(label).toHaveText('第 1 / 2 頁');
-  await expect(page.getByRole('button')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: '顯示全文' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '顯示全文' })).toBeHidden();
   await expect(page.getByRole('button', { name: '跳過' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '推進時段' })).toHaveCount(0);
   await expect(page.locator('.hand-panel, .map-panel, .opening')).toHaveCount(0);
@@ -66,7 +65,7 @@ test('refuse boarding: fill -> flip -> last page -> complete back to opening, wi
   // 一次鍵盤輸入只翻頁，不同時補完下一頁
   await page.keyboard.press('Space');
   await expect(label).toHaveText('第 2 / 2 頁');
-  await expect(page.getByRole('button', { name: '顯示全文' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '顯示全文' })).toBeHidden();
   await expect(page.getByText(firstPage.text)).toHaveCount(0);
 
   // 逐字自然播完 = 補完當頁；末頁揭露後才出現「完成」

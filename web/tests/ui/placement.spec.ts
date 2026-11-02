@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './story-fixture';
 import { readFileSync } from 'node:fs';
 
 const opening = JSON.parse(readFileSync('../data/opening_choices.json', 'utf8'));
@@ -49,18 +49,14 @@ test('UI real player flow: walks D1-D3, readonly preview equality, free compare 
   const advanceBtn = page.getByRole('button', { name: '推進時段' });
 
   // D1 morning -> afternoon -> evening -> night -> D2 morning
-  await nextBtn.click();
   await advanceBtn.click(); // -> D1 pm
 
-  await nextBtn.click();
   await advanceBtn.click(); // -> D1 eve
 
   await nextBtn.click();
   await nextBtn.click();
-  await nextBtn.click();
   await advanceBtn.click(); // -> D1 night
 
-  await nextBtn.click();
   await page.getByRole('button', { name: '結束今晚' }).click(); // -> D2 morning（W6-A：夜間主按鈕）
 
   await expect(page.locator('header')).toContainText('第 2 天');
@@ -157,11 +153,9 @@ test('UI real player flow: walks D1-D3, readonly preview equality, free compare 
   // D2 evening narration (3 passages: bath intro, bath on_enter, debt alert)
   await nextBtn.click();
   await nextBtn.click();
-  await nextBtn.click();
   await advanceBtn.click(); // -> D2 night
 
   // D2 night narration
-  await nextBtn.click();
   await page.getByRole('button', { name: '結束今晚' }).click(); // -> D3 morning（W6-A：夜間主按鈕）
 
   // D3 morning map

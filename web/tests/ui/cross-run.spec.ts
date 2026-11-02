@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { finishStory } from './story-fixture';
+import { expect, test, type Page } from './story-fixture';
 import { readFileSync } from 'node:fs';
 import type { GameSnapshot } from '../../src/core/state-types';
 
@@ -118,7 +119,7 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
   await expect(encounterPanel).toBeVisible();
 
   const introContinue = page.getByTestId('encounter-intro-continue');
-  while (await introContinue.isVisible()) {
+  while (await finishStory(page), await introContinue.isVisible()) {
     await introContinue.click();
   }
 
@@ -161,7 +162,7 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
   await phaseExitBtn.click();
 
   const continueCodaBtn = page.getByRole('button', { name: '繼續演出' });
-  while (await continueCodaBtn.isVisible()) {
+  while (await finishStory(page), await continueCodaBtn.isVisible()) {
     await continueCodaBtn.click();
   }
 
@@ -193,11 +194,10 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
       await completeButton.click();
       break;
     }
-    const revealButton = page.getByRole('button', { name: '顯示全文' });
-    if (await revealButton.isVisible()) {
+    if (await page.locator('[data-ending-typing="true"]').isVisible()) {
       // 逐字輸入中至少存在 1 個活躍 interval
       await expect.poll(getTimerCount).toBeGreaterThanOrEqual(1);
-      await revealButton.click();
+      await page.getByTestId('ending-body').click();
       // 點擊「顯示全文」後當頁揭露，計時器立即清除歸零
       await expect.poll(getTimerCount).toBe(0);
       continue;
@@ -251,28 +251,28 @@ test('UI cross-run: D45 afternoon encounter -> D45 evening coda -> ending -> cle
   const advancePhaseBtn = page.getByRole('button', { name: '推進時段' });
 
   // D1 morning 演出
-  while (await nextPerformanceBtn.isVisible()) {
+  while (await finishStory(page), await nextPerformanceBtn.isVisible()) {
     await nextPerformanceBtn.click();
   }
   await expect(advancePhaseBtn).toBeEnabled();
   await advancePhaseBtn.click();
 
   // D1 afternoon 演出
-  while (await nextPerformanceBtn.isVisible()) {
+  while (await finishStory(page), await nextPerformanceBtn.isVisible()) {
     await nextPerformanceBtn.click();
   }
   await expect(advancePhaseBtn).toBeEnabled();
   await advancePhaseBtn.click();
 
   // D1 evening 演出
-  while (await nextPerformanceBtn.isVisible()) {
+  while (await finishStory(page), await nextPerformanceBtn.isVisible()) {
     await nextPerformanceBtn.click();
   }
   await expect(advancePhaseBtn).toBeEnabled();
   await advancePhaseBtn.click();
 
   // D1 night 演出（走廊 fixed 後以「結束今晚」換日）
-  while (await nextPerformanceBtn.isVisible()) {
+  while (await finishStory(page), await nextPerformanceBtn.isVisible()) {
     await nextPerformanceBtn.click();
   }
   const endNightBtn = page.getByRole('button', { name: '結束今晚' });

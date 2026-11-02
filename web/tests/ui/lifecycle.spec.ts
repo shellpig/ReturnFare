@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { finishStory } from './story-fixture';
+import { expect, test, type Page } from './story-fixture';
 
 /**
  * 測試專用起點注入（透過 Playwright 路由攔截 dev server 的 state.ts，正式產品無測試入口）。
@@ -77,7 +78,7 @@ test('D45 evening phase-exit button opens coda location, player chooses empty_ha
 
   // 3. 讀完 coda 事件文本演出
   const continueBtn = page.getByRole('button', { name: '繼續演出' });
-  while (await continueBtn.isVisible()) {
+  while (await finishStory(page), await continueBtn.isVisible()) {
     await continueBtn.click();
   }
 

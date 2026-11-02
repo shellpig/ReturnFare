@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { finishStory } from './story-fixture';
+import { expect, test, type Page } from './story-fixture';
 
 type TestWindow = {
   __testGame?: {
@@ -89,7 +90,7 @@ test('W6-C UI: D17 下午委託阿珠（隔日上午回報）完整生命週期 
 
   // 點選「繼續演出」直到所有新事件播完，進入卡槽階段
   const continueBeatBtn = page.getByRole('button', { name: '繼續演出' });
-  while (await continueBeatBtn.isVisible()) {
+  while (await finishStory(page), await continueBeatBtn.isVisible()) {
     await continueBeatBtn.click();
   }
 
@@ -162,7 +163,7 @@ test('W6-C UI: D17 下午委託阿珠（隔日上午回報）完整生命週期 
 
   // 傍晚演出（繼續演出）
   const continueEveningBtn = page.getByRole('button', { name: '繼續演出' });
-  while (await continueEveningBtn.isVisible()) {
+  while (await finishStory(page), await continueEveningBtn.isVisible()) {
     await continueEveningBtn.click();
   }
 
@@ -172,7 +173,7 @@ test('W6-C UI: D17 下午委託阿珠（隔日上午回報）完整生命週期 
 
   // 夜晚固定演出（繼續演出）
   const continueNightBtn = page.getByRole('button', { name: '繼續演出' });
-  while (await continueNightBtn.isVisible()) {
+  while (await finishStory(page), await continueNightBtn.isVisible()) {
     await continueNightBtn.click();
   }
 
@@ -245,7 +246,7 @@ test('W6-C UI: 首次取得人物卡彈出委託教學彈窗，關閉後寫入 m
 
   // 點選「繼續演出」完成 beat
   const continueBeatBtn = page.getByRole('button', { name: '繼續演出' });
-  while (await continueBeatBtn.isVisible()) {
+  while (await finishStory(page), await continueBeatBtn.isVisible()) {
     await continueBeatBtn.click();
   }
 
@@ -258,7 +259,7 @@ test('W6-C UI: 首次取得人物卡彈出委託教學彈窗，關閉後寫入 m
 
   // 下午再次進入山泉閣
   await sanquanBtn.click();
-  while (await continueBeatBtn.isVisible()) {
+  while (await finishStory(page), await continueBeatBtn.isVisible()) {
     await continueBeatBtn.click();
   }
 

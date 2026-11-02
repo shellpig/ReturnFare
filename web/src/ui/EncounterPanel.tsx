@@ -3,6 +3,7 @@ import type { Game } from '../core/state-types';
 import { CardDetail } from './CardDetail';
 import { ModalDialog } from './ModalDialog';
 import { strings } from './strings';
+import { useStoryText } from './use-story-text';
 
 export interface EncounterPanelProps {
   readonly game: Game;
@@ -39,6 +40,10 @@ export function EncounterPanel({
   } | null>(null);
 
   const view = game.encounterView();
+  const story = useStoryText(
+    !('stage' in view) ? [] : view.stage === 'intro' ? [introLines[introIndex] ?? ''] : [...lastActionLines, view.demand],
+    !('stage' in view) ? '' : `${view.beat_id}:${view.stage}:${view.stage === 'intro' ? introIndex : view.round_id}`,
+  );
   if (!('stage' in view)) {
     return null;
   }
@@ -55,11 +60,12 @@ export function EncounterPanel({
         className="encounter-panel encounter-intro"
         aria-label={strings.encounterRegion}
         data-testid="encounter-panel"
+        {...story.revealProps}
       >
         <div className="encounter-intro-text">
           {displayedLines.map((line, idx) => (
             <p key={idx} className="story intro-line">
-              {line}
+              {idx === introIndex ? story.visibleLines[0] : line}
             </p>
           ))}
         </div>
@@ -99,12 +105,13 @@ export function EncounterPanel({
       className="encounter-panel encounter-round"
       aria-label={strings.encounterRegion}
       data-testid="encounter-panel"
+      {...story.revealProps}
     >
       {lastActionLines.length > 0 && (
         <div className="encounter-action-lines">
           {lastActionLines.map((line, idx) => (
             <p key={idx} className="story action-line">
-              {line}
+              {story.visibleLines[idx]}
             </p>
           ))}
         </div>
@@ -115,7 +122,7 @@ export function EncounterPanel({
         data-testid="encounter-demand"
         data-meta="encounter_demand"
       >
-        {view.demand}
+        {story.visibleLines[lastActionLines.length]}
       </div>
 
       <div

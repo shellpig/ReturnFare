@@ -20,6 +20,7 @@ export function SlotView({
       : '';
 
   const isDelegation = Boolean(slot.delegation);
+  const isDisplayOnly = slot.accepts.length === 0 && !slot.isChoice && !isDelegation;
 
   const canDirectChoose =
     slot.tri === TriState.OPEN &&
@@ -60,7 +61,7 @@ export function SlotView({
           : slot.tri === TriState.RESOLVED
             ? 'slot-resolved'
             : 'slot-open'
-      } ${canInteractive ? 'slot-interactive' : ''}`}
+      } ${canInteractive ? 'slot-interactive' : ''} ${isDisplayOnly ? 'slot-display' : ''}`}
       data-testid={`slot-${slot.id}`}
       onClick={handleClick}
       onContextMenu={handleContextMenu}

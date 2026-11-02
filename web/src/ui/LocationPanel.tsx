@@ -5,6 +5,7 @@ import { DelegationPreview } from './DelegationPreview';
 import { ModalDialog } from './ModalDialog';
 import { SlotView } from './SlotView';
 import { strings } from './strings';
+import { useStoryText } from './use-story-text';
 
 const SCENE_ART_LOCATIONS = new Set([
   'bathhouse',
@@ -67,9 +68,13 @@ export function LocationPanel({
   const hasSceneArt = SCENE_ART_LOCATIONS.has(panel.location.id);
   // 對位只在白天地點演出播完、進入常態畫面後出現；夜間或不符條件時規則層回 unavailable。
   const alignment = game.alignmentOffer(panel.location.id);
+  const story = useStoryText(
+    isPlaying ? [beatLines.join('\n\n')] : [...actionResultLines, panel.location.desc],
+    `${panel.location.id}:${isPlaying}:${beatTitle}`,
+  );
 
   return (
-    <section className="location-panel">
+    <section className="location-panel" {...story.revealProps}>
       <div className="location-header">
         <h2>{panel.location.name}</h2>
         <button type="button" onClick={onBack}>
@@ -91,7 +96,7 @@ export function LocationPanel({
         <div className="beat-stage">
           <h3 className="beat-title">{beatTitle || strings.noTitle}</h3>
           <p className="story beat-text" aria-live="polite">
-            {beatLines.join('\n\n')}
+            {story.visibleLines[0]}
           </p>
           <button type="button" onClick={onAdvanceBeat}>
             {strings.continue}
@@ -107,13 +112,13 @@ export function LocationPanel({
                   className="story action-result-line"
                   aria-live="polite"
                 >
-                  {line}
+                  {story.visibleLines[idx]}
                 </p>
               ))}
             </div>
           )}
           {panel.location.desc && (
-            <p className="story location-desc">{panel.location.desc}</p>
+            <p className="story location-desc">{story.visibleLines[actionResultLines.length]}</p>
           )}
           {panel.empty_result && (
             <p className="story night-empty-result" data-testid="night-empty-result">

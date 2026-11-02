@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './story-fixture';
 import { readFileSync } from 'node:fs';
 
 const locations = JSON.parse(readFileSync('../data/locations.json', 'utf8')).day;

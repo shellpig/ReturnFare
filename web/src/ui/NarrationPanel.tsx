@@ -1,15 +1,18 @@
 import type { PhaseView } from '../core/state-types';
 import { strings } from './strings';
-export function NarrationPanel({ view, index, error, onContinue, onAdvance }: {
-  view: PhaseView; index: number; error: string; onContinue: () => void; onAdvance: () => void;
+import { useStoryText } from './use-story-text';
+export function NarrationPanel({ view, index, error, canAdvanceDirect, advanceText, onContinue, onAdvance }: {
+  view: PhaseView; index: number; error: string; canAdvanceDirect: boolean; advanceText: string;
+  onContinue: () => void; onAdvance: () => void;
 }) {
-  const reading = index < view.lines.length;
+  const reading = index < view.lines.length - 1 || (index < view.lines.length && !canAdvanceDirect);
   const passage = view.lines[Math.min(index, view.lines.length - 1)];
-  return <section className="narration">
+  const story = useStoryText([passage ?? ''], `${view.day}:${view.phase}:${index}`);
+  return <section className="narration" {...story.revealProps}>
     <header>{strings.status(view.day, strings.phases[view.phase], view.chapter)}</header>
-    {passage !== undefined && <p className="story passage" aria-live="polite">{passage}</p>}
+    {passage !== undefined && <p className="story passage">{story.visibleLines[0]}</p>}
     {error && <p role="alert" className="reason">{error}</p>}
-    {reading ? <button onClick={onContinue}>{strings.continue}</button>
-      : <button disabled={!view.can_advance} onClick={onAdvance}>{strings.advance}</button>}
+    {!story.typing && (reading ? <button onClick={onContinue}>{strings.continue}</button>
+      : <button disabled={!view.can_advance} onClick={onAdvance}>{advanceText}</button>)}
   </section>;
 }

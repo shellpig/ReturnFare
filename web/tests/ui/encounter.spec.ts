@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { finishStory } from './story-fixture';
+import { expect, test, type Page } from './story-fixture';
 
 type TestWindow = {
   __testGame?: {
@@ -92,7 +93,7 @@ test('W6-D UI: D8 evening 推進至入夜遭遇 — intro -> ack -> 候選卡取
 
   // 演出若有多段，以「繼續演出」逐段推進
   const continueBtn = page.locator('[data-testid="encounter-intro-continue"]');
-  while (await continueBtn.isVisible()) {
+  while (await finishStory(page), await continueBtn.isVisible()) {
     await continueBtn.click();
   }
 
@@ -191,7 +192,7 @@ test('W6-D UI: D45 afternoon 遭遇結算 after_finish 自動推進至 evening�
   await expect(encounterPanel).toBeVisible();
 
   const continueBtn = page.locator('[data-testid="encounter-intro-continue"]');
-  while (await continueBtn.isVisible()) {
+  while (await finishStory(page), await continueBtn.isVisible()) {
     await continueBtn.click();
   }
 
