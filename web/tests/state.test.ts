@@ -478,7 +478,7 @@ describe('W3-B GameState store, core engines, and trace parity', () => {
     const traceGame = createRunForTrace(data);
     expect(traceGame.serialize()).toEqual(baseline.checkpoints[0].state);
 
-    // 狀態前綴回歸；舊 manifest 因正式文案更新而不適用，嚴格 CLI 另行回報。
+    // 狀態前綴回歸（保留 seq 0..4 歷史前綴意圖）。
     const actualTrace = (await buildWebTrace()) as unknown as Trace;
     expect(actualTrace.checkpoints.slice(0, 5)).toEqual(baseline.checkpoints.slice(0, 5));
 

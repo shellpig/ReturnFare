@@ -1,8 +1,8 @@
 /**
- * ReturnFare Web — 45 天全程軌跡與黃金基線對帳測試（W6-E2-3）。
+ * ReturnFare Web — 45 天全程軌跡與黃金基線對帳測試（W6-E2-3 / W7-A）。
  *
  * 驗收規格：
- * 1. 使用現行資料產生完整軌跡，逐欄回歸既有 checkpoint；資料 manifest 適用性由嚴格 CLI 分開檢查。
+ * 1. 使用現行資料產生完整軌跡，呼叫生產 compareTraces 進行嚴格無 options 全程對帳（193 checkpoints，0 diff，真實 data_manifest 一致）。
  * 2. 179 phase_end 排程（含 D45 afternoon 遭遇結算 auto-advance 使 seq 178/179 均為 evening）。
  * 3. 結局逐頁 reveal/advance 序列（2 * page_count - 1 = 11 steps）與 opening_ready 結算狀態。
  * 4. 兩次獨立走查具備完全決定論。
@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { loadGameDataNode } from '../src/data/load-node';
 import { runGreedyFull } from './support/greedy';
 import { buildWebTrace } from '../scripts/trace-web';
-import type { Trace } from '../../tools/trace/compare';
+import { compareTraces, type Trace } from '../../tools/trace/compare';
 import { createInitialSnapshot } from '../src/core/run-initialization';
 import { planEffects } from '../src/core/effect';
 import * as traceEntry from '../src/core/trace-entry';
@@ -31,8 +31,8 @@ const BASELINE_PATH = path.join(
   'tools/trace/baselines/greedy-godot.json',
 );
 
-describe('W6-E2-3 full-trace verification', () => {
-  it('1. current-data full trace retains all 193 historical checkpoint states independently of manifest applicability', async () => {
+describe('W6-E2-3 / W7-A full-trace verification', () => {
+  it('1. current-data full trace strictly matches golden baseline across all 193 checkpoints and manifest with zero options', async () => {
     const baseline = JSON.parse(
       fs.readFileSync(BASELINE_PATH, 'utf-8'),
     ) as Trace;
@@ -41,8 +41,23 @@ describe('W6-E2-3 full-trace verification', () => {
 
     expect(actualTrace.checkpoints).toHaveLength(193);
 
-    // 文案更新已使舊 manifest 不適用；不偽造 metadata、不宣稱嚴格全程對帳成功。
+    // W7-A：呼叫生產 compareTraces(baseline, actualTrace) 無任何 options（無 scope、無 ignorePaths）進行嚴格全量對帳
+    const result = compareTraces(baseline, actualTrace);
+    expect(result.equal).toBe(true);
+    expect(result.difference).toBeNull();
+    expect(result.comparedCheckpoints).toBe(193);
+    expect(result.comparedFields).toBeGreaterThan(0);
+
+    // 文案更新後 Godot 基準已於 A1 重產，真實 data_manifest 與所有 checkpoint 全數嚴格相等
     expect(actualTrace.checkpoints).toEqual(baseline.checkpoints);
+
+    // 變異保真：翻轉記憶體中單一純量欄位時，compareTraces 必須精確回報差異且轉為 false
+    const mutatedTrace = JSON.parse(JSON.stringify(actualTrace)) as Trace;
+    mutatedTrace.checkpoints[0].state.meta.run_number = 999;
+    const mutatedResult = compareTraces(baseline, mutatedTrace);
+    expect(mutatedResult.equal).toBe(false);
+    expect(mutatedResult.difference?.seq).toBe(0);
+    expect(mutatedResult.difference?.path).toBe('/meta/run_number');
   });
 
   it('2. reproduces 179 phase_end schedule with D45 afternoon auto-advance (seq 178/179 both evening)', async () => {

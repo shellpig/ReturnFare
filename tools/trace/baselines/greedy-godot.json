@@ -1,51 +1,51 @@
 {
   "schema_version": 1,
   "policy": "greedy-v1",
-  "source_revision": "e1650f0c6b1948305222790115d9e1be2f6c8daa",
+  "source_revision": "313bf1a42a3b328d4a8785d6d906f3d378d86e0a",
   "data_manifest": [
     {
       "path": "beats/ch1_d01_d03.json",
-      "sha256": "5228398dce1917570a1fd4b6091c4ed9507989317178fca5adb103bfdd370c33"
+      "sha256": "ef0d685dd08aea86e6b4037fa8c81a7099934472bea1abd297d3b5b52e3e1d57"
     },
     {
       "path": "beats/ch1_d04_d15.json",
-      "sha256": "c20768f775487fce52bfa58e0a4b7d8164d71465fe042f1ca4d749cba22afd3e"
+      "sha256": "b57d81049937554912164dd711a8464bd2bbf4586ad493c349aa0e2c7314500b"
     },
     {
       "path": "beats/ch1_nights.json",
-      "sha256": "186b8a0a733affa5e01081a3d97cce9bfe6a24b6636d8efbeba52a9a91af115d"
+      "sha256": "33d0938cb8dd20567af8e62e10aa9699af4bd5304a4c7e168bb50f8bb0382aad"
     },
     {
       "path": "beats/ch2_d16_d22.json",
-      "sha256": "4aa5248eb35feae5a36eb043479d07521aea7b04738d45596fea6dd61af46458"
+      "sha256": "2d36e4f00328f20e2a82616fe64a6ee1de579a5b8c4f2cb7ba9f0bc1e5a4ec29"
     },
     {
       "path": "beats/ch2_d23_d26.json",
-      "sha256": "ff69c0583cd1b94669c8cd6e7e464680cb1a8727f6160e48cfc05ca26711cb6d"
+      "sha256": "11829da6a4e839112fb093bda0a50312ad556498fdc311c9a9e080df25f7ecbb"
     },
     {
       "path": "beats/ch2_d27_d32.json",
-      "sha256": "01647642242f0795599817355e67d5dceb66effde6b8ec648b87710d1bd88908"
+      "sha256": "caa2e6e9fdb3456c6f35d0328b99fc8b479ea90f233ead47fa0d5f88ccc20c3d"
     },
     {
       "path": "beats/ch2_nights.json",
-      "sha256": "31788fae63d6127118440bc1b162835cc4d932b6911a94491d27b387efeddcd1"
+      "sha256": "a1d0e5aefe7b6a951d632308b3249dc40c0a866f4965c9e54b6d49a57f6fa835"
     },
     {
       "path": "beats/ch3_d33_d38.json",
-      "sha256": "e0d7568c307ddacef7469f16e4893000ca0760e92da01bf2b981ca32102be117"
+      "sha256": "2e8ca1aa2e6f52e695e33959a06e4863b99743216f9adbf7122e049291798fb5"
     },
     {
       "path": "beats/ch3_d39_d45.json",
-      "sha256": "084f70112e0c5cf4da81635252f95742616cd4ba2d2290e10ff57502df1d76ce"
+      "sha256": "617f03436bb3dab51884eb038affe5eaec656030b411c89595478343e5f4309b"
     },
     {
       "path": "beats/ch3_nights.json",
-      "sha256": "d22d91d6891310562e529190d9c632cd41973423b4f3252805208c80cc368569"
+      "sha256": "748089318e0a58768b5cfb5ed12dd4051b5e340a0d409672d28ed5b2fd9d69e5"
     },
     {
       "path": "beats/indulgence_exits.json",
-      "sha256": "059603323e30cd6d71a3245ac9fef81c94f78410d1b693415df88cb54ff51031"
+      "sha256": "4e4489309321931417db527ef4b9aa33777d5b80b51cb8a397230b0e87e2e9f3"
     },
     {
       "path": "card_types.json",
@@ -61,11 +61,11 @@
     },
     {
       "path": "locations.json",
-      "sha256": "ee2e5de7a60d63030acf511e868a15468c560dd0a33ed303a308a962f50926b9"
+      "sha256": "749e2fd4179da3b510861e6224396a5b106851df523bfb442de056208febd49b"
     },
     {
       "path": "npcs.json",
-      "sha256": "7536231e967da8954c75bc8c2c61927b2079cc7c7ef71609af8a65ed134bf7cc"
+      "sha256": "678580c063c8ce7c905920e5f2dee0ea1bcfdf110e7e495bc73a0f1612b79056"
     },
     {
       "path": "opening_choices.json",
