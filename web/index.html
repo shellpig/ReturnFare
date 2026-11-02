@@ -4,8 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ReturnFare</title>
+    <!-- 載入畫面：收到 HTML 就顯示，不等 JS／資料／字型；進度由 src/ui/boot.ts 推進，就緒後移除。 -->
+    <style>
+      #boot { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 1rem; background: linear-gradient(135deg, #e8e1d2, #cfc7b6); color: #806e5a; font-family: sans-serif; transition: opacity .3s; }
+      #boot.done { opacity: 0; pointer-events: none; }
+      #boot-track { width: min(70vw, 320px); height: 6px; background: #d7cdbb; border-radius: 3px; overflow: hidden; }
+      #boot-bar { width: 0; height: 100%; background: #8a6746; transition: width .2s; }
+    </style>
   </head>
   <body>
+    <div id="boot">
+      <p>載入中...</p>
+      <div id="boot-track" role="progressbar" aria-label="載入進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="boot-bar"></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

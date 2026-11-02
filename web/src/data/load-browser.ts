@@ -27,8 +27,12 @@ async function fetchJsonManifest(): Promise<DataFile[]> {
   return obj.files as DataFile[];
 }
 
-export async function loadGameDataBrowser(): Promise<GameData> {
+/** onFileLoaded：每讀完一份資料回報（已完成份數, manifest 總份數），供載入畫面顯示進度。 */
+export async function loadGameDataBrowser(
+  onFileLoaded?: (done: number, total: number) => void,
+): Promise<GameData> {
   const manifest = await fetchJsonManifest();
+  let loadedCount = 0;
 
   const readText: ReadText = async (relativeDataPath: string): Promise<string> => {
     // 逐段編碼：整段 encodeURIComponent 會把 beats/ 的斜線變成 %2F，靜態主機找不到檔。
@@ -37,7 +41,10 @@ export async function loadGameDataBrowser(): Promise<GameData> {
     if (!res.ok) {
       throw new Error(`${relativeDataPath}: 讀取失敗：HTTP ${res.status}`);
     }
-    return res.text();
+    const text = await res.text();
+    loadedCount += 1;
+    onFileLoaded?.(loadedCount, manifest.length);
+    return text;
   };
 
   return loadGameData(readText, manifest);
