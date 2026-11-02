@@ -179,8 +179,14 @@ export const strings = {
   autoSaveDetected: (day: number, phaseName: string, time: string) =>
     `偵測到進度：第 ${day} 天 ${phaseName}（${time}）`,
   autoSaveCorrupted: (err: string) =>
-    `自動存檔無法讀取：${err}（已保留原檔案，可正常遊玩新局）`,
+    `自動存檔無法讀取：${err}（已保留原檔案；確認覆蓋前，新進度不會自動存檔，手動存檔與匯出仍可使用）`,
   autoSaveReadError: (err: string) =>
-    `自動存檔讀取失敗：${err}（可正常遊玩新局）`,
+    `自動存檔讀取失敗：${err}（已保留原檔案；確認覆蓋前，新進度不會自動存檔，手動存檔與匯出仍可使用）`,
+  autosaveSuspendedNote: '舊自動存檔無法讀取，已保留原檔案；新進度暫不自動存檔。',
+  overwriteAuto: '覆蓋舊自動存檔',
+  overwriteAutoConfirmTitle: '確認覆蓋舊自動存檔',
+  overwriteAutoConfirmText:
+    '舊自動存檔將被目前進度取代，且無法復原。確定要覆蓋並恢復自動存檔嗎？',
+  overwriteAutoSuccess: '已覆蓋舊自動存檔，自動存檔已恢復',
   storageUnavailable: '本機儲存空間不可用（仍可於記憶體中正常遊玩）',
 } as const;

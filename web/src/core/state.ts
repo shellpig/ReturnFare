@@ -1483,6 +1483,36 @@ function planEncounterAction(
 }
 
 /**
+ * 當日殘響選文（純函式，不改 state）：回傳 echo.day === day 且條件成立者的去空白文字。
+ * 條件不合法時丟出 UnsupportedConditionError／ConditionError，由呼叫端決定如何拒絕。
+ * playEvening 以播放中的 draft 判斷；讀檔投影只能以讀檔當下狀態判斷（已知殘留差異：
+ * 條件若依賴播放途中才存在的狀態，投影結果可能與當時播出的不同，演出文字不存進 snapshot）。
+ */
+function selectEchoLines(state: GameSnapshot, data: GameData, day: number): string[] {
+  const lines: string[] = [];
+  for (let i = 0; i < data.beats.length; i += 1) {
+    const b = data.beats[i];
+    if (!isPlainObject(b.echo)) {
+      continue;
+    }
+    const echo = b.echo as { day?: number; text?: string; condition?: unknown; requires?: unknown };
+    if (echo.day !== day) {
+      continue;
+    }
+    if (
+      evalCondition(echo.condition as Condition | undefined, state, data) &&
+      evalCondition(echo.requires as Condition | undefined, state, data)
+    ) {
+      const t = typeof echo.text === 'string' ? echo.text.trim() : '';
+      if (t.length > 0) {
+        lines.push(t);
+      }
+    }
+  }
+  return lines;
+}
+
+/**
  * 純資料投影：從既有已進入事件（beats_entered）中投影當前時段的主要演出文字（W7-B2）。
  *
  * 僅在載入已儲存之可信快照時供 createGame 初始化暫態演出變數使用：
@@ -1535,29 +1565,7 @@ function projectRestoredNarrationLines(
         lines.push(...collectBeatText(b));
       }
     }
-    for (let i = 0; i < data.beats.length; i += 1) {
-      const b = data.beats[i];
-      if (!isPlainObject(b.echo)) {
-        continue;
-      }
-      const echo = b.echo as { day?: number; text?: string; condition?: unknown; requires?: unknown };
-      if (echo.day !== day) {
-        continue;
-      }
-      if (
-        evalCondition(echo.condition as Condition | undefined, currentState, data) &&
-        evalCondition(
-          (echo as unknown as { requires?: Condition }).requires,
-          currentState,
-          data,
-        )
-      ) {
-        const t = typeof echo.text === 'string' ? echo.text.trim() : '';
-        if (t.length > 0) {
-          lines.push(t);
-        }
-      }
-    }
+    lines.push(...selectEchoLines(currentState, data, day));
     return { autoEnterLines: [], phaseNarrationLines: lines.length > 0 ? lines : null };
   }
 
@@ -2002,39 +2010,16 @@ export function createGame(
     }
 
     // 2. 當日殘響（echo.day === curDay）
-    for (let i = 0; i < data.beats.length; i += 1) {
-      const b = data.beats[i];
-      if (!isPlainObject(b.echo)) {
-        continue;
+    try {
+      lines.push(...selectEchoLines(draft, data, curDay));
+    } catch (err) {
+      if (err instanceof UnsupportedConditionError) {
+        return mutationReject('not_implemented', err.message);
       }
-      const echo = b.echo;
-      if (echo.day !== curDay) {
-        continue;
+      if (err instanceof ConditionError) {
+        return mutationReject('data_conflict', err.message);
       }
-      let echoOk = false;
-      try {
-        echoOk =
-          evalCondition(echo.condition as Condition | undefined, draft, data) &&
-          evalCondition(
-            (echo as unknown as { requires?: Condition }).requires,
-            draft,
-            data,
-          );
-      } catch (err) {
-        if (err instanceof UnsupportedConditionError) {
-          return mutationReject('not_implemented', err.message);
-        }
-        if (err instanceof ConditionError) {
-          return mutationReject('data_conflict', err.message);
-        }
-        throw err;
-      }
-      if (echoOk) {
-        const text = typeof echo.text === 'string' ? echo.text.trim() : '';
-        if (text.length > 0) {
-          lines.push(text);
-        }
-      }
+      throw err;
     }
 
     const isFirstPhaseNarration = phaseNarrationLines === null;

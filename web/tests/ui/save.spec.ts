@@ -1,6 +1,8 @@
 import { expect, test, finishStory, type Page } from './story-fixture';
 import { readFileSync } from 'node:fs';
 import type { GameSnapshot } from '../../src/core/state-types';
+import { createInitialSnapshot } from '../../src/core/run-initialization';
+import { encodeSave } from '../../src/save/codec';
 
 const opening = JSON.parse(readFileSync('../data/opening_choices.json', 'utf8'));
 const endings = JSON.parse(readFileSync('../data/endings.json', 'utf8'));
@@ -513,12 +515,8 @@ test.describe('W7-B2 Local Storage & Save UI', () => {
       await setupGameInspectionRoute(page);
 
       // 先種入一份既有合法自動存檔字串，用於驗證失敗時舊檔原樣保留
-      const initialOldRaw = JSON.stringify({
-        format: 'returnfare-web',
-        version: 1,
-        saved_at: '2026-11-01T00:00:00.000Z',
-        state: { flow: { mode: 'opening', active_ending: null }, meta: { run_number: 1 } },
-      });
+      // （須為可解碼的合法存檔；壞檔／不支援版本會暫停 autosave，見測試 9）
+      const initialOldRaw = encodeSave(createInitialSnapshot(), '2026-11-01T00:00:00.000Z');
 
       await page.addInitScript(({ raw }) => {
         window.localStorage.setItem('returnfare.save.auto', raw);
@@ -740,5 +738,68 @@ test.describe('W7-B2 Local Storage & Save UI', () => {
     } finally {
       await context.close();
     }
+  });
+
+test('9. Unsupported-version auto save is preserved until explicit overwrite confirmation', async ({
+    page,
+  }) => {
+    await setupGameInspectionRoute(page);
+    await page.goto('/');
+    const unsupportedAuto = JSON.stringify({
+      format: 'returnfare-web',
+      version: 99,
+      saved_at: '2026-11-01T12:00:00.000Z',
+      state: {},
+    });
+    await page.evaluate((raw) => window.localStorage.setItem('returnfare.save.auto', raw), unsupportedAuto);
+    await page.reload();
+
+    await expect(page.getByTestId('autosave-suspended-banner')).toBeVisible();
+    await expect(page.getByTestId('save-error')).toContainText('保留原檔案');
+
+    // 開局選擇並推進：auto 原字串逐字不變
+    await page.getByRole('button', { name: opening.opening_choices[0].label }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '確認', exact: true }).click();
+    await expect(page.locator('header')).toContainText('第 1 天');
+    await finishStory(page);
+    await page.getByRole('button', { name: '推進時段' }).click();
+    await expect(page.locator('header')).toContainText('第 1 天');
+    expect((await getRawStorage(page)).auto).toBe(unsupportedAuto);
+
+    // 點覆蓋後取消：仍不變
+    await page.getByTestId('overwrite-auto-btn').click();
+    await page.getByTestId('save-dialog-cancel-btn').click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect((await getRawStorage(page)).auto).toBe(unsupportedAuto);
+    await expect(page.getByTestId('autosave-suspended-banner')).toBeVisible();
+
+    // 確認後 auto 變為目前進度且可解碼
+    await page.getByTestId('overwrite-auto-btn').click();
+    await page.getByTestId('save-dialog-confirm-btn').click();
+    await expect(page.getByTestId('autosave-suspended-banner')).toHaveCount(0);
+    const live = await getGameSnapshot(page);
+    const raw = (await getRawStorage(page)).auto;
+    expect(raw).not.toBe(unsupportedAuto);
+    const decoded = JSON.parse(raw!);
+    expect(decoded.version).toBe(1);
+    expect(decoded.state).toEqual(live);
+  });
+
+  test('10. Startup banner disappears after continuing from an opening-mode auto save', async ({
+    page,
+  }) => {
+    await setupGameInspectionRoute(page);
+    await page.goto('/');
+    // 以手動存檔→讀取讓 auto 槽位停在 opening
+    await page.getByTestId('manual-save-btn').click();
+    await page.getByTestId('manual-load-btn').click();
+    await page.getByTestId('save-dialog-confirm-btn').click();
+    await expect(page.getByTestId('save-status')).toHaveText('讀取成功');
+
+    await page.reload();
+    await expect(page.getByTestId('save-continue-banner')).toBeVisible();
+    await page.getByTestId('continue-auto-btn').click();
+    await expect(page.getByTestId('save-status')).toHaveText('進度已載入');
+    await expect(page.getByTestId('save-continue-banner')).toHaveCount(0);
   });
 });

@@ -5,6 +5,7 @@
  * - 集中管理 Game 實例的 autosave 訂閱生命週期（subscribe / unsubscribe）
  * - 比對序列化快照，確保只在成功提交的指令變更時觸發 autosave，拒絕／預覽／無狀態變更不寫檔
  * - 開局啟動不覆寫現有 auto-save（直到玩家做出實際遊戲提交或選擇載入）
+ * - 啟動時 auto 檔壞損／讀取失敗則暫停 autosave，直到玩家明示覆蓋或改以讀取／匯入取代
  * - 封裝手動存檔、讀取、匯入與匯出之驗證與狀態替換
  * - 錯誤安全防護：Storage 例外回報給 UI，記憶體遊戲可繼續遊玩
  */
@@ -28,6 +29,8 @@ export interface SaveControllerOptions {
   storage: SaveStorage;
   clock?: Clock;
   onStorageError?: (error: string) => void;
+  /** true 時不寫 auto（用於保護啟動時無法解碼的既有自動檔），直到 resumeAutosave 或 applySnapshot。 */
+  autosaveSuspended?: boolean;
 }
 
 export interface SaveController {
@@ -37,6 +40,9 @@ export interface SaveController {
   setGame(game: Game, baselineSnapshot?: GameSnapshot): void;
   subscribeToCurrentGame(): void;
   unsubscribe(): void;
+  isAutosaveSuspended(): boolean;
+  /** 恢復 autosave 並立即把目前已提交的快照寫入 auto（寫入失敗同樣走 onStorageError）。 */
+  resumeAutosave(): SaveWriteResult;
   hasAutoSave(): boolean;
   peekAutoSave(): SaveSummary;
   loadAutoSave(): SaveLoadResult;
@@ -57,6 +63,7 @@ export function createSaveController(options: SaveControllerOptions): SaveContro
   const clock = options.clock ?? (() => new Date().toISOString());
   let currentGame: Game = options.initialGame;
   let unsubscribeFn: (() => void) | null = null;
+  let autosaveSuspended = options.autosaveSuspended === true;
   // 記錄前一次成功寫入或做為基線的快照 JSON 字串
   let lastSavedSnapshotJson: string = JSON.stringify(currentGame.getSnapshot());
 
@@ -68,6 +75,9 @@ export function createSaveController(options: SaveControllerOptions): SaveContro
   }
 
   function handleGameChange(): void {
+    if (autosaveSuspended) {
+      return;
+    }
     const currentSnap = currentGame.getSnapshot() as GameSnapshot;
     const currentJson = JSON.stringify(currentSnap);
     if (currentJson === lastSavedSnapshotJson) {
@@ -92,6 +102,22 @@ export function createSaveController(options: SaveControllerOptions): SaveContro
     currentGame = game;
     lastSavedSnapshotJson = JSON.stringify(baselineSnapshot ?? game.getSnapshot());
     subscribeToCurrentGame();
+  }
+
+  function isAutosaveSuspended(): boolean {
+    return autosaveSuspended;
+  }
+
+  function resumeAutosave(): SaveWriteResult {
+    autosaveSuspended = false;
+    const snap = currentGame.getSnapshot() as GameSnapshot;
+    const res = storage.save('auto', snap);
+    if (res.ok) {
+      lastSavedSnapshotJson = JSON.stringify(snap);
+    } else {
+      options.onStorageError?.(res.error);
+    }
+    return res;
   }
 
   function hasAutoSave(): boolean {
@@ -141,6 +167,8 @@ export function createSaveController(options: SaveControllerOptions): SaveContro
     updateAuto = false,
   ): { game: Game; autoWriteOk: boolean } {
     const newGame = createGame(data, snapshot);
+    // 玩家明示繼續／讀取／匯入即視同選擇取代舊自動檔，恢復 autosave
+    autosaveSuspended = false;
     let autoWriteOk = true;
     if (updateAuto) {
       // 手動讀取或匯入確認成功後，將新快照寫入 auto，manual 槽位不受影響
@@ -164,6 +192,8 @@ export function createSaveController(options: SaveControllerOptions): SaveContro
     setGame,
     subscribeToCurrentGame,
     unsubscribe,
+    isAutosaveSuspended,
+    resumeAutosave,
     hasAutoSave,
     peekAutoSave,
     loadAutoSave,

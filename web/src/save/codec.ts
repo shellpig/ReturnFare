@@ -77,21 +77,6 @@ export function decodeSave(text: string, data: GameData): SaveDecodeResult {
     };
   }
 
-  const envelopeKeys = Object.keys(parsed);
-  if (
-    envelopeKeys.length !== 4 ||
-    !hasOwn(parsed, 'format') ||
-    !hasOwn(parsed, 'version') ||
-    !hasOwn(parsed, 'saved_at') ||
-    !hasOwn(parsed, 'state')
-  ) {
-    return {
-      ok: false,
-      reason_code: 'invalid_envelope',
-      error: '存檔 envelope 欄位不完整或含有未知欄位',
-    };
-  }
-
   if (parsed.format !== SAVE_FORMAT) {
     return {
       ok: false,
@@ -112,6 +97,22 @@ export function decodeSave(text: string, data: GameData): SaveDecodeResult {
       ok: false,
       reason_code: 'unsupported_version',
       error: `不支援的存檔版本號: ${parsed.version}`,
+    };
+  }
+
+  // 版本確認後才檢查欄位數，較新版本多出的欄位才會回報 unsupported_version
+  const envelopeKeys = Object.keys(parsed);
+  if (
+    envelopeKeys.length !== 4 ||
+    !hasOwn(parsed, 'format') ||
+    !hasOwn(parsed, 'version') ||
+    !hasOwn(parsed, 'saved_at') ||
+    !hasOwn(parsed, 'state')
+  ) {
+    return {
+      ok: false,
+      reason_code: 'invalid_envelope',
+      error: '存檔 envelope 欄位不完整或含有未知欄位',
     };
   }
 

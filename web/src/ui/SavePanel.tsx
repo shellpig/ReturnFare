@@ -13,8 +13,25 @@ export interface SavePanelProps {
   onClearStorageError?: () => void;
 }
 
+// saved_at 存檔內容維持 UTC ISO，只在顯示時轉為本地時間；無法解析時退回原字串
+const savedAtFormatter = new Intl.DateTimeFormat('zh-TW', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+function formatSavedAt(iso: string): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return savedAtFormatter.format(new Date(ms));
+}
+
 type ConfirmState =
   | { type: 'overwrite' }
+  | { type: 'overwriteAuto' }
   | { type: 'load'; snapshot: GameSnapshot; savedAt: string }
   | { type: 'import'; snapshot: GameSnapshot; savedAt: string };
 
@@ -29,6 +46,8 @@ export function SavePanel({
   const [localError, setLocalError] = useState('');
   const [status, setStatus] = useState('');
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  // 成功替換遊戲後隱藏啟動橫幅（自動檔本身停在 opening 時，替換後仍會符合顯示條件）
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const error = localError || storageError || '';
@@ -53,6 +72,7 @@ export function SavePanel({
     }
     const { game: newGame } = controller.applySnapshot(loadRes.state, false);
     onReplaceGame(newGame);
+    setBannerDismissed(true);
     setStatus(strings.continueSuccess);
   }
 
@@ -108,7 +128,8 @@ export function SavePanel({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // 延後撤銷，避免部分瀏覽器（如 iOS Safari）在下載開始前 URL 已失效而取消下載
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       setLocalError(strings.saveError((err as Error).message));
     }
@@ -149,12 +170,20 @@ export function SavePanel({
     if (confirmState.type === 'overwrite') {
       setConfirmState(null);
       executeManualSave();
+    } else if (confirmState.type === 'overwriteAuto') {
+      setConfirmState(null);
+      // 恢復 autosave 並把目前已提交進度寫入 auto；寫入失敗由 controller 回報 onStorageError
+      const res = controller.resumeAutosave();
+      if (res.ok) {
+        setStatus(strings.overwriteAutoSuccess);
+      }
     } else if (confirmState.type === 'load') {
       const snap = confirmState.snapshot;
       setConfirmState(null);
       // 手動載入成功確認後，更新 auto 槽位為此快照，避免重新整理後繼續舊的未來進度
       const { game: newGame, autoWriteOk } = controller.applySnapshot(snap, true);
       onReplaceGame(newGame);
+      setBannerDismissed(true);
       if (autoWriteOk) {
         setStatus(strings.loadSuccess);
       }
@@ -164,6 +193,7 @@ export function SavePanel({
       // 匯入成功確認後，更新 auto 槽位
       const { game: newGame, autoWriteOk } = controller.applySnapshot(snap, true);
       onReplaceGame(newGame);
+      setBannerDismissed(true);
       if (autoWriteOk) {
         setStatus(strings.importSuccess);
       }
@@ -172,7 +202,11 @@ export function SavePanel({
 
   // 判斷是否在開局狀態且偵測到先前自動存檔
   const showStartupContinue =
-    snapshot.flow.mode === 'opening' && autoSummary.exists && Boolean(autoSummary.saved_at);
+    !bannerDismissed &&
+    snapshot.flow.mode === 'opening' &&
+    autoSummary.exists &&
+    Boolean(autoSummary.saved_at);
+  const autosaveSuspended = controller.isAutosaveSuspended();
 
   const phaseName = autoSummary.phase ? (strings.phases[autoSummary.phase as keyof typeof strings.phases] ?? autoSummary.phase) : '';
 
@@ -184,7 +218,7 @@ export function SavePanel({
             {strings.autoSaveDetected(
               autoSummary.day ?? 1,
               phaseName,
-              autoSummary.saved_at ?? strings.saveNoSlot,
+              autoSummary.saved_at ? formatSavedAt(autoSummary.saved_at) : strings.saveNoSlot,
             )}
           </span>
           <button
@@ -198,14 +232,36 @@ export function SavePanel({
         </div>
       )}
 
+      {autosaveSuspended && (
+        <div className="save-continue-banner" data-testid="autosave-suspended-banner">
+          <span className="save-continue-info">{strings.autosaveSuspendedNote}</span>
+          <button
+            type="button"
+            className="save-btn"
+            data-testid="overwrite-auto-btn"
+            onClick={() => {
+              clearErrors();
+              setStatus('');
+              setConfirmState({ type: 'overwriteAuto' });
+            }}
+          >
+            {strings.overwriteAuto}
+          </button>
+        </div>
+      )}
+
       <div className="save-toolbar">
         <span className="save-storage-hint">{strings.saveStorageLocal}</span>
         <div className="save-summary-row">
           <span className="save-slot-summary" data-testid="auto-slot-summary">
-            {strings.saveAutoInfo(autoSummary.saved_at ?? strings.saveNoSlot)}
+            {strings.saveAutoInfo(
+              autoSummary.saved_at ? formatSavedAt(autoSummary.saved_at) : strings.saveNoSlot,
+            )}
           </span>
           <span className="save-slot-summary" data-testid="manual-slot-summary">
-            {strings.saveManualInfo(manualSummary.saved_at ?? strings.saveNoSlot)}
+            {strings.saveManualInfo(
+              manualSummary.saved_at ? formatSavedAt(manualSummary.saved_at) : strings.saveNoSlot,
+            )}
           </span>
         </div>
         <div className="save-actions">
@@ -283,16 +339,22 @@ export function SavePanel({
             <h2 id="save-dialog-title">
               {confirmState.type === 'overwrite'
                 ? strings.saveConfirmOverwriteTitle
-                : confirmState.type === 'load'
+                : confirmState.type === 'overwriteAuto'
+                  ? strings.overwriteAutoConfirmTitle
+                  : confirmState.type === 'load'
                   ? strings.loadConfirmTitle
                   : strings.importConfirmTitle}
             </h2>
             <p className="story">
               {confirmState.type === 'overwrite'
-                ? strings.saveConfirmOverwriteText(manualSummary.saved_at ?? '')
-                : confirmState.type === 'load'
-                  ? strings.loadConfirmText(confirmState.savedAt)
-                  : strings.importConfirmText(confirmState.savedAt)}
+                ? strings.saveConfirmOverwriteText(
+                    manualSummary.saved_at ? formatSavedAt(manualSummary.saved_at) : '',
+                  )
+                : confirmState.type === 'overwriteAuto'
+                  ? strings.overwriteAutoConfirmText
+                  : confirmState.type === 'load'
+                    ? strings.loadConfirmText(formatSavedAt(confirmState.savedAt))
+                    : strings.importConfirmText(formatSavedAt(confirmState.savedAt))}
             </p>
             <div className="dialog-actions">
               <button

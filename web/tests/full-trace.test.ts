@@ -2,7 +2,7 @@
  * ReturnFare Web — 45 天全程軌跡與黃金基線對帳測試（W6-E2-3 / W7-A）。
  *
  * 驗收規格：
- * 1. 使用現行資料產生完整軌跡，呼叫生產 compareTraces 進行嚴格無 options 全程對帳（193 checkpoints，0 diff，真實 data_manifest 一致）。
+ * 1. 使用現行資料產生完整軌跡，呼叫生產 compareTraces 進行嚴格無 options 全程對帳（全部基線 checkpoints，0 diff，真實 data_manifest 一致）。
  * 2. 179 phase_end 排程（含 D45 afternoon 遭遇結算 auto-advance 使 seq 178/179 均為 evening）。
  * 3. 結局逐頁 reveal/advance 序列（2 * page_count - 1 = 11 steps）與 opening_ready 結算狀態。
  * 4. 兩次獨立走查具備完全決定論。
@@ -31,21 +31,27 @@ const BASELINE_PATH = path.join(
   'tools/trace/baselines/greedy-godot.json',
 );
 
+// 檢查點總數以基線為準，不寫死；基線重產時只要兩邊一致即可
+const BASELINE_CHECKPOINT_COUNT = (
+  JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf-8')) as Trace
+).checkpoints.length;
+
 describe('W6-E2-3 / W7-A full-trace verification', () => {
-  it('1. current-data full trace strictly matches golden baseline across all 193 checkpoints and manifest with zero options', async () => {
+  it('1. current-data full trace strictly matches golden baseline across every baseline checkpoint and manifest with zero options', async () => {
     const baseline = JSON.parse(
       fs.readFileSync(BASELINE_PATH, 'utf-8'),
     ) as Trace;
     // 使用生產 buildWebTrace()，保留真實 current data_manifest（不偽造為 baseline manifest）
     const actualTrace = (await buildWebTrace()) as unknown as Trace;
 
-    expect(actualTrace.checkpoints).toHaveLength(193);
+    expect(BASELINE_CHECKPOINT_COUNT).toBeGreaterThan(0);
+    expect(actualTrace.checkpoints).toHaveLength(BASELINE_CHECKPOINT_COUNT);
 
     // W7-A：呼叫生產 compareTraces(baseline, actualTrace) 無任何 options（無 scope、無 ignorePaths）進行嚴格全量對帳
     const result = compareTraces(baseline, actualTrace);
     expect(result.equal).toBe(true);
     expect(result.difference).toBeNull();
-    expect(result.comparedCheckpoints).toBe(193);
+    expect(result.comparedCheckpoints).toBe(baseline.checkpoints.length);
     expect(result.comparedFields).toBeGreaterThan(0);
 
     // 文案更新後 Godot 基準已於 A1 重產，真實 data_manifest 與所有 checkpoint 全數嚴格相等
@@ -154,7 +160,7 @@ describe('W6-E2-3 / W7-A full-trace verification', () => {
     );
     expect(cp192.state.meta.knowledge['k_not_today']).toBe(true);
     expect(cp192.state.meta.knowledge['k_i_returned']).toBe(true);
-    expect(checkpoints).toHaveLength(193);
+    expect(checkpoints).toHaveLength(BASELINE_CHECKPOINT_COUNT);
   });
 
   it('4. is fully deterministic across consecutive runs', async () => {
@@ -162,9 +168,9 @@ describe('W6-E2-3 / W7-A full-trace verification', () => {
     const run1 = runGreedyFull(data);
     const run2 = runGreedyFull(data);
 
-    expect(run1.checkpoints).toHaveLength(193);
-    expect(run2.checkpoints).toHaveLength(193);
-    for (let i = 0; i < 193; i += 1) {
+    expect(run1.checkpoints).toHaveLength(BASELINE_CHECKPOINT_COUNT);
+    expect(run2.checkpoints).toHaveLength(BASELINE_CHECKPOINT_COUNT);
+    for (let i = 0; i < BASELINE_CHECKPOINT_COUNT; i += 1) {
       expect(run1.checkpoints[i].seq).toBe(run2.checkpoints[i].seq);
       expect(run1.checkpoints[i].label).toBe(run2.checkpoints[i].label);
       expect(run1.checkpoints[i].day).toBe(run2.checkpoints[i].day);

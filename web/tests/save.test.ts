@@ -273,6 +273,17 @@ describe('W7-B1 save codec & storage adapter', () => {
       expect(res.reason_code).toBe('unsupported_version');
     });
 
+    it('3.2b 版本 2 且多一個未知欄位仍回報 unsupported_version (先檢版本再檢欄位數)', () => {
+      const v2Obj = JSON.parse(encodeSave(createInitialSnapshot(), '2026-11-02T12:00:00.000Z'));
+      v2Obj.version = 2;
+      v2Obj.extra_future_field = true;
+
+      const res = decodeSave(JSON.stringify(v2Obj), data);
+      expect(res.ok).toBe(false);
+      if (res.ok) return;
+      expect(res.reason_code).toBe('unsupported_version');
+    });
+
     it('3.3 錯誤 envelope 格式拒絕 (invalid_envelope)', () => {
       const validText = encodeSave(createInitialSnapshot(), '2026-11-02T12:00:00.000Z');
       const obj = JSON.parse(validText);
@@ -711,6 +722,72 @@ describe('W7-B1 save codec & storage adapter', () => {
       if (!auto2.ok) return;
       expect(auto2.state.run.phase).toBe('afternoon');
 
+      controller.unsubscribe();
+    });
+
+    it('5.3b autosave suspended: 暫停時連續命令 auto 原字串逐字不變，resume 後才寫入目前進度', () => {
+      // 模擬部署回退後遇到的新版（不支援版本）自動檔
+      const unsupportedAuto = JSON.stringify({
+        format: SAVE_FORMAT,
+        version: SAVE_VERSION + 1,
+        saved_at: '2026-11-01T12:00:00.000Z',
+        state: {},
+      });
+      const driver = createMemoryStorageDriver({ [SAVE_STORAGE_KEYS.auto]: unsupportedAuto });
+      const storage = createSaveStorage({ driver });
+      const game = createGame(data);
+      const controller = createSaveController({
+        data,
+        initialGame: game,
+        storage,
+        autosaveSuspended: true,
+      });
+      expect(controller.isAutosaveSuspended()).toBe(true);
+
+      expect(game.chooseOpening('take_family_album').ok).toBe(true);
+      expect(driver.getItem(SAVE_STORAGE_KEYS.auto)).toBe(unsupportedAuto);
+      expect(game.advancePhase().ok).toBe(true);
+      expect(driver.getItem(SAVE_STORAGE_KEYS.auto)).toBe(unsupportedAuto);
+
+      // 明示覆蓋：恢復並立即寫入目前已提交快照
+      const res = controller.resumeAutosave();
+      expect(res.ok).toBe(true);
+      expect(controller.isAutosaveSuspended()).toBe(false);
+      const afterResume = storage.load('auto', data);
+      expect(afterResume.ok).toBe(true);
+      if (!afterResume.ok) return;
+      expect(afterResume.state).toEqual(game.getSnapshot());
+
+      // 恢復後的後續命令照常寫入
+      expect(game.advancePhase().ok).toBe(true);
+      const afterNext = storage.load('auto', data);
+      expect(afterNext.ok).toBe(true);
+      if (!afterNext.ok) return;
+      expect(afterNext.state.run.phase).toBe(game.getSnapshot().run.phase);
+
+      controller.unsubscribe();
+    });
+
+    it('5.3c autosave suspended: applySnapshot（讀取／匯入／繼續）視同取代，恢復 autosave', () => {
+      const unsupportedAuto = '{"format":"returnfare-web","version":99}';
+      const driver = createMemoryStorageDriver({ [SAVE_STORAGE_KEYS.auto]: unsupportedAuto });
+      const storage = createSaveStorage({ driver });
+      const controller = createSaveController({
+        data,
+        initialGame: createGame(data),
+        storage,
+        autosaveSuspended: true,
+      });
+      const other = createGame(data);
+      other.chooseOpening('take_family_album');
+      const { game: loaded } = controller.applySnapshot(other.getSnapshot() as GameSnapshot, true);
+      expect(controller.isAutosaveSuspended()).toBe(false);
+      expect(storage.load('auto', data).ok).toBe(true);
+      expect(loaded.advancePhase().ok).toBe(true);
+      const after = storage.load('auto', data);
+      expect(after.ok).toBe(true);
+      if (!after.ok) return;
+      expect(after.state.run.phase).toBe('afternoon');
       controller.unsubscribe();
     });
 

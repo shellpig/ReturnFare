@@ -36,14 +36,18 @@ export default function App() {
         if (!activeRef.current) return;
         const storage = createSaveStorage();
         let initialError = '';
+        // 壞檔／讀取失敗時暫停 autosave，避免第一個成功命令就覆寫原檔
+        let suspendAutosave = false;
         const probe = storage.load('auto', data);
         if (!probe.ok && probe.reason !== 'empty_slot') {
           if (probe.reason === 'decode_error') {
             initialError = strings.autoSaveCorrupted(probe.error);
+            suspendAutosave = true;
           } else if (probe.reason === 'storage_unavailable') {
             initialError = strings.storageUnavailable;
           } else if (probe.reason === 'read_error') {
             initialError = strings.autoSaveReadError(probe.error);
+            suspendAutosave = true;
           }
         }
         if (initialError) {
@@ -55,6 +59,7 @@ export default function App() {
           data,
           initialGame,
           storage,
+          autosaveSuspended: suspendAutosave,
           onStorageError: (err) => {
             if (activeRef.current) {
               setStorageError(err);
