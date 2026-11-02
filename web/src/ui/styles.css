@@ -15,6 +15,7 @@ button:focus-visible { outline: 3px solid #8a6746; outline-offset: 2px; }
 button:disabled { opacity: .55; cursor: default; }
 .choices button { width: 100%; text-align: left; }
 .reason { color: #775b49; font-size: .95rem; }
+.choices .reason { margin: .35rem 0 0; padding-left: calc(1.2rem + 1px); font-size: .9rem; }
 dialog { width: min(90vw, 560px); border: 1px solid #ac9b7e; background: #f9f5eb; color: inherit; padding: 2rem; }
 dialog::backdrop { background: #251c16aa; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: .75rem; }
