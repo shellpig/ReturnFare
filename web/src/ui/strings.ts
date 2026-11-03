@@ -1,5 +1,7 @@
 // UI 介面詞彙（W-02）：沿用 Godot 原文，逐條註明來源；Godot 無對應原文者另註。
 export const strings = {
+  musicOn: '音樂：開',
+  musicOff: '音樂：關',
   zoomArt: '放大圖片 2x',
   restoreArt: '恢復原圖',
   // scenes/ui/opening_panel.tscn ConfirmDialog 用引擎預設按鈕、無專案原文；確認／取消為 W3-A 新增。

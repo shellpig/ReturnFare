@@ -1,5 +1,11 @@
 @font-face { font-family: WenKai; src: url('/fonts/lxgw-wenkai-tc.woff2') format('woff2'); font-display: swap; }
 @font-face { font-family: TaipeiSans; src: url('/fonts/taipei-sans-tc.woff2') format('woff2'); font-display: swap; }
+.day-night-transition { position: fixed; inset: 0; z-index: 10000; animation: phase-cover .4s ease-in-out both; }
+.day-night-transition.to-night { background: #080b10; }
+.day-night-transition.to-day { background: #eee6d7; }
+.day-night-transition.revealing { animation: phase-reveal .4s ease-in-out both; }
+@keyframes phase-cover { from { opacity: 0; } to { opacity: 1; } }
+@keyframes phase-reveal { from { opacity: 1; } to { opacity: 0; } }
 :root {
   color-scheme: light;
   --text: #382e27; --page-base: #e9e3d7; --page-start: #e8e1d2; --page-end: #cfc7b6;

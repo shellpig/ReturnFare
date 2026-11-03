@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 
-export function BackgroundMusic({ src }: { src: string }) {
+export function BackgroundMusic({ src, enabled }: { src: string; enabled: boolean }) {
   const ref = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const audio = ref.current!;
     const resume = () => {
-      if (audio.paused) void audio.play().catch(() => {});
+      if (enabled && audio.paused) void audio.play().catch(() => {});
     };
     // 瀏覽器拒絕自動播放時，在下一次使用者操作同步重試。
     document.addEventListener('pointerdown', resume);
@@ -16,11 +16,12 @@ export function BackgroundMusic({ src }: { src: string }) {
       document.removeEventListener('keydown', resume);
       audio.pause();
     };
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    void ref.current!.play().catch(() => {});
-  }, [src]);
+    if (enabled) void ref.current!.play().catch(() => {});
+    else ref.current!.pause();
+  }, [src, enabled]);
 
-  return <audio ref={ref} src={src} loop preload="metadata" />;
+  return <audio ref={ref} src={src} muted={!enabled} loop preload="metadata" />;
 }

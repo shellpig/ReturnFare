@@ -16,6 +16,7 @@ import { OpeningPanel } from './OpeningPanel';
 import { SavePanel } from './SavePanel';
 import { strings } from './strings';
 import { useGame } from './use-game';
+import { useDayNightTransition, type DayNightDirection } from './use-day-night-transition';
 
 interface ActiveLocationState {
   locationId: string;
@@ -44,6 +45,17 @@ export function GameShell({
   onClearStorageError?: () => void;
 }) {
   const snapshot = useGame(game);
+  const transition = useDayNightTransition(gameKey);
+  const [musicEnabled, setMusicEnabled] = useState(() => {
+    try { return localStorage.getItem('returnfare.bgm') !== 'off'; }
+    catch { return true; }
+  });
+  function toggleMusic() {
+    const enabled = !musicEnabled;
+    setMusicEnabled(enabled);
+    try { localStorage.setItem('returnfare.bgm', enabled ? 'on' : 'off'); }
+    catch { /* 儲存不可用時仍可控制本次音樂。 */ }
+  }
   const nightTheme = snapshot.flow.mode !== 'opening' && snapshot.run.phase === 'night';
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = nightTheme ? 'night' : 'day';
@@ -56,19 +68,28 @@ export function GameShell({
       chapter === 1 ? `bgm_02_day_ch1_${version === 'a' ? 'b' : 'a'}` :
         chapter === 2 ? 'bgm_03_day_ch2' : `bgm_04_day_ch3_${version}`;
   return <>
-    <BackgroundMusic src={`/audio/bgm/${track}.mp3`} />
+    <BackgroundMusic src={`/audio/bgm/${track}.mp3`} enabled={musicEnabled} />
+    <div ref={transition.contentRef}>
     <SavePanel
       game={game}
       controller={controller}
       onReplaceGame={onReplaceGame}
       storageError={storageError}
       onClearStorageError={onClearStorageError}
+      musicEnabled={musicEnabled}
+      onToggleMusic={toggleMusic}
     />
-    <GameContent key={gameKey} game={game} data={data} />
+    <GameContent key={gameKey} game={game} data={data} transition={transition.start} />
+    </div>
+    {transition.overlay}
   </>;
 }
 
-function GameContent({ game, data }: { game: Game; data: GameData }) {
+function GameContent({ game, data, transition }: {
+  game: Game;
+  data: GameData;
+  transition: (direction: DayNightDirection, advance: () => void) => void;
+}) {
   const snapshot = useGame(game);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
@@ -102,6 +123,16 @@ function GameContent({ game, data }: { game: Game; data: GameData }) {
   const view = game.getPhaseView();
 
   function advance() {
+    if (view.can_advance && view.phase === 'evening') {
+      transition('night', advanceNow);
+    } else if (view.can_advance && view.phase === 'night' && view.night_advance !== 'sleep') {
+      transition('day', advanceNow);
+    } else {
+      advanceNow();
+    }
+  }
+
+  function advanceNow() {
     const result = game.advancePhase();
     if (!result.ok) {
       setError(result.reason_text);

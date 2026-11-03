@@ -11,6 +11,8 @@ export interface SavePanelProps {
   onReplaceGame: (newGame: Game) => void;
   storageError?: string;
   onClearStorageError?: () => void;
+  musicEnabled: boolean;
+  onToggleMusic: () => void;
 }
 
 // saved_at 存檔內容維持 UTC ISO，只在顯示時轉為本地時間；無法解析時退回原字串
@@ -41,6 +43,8 @@ export function SavePanel({
   onReplaceGame,
   storageError,
   onClearStorageError,
+  musicEnabled,
+  onToggleMusic,
 }: SavePanelProps) {
   const snapshot = useGame(game);
   const [localError, setLocalError] = useState('');
@@ -265,6 +269,15 @@ export function SavePanel({
           </span>
         </div>
         <div className="save-actions">
+          <button
+            type="button"
+            className="save-btn"
+            aria-pressed={musicEnabled}
+            data-testid="bgm-toggle"
+            onClick={onToggleMusic}
+          >
+            {musicEnabled ? strings.musicOn : strings.musicOff}
+          </button>
           <button
             type="button"
             className="save-btn"
