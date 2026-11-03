@@ -1,6 +1,6 @@
 # 指揮者手冊 — 讓 agy / ChatGPT / Muse 實作，指揮者驗證與收尾
 
-適用對象：被指定為「指揮者」的 AI session（目前是 Claude Code）。指揮者不自己寫主要程式，而是把 Subphase 拆成小步驟交給外部 worker（Antigravity CLI `agy`、ChatGPT Web、Muse 網頁版、OpenCode CLI）實作，再在本機驗證、審核、修小錯、commit、push、更新實作紀錄。
+適用對象：被指定為「指揮者」的 AI session（Claude Code、Codex 等）。指揮者不自己寫主要程式，而是把 Subphase 拆成小步驟交給外部 worker（Antigravity CLI `agy`、ChatGPT Web、Muse 網頁版、OpenCode CLI）實作，再在本機驗證、審核、修小錯、commit、push、更新實作紀錄。
 
 本檔是流程與踩坑紀錄，不是 Phase 契約。Phase 要做什麼看根目錄三份文件（`實作規格書.md`／`開發設計方針.md`／`測試指南.md`，按 AGENTS.md「按 Phase 查閱規則」只讀對應段）；網頁版 W 編號工單看 `docs/web/網頁版移植計畫.md`。本檔只講「怎麼讓別人做、怎麼確認做對」。
 
@@ -46,7 +46,7 @@
 7. **HARD RULES / GIT**：agy 不得 git 操作；ChatGPT 的 commit message、禁 force push / 開新 branch / 動 main。**parent 一律寫「你動手前 fetch 到的 branch HEAD」，不要寫死 hash**——指揮者常在 worker 跑的期間推自己的修正或文件 commit，寫死的 hash 會過期（2026-09-17 E10d-2a 撞到，worker 正確地拒絕覆蓋並改用當前 HEAD）。
 8. **FINAL REPORT**：固定五項（commit / 檔案 / 新簽名 / 測試名 / 契約疑點）。
 
-prompt 檔存 `C:\_work\AI_Work\Tools\agy-runs\<worker>-<phase>-<step>.prompt.txt`，session 中斷後可從這裡與實作紀錄接手。
+原始 prompt 檔存 `C:\_work\AI_Work\Tools\agy-runs\<worker>-<phase>-<step>.prompt.txt`。agy 由共用控制器複製有效 prompt 並保存到自己的 `runs/<task ID>/`；派工紀錄須記 task ID／run_dir，session 中斷後依 §7 接手。
 
 ### 2.3 指揮者驗證 gate（每個 step）
 
@@ -80,36 +80,28 @@ Worker／新指揮者先讀接手摘要與步驟板，再讀自己的 step；只
 
 ## 3. agy（Antigravity CLI）流程
 
-啟動指令、`--add-dir`、`-p` 單行限制、背景執行、`--conversation` 接續、model 名稱：全部見 [local-tools.md](local-tools.md)「Antigravity CLI」，本檔不重抄。
+本機統一使用 `agent-worker` 共用 Python 控制器。先讀共用 [skill](C:/_work/AI_Work/Skills/engineering/agent-worker/SKILL.md)；啟動、狀態、結果、停止、`--conversation` 與模型的操作說明只放在 [local-tools.md「agy 共用控制器」](local-tools.md#agy-共用控制器)，本檔不重抄命令。
 
 指揮者要做的：
 
-1. 寫 prompt 檔 → 背景啟動 → 被喚醒後用 `C:\_work\AI_Work\Tools\agy-runs\report.py <step>.json` 讀結果（印 status / duration / denied_actions / response）。
+1. 寫 UTF-8 prompt 檔 → `start --mode implement`（已授權實作時）→ 記下 task ID／run_dir → 主動查 `status`／`result`。review 改用 `--mode review`。控制器已處理背景程序與輸出，不再依賴特定 agent 的喚醒通知或舊 `report.py`。
 2. `git status` / `git diff` 看它實際改了什麼（不要只信 final report）。
-3. 跑 §2.3 gate。失敗把錯誤訊息餵回**同一個** `--conversation`；換 step 開新對話。
+3. 跑 §2.3 gate。失敗先讀產物，再把錯誤訊息寫進新 prompt，以 agy 輸出中**同一個** `conversation_id` 接續；不要把控制器的 task ID 當 conversation ID。換 step 開新對話。
 4. 審完剩餘修改很小 → 自己改，不再開 agy 回合。
 
 ### 3.1 中途監看與判死（不要傻等 print-timeout）
 
-背景啟動後**不能只等結束通知**：agy 會把 pytest 丟到背景然後「等待完成」直到 `--print-timeout` 整個吃完，輸出檔只有一句話、零檔案改動（2026-09-18 F7b 第一回合，35 分鐘全浪費）。
+背景啟動後**不能只等結束通知**：agy 曾把 pytest 丟到背景然後「等待完成」直到 `--print-timeout` 整個吃完（2026-09-18 F7b 第一回合，35 分鐘全浪費）。共用控制器會注入「不得委派、測試前景執行並等完成」；指揮者仍須監看。
 
-啟動後立刻掛一個 `Monitor`（或等價的背景 loop），每 4～5 分鐘印一行：
-
-```bash
-git status --short --untracked-files=all -- scripts scenes tests data web | wc -l   # 改動檔數
-git status --short --untracked-files=all -- scripts scenes tests data web | awk '{print $2}' | xargs -r ls -t | head -1   # 最新被改的檔
-tasklist | grep -ciE "godot|node.exe"                                              # 有沒有測試在跑
-```
-
-輸出檔（`<步驟>.json`）非空即結束，loop 退出。判斷規則：
+啟動後先查該 task 的狀態；未完成時每 4～5 分鐘查 `status`／`result`，並查看授權範圍內的 `git status`／`git diff` 與最新修改時間。`queued` 表示 worker 尚未啟動（可能在等同一 repo 的任務釋放鎖），不代表已在讀檔或卡住；agy 可能緩衝 JSON，因此 **log 空白或非空都不能單獨判定開始、卡住或完成**。以控制器終態與實際 agy 報告共同確認結果；狀態不確定與清理錯誤依 local-tools 處理。判斷規則：
 
 | 觀察 | 判定 | 動作 |
 |---|---|---|
 | 檔數在增加、或最新檔在變 | 正常 | 不打擾 |
 | 前 5 分鐘 0 檔改動 | 正常（讀檔階段） | 不打擾 |
-| 連續 2 次（≈8～10 分鐘）檔數不變、最新檔 mtime 不變 | 卡住（多半在等自己丟到背景的測試） | 殺 agy 程序，讀輸出檔與已寫的檔，小則自己收尾、大則開新對話重送 |
-| Godot／node 程序常駐 + 檔案不變 | 同上 | 同上 |
-| 輸出檔開頭 `print timeout after ... with turn in progress` | 已死 | 同上 |
+| 連續 2 次（≈8～10 分鐘）檔數不變、最新檔 mtime 不變 | 疑似卡住，仍須核對 log 與測試進度 | 必要時對該 task 發 `stop` 並確認終態；讀已寫檔案後決定收尾或續做，不自動重派 |
+| 該任務的 Godot／node 程序常駐 + 檔案不變 | 可能仍在跑測試或等待 | 核對測試輸出，不能只憑程序名稱判死或殺整批程序 |
+| 控制器 `timed_out` 或 agy 報告 print timeout | 本輪未完成，不能驗收 | 確認控制器終態與既有改動，再決定是否續做 |
 
 重送時 prompt 加一句硬規則：「所有指令前景執行並等它回來；不得把測試丟到背景再等；先寫程式、最後只跑一次測試」。F7b 第二回合即以此重送。
 
@@ -317,6 +309,6 @@ document.querySelector('button[aria-label="傳送"]').click();
 
 1. 確認最新 `AGENTS.md`（已完整載入則不重讀）→ 精簡 `PROJECT_BRIEF.md` → 本檔共通段落與所選 worker 段落 → 當前 Subphase 接手摘要／步驟板 → 本步及必要前置／待審紀錄。舊格式按 §2.4 定位，不整份讀。
 2. `git fetch` + `git log origin/<branch> --oneline -5`，確認 remote 與本機一致；有未審的 worker commit 先走 §2.3 gate。
-3. 看 `C:\_work\AI_Work\Tools\agy-runs\` 最新的 prompt 檔，知道上一步送了什麼。
+3. agy 優先用派工紀錄的 task ID／run_dir 查 `status`／`result` 與有效 prompt；ID 未記下時，依 `agent-worker/runs/*/status.json` 的 repo、建立時間及 prompt 辨認，不直接重派。其他 worker 或原始 prompt 仍查 `C:\_work\AI_Work\Tools\agy-runs\`。
 4. ChatGPT 對話 URL 與帳號：本專案 memory 沒有記錄，先問使用者；Muse thread 依 §4b.1 先問使用者；agy conversation id 遺失不影響，開新對話讀實作紀錄即可。
 5. 依所選 worker 的檢查節奏繼續（ChatGPT §4.3、Muse §4b.3）。

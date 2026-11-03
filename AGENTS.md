@@ -208,23 +208,11 @@ Default mode: read-only reviewer.
 
 使用者說「要 agy 做 XXX」「用 agy 審 / 驗證 XXX」時走 `agy`。
 
-Binary：`C:\Users\User\AppData\Local\agy\bin\agy.exe`（在 user PATH，但部分 shell 的 PATH 快照可能沒有，直接用完整路徑最穩）。
-
-```powershell
-cmd /c "C:\Users\User\AppData\Local\agy\bin\agy.exe -p `"<任務>`" --model `"<模型>`" --add-dir `"C:\_work\AI_Work\Projects\ReturnFare`" --dangerously-skip-permissions --print-timeout 540s < NUL > <輸出檔> 2>&1"
-```
-
-四個參數都是必要的，各修一個已驗證的失敗模式：
-
-- `< NUL`：非 TTY 下 agy 會癡等 stdin 永久卡死（連自己的 print-timeout 都不會觸發）。主因是 stdin，不是權限確認框。
-- `> 檔案`：非 TTY 下 stdout 不導檔就看不到任何輸出。
-- `--add-dir <專案路徑>`：不加的話 agy 只在自己的 sandbox 暫存區活動，cwd 不算數——它會回報成功但專案裡什麼都沒發生。
-- `--dangerously-skip-permissions`：單次生效，不動持久設定。
-
-Model selection：`--model` 吃 `agy models` 列出的**完整顯示字串**（含括號內專注程度），例如 `"Gemini 4 Argon (High)"`。未指定時一律預設 `"Gemini 4 Argon (High)"`。
+本機統一使用共用 Python 控制器 `C:\_work\AI_Work\Tools\agent-worker\worker.py`，以工具自己的 `.venv\Scripts\python.exe` 執行。操作命令、模型、任務紀錄與接續方式只維護於 [local-tools.md「agy 共用控制器」](docs/others/local-tools.md#agy-共用控制器)。各 agent 可先讀共用 [agent-worker skill](C:/_work/AI_Work/Skills/engineering/agent-worker/SKILL.md)。不再手寫 `cmd /c`、stdin 重導或另一層背景啟動。
 
 Default mode: read-only reviewer.
 - prompt 內明確要求：不建立 / 修改 / 刪除任何檔案、不跑會寫檔的命令、輸出純文字報告。
+- 使用控制器的 `--mode review`；這是提示詞約束，不是強制唯讀檔案系統沙箱。只有使用者已授權實作時才改用 `--mode implement`。
 - 跑完必以 `git status` / `git diff` 確認實際改動；agy 的口頭回報不可作為改動依據。
 
 ### Codex CLI (OpenAI) Reviewer
