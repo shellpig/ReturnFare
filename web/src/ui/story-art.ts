@@ -11,6 +11,7 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d1_ambient_couple: '/art/story/d1_ambient_couple.webp',
   d2_morning_intro: '/art/story/d2_morning_intro.webp',
   d2_evening_bath: '/art/story/d2_evening_bath.webp',
+  d2_ambient_debt: '/art/story/d2_ambient_debt.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
