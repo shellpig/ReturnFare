@@ -19,6 +19,8 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d7_pm_numbers: '/art/story/d7_pm_numbers.webp',
   d8_echo_bathhouse: '/art/story/d8_echo_bathhouse.webp',
   d8_ambient_monkey: '/art/story/d8_ambient_monkey.webp',
+  d10_morning_landslide: '/art/story/d10_morning_landslide.webp',
+  d12_morning_medicine: '/art/story/d12_morning_medicine.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
