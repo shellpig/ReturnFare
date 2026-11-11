@@ -21,12 +21,14 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d8_ambient_monkey: '/art/story/d8_ambient_monkey.webp',
   d10_morning_landslide: '/art/story/d10_morning_landslide.webp',
   d12_morning_medicine: '/art/story/d12_morning_medicine.webp',
+  d15_morning_collapse: '/art/story/d15_morning_collapse.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
 /** 進場後第二段文字（beat.on_enter.text）的插圖：beat id → 圖檔。 */
 export const STORY_ART_ON_ENTER: Readonly<Record<string, string>> = {
   d1_arrival: '/art/story/d1_arrival_dinner.webp',
+  d15_pm_clinic: '/art/story/d15_pm_clinic_awei.webp',
 };
 
 /** 段落文字即 beat.text（state.ts playBeatOnDraft），以此反查插圖。 */
