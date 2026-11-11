@@ -31,6 +31,7 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d23_morning_awei_knocks: '/art/story/d23_morning_awei_knocks.webp',
   d24_evening_student_missing: '/art/story/d24_evening_student_missing.webp',
   d25_morning_found: '/art/story/d25_morning_found.webp',
+  d27_morning_school_call: '/art/story/d27_morning_school_call.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
