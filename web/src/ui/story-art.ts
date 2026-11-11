@@ -27,6 +27,8 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d19_evening_arrive: '/art/story/d19_evening_arrive.webp',
   d19_evening_acai_leave: '/art/story/d19_evening_acai_leave.webp',
   d20_morning_wu: '/art/story/d20_morning_wu.webp',
+  d22_evening_ajie_leaves: '/art/story/d22_evening_ajie_leaves.webp',
+  d23_morning_awei_knocks: '/art/story/d23_morning_awei_knocks.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
