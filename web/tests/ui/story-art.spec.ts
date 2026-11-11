@@ -30,7 +30,7 @@ test('開場與第 1 天敘事段落顯示對應插圖，未對照段落不顯�
   await expect(art).toHaveAttribute('src', '/art/story/d1_arrival.webp');
   await next.click();
   await expect(passage).toHaveText(beat('d1_arrival').on_enter.text);
-  await expect(art).toHaveCount(0);
+  await expect(art).toHaveAttribute('src', '/art/story/d1_arrival_dinner.webp');
   await next.click();
   await expect(passage).toHaveText(beat('d1_ambient_couple').text);
   await expect(art).toHaveAttribute('src', '/art/story/d1_ambient_couple.webp');

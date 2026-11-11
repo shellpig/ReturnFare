@@ -14,11 +14,20 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
+/** 進場後第二段文字（beat.on_enter.text）的插圖：beat id → 圖檔。 */
+export const STORY_ART_ON_ENTER: Readonly<Record<string, string>> = {
+  d1_arrival: '/art/story/d1_arrival_dinner.webp',
+};
+
 /** 段落文字即 beat.text（state.ts playBeatOnDraft），以此反查插圖。 */
 export function storyArtFor(data: GameData, passage: string | undefined): string | null {
   if (!passage) return null;
   for (const [beatId, src] of Object.entries(STORY_ART)) {
     if (data.beatsById.get(beatId)?.text === passage) return src;
+  }
+  for (const [beatId, src] of Object.entries(STORY_ART_ON_ENTER)) {
+    const onEnter = data.beatsById.get(beatId)?.on_enter as { text?: unknown } | undefined;
+    if (onEnter?.text === passage) return src;
   }
   return null;
 }

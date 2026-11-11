@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { existsSync } from 'node:fs';
 import { loadGameDataNode } from '../src/data/load-node';
 import type { GameData } from '../src/data/types';
-import { OPENING_ART, STORY_ART, storyArtFor } from '../src/ui/story-art';
+import { OPENING_ART, STORY_ART, STORY_ART_ON_ENTER, storyArtFor } from '../src/ui/story-art';
 
 describe('敘事插圖對照', () => {
   let data: GameData;
@@ -18,8 +18,16 @@ describe('敘事插圖對照', () => {
     }
   });
 
+  it('進場後第二段文字反查得到自己的圖檔', () => {
+    for (const [beatId, src] of Object.entries(STORY_ART_ON_ENTER)) {
+      const text = (data.beatsById.get(beatId)?.on_enter as { text?: string } | undefined)?.text;
+      expect(text, beatId).toBeTruthy();
+      expect(storyArtFor(data, text)).toBe(src);
+    }
+  });
+
   it('圖檔都在 public/ 下', () => {
-    for (const src of [OPENING_ART, ...Object.values(STORY_ART)]) {
+    for (const src of [OPENING_ART, ...Object.values(STORY_ART), ...Object.values(STORY_ART_ON_ENTER)]) {
       expect(existsSync(`public${src}`), src).toBe(true);
     }
   });
