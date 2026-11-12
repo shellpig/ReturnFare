@@ -46,6 +46,8 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d37_morning_absent: '/art/story/d37_morning_absent.webp',
   d39_morning_return: '/art/story/d39_morning_return.webp',
   d41_pm_longstay: '/art/story/d41_pm_longstay.webp',
+  d43_pm_zhou: '/art/story/d43_pm_zhou.webp',
+  d45_morning_invitation: '/art/story/d45_morning_invitation.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
