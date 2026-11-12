@@ -38,6 +38,7 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d32_festival: '/art/story/d32_festival.webp',
   d32_festival_ajie: '/art/story/d32_festival_ajie.webp',
   d32_festival_awei: '/art/story/d32_festival_awei.webp',
+  d32_festival_alone: '/art/story/d32_festival_alone.webp',
   d33_morning_after: '/art/story/d33_morning_after.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
