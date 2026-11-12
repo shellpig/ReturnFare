@@ -40,6 +40,10 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d32_festival_awei: '/art/story/d32_festival_awei.webp',
   d32_festival_alone: '/art/story/d32_festival_alone.webp',
   d33_morning_after: '/art/story/d33_morning_after.webp',
+  d35_morning_inherit_high: '/art/story/d35_morning_inherit.webp',
+  d35_morning_inherit_mid: '/art/story/d35_morning_inherit.webp',
+  d35_morning_inherit_low: '/art/story/d35_morning_inherit.webp',
+  d37_morning_absent: '/art/story/d37_morning_absent.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
