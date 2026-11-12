@@ -44,6 +44,8 @@ export const STORY_ART: Readonly<Record<string, string>> = {
   d35_morning_inherit_mid: '/art/story/d35_morning_inherit.webp',
   d35_morning_inherit_low: '/art/story/d35_morning_inherit.webp',
   d37_morning_absent: '/art/story/d37_morning_absent.webp',
+  d39_morning_return: '/art/story/d39_morning_return.webp',
+  d41_pm_longstay: '/art/story/d41_pm_longstay.webp',
   n_corridor_ch1: '/art/scenes/n_corridor.webp',
 };
 
